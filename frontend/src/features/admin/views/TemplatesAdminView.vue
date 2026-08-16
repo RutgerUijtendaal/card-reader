@@ -190,7 +190,7 @@ type TemplateForm = {
   definition_json: string;
 };
 
-const templateDefinitionHint = `Define parser-driven regions with region_id, cut_region, parser_type, and ocr_config. Supported parser types: ${TEMPLATE_PARSER_TYPES_HINT}.`;
+const templateDefinitionHint = `Define parser-driven regions with region_id, cut_region, parser_type, and ocr_config. name_mana_cost regions may also define mana_badge_ocr with optional scales from 1 through 4. Supported parser types: ${TEMPLATE_PARSER_TYPES_HINT}.`;
 
 const TEMPLATE_DEFINITION_EXAMPLE: TemplateDefinition = {
   id: 'mtg-like-v1',
@@ -208,6 +208,16 @@ const TEMPLATE_DEFINITION_EXAMPLE: TemplateDefinition = {
       },
       ocr_config: {
         ocr_min_confidence: 0.55,
+      },
+      mana_badge_ocr: {
+        cut_region: {
+          unit: 'relative',
+          x: 0.86,
+          y: 0,
+          w: 0.14,
+          h: 1,
+        },
+        scales: [3, 2],
       },
     },
     {

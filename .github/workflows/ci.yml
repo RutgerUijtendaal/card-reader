@@ -129,7 +129,7 @@ jobs:
           - group: full-flow
             tests: tests/test_parser_db_full_flow_cases.py
           - group: workflows-and-stats
-            tests: tests/test_card_edit_reparse.py tests/test_metadata_suggestions.py tests/test_catalog_contract.py tests/test_stats_region_ocr.py
+            tests: tests/test_card_edit_reparse.py tests/test_metadata_suggestions.py tests/test_catalog_contract.py tests/test_stats_region_ocr.py tests/test_name_mana_cost_region_ocr.py
     env:
       PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: 'True'
     steps:

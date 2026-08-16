@@ -156,6 +156,9 @@ class CardParser:
                     "normalized_fields": region_results.get(
                         region_name, RegionParseResult(region_name)
                     ).normalized_fields,
+                    "field_confidences": region_results.get(
+                        region_name, RegionParseResult(region_name)
+                    ).field_confidences,
                     "debug_crop_written": bool(settings.save_debug_crops),
                 }
                 for region_name, crop in region_crops.items()
@@ -355,10 +358,14 @@ class CardParser:
 
     def _confidence_breakdown(self, semantic_results: dict[str, RegionParseResult]) -> dict[str, float]:
         name_result = semantic_results.get(NAME) or semantic_results.get(NAME_MANA_COST)
-        name_conf = name_result.confidence if name_result is not None else 0.0
+        name_conf = (
+            name_result.field_confidences.get("name", name_result.confidence)
+            if name_result is not None
+            else 0.0
+        )
         mana_result = semantic_results.get(NAME_MANA_COST)
         mana_conf = (
-            mana_result.confidence
+            mana_result.field_confidences.get("mana_cost", mana_result.confidence)
             if mana_result is not None and mana_result.normalized_fields.get("mana_cost", "").strip()
             else 0.0
         )

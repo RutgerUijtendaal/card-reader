@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from card_reader_core.models import (
@@ -10,6 +11,10 @@ from card_reader_core.models import (
     PLAYER_CARD_POOL,
     CardPool,
     Symbol,
+)
+from card_reader_core.services.templates import (
+    MAX_MANA_BADGE_OCR_ATTEMPTS,
+    MAX_MANA_BADGE_OCR_SCALE,
 )
 from PIL import Image
 
@@ -29,9 +34,25 @@ _MANA_COST_SOURCE_BY_POOL: dict[CardPool, ManaCostSource] = {
 }
 
 
+@dataclass(frozen=True, slots=True)
+class ManaBadgeOcrResult:
+    mana_cost: str
+    mana_total: int
+    text: str
+    confidence: float
+    lines: list[dict[str, Any]]
+    scale: int
+    bounds: tuple[int, int, int, int]
+
+
 class NameManaCostParser:
     _EXPECTED_SYMBOL_TYPES = {"mana"}
+    _DEFAULT_MANA_BADGE_OCR_SCALES = (3, 2)
     _trailing_integer_pattern = re.compile(r"(\d+)\s*$")
+    _trailing_variable_x_pattern = re.compile(
+        r"(?<![a-zA-Z0-9])x\s*$",
+        re.IGNORECASE,
+    )
     _leading_noise_number_pattern = re.compile(r"^\s*\d+(?:\s+\d+)?\s+")
     _integer_pattern = re.compile(r"\d+")
     _variable_x_pattern = re.compile(r"(?<![a-zA-Z0-9])x(?![a-zA-Z0-9])", re.IGNORECASE)
@@ -73,6 +94,9 @@ class NameManaCostParser:
         mana_cost = ""
         mana_total = ""
         has_mana = False
+        has_variable_x = False
+        mana_badge_result: ManaBadgeOcrResult | None = None
+        mana_badge_attempted_texts: list[str] = []
 
         if mana_source == "symbols":
             candidate_symbols = self._select_mana_candidate_symbols(symbols)
@@ -104,8 +128,53 @@ class NameManaCostParser:
                 mana_cost = str(evil_total)
                 mana_total = str(evil_total)
                 has_mana = True
+            else:
+                mana_badge_result, mana_badge_attempted_texts = self._read_evil_mana_badge(
+                    image=image,
+                    ocr_config=ocr_text.ocr_config,
+                    region_spec=region_spec,
+                )
+            if mana_badge_result is not None:
+                mana_cost = mana_badge_result.mana_cost
+                mana_total = str(mana_badge_result.mana_total)
+                has_mana = True
+                has_variable_x = mana_cost == "X"
+                if has_variable_x:
+                    mana_symbol_keys.append("x")
 
-        name = self._extract_name(full_text, has_mana=has_mana) or image_stem
+        primary_ocr_contains_confirmed_badge_x = bool(
+            mana_badge_result is not None
+            and mana_badge_result.mana_cost == "X"
+            and self._primary_ocr_contains_badge_token(
+                filtered_lines,
+                token="X",
+                bounds=mana_badge_result.bounds,
+            )
+        )
+        name = (
+            self._extract_name(
+                full_text,
+                has_mana=has_mana,
+                confirmed_variable_x=primary_ocr_contains_confirmed_badge_x,
+            )
+            or image_stem
+        )
+        result_text = full_text
+        result_lines = filtered_lines
+        result_confidence = ocr_text.confidence
+        if mana_badge_result is not None:
+            result_text = "\n".join(
+                part for part in (full_text, mana_badge_result.text) if part
+            )
+            result_lines = [*filtered_lines, *mana_badge_result.lines]
+
+        field_confidences = {"name": ocr_text.confidence}
+        if has_mana:
+            field_confidences["mana_cost"] = (
+                mana_badge_result.confidence
+                if mana_badge_result is not None
+                else ocr_text.confidence
+            )
 
         logger.info(
             "Name/mana parse summary. text=%r card_pool=%s mana_source=%s symbols=%s symbol_keys=%s name=%r mana_cost=%r mana_total=%r",
@@ -138,7 +207,7 @@ class NameManaCostParser:
         logger.info(
             "Name/mana parser finished. region=%s conf=%.3f name=%r mana_cost=%r mana_symbols=%s",
             region_name,
-            ocr_text.confidence,
+            result_confidence,
             name,
             mana_cost,
             mana_symbol_keys,
@@ -153,11 +222,12 @@ class NameManaCostParser:
 
         return RegionParseResult(
             region_name=region_name,
-            text=full_text,
-            confidence=ocr_text.confidence,
-            lines=filtered_lines,
+            text=result_text,
+            confidence=result_confidence,
+            lines=result_lines,
             detected_symbols=detected_symbols,
             normalized_fields=normalized_fields,
+            field_confidences=field_confidences,
             debug={
                 "card_pool": card_pool,
                 "mana_source": mana_source,
@@ -165,6 +235,17 @@ class NameManaCostParser:
                     sorted(self._EXPECTED_SYMBOL_TYPES) if mana_source == "symbols" else []
                 ),
                 "full_ocr_text": full_text,
+                "mana_badge_ocr": (
+                    {
+                        "text": mana_badge_result.text,
+                        "confidence": mana_badge_result.confidence,
+                        "scale": mana_badge_result.scale,
+                        "line_count": len(mana_badge_result.lines),
+                    }
+                    if mana_badge_result is not None
+                    else None
+                ),
+                "mana_badge_attempted_texts": mana_badge_attempted_texts,
                 "candidate_symbol_count": len(candidate_symbols),
                 "ocr_config": ocr_text.ocr_config,
                 "ocr_line_count_raw": ocr_text.raw_line_count,
@@ -188,12 +269,20 @@ class NameManaCostParser:
         )
         return mana_typed
 
-    def _extract_name(self, text: str, *, has_mana: bool) -> str:
+    def _extract_name(
+        self,
+        text: str,
+        *,
+        has_mana: bool,
+        confirmed_variable_x: bool = False,
+    ) -> str:
         compact = normalize_name_text(text)
         if not compact:
             return ""
         if has_mana:
             compact = self._trailing_integer_pattern.sub("", compact).strip()
+            if confirmed_variable_x:
+                compact = self._trailing_variable_x_pattern.sub("", compact).strip()
             compact = self._leading_noise_number_pattern.sub("", compact).strip()
         return compact.strip()
 
@@ -206,6 +295,174 @@ class NameManaCostParser:
             return int(match.group(1))
         except ValueError:
             return None
+
+    def _extract_standalone_ocr_mana(self, text: str) -> tuple[str, int] | None:
+        compact = " ".join(text.split())
+        integer_match = self._trailing_integer_pattern.fullmatch(compact)
+        if integer_match is not None:
+            try:
+                value = int(integer_match.group(1))
+            except ValueError:
+                return None
+            return str(value), value
+        if self._trailing_variable_x_pattern.fullmatch(compact) is not None:
+            return "X", 0
+        return None
+
+    def _read_evil_mana_badge(
+        self,
+        *,
+        image: Image.Image,
+        ocr_config: dict[str, object],
+        region_spec: dict[str, Any],
+    ) -> tuple[ManaBadgeOcrResult | None, list[str]]:
+        badge_config = self._resolve_mana_badge_ocr_config(region_spec)
+        if badge_config is None:
+            return None, []
+        badge, left, top, scales = self._crop_mana_badge(
+            image=image,
+            config=badge_config,
+        )
+        attempted_texts: list[str] = []
+        for scale in scales:
+            scaled_badge = badge.resize(
+                (badge.width * scale, badge.height * scale),
+                Image.Resampling.LANCZOS,
+            )
+            ocr_data = self._ocr_runner.run(scaled_badge, config=ocr_config)
+            badge_text = str(ocr_data.get("text", "")).strip()
+            attempted_texts.append(badge_text)
+            parsed_mana = self._extract_standalone_ocr_mana(badge_text)
+            if parsed_mana is None:
+                continue
+            mana_cost, mana_total = parsed_mana
+            return (
+                ManaBadgeOcrResult(
+                    mana_cost=mana_cost,
+                    mana_total=mana_total,
+                    text=badge_text,
+                    confidence=self._safe_confidence(ocr_data.get("confidence", 0.0)),
+                    lines=self._normalize_badge_lines(
+                        self._safe_lines(ocr_data.get("lines", [])),
+                        left=left,
+                        top=top,
+                        scale=scale,
+                    ),
+                    scale=scale,
+                    bounds=(left, top, left + badge.width, top + badge.height),
+                ),
+                attempted_texts,
+            )
+        return None, attempted_texts
+
+    def _resolve_mana_badge_ocr_config(
+        self,
+        region_spec: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        raw = region_spec.get("mana_badge_ocr")
+        if not isinstance(raw, dict) or not isinstance(raw.get("cut_region"), dict):
+            return None
+        return raw
+
+    def _crop_mana_badge(
+        self,
+        *,
+        image: Image.Image,
+        config: dict[str, Any],
+    ) -> tuple[Image.Image, int, int, tuple[int, ...]]:
+        bounds = config["cut_region"]
+        unit = str(bounds.get("unit", "relative")).strip().lower()
+        if unit == "relative":
+            left = round(float(bounds.get("x", 0.0)) * image.width)
+            top = round(float(bounds.get("y", 0.0)) * image.height)
+            width = round(float(bounds.get("w", 1.0)) * image.width)
+            height = round(float(bounds.get("h", 1.0)) * image.height)
+        elif unit == "absolute":
+            left = round(float(bounds.get("x", 0.0)))
+            top = round(float(bounds.get("y", 0.0)))
+            width = round(float(bounds.get("w", image.width)))
+            height = round(float(bounds.get("h", image.height)))
+        else:
+            raise ValueError(f"Unsupported mana badge region unit '{unit}'.")
+
+        left = max(0, min(left, image.width - 1))
+        top = max(0, min(top, image.height - 1))
+        width = max(1, min(width, image.width - left))
+        height = max(1, min(height, image.height - top))
+        scales = self._resolve_mana_badge_scales(config.get("scales"))
+        return image.crop((left, top, left + width, top + height)), left, top, scales
+
+    def _resolve_mana_badge_scales(self, raw: Any) -> tuple[int, ...]:
+        if not isinstance(raw, list):
+            return self._DEFAULT_MANA_BADGE_OCR_SCALES
+        scales: list[int] = []
+        for value in raw:
+            if (
+                not isinstance(value, int)
+                or isinstance(value, bool)
+                or not 0 < value <= MAX_MANA_BADGE_OCR_SCALE
+                or value in scales
+            ):
+                continue
+            scales.append(value)
+            if len(scales) == MAX_MANA_BADGE_OCR_ATTEMPTS:
+                break
+        return tuple(scales) or self._DEFAULT_MANA_BADGE_OCR_SCALES
+
+    def _primary_ocr_contains_badge_token(
+        self,
+        lines: list[dict[str, Any]],
+        *,
+        token: str,
+        bounds: tuple[int, int, int, int],
+    ) -> bool:
+        left, top, right, bottom = bounds
+        for line in lines:
+            # A combined row has no character-level boxes, so its trailing X may
+            # belong to the title. Only a standalone row is safe to remove.
+            if str(line.get("text", "")).strip().upper() != token.upper():
+                continue
+            x = line.get("x")
+            y = line.get("y")
+            if isinstance(x, (int, float)) and isinstance(y, (int, float)):
+                if left <= float(x) <= right and top <= float(y) <= bottom:
+                    return True
+        return False
+
+    def _normalize_badge_lines(
+        self,
+        lines: list[dict[str, Any]],
+        *,
+        left: int,
+        top: int,
+        scale: int,
+    ) -> list[dict[str, Any]]:
+        normalized: list[dict[str, Any]] = []
+        for line in lines:
+            row = dict(line)
+            row["ocr_source"] = "mana_badge"
+            if isinstance(row.get("x"), (int, float)):
+                row["x"] = left + float(row["x"]) / scale
+            if isinstance(row.get("y"), (int, float)):
+                row["y"] = top + float(row["y"]) / scale
+            box = row.get("box")
+            if isinstance(box, list):
+                row["box"] = [
+                    (left + float(point[0]) / scale, top + float(point[1]) / scale)
+                    for point in box
+                    if isinstance(point, (list, tuple)) and len(point) >= 2
+                ]
+            normalized.append(row)
+        return normalized
+
+    def _safe_confidence(self, raw: Any) -> float:
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _safe_lines(self, raw: Any) -> list[dict[str, Any]]:
+        return raw if isinstance(raw, list) else []
 
     def _mana_symbol_keys(self, rows: list[DetectedSymbol]) -> list[str]:
         ordered = sorted(rows, key=lambda row: row.bbox.x)
@@ -246,4 +503,3 @@ class NameManaCostParser:
         if mana_total <= 0:
             return "X"
         return f"X+{mana_total}"
-
