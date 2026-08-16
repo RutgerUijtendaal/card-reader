@@ -3550,6 +3550,23 @@ def test_grouped_gallery_default_sort_bounds_candidates_before_hydration(
     assert len(response.json()["results"]) == 1
     assert evaluated_candidates == 2
 
+    evaluated_candidates = 0
+    later_response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {
+            "show_groups": "true",
+            "sort": "default",
+            "card_pool": "player",
+            "q": "Bounded Default",
+            "page": 6,
+            "page_size": 1,
+        },
+    )
+
+    assert later_response.status_code == 200
+    assert len(later_response.json()["results"]) == 1
+    assert evaluated_candidates <= 4
+
 
 def test_grouped_gallery_type_sort_uses_anchor_card_types() -> None:
     spell_type = _create_type(key="sort-group-spell", label="Spell")

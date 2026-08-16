@@ -417,104 +417,178 @@ def list_default_grouped_card_references(
     normalized_page = max(page, 1)
     normalized_page_size = max(1, min(page_size, 100))
     offset = (normalized_page - 1) * normalized_page_size
-    candidate_limit = offset + normalized_page_size
-    total_count = standalone_versions.count() + participating_groups.count()
+    standalone_count = standalone_versions.count()
+    group_count = participating_groups.count()
+    total_count = standalone_count + group_count
 
     ordered_standalone = apply_default_card_sort(
         standalone_versions,
         card_pool=card_pool,
-    )
-    standalone_candidates = list(
-        ordered_standalone.select_related("card")
-        .prefetch_related(
-            "card__role_assignments",
-            "card__faction_assignments",
-        )[:candidate_limit]
+    ).select_related("card").prefetch_related(
+        "card__role_assignments",
+        "card__faction_assignments",
     )
     ordered_groups = apply_default_card_group_sort(
         participating_groups,
         card_pool=card_pool,
+    ).select_related(
+        "anchor_card",
+        "anchor_card__latest_version",
+    ).prefetch_related(
+        "anchor_card__role_assignments",
+        "anchor_card__faction_assignments",
+    )
+    standalone_offset, group_offset = _default_grouped_page_partition(
+        ordered_standalone,
+        ordered_groups,
+        offset=offset,
+        standalone_count=standalone_count,
+        group_count=group_count,
+        card_pool=card_pool,
+    )
+    standalone_candidates = list(
+        ordered_standalone[
+            standalone_offset : standalone_offset + normalized_page_size
+        ]
     )
     group_candidates = list(
-        ordered_groups.select_related(
-            "anchor_card",
-            "anchor_card__latest_version",
-        )
-        .prefetch_related(
-            "anchor_card__role_assignments",
-            "anchor_card__faction_assignments",
-        )[:candidate_limit]
+        ordered_groups[group_offset : group_offset + normalized_page_size]
     )
 
-    sortable_references: list[
-        tuple[tuple[object, ...], GroupedCardListReference]
-    ] = []
-    for version in standalone_candidates:
-        item_id = version.card.id
-        sortable_references.append(
-            (
-                (
-                    *card_default_sort_key(
-                        card_pool=card_pool,
-                        card_id=version.card.id,
-                        label=version.card.label,
-                        name=version.name,
-                        mana_family_sort_key=version.card.mana_family_sort_key,
-                        mana_value=version.mana_value,
-                        card_roles=card_role_keys(version.card),
-                        card_factions=card_faction_keys(version.card),
-                    ),
-                    item_id,
-                ),
-                GroupedCardListReference(
-                    result_type="card",
-                    item_id=item_id,
-                    card_version_id=version.id,
-                    group_id=None,
-                ),
-            )
-        )
-    for group in group_candidates:
-        anchor_version = group.anchor_card.latest_version
-        if anchor_version is None:
-            continue
-        item_id = group.id
-        sortable_references.append(
-            (
-                (
-                    *card_default_sort_key(
-                        card_pool=card_pool,
-                        card_id=group.anchor_card.id,
-                        label=group.anchor_card.label,
-                        name=anchor_version.name,
-                        mana_family_sort_key=group.anchor_card.mana_family_sort_key,
-                        mana_value=anchor_version.mana_value,
-                        card_roles=card_role_keys(group.anchor_card),
-                        card_factions=card_faction_keys(group.anchor_card),
-                    ),
-                    item_id,
-                ),
-                GroupedCardListReference(
-                    result_type="card_group",
-                    item_id=item_id,
-                    card_version_id=None,
-                    group_id=group.id,
-                ),
-            )
-        )
+    sortable_references = [
+        _default_standalone_reference(version, card_pool=card_pool)
+        for version in standalone_candidates
+    ]
+    sortable_references.extend(
+        _default_group_reference(group, card_pool=card_pool)
+        for group in group_candidates
+    )
 
     sortable_references.sort(key=lambda row: row[0])
     page_references = [
         reference
-        for _sort_key, reference in sortable_references[
-            offset : offset + normalized_page_size
-        ]
+        for _sort_key, reference in sortable_references[:normalized_page_size]
     ]
     return PaginatedGroupedCardList(
         count=total_count,
         page=normalized_page,
         page_size=normalized_page_size,
         results=page_references,
+    )
+
+
+def _default_grouped_page_partition(
+    ordered_standalone: QuerySet[CardVersion],
+    ordered_groups: QuerySet[CardGroup],
+    *,
+    offset: int,
+    standalone_count: int,
+    group_count: int,
+    card_pool: CardPool,
+) -> tuple[int, int]:
+    """Find the two sorted-stream offsets without loading preceding rows."""
+    target = min(max(offset, 0), standalone_count + group_count)
+    low = max(0, target - group_count)
+    high = min(target, standalone_count)
+    standalone_keys: dict[int, tuple[object, ...]] = {}
+    group_keys: dict[int, tuple[object, ...]] = {}
+
+    def standalone_key(index: int) -> tuple[object, ...]:
+        if index not in standalone_keys:
+            standalone_keys[index] = _default_standalone_reference(
+                ordered_standalone[index],
+                card_pool=card_pool,
+            )[0]
+        return standalone_keys[index]
+
+    def group_key(index: int) -> tuple[object, ...]:
+        if index not in group_keys:
+            group_keys[index] = _default_group_reference(
+                ordered_groups[index],
+                card_pool=card_pool,
+            )[0]
+        return group_keys[index]
+
+    while low <= high:
+        standalone_offset = (low + high) // 2
+        group_offset = target - standalone_offset
+        if (
+            standalone_offset > 0
+            and group_offset < group_count
+            and standalone_key(standalone_offset - 1) > group_key(group_offset)
+        ):
+            high = standalone_offset - 1
+            continue
+        if (
+            group_offset > 0
+            and standalone_offset < standalone_count
+            and group_key(group_offset - 1) >= standalone_key(standalone_offset)
+        ):
+            low = standalone_offset + 1
+            continue
+        return standalone_offset, group_offset
+
+    raise RuntimeError("Unable to partition grouped card results.")
+
+
+def _default_standalone_reference(
+    version: CardVersion,
+    *,
+    card_pool: CardPool,
+) -> tuple[tuple[object, ...], GroupedCardListReference]:
+    item_id = version.card.id
+    return (
+        (
+            *card_default_sort_key(
+                card_pool=card_pool,
+                card_id=version.card.id,
+                label=version.card.label,
+                name=version.name,
+                mana_family_sort_key=version.card.mana_family_sort_key,
+                mana_value=version.mana_value,
+                card_roles=card_role_keys(version.card),
+                card_factions=card_faction_keys(version.card),
+            ),
+            item_id,
+        ),
+        GroupedCardListReference(
+            result_type="card",
+            item_id=item_id,
+            card_version_id=version.id,
+            group_id=None,
+        ),
+    )
+
+
+def _default_group_reference(
+    group: CardGroup,
+    *,
+    card_pool: CardPool,
+) -> tuple[tuple[object, ...], GroupedCardListReference]:
+    anchor_version = group.anchor_card.latest_version
+    if anchor_version is None:
+        raise ValueError("Grouped card result has no anchor version.")
+    item_id = group.id
+    return (
+        (
+            *card_default_sort_key(
+                card_pool=card_pool,
+                card_id=group.anchor_card.id,
+                label=group.anchor_card.label,
+                name=anchor_version.name,
+                mana_family_sort_key=group.anchor_card.mana_family_sort_key,
+                mana_value=anchor_version.mana_value,
+                card_roles=card_role_keys(group.anchor_card),
+                card_factions=card_faction_keys(group.anchor_card),
+            ),
+            item_id,
+        ),
+        GroupedCardListReference(
+            result_type="card_group",
+            item_id=item_id,
+            card_version_id=None,
+            group_id=group.id,
+        ),
     )
 
 
