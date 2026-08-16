@@ -38,6 +38,7 @@ import {
   formatDeckBuildingConfigJson,
 } from '@/domain/decks/utils/deckRules';
 import { queryString } from '@/shared/router/routeState';
+import { getApiErrorMessage } from '@/shared/api/errors';
 import {
   patchLatestCardVersion,
   promoteCardVersion,
@@ -61,6 +62,7 @@ export const useCardDetailState = () => {
   const isQueuingReparse = ref(false);
   const promotingVersionId = ref<string | null>(null);
   const saveMessage = ref('');
+  const saveError = ref('');
   let loadRequestId = 0;
 
   const form = reactive<EditorForm>({
@@ -171,6 +173,7 @@ export const useCardDetailState = () => {
         versions.value[0]?.version_id ??
         '';
       saveMessage.value = '';
+      saveError.value = '';
     } finally {
       if (requestId === loadRequestId) {
         isLoadingInitial.value = false;
@@ -202,6 +205,7 @@ export const useCardDetailState = () => {
     form.additional_symbol_ids = uniqueIds(version.symbol_ids);
     reparseTemplateId.value = version.template_id;
     saveMessage.value = '';
+    saveError.value = '';
   };
 
   const selectVersion = (versionId: string): void => {
@@ -228,11 +232,15 @@ export const useCardDetailState = () => {
     return poolChanged;
   };
 
-  const patchLatestVersion = async (payload: Record<string, unknown>, successMessage = 'Version updated.'): Promise<void> => {
+  const patchLatestVersion = async (
+    payload: Record<string, unknown>,
+    successMessage = 'Version updated.',
+  ): Promise<boolean> => {
     const version = selectedVersion.value;
-    if (!version?.editable) return;
+    if (!version?.editable) return false;
     isSaving.value = true;
     saveMessage.value = '';
+    saveError.value = '';
     try {
       const updatedVersion = await patchLatestCardVersion(version.id, payload);
       const poolChanged = applyUpdatedVersion(updatedVersion);
@@ -247,6 +255,10 @@ export const useCardDetailState = () => {
         }
       }
       saveMessage.value = successMessage;
+      return true;
+    } catch (error) {
+      saveError.value = cardSaveErrorMessage(error);
+      return false;
     } finally {
       isSaving.value = false;
     }
@@ -255,6 +267,8 @@ export const useCardDetailState = () => {
   const saveVersionEdits = async (): Promise<void> => {
     const version = selectedVersion.value;
     if (!version?.editable) return;
+    saveMessage.value = '';
+    saveError.value = '';
     const selectedTemplateId = reparseTemplateId.value;
     const templateChanged = selectedTemplateId !== version.template_id;
     const updates = buildVersionUpdatePayload(form, version, effectiveSymbolIds.value);
@@ -266,11 +280,11 @@ export const useCardDetailState = () => {
       saveMessage.value = 'No changes to save.';
       return;
     }
-    await patchLatestVersion(
+    const saved = await patchLatestVersion(
       updates,
       'Changes saved. Edited fields and metadata are now locked to manual ownership.',
     );
-    if (templateChanged) {
+    if (saved && templateChanged) {
       await queueLatestCardReparseForTemplate(selectedTemplateId);
     }
   };
@@ -278,11 +292,13 @@ export const useCardDetailState = () => {
   const saveCardEdits = async (): Promise<void> => {
     const version = selectedVersion.value;
     if (!version?.editable) return;
+    saveMessage.value = '';
+    saveError.value = '';
     let updates: Record<string, unknown>;
     try {
       updates = buildCardUpdatePayload(form, version);
     } catch (error) {
-      saveMessage.value = error instanceof Error ? error.message : 'Deck-building config must be valid JSON.';
+      saveError.value = error instanceof Error ? error.message : 'Deck-building config must be valid JSON.';
       return;
     }
     if (Object.keys(updates).length === 0) {
@@ -327,6 +343,7 @@ export const useCardDetailState = () => {
     if (!version?.editable) return;
     isQueuingReparse.value = true;
     saveMessage.value = '';
+    saveError.value = '';
     try {
       saveMessage.value = await queueCardReparse(version.id, templateId);
     } finally {
@@ -343,6 +360,7 @@ export const useCardDetailState = () => {
 
     promotingVersionId.value = versionId;
     saveMessage.value = '';
+    saveError.value = '';
     try {
       const promotedVersion = await promoteCardVersion(targetCard.id, versionId);
       versions.value = versions.value.map((item) =>
@@ -486,6 +504,7 @@ export const useCardDetailState = () => {
     isQueuingReparse,
     promotingVersionId,
     saveMessage,
+    saveError,
     deckBuildingConfigExample,
     form,
     metadataSearch,
@@ -529,6 +548,14 @@ export const useCardDetailState = () => {
     toAbsoluteApiUrl,
     formatDate,
   };
+};
+
+export const cardSaveErrorMessage = (error: unknown): string => {
+  const message = getApiErrorMessage(error, 'Card changes could not be saved.');
+  if (!message.toLowerCase().includes('conflict')) {
+    return message;
+  }
+  return `${message} Merge the duplicate cards before changing this card's name, pool, or factions.`;
 };
 
 const normalizeFieldValue = (version: CardVersionDetail, fieldName: ScalarFieldName): string => {
