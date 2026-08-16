@@ -2,18 +2,31 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
+from typing import Any, Literal
 
-from card_reader_core.models import Symbol
+from card_reader_core.models import (
+    EVIL_CARD_POOL,
+    NEUTRAL_CARD_POOL,
+    PLAYER_CARD_POOL,
+    CardPool,
+    Symbol,
+)
 from PIL import Image
 
 from ..ocr_runner import OcrRunner
-from ..symbol_detector import SymbolDetector
+from ..symbol_detector import DetectedSymbol, SymbolDetector
 
 from .name_text import normalize_name_text, read_name_ocr_text
 from .types import RegionParseResult
 
 logger = logging.getLogger(__name__)
+
+ManaCostSource = Literal["symbols", "trailing_ocr_integer", "none"]
+_MANA_COST_SOURCE_BY_POOL: dict[CardPool, ManaCostSource] = {
+    PLAYER_CARD_POOL: "symbols",
+    EVIL_CARD_POOL: "trailing_ocr_integer",
+    NEUTRAL_CARD_POOL: "none",
+}
 
 
 class NameManaCostParser:
@@ -33,15 +46,18 @@ class NameManaCostParser:
         region_name: str,
         image: Image.Image,
         image_stem: str,
+        card_pool: CardPool,
         region_spec: dict[str, Any],
         symbols: list[Symbol],
     ) -> RegionParseResult:
+        mana_source = self._mana_source(card_pool)
         logger.info(
-            "Name/mana parser started. region=%s image_size=%sx%s expected_symbol_types=%s",
+            "Name/mana parser started. region=%s card_pool=%s mana_source=%s image_size=%sx%s",
             region_name,
+            card_pool,
+            mana_source,
             image.width,
             image.height,
-            sorted(self._EXPECTED_SYMBOL_TYPES),
         )
         ocr_text = read_name_ocr_text(
             ocr_runner=self._ocr_runner,
@@ -51,31 +67,51 @@ class NameManaCostParser:
         filtered_lines = ocr_text.lines
         full_text = ocr_text.text
 
-        candidate_symbols = self._select_mana_candidate_symbols(symbols)
-        detected_symbols = self._symbol_detector.detect(
-            image=image,
-            symbols=candidate_symbols,
-            expected_symbol_types=self._EXPECTED_SYMBOL_TYPES,
-        )
-        mana_symbol_keys = self._mana_symbol_keys(detected_symbols)
-        variable_x_in_symbols = any(self._is_variable_symbol_key(key) for key in mana_symbol_keys)
-        variable_x_in_ocr = self._has_variable_x_in_text(full_text)
-        has_variable_x = variable_x_in_symbols or variable_x_in_ocr
+        candidate_symbols: list[Symbol] = []
+        detected_symbols: list[DetectedSymbol] = []
+        mana_symbol_keys: list[str] = []
+        mana_cost = ""
+        mana_total = ""
+        has_mana = False
 
-        mana_total = sum(self._mana_value_from_symbol_key(key) for key in mana_symbol_keys)
-        if has_variable_x and not variable_x_in_symbols:
-            mana_symbol_keys.append("x")
+        if mana_source == "symbols":
+            candidate_symbols = self._select_mana_candidate_symbols(symbols)
+            detected_symbols = self._symbol_detector.detect(
+                image=image,
+                symbols=candidate_symbols,
+                expected_symbol_types=self._EXPECTED_SYMBOL_TYPES,
+            )
+            mana_symbol_keys = self._mana_symbol_keys(detected_symbols)
+            variable_x_in_symbols = any(
+                self._is_variable_symbol_key(key) for key in mana_symbol_keys
+            )
+            variable_x_in_ocr = self._has_variable_x_in_text(full_text)
+            has_variable_x = variable_x_in_symbols or variable_x_in_ocr
+            parsed_total = sum(
+                self._mana_value_from_symbol_key(key) for key in mana_symbol_keys
+            )
+            if has_variable_x and not variable_x_in_symbols:
+                mana_symbol_keys.append("x")
+            mana_cost = self._format_mana_cost(
+                mana_total=parsed_total,
+                has_variable_x=has_variable_x,
+            )
+            mana_total = str(parsed_total)
+            has_mana = parsed_total > 0 or bool(mana_symbol_keys) or has_variable_x
+        elif mana_source == "trailing_ocr_integer":
+            evil_total = self._extract_trailing_ocr_integer(full_text)
+            if evil_total is not None:
+                mana_cost = str(evil_total)
+                mana_total = str(evil_total)
+                has_mana = True
 
-        mana_cost = self._format_mana_cost(mana_total=mana_total, has_variable_x=has_variable_x)
-        name = self._extract_name(
-            full_text,
-            has_mana=mana_total > 0 or len(mana_symbol_keys) > 0 or has_variable_x,
-        ) or image_stem
+        name = self._extract_name(full_text, has_mana=has_mana) or image_stem
 
         logger.info(
-            "Name/mana parse summary. text=%r symbol_mana_total=%s symbols=%s symbol_keys=%s name=%r mana_cost=%r mana_total=%s",
+            "Name/mana parse summary. text=%r card_pool=%s mana_source=%s symbols=%s symbol_keys=%s name=%r mana_cost=%r mana_total=%r",
             full_text,
-            mana_total,
+            card_pool,
+            mana_source,
             len(detected_symbols),
             mana_symbol_keys,
             name,
@@ -112,7 +148,7 @@ class NameManaCostParser:
             "name": name,
             "mana_cost": mana_cost,
             "mana_symbols": " ".join(mana_symbol_keys).strip(),
-            "mana_total": str(mana_total),
+            "mana_total": mana_total,
         }
 
         return RegionParseResult(
@@ -123,7 +159,11 @@ class NameManaCostParser:
             detected_symbols=detected_symbols,
             normalized_fields=normalized_fields,
             debug={
-                "expected_symbol_types": sorted(self._EXPECTED_SYMBOL_TYPES),
+                "card_pool": card_pool,
+                "mana_source": mana_source,
+                "expected_symbol_types": (
+                    sorted(self._EXPECTED_SYMBOL_TYPES) if mana_source == "symbols" else []
+                ),
                 "full_ocr_text": full_text,
                 "candidate_symbol_count": len(candidate_symbols),
                 "ocr_config": ocr_text.ocr_config,
@@ -131,6 +171,12 @@ class NameManaCostParser:
                 "ocr_line_count_filtered": len(filtered_lines),
             },
         )
+
+    def _mana_source(self, card_pool: CardPool) -> ManaCostSource:
+        try:
+            return _MANA_COST_SOURCE_BY_POOL[card_pool]
+        except KeyError as exc:
+            raise ValueError(f"Unsupported card pool '{card_pool}'.") from exc
 
     def _select_mana_candidate_symbols(self, symbols: list[Symbol]) -> list[Symbol]:
         enabled_template = [row for row in symbols if row.enabled and row.detector_type == "template"]
@@ -151,7 +197,17 @@ class NameManaCostParser:
             compact = self._leading_noise_number_pattern.sub("", compact).strip()
         return compact.strip()
 
-    def _mana_symbol_keys(self, rows: list[Any]) -> list[str]:
+    def _extract_trailing_ocr_integer(self, text: str) -> int | None:
+        compact = " ".join(text.split())
+        match = self._trailing_integer_pattern.search(compact)
+        if match is None:
+            return None
+        try:
+            return int(match.group(1))
+        except ValueError:
+            return None
+
+    def _mana_symbol_keys(self, rows: list[DetectedSymbol]) -> list[str]:
         ordered = sorted(rows, key=lambda row: row.bbox.x)
         out: list[str] = []
         for row in ordered:

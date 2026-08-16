@@ -80,7 +80,14 @@ def _build_parser(*, template: dict[str, object], region_ids: list[str]) -> Card
         }
     )
     parser._name_mana_cost_parser = StubRegionParser(
-        {"top_bar": _parser_result("top_bar", text="Top", confidence=0.91, normalized_fields={"name": "Spellblade"})}
+        {
+            "top_bar": _parser_result(
+                "top_bar",
+                text="Top",
+                confidence=0.91,
+                normalized_fields={"name": "Spellblade", "mana_cost": "0"},
+            )
+        }
     )
     parser._type_tag_parser = StubRegionParser(
         {
@@ -155,9 +162,10 @@ def test_card_parser_dispatches_parser_type_handlers(tmp_path: Path) -> None:
         region_ids=["top_bar", "type_bar", "rules_text", "bottom_left", "bottom_middle", "bottom_right"],
     )
 
-    parsed = parser.parse(image_path=image_path, template_id="mtg-like-v1")
+    parsed = parser.parse(image_path=image_path, card_pool="player", template_id="mtg-like-v1")
 
     assert len(parser._name_mana_cost_parser.calls) == 1
+    assert parser._name_mana_cost_parser.calls[0]["card_pool"] == "player"
     assert len(parser._type_tag_parser.calls) == 1
     assert len(parser._rules_text_parser.calls) == 1
     assert len(parser._affinity_parser.calls) == 1
@@ -169,6 +177,39 @@ def test_card_parser_dispatches_parser_type_handlers(tmp_path: Path) -> None:
     assert parsed.normalized_fields["rules_text"] == "Primary rules"
     assert parsed.normalized_fields["attack"] == "3"
     assert parsed.normalized_fields["health"] == "2"
+    assert parsed.confidence["mana_cost"] == 0.91
+
+
+def test_card_parser_reports_zero_mana_confidence_when_pool_cost_is_missing(tmp_path: Path) -> None:
+    image_path = tmp_path / "neutral-card.png"
+    image_path.write_bytes(b"card-image")
+    template = {
+        "regions": [
+            {
+                "region_id": "top_bar",
+                "parser_type": "name_mana_cost",
+                "cut_region": {},
+                "ocr_config": {},
+            }
+        ]
+    }
+    parser = _build_parser(template=template, region_ids=["top_bar"])
+    parser._name_mana_cost_parser = StubRegionParser(
+        {
+            "top_bar": _parser_result(
+                "top_bar",
+                text="Neutral Relic",
+                confidence=0.91,
+                normalized_fields={"name": "Neutral Relic", "mana_cost": ""},
+            )
+        }
+    )
+
+    parsed = parser.parse(image_path=image_path, card_pool="neutral", template_id="mtg-like-v1")
+
+    assert parser._name_mana_cost_parser.calls[0]["card_pool"] == "neutral"
+    assert parsed.confidence["name"] == 0.91
+    assert parsed.confidence["mana_cost"] == 0.0
 
 
 def test_card_parser_uses_second_rules_text_region_as_fallback(tmp_path: Path) -> None:
@@ -193,7 +234,7 @@ def test_card_parser_uses_second_rules_text_region_as_fallback(tmp_path: Path) -
         }
     )
 
-    parsed = parser.parse(image_path=image_path, template_id="mtg-like-v1")
+    parsed = parser.parse(image_path=image_path, card_pool="player", template_id="mtg-like-v1")
 
     assert len(parser._rules_text_parser.calls) == 2
     assert parsed.normalized_fields["rules_text"] == "Recovered rules"
@@ -215,7 +256,7 @@ def test_card_parser_dispatches_name_without_mana_inputs(tmp_path: Path) -> None
     }
     parser = _build_parser(template=template, region_ids=["name_bar"])
 
-    parsed = parser.parse(image_path=image_path, template_id="name-only-v1")
+    parsed = parser.parse(image_path=image_path, card_pool="player", template_id="name-only-v1")
 
     assert len(parser._name_parser.calls) == 1
     assert "symbols" not in parser._name_parser.calls[0]
