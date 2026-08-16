@@ -15,6 +15,7 @@ import { useHoverModeSurface } from '@/domain/cards/composables/useHoverModePref
 import { useCardSortSurface } from '@/domain/cards/composables/useCardSortPreferences';
 import { buildHeroManaFamilyPreset } from '@/domain/decks/utils/heroManaFamilies';
 import type { DeckCardSummary } from '@/domain/decks/types';
+import { sanitizeDeckBuilderFilterSelection } from '@/features/decks/utils/deckBuilderFilterPolicy';
 
 type UseDeckEditorFiltersOptions = {
   deckCardIds: Ref<string[]>;
@@ -105,7 +106,7 @@ export const useDeckEditorFilters = ({ deckCardIds, editorMode }: UseDeckEditorF
   };
 
   const buildDeckEditorSelectionState = (): CardFilterSelectionState => {
-    const selection = filterController.selectionState.value;
+    const selection = sanitizeDeckBuilderFilterSelection(filterController.selectionState.value);
     if (editorMode.value === 'cards') {
       return selection;
     }
