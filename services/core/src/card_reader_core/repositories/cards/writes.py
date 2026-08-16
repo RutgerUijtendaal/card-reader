@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from django.db import transaction
+from django.db.models import F
 
 from card_reader_core.database import retry_sqlite_write
 from card_reader_core.models import (
@@ -224,11 +225,24 @@ def save_parsed_card_result(
                 created_new_version=created_new_version,
             )
 
-        card, created_new_card = create_card_identity(
-            name=parsed_name,
-            card_pool=card_pool,
-            card_factions=resolved_card_factions,
+        corrected_card = (
+            _resolve_corrected_import_card(
+                checksum=checksum,
+                card_pool=card_pool,
+                resolved_card_factions=resolved_card_factions,
+            )
+            if reparse_existing
+            else None
         )
+        if corrected_card is None:
+            card, created_new_card = create_card_identity(
+                name=parsed_name,
+                card_pool=card_pool,
+                card_factions=resolved_card_factions,
+            )
+        else:
+            card = corrected_card
+            created_new_card = False
         if created_new_card:
             CardRoleAssignment.objects.bulk_create(
                 [CardRoleAssignment(card=card, role=role) for role in resolved_card_roles]
@@ -317,9 +331,8 @@ def _resolve_existing_import_version(
     card_pool: CardPool,
     resolved_card_factions: tuple[CardFaction, ...],
 ) -> CardVersion | None:
-    """Recover a unique manual faction correction without weakening normal namespaces."""
     faction_key = card_faction_identity_key(resolved_card_factions)
-    exact_match = (
+    return (
         CardVersion.objects.filter(
             image_hash=checksum,
             is_latest=True,
@@ -329,15 +342,24 @@ def _resolve_existing_import_version(
         .order_by("-updated_at")
         .first()
     )
-    if exact_match is not None:
-        return exact_match
 
+
+def _resolve_corrected_import_card(
+    *,
+    checksum: str,
+    card_pool: CardPool,
+    resolved_card_factions: tuple[CardFaction, ...],
+) -> Card | None:
+    """Recover one same-pool manual faction correction from its completed import."""
+    faction_key = card_faction_identity_key(resolved_card_factions)
     corrected_card_ids = list(
         ImportJobItem.objects.filter(
             status=ImportJobStatus.completed,
+            job__card_pool=card_pool,
             resolved_card_factions_json=list(resolved_card_factions),
             target_card__card_pool=card_pool,
-            target_card__latest_version__image_hash=checksum,
+            target_card_version__card_id=F("target_card_id"),
+            target_card_version__image_hash=checksum,
         )
         .exclude(target_card__faction_identity_key=faction_key)
         .order_by()
@@ -347,15 +369,7 @@ def _resolve_existing_import_version(
     if len(corrected_card_ids) != 1:
         return None
 
-    return (
-        CardVersion.objects.filter(
-            card_id=corrected_card_ids[0],
-            image_hash=checksum,
-            is_latest=True,
-        )
-        .order_by("-updated_at")
-        .first()
-    )
+    return Card.objects.filter(id=corrected_card_ids[0], card_pool=card_pool).first()
 
 
 def apply_latest_version_identity(card: Card, version: CardVersion) -> None:

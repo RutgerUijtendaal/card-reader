@@ -260,6 +260,123 @@ def test_reimport_reuses_unique_image_after_manual_faction_correction() -> None:
 
 
 @pytest.mark.django_db
+def test_reimport_does_not_reuse_correction_provenance_from_another_pool() -> None:
+    template = Template.objects.create(key="moved-pool-import", label="Moved Pool")
+    source_path = build_storage_relative_path("uploads", "moved-pool", "player.webp")
+    path = settings.storage_root_dir / source_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"moved-pool-art")
+    player_job = ImportJob.objects.create(
+        source_path="uploads/moved-pool",
+        template=template,
+        card_pool="player",
+        total_items=1,
+    )
+    player_item = ImportJobItem.objects.create(job=player_job, source_file=source_path)
+    player_version = save_parsed_card(
+        item=player_item,
+        template_id=template.key,
+        checksum="moved-pool-art",
+        normalized_fields={"name": "Moved Pool Card"},
+        confidence={"overall": 1.0},
+        raw_ocr={},
+        card_pool="player",
+        resolved_card_factions=(),
+    )
+    change_card_identity(
+        card=player_version.card,
+        card_pool="evil",
+        card_factions=("order",),
+    )
+
+    evil_job = ImportJob.objects.create(
+        source_path="uploads/moved-pool",
+        template=template,
+        card_pool="evil",
+        total_items=1,
+    )
+    evil_item = ImportJobItem.objects.create(job=evil_job, source_file=source_path)
+    evil_version = save_parsed_card(
+        item=evil_item,
+        template_id=template.key,
+        checksum="moved-pool-art",
+        normalized_fields={"name": "Moved Pool Card"},
+        confidence={"overall": 1.0},
+        raw_ocr={},
+        card_pool="evil",
+        resolved_card_factions=(),
+    )
+
+    assert evil_version.card_id != player_version.card_id
+    assert card_faction_keys(evil_version.card) == ()
+
+
+@pytest.mark.django_db
+def test_reimport_reuses_corrected_card_when_provenance_version_is_not_latest() -> None:
+    template = Template.objects.create(key="historical-faction-import", label="Historical Faction")
+    source_path = build_storage_relative_path("uploads", "historical-faction", "original.webp")
+    path = settings.storage_root_dir / source_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"historical-faction-art")
+    original_job = ImportJob.objects.create(
+        source_path="uploads/historical-faction",
+        template=template,
+        card_pool="evil",
+        total_items=1,
+    )
+    original_item = ImportJobItem.objects.create(job=original_job, source_file=source_path)
+    original_version = save_parsed_card(
+        item=original_item,
+        template_id=template.key,
+        checksum="historical-faction-art",
+        normalized_fields={"name": "Historical Faction Card"},
+        confidence={"overall": 1.0},
+        raw_ocr={},
+        card_pool="evil",
+        resolved_card_factions=(),
+    )
+    change_card_identity(card=original_version.card, card_factions=("dark",))
+    original_version.is_latest = False
+    original_version.save(update_fields=["is_latest"])
+    newer_version = CardVersion.objects.create(
+        card=original_version.card,
+        template=template,
+        version_number=2,
+        image_hash="newer-faction-art",
+        name=original_version.name,
+        previous_version=original_version,
+    )
+    original_version.card.latest_version = newer_version
+    original_version.card.save(update_fields=["latest_version"])
+
+    repeated_job = ImportJob.objects.create(
+        source_path="uploads/historical-faction",
+        template=template,
+        card_pool="evil",
+        total_items=1,
+    )
+    repeated_item = ImportJobItem.objects.create(job=repeated_job, source_file=source_path)
+    repeated_version = save_parsed_card(
+        item=repeated_item,
+        template_id=template.key,
+        checksum="historical-faction-art",
+        normalized_fields={"name": "Historical Faction Card"},
+        confidence={"overall": 1.0},
+        raw_ocr={},
+        card_pool="evil",
+        resolved_card_factions=(),
+    )
+
+    repeated_item.refresh_from_db()
+    assert repeated_version.card_id == original_version.card_id
+    assert repeated_version.id not in {original_version.id, newer_version.id}
+    assert repeated_version.version_number == 3
+    assert repeated_version.previous_version_id == newer_version.id
+    assert repeated_item.warning_code == "card_classification_mismatch"
+    assert card_faction_keys(repeated_version.card) == ("dark",)
+
+
+@pytest.mark.django_db
 def test_reimport_does_not_cross_faction_namespace_when_corrected_image_is_ambiguous() -> None:
     template = Template.objects.create(key="ambiguous-faction-import", label="Ambiguous Faction")
     corrected_cards = []
