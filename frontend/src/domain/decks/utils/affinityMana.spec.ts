@@ -1,17 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { buildHeroAffinityManaPreset, getManaSymbolKeysForAffinityKeys } from '@/domain/decks/utils/affinityMana';
+import { buildHeroManaFamilyPreset, getManaFamilyKeysForSymbolKeys } from '@/domain/decks/utils/affinityMana';
 import type { SymbolFilterOption } from '@/domain/cards/types';
-import type { DeckCardSummary } from '@/domain/decks/types';
-
-const symbol = (key: string, symbolType: string): DeckCardSummary['symbols'][number] => ({
-  id: `${key}-id`,
-  key,
-  label: key,
-  linked_card_count: 1,
-  symbol_type: symbolType,
-  text_token: `{${key}}`,
-  asset_url: null,
-});
 
 const manaOption = (key: string): SymbolFilterOption => ({
   id: key,
@@ -30,9 +19,9 @@ const familyBySymbolKey = {
   'martial-mana': 'martial',
 };
 
-describe('affinity mana mapping', () => {
-  test('maps standardized affinity keys to mana keys', () => {
-    expect(getManaSymbolKeysForAffinityKeys(
+describe('hero mana-family presets', () => {
+  test('maps standardized Symbol keys to mana-family keys', () => {
+    expect(getManaFamilyKeysForSymbolKeys(
       ['martial-affinity', 'arcane-affinity', 'martial-affinity'],
       familyBySymbolKey,
     )).toEqual([
@@ -41,29 +30,28 @@ describe('affinity mana mapping', () => {
     ]);
   });
 
-  test('builds an include/exclude mana preset from either hero representation', () => {
+  test('builds an include/exclude mana preset from stored hero families', () => {
     const hero = {
-      symbols: [symbol('martial-mana', 'mana'), symbol('divine-affinity', 'affinity'), symbol('exhaust', 'generic')],
+      card_mana_families: ['martial', 'divine'] as Array<'martial' | 'divine'>,
     };
 
     expect(
-      buildHeroAffinityManaPreset(hero, [
+      buildHeroManaFamilyPreset(hero, [
         manaOption('arcane'),
         manaOption('divine'),
         manaOption('martial'),
         manaOption('occult'),
-      ], familyBySymbolKey),
+      ]),
     ).toEqual({
-      includedManaSymbolKeys: ['divine', 'martial'],
-      excludedManaSymbolKeys: ['arcane', 'occult'],
+      includedManaFamilyKeys: ['divine', 'martial'],
+      excludedManaFamilyKeys: ['arcane', 'occult'],
     });
   });
 
-  test('does not create a preset when the hero has no mapped affinity', () => {
-    expect(buildHeroAffinityManaPreset(
-      { symbols: [symbol('sola-affinity', 'affinity')] },
+  test('does not create a preset when the hero has no stored mana family', () => {
+    expect(buildHeroManaFamilyPreset(
+      { card_mana_families: [] },
       [manaOption('martial')],
-      familyBySymbolKey,
     )).toBeNull();
   });
 });

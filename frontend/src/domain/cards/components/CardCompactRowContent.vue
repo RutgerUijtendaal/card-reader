@@ -49,6 +49,13 @@
         >
           {{ faction }}
         </span>
+        <span
+          v-for="family in displayManaFamilyLabels(card.card_mana_families ?? [])"
+          :key="`mana-${family}`"
+          class="theme-pill theme-pill-warning px-1.5 py-0.5 text-[9px] font-semibold"
+        >
+          {{ family }}
+        </span>
       </div>
     </div>
   </div>
@@ -87,6 +94,7 @@ import { cardIsDeprecated } from '@/domain/cards/utils/filters/cardLifecycle';
 import { cardPoolLabel } from '@/domain/cards/cardPools';
 import { displayCardRoleLabels } from '@/domain/cards/cardRoles';
 import { displayCardFactionLabels } from '@/domain/cards/cardFactions';
+import { displayManaFamilyLabels } from '@/domain/cards/manaFamilies';
 
 type CardCompactRowCard = Pick<
   CardHoverTooltipModel,
@@ -99,6 +107,7 @@ type CardCompactRowCard = Pick<
   | 'card_pool'
   | 'card_roles'
   | 'card_factions'
+  | 'card_mana_families'
 > & {
   image_url: string | null;
 };

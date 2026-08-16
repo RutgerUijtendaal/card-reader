@@ -107,7 +107,7 @@
                     </label>
                   </div>
                   <p class="theme-section-muted mt-1 text-sm">
-                    Automatic uses matching Tag and Type rules for this pool. Override uses exactly these roles for every card in the batch.
+                    Automatic uses matching Tag, Type, and Symbol rules for this pool. Override uses exactly these roles for every card in the batch.
                   </p>
                   <div
                     v-if="cardRoleMode === 'override'"
@@ -159,7 +159,7 @@
                     </label>
                   </div>
                   <p class="theme-section-muted mt-1 text-sm">
-                    Automatic uses matching Tag and Type rules for this pool. Override uses exactly these factions for every card in the batch.
+                    Automatic uses matching Tag, Type, and Symbol rules for this pool. Override uses exactly these factions for every card in the batch.
                   </p>
                   <div
                     v-if="cardFactionMode === 'override'"
@@ -183,6 +183,58 @@
                       class="theme-section-muted basis-full text-sm"
                     >
                       No faction
+                    </span>
+                  </div>
+                </fieldset>
+                <fieldset class="theme-divider space-y-3 border-t pt-4 md:col-span-2">
+                  <legend class="field-label">
+                    Mana Families
+                  </legend>
+                  <div class="flex flex-wrap gap-3">
+                    <label class="theme-section-title inline-flex items-center gap-2 text-sm">
+                      <input
+                        v-model="cardManaFamilyMode"
+                        type="radio"
+                        value="automatic"
+                        :disabled="formLocked"
+                      >
+                      Automatic
+                    </label>
+                    <label class="theme-section-title inline-flex items-center gap-2 text-sm">
+                      <input
+                        v-model="cardManaFamilyMode"
+                        type="radio"
+                        value="override"
+                        :disabled="formLocked"
+                      >
+                      Override
+                    </label>
+                  </div>
+                  <p class="theme-section-muted mt-1 text-sm">
+                    Automatic uses matching Tag, Type, and Symbol rules for this pool. Override uses exactly these Mana Families for every card in the batch.
+                  </p>
+                  <div
+                    v-if="cardManaFamilyMode === 'override'"
+                    class="flex flex-wrap gap-3"
+                  >
+                    <label
+                      v-for="option in manaFamilyOptions"
+                      :key="option.value"
+                      class="theme-section-title inline-flex items-center gap-2 text-sm"
+                    >
+                      <input
+                        v-model="cardManaFamilyOverride"
+                        type="checkbox"
+                        :value="option.value"
+                        :disabled="formLocked"
+                      >
+                      {{ option.label }}
+                    </label>
+                    <span
+                      v-if="cardManaFamilyOverride.length === 0"
+                      class="theme-section-muted basis-full text-sm"
+                    >
+                      Colorless
                     </span>
                   </div>
                 </fieldset>
@@ -380,6 +432,7 @@
 import { CARD_ROLE_OPTIONS } from '@/domain/cards/cardRoles';
 import { CARD_FACTION_OPTIONS } from '@/domain/cards/cardFactions';
 import { CARD_POOL_OPTIONS } from '@/domain/cards/cardPools';
+import { MANA_FAMILY_OPTIONS } from '@/domain/cards/manaFamilies';
 import { Info } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
@@ -400,6 +453,8 @@ const {
   cardRoleOverride,
   cardFactionMode,
   cardFactionOverride,
+  cardManaFamilyMode,
+  cardManaFamilyOverride,
   contentVersionBase,
   contentVersionDescription,
   currentContentVersion,
@@ -447,6 +502,7 @@ const templateOptions = computed(() =>
 const cardPoolOptions = CARD_POOL_OPTIONS;
 const cardRoleOptions = CARD_ROLE_OPTIONS;
 const cardFactionOptions = CARD_FACTION_OPTIONS;
+const manaFamilyOptions = MANA_FAMILY_OPTIONS;
 
 onBeforeRouteLeave(() => {
   if (!auth.canAccessStaffRoutes) return true;

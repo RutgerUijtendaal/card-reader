@@ -16,6 +16,7 @@ from card_reader_core.models import (
     Tag,
     Type,
     card_faction_keys,
+    card_mana_family_keys,
     card_role_keys,
     now_utc,
 )
@@ -64,6 +65,7 @@ from card_reader_core.repositories.metadata import (
 from card_reader_core.services.classification_rules import (
     ClassificationRuleService,
     classification_rule_payload,
+    ensure_default_mana_family_classification_rules,
 )
 from .input_normalization import CatalogInputNormalizer
 from .types import (
@@ -232,6 +234,13 @@ class CatalogService:
             "entry": entry,
             "linked_cards": linked_cards,
             "linked_card_count": linked_card_count,
+            "classification_rules": [
+                classification_rule_payload(rule)
+                for rule in ClassificationRuleService().rules_for_source(
+                    source_kind="symbol",
+                    source_id=entry_id,
+                )
+            ],
         }
 
     def accept_suggestion_to_existing(
@@ -446,7 +455,7 @@ class CatalogService:
             None,
             field_name="text_enrichment_json",
         )
-        return create_symbol(
+        symbol = create_symbol(
             key=normalized_key,
             label=normalized_label,
             symbol_type=self._normalizer.normalize_symbol_type(symbol_type),
@@ -457,6 +466,8 @@ class CatalogService:
             text_token=(text_token or "").strip(),
             enabled=enabled if enabled is not None else True,
         )
+        ensure_default_mana_family_classification_rules()
+        return symbol
 
     def update_symbol(
         self,
@@ -535,7 +546,14 @@ class CatalogService:
             raise ValueError(_protected_rule_message("Type", rules)) from exc
 
     def delete_symbol(self, *, entry_id: str) -> bool:
-        return delete_symbol(entry_id=entry_id)
+        try:
+            return delete_symbol(entry_id=entry_id)
+        except ProtectedError as exc:
+            rules = ClassificationRuleService().rules_for_source(
+                source_kind="symbol",
+                source_id=entry_id,
+            )
+            raise ValueError(_protected_rule_message("Symbol", rules)) from exc
 
     def _apply_symbol_updates(
         self,
@@ -616,6 +634,7 @@ class CatalogService:
                     "card_pool": card.card_pool,
                     "card_roles": list(card_role_keys(card)),
                     "card_factions": list(card_faction_keys(card)),
+                    "card_mana_families": list(card_mana_family_keys(card)),
                 }
             )
         return {
@@ -687,6 +706,7 @@ class CatalogService:
                     "card_pool": version.card.card_pool,
                     "card_roles": list(card_role_keys(version.card)),
                     "card_factions": list(card_faction_keys(version.card)),
+                    "card_mana_families": list(card_mana_family_keys(version.card)),
                 }
             )
         return previews, linked_card_count

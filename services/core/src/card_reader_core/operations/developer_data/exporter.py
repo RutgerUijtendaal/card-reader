@@ -12,7 +12,9 @@ from django.db.migrations.recorder import MigrationRecorder
 from card_reader_core.config.settings import settings
 from card_reader_core.models import (
     CARD_CLASSIFICATION_SOURCE_TAG,
+    CARD_CLASSIFICATION_SOURCE_TYPE,
     CARD_CLASSIFICATION_TARGET_ROLE,
+    CARD_CLASSIFICATION_TARGET_FACTION,
     CARD_FACTION_DEFINITIONS,
     CARD_POOL_DEFINITIONS,
     CARD_POOLS,
@@ -31,8 +33,10 @@ from card_reader_core.models import (
     Type,
     CardPool,
     card_faction_keys,
+    card_mana_family_keys,
     card_role_keys,
 )
+from card_reader_core.metadata import MANA_FAMILIES
 from card_reader_core.storage import relativize_image_storage_path, relativize_storage_path
 
 from .archive import DeveloperDataError, canonical_json_bytes, sha256_file
@@ -163,9 +167,10 @@ def _resolve_selection(
         card_queryset = card_queryset.filter(id__in=selected_card_ids)
     cards = list(
         card_queryset.prefetch_related(
-            "aliases",
             "role_assignments",
             "faction_assignments",
+            "mana_family_assignments",
+            "aliases",
             "versions__template",
             "versions__content_version",
             "versions__images",
@@ -201,7 +206,9 @@ def _build_payload(*, cards: list[Card], groups: list[CardGroup]) -> DeveloperDa
         classification_rules=sorted(
             (
                 _classification_rule_record(row)
-                for row in CardClassificationRule.objects.select_related("tag", "type")
+                for row in CardClassificationRule.objects.select_related(
+                    "tag", "type", "symbol"
+                )
             ),
             key=_classification_rule_sort_key,
         ),
@@ -231,7 +238,13 @@ def _build_payload(*, cards: list[Card], groups: list[CardGroup]) -> DeveloperDa
 def _classification_rule_record(
     row: CardClassificationRule,
 ) -> ClassificationRuleRecord:
-    source = row.tag if row.source_kind == "tag" else row.type
+    source = (
+        row.tag
+        if row.source_kind == "tag"
+        else row.type
+        if row.source_kind == "type"
+        else row.symbol
+    )
     if source is None:
         raise DeveloperDataError(f"Classification rule {row.id} has no source.")
     return ClassificationRuleRecord(
@@ -257,14 +270,27 @@ def _classification_rule_sort_key(
             for definition in CARD_ROLE_DEFINITIONS
             if definition.key == rule.target_key
         )
-    else:
+    elif rule.target_kind == CARD_CLASSIFICATION_TARGET_FACTION:
         target_kind_rank = 1
         target_rank = next(
             definition.rank
             for definition in CARD_FACTION_DEFINITIONS
             if definition.key == rule.target_key
         )
-    source_kind_rank = 0 if rule.source_kind == CARD_CLASSIFICATION_SOURCE_TAG else 1
+    else:
+        target_kind_rank = 2
+        target_rank = next(
+            definition.rank
+            for definition in MANA_FAMILIES
+            if definition.key == rule.target_key
+        )
+    source_kind_rank = (
+        0
+        if rule.source_kind == CARD_CLASSIFICATION_SOURCE_TAG
+        else 1
+        if rule.source_kind == CARD_CLASSIFICATION_SOURCE_TYPE
+        else 2
+    )
     return pool_rank, target_kind_rank, target_rank, source_kind_rank, rule.source_key
 
 
@@ -306,6 +332,7 @@ def _card_record(card: Card) -> CardRecord:
         card_pool=cast(CardPool, card.card_pool),
         card_roles=list(card_role_keys(card)),
         card_factions=list(card_faction_keys(card)),
+        card_mana_families=list(card_mana_family_keys(card)),
         deck_building_config=dict(card.deck_building_config_json),
         lifecycle_status=card.lifecycle_status,
         latest_version_number=latest_number,
@@ -381,6 +408,7 @@ def _card_reference_record(card: Card) -> CardReferenceRecord:
         key=card.key,
         card_pool=cast(CardPool, card.card_pool),
         card_factions=list(card_faction_keys(card)),
+        card_mana_families=list(card_mana_family_keys(card)),
     )
 
 
@@ -448,6 +476,16 @@ def _validate_coverage(
         if faction_counts[faction] < minimum:
             errors.append(
                 f"faction {faction} has {faction_counts[faction]} cards; requires {minimum}"
+            )
+    mana_family_counts = {
+        family: sum(family in card.card_mana_families for card in payload.cards)
+        for family in coverage.min_cards_by_mana_family
+    }
+    for family, minimum in coverage.min_cards_by_mana_family.items():
+        if mana_family_counts[family] < minimum:
+            errors.append(
+                f"mana family {family} has {mana_family_counts[family]} cards; "
+                f"requires {minimum}"
             )
     available_rules = {
         (

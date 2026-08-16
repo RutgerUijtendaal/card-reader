@@ -38,9 +38,12 @@ from card_reader_core.models import (
     Type,
     card_faction_identity_key,
 )
-from card_reader_core.repositories.cards import lock_card_identity_pools
-from card_reader_core.services.classification_rules import ClassificationRuleService
-from card_reader_core.metadata import mana_family_sort_key
+from card_reader_core.repositories.cards import lock_card_identity_pools, set_card_mana_families
+from card_reader_core.services.classification_rules import (
+    ClassificationRuleService,
+    ensure_default_mana_family_classification_rules,
+)
+from card_reader_core.metadata import MANA_FAMILY_BY_KEY
 
 from .archive import DeveloperDataError, extracted_archive, load_extracted_bundle, sha256_file
 from .schema import (
@@ -400,13 +403,17 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
         templates[template_record.key] = template
     classification_rule_service = ClassificationRuleService()
     for rule_record in payload.classification_rules:
-        source_rows = tags if rule_record.source_kind == "tag" else types
+        source_rows = {
+            "tag": tags,
+            "type": types,
+            "symbol": symbols,
+        }[rule_record.source_kind]
         source = source_rows[rule_record.source_key]
-        source_fields = (
-            {"tag_id": source.id, "type_id": None}
-            if rule_record.source_kind == "tag"
-            else {"tag_id": None, "type_id": source.id}
-        )
+        source_fields = {
+            "tag_id": source.id if rule_record.source_kind == "tag" else None,
+            "type_id": source.id if rule_record.source_kind == "type" else None,
+            "symbol_id": source.id if rule_record.source_kind == "symbol" else None,
+        }
         existing_rule = CardClassificationRule.objects.filter(
             card_pool=rule_record.card_pool,
             target_kind=rule_record.target_kind,
@@ -428,6 +435,7 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
                 rule_id=existing_rule.id,
                 enabled=rule_record.enabled,
             )
+    ensure_default_mana_family_classification_rules()
     for deck_tag_record in payload.deck_tags:
         DeckTag.objects.update_or_create(
             kind=deck_tag_record.kind,
@@ -467,6 +475,10 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
                 for faction in card_record.card_factions
             ]
         )
+        set_card_mana_families(
+            card=card,
+            mana_families=card_record.card_mana_families,
+        )
         CardAlias.objects.bulk_create(
             [
                 CardAlias(
@@ -491,7 +503,6 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
                 mana_cost=version.mana_cost,
                 mana_symbols_json=version.mana_symbols,
                 mana_value=version.mana_value,
-                mana_family_sort_key=mana_family_sort_key(version.symbol_keys),
                 attack=version.attack,
                 health=version.health,
                 rules_text_raw=version.rules_text_raw,
@@ -620,12 +631,24 @@ def _validate_payload_references(payload: DeveloperDataPayload) -> None:
         if identity in rule_identities:
             issues.append("classification rule identities are not unique")
         rule_identities.add(identity)
-        available_targets = CARD_ROLES if rule.target_kind == "role" else CARD_FACTIONS
+        available_targets = (
+            CARD_ROLES
+            if rule.target_kind == "role"
+            else CARD_FACTIONS
+            if rule.target_kind == "faction"
+            else tuple(MANA_FAMILY_BY_KEY)
+        )
         if rule.target_key not in available_targets:
             issues.append(
                 f"classification rule references unknown {rule.target_kind} {rule.target_key}"
             )
-        available_sources = tag_keys if rule.source_kind == "tag" else type_keys
+        available_sources = (
+            tag_keys
+            if rule.source_kind == "tag"
+            else type_keys
+            if rule.source_kind == "type"
+            else symbol_keys
+        )
         if rule.source_key not in available_sources:
             issues.append(
                 f"classification rule references unknown {rule.source_kind} {rule.source_key}"
@@ -699,6 +722,7 @@ def _payload_card_identity(card: DeveloperDataCardRecord) -> CardReferenceIdenti
             key=card.key,
             card_pool=card.card_pool,
             card_factions=card.card_factions,
+            card_mana_families=card.card_mana_families,
         )
     )
 

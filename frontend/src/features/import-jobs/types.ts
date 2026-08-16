@@ -1,6 +1,7 @@
 import type { CardRole } from '@/domain/cards/cardRoles';
 import type { CardFaction } from '@/domain/cards/cardFactions';
 import type { CardPool } from '@/domain/cards/cardPools';
+import type { ManaFamily } from '@/domain/cards/manaFamilies';
 
 export type ImportJobStatus = 'queued' | 'running' | 'canceling' | 'cancelled' | 'completed' | 'failed';
 
@@ -26,6 +27,8 @@ export type ImportJob = {
   card_role_override: CardRole[];
   card_faction_mode: 'automatic' | 'override';
   card_faction_override: CardFaction[];
+  card_mana_family_mode: 'automatic' | 'override';
+  card_mana_family_override: ManaFamily[];
   classification_rule_snapshot: {
     schema_version: number;
     card_pool: CardPool;
@@ -50,12 +53,14 @@ export type ImportJobItem = {
   warnings: ImportWarning[];
   resolved_card_roles: CardRole[];
   resolved_card_factions: CardFaction[];
+  resolved_card_mana_families: ManaFamily[];
   classification_inference: Record<string, unknown>;
   target_card_id: string | null;
   target_card_version_id: string | null;
   target_card_pool_snapshot: CardPool | null;
   target_card_roles_snapshot: CardRole[];
   target_card_factions_snapshot: CardFaction[];
+  target_card_mana_families_snapshot: ManaFamily[];
   card_tab_url: string | null;
 };
 

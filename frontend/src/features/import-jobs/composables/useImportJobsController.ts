@@ -3,6 +3,7 @@ import { computed, onMounted, ref, shallowRef } from 'vue';
 import type { CardRole } from '@/domain/cards/cardRoles';
 import type { CardFaction } from '@/domain/cards/cardFactions';
 import { isCardPool, type CardPool } from '@/domain/cards/cardPools';
+import type { ManaFamily } from '@/domain/cards/manaFamilies';
 import { fetchTemplates } from '@/domain/templates/api';
 import type { TemplateRecord } from '@/domain/templates/types';
 import {
@@ -49,6 +50,8 @@ export const useImportJobsController = () => {
   const cardRoleOverride = ref<CardRole[]>([]);
   const cardFactionMode = ref<'automatic' | 'override'>('automatic');
   const cardFactionOverride = ref<CardFaction[]>([]);
+  const cardManaFamilyMode = ref<'automatic' | 'override'>('automatic');
+  const cardManaFamilyOverride = ref<ManaFamily[]>([]);
   const creationKey = ref(newCreationKey());
   const createState = ref<ImportCreateState>({ phase: 'idle' });
   const pendingAttempt = shallowRef<CreateImportJobInput | null>(null);
@@ -177,6 +180,8 @@ export const useImportJobsController = () => {
     cardRoleOverride.value = [];
     cardFactionMode.value = 'automatic';
     cardFactionOverride.value = [];
+    cardManaFamilyMode.value = 'automatic';
+    cardManaFamilyOverride.value = [];
     pickerTemplateId.value = null;
     cardPool.value = null;
     creationKey.value = newCreationKey();
@@ -227,6 +232,9 @@ export const useImportJobsController = () => {
       cardFactionMode: cardFactionMode.value,
       cardFactionOverride:
         cardFactionMode.value === 'override' ? [...cardFactionOverride.value] : [],
+      cardManaFamilyMode: cardManaFamilyMode.value,
+      cardManaFamilyOverride:
+        cardManaFamilyMode.value === 'override' ? [...cardManaFamilyOverride.value] : [],
     };
     pendingAttempt.value = attempt;
     creatingJob.value = true;
@@ -291,6 +299,8 @@ export const useImportJobsController = () => {
     cardRoleOverride,
     cardFactionMode,
     cardFactionOverride,
+    cardManaFamilyMode,
+    cardManaFamilyOverride,
     creationKey,
     contentVersionBase,
     contentVersionDescription,

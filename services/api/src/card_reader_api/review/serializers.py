@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import cast
-
 from rest_framework import serializers
 
 from card_reader_api.cards.public_urls import card_image_asset_url
@@ -9,7 +7,10 @@ from card_reader_core.models import (
     CardVersion,
     CardVersionParseFlag,
     CardVersionParseFlagItem,
-    CardPool,
+    Card,
+    card_faction_keys,
+    card_mana_family_keys,
+    card_role_keys,
 )
 from card_reader_core.repositories.cards import get_card_image
 
@@ -46,10 +47,8 @@ def parse_flag_payload(flag: CardVersionParseFlag) -> dict[str, object]:
             "username": submitted_by.get_username(),
         },
         "card": _card_payload(
-            card_id=card.id,
-            card_label=card.label,
+            card=card,
             card_name=version.name,
-            card_pool=cast(CardPool, card.card_pool),
             image_url=image_url,
         ),
         "version": _version_payload(version),
@@ -72,10 +71,8 @@ def parse_flag_item_payload(item: CardVersionParseFlagItem) -> dict[str, object]
             "username": submitted_by.get_username(),
         },
         "card": _card_payload(
-            card_id=card.id,
-            card_label=card.label,
+            card=card,
             card_name=version.name,
-            card_pool=cast(CardPool, card.card_pool),
             image_url=image_url,
         ),
         "version": _version_payload(version),
@@ -107,17 +104,18 @@ def _parse_flag_item_fields(item: CardVersionParseFlagItem) -> dict[str, object]
 
 def _card_payload(
     *,
-    card_id: str,
-    card_label: str,
+    card: Card,
     card_name: str,
-    card_pool: CardPool,
     image_url: str | None,
 ) -> dict[str, object]:
     return {
-        "id": card_id,
-        "label": card_label,
+        "id": card.id,
+        "label": card.label,
         "name": card_name,
-        "card_pool": card_pool,
+        "card_pool": card.card_pool,
+        "card_roles": list(card_role_keys(card)),
+        "card_factions": list(card_faction_keys(card)),
+        "card_mana_families": list(card_mana_family_keys(card)),
         "image_url": image_url,
     }
 

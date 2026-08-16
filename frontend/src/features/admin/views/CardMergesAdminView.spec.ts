@@ -68,6 +68,7 @@ const buildPreview = (): CardMergePreview => ({
     card_pool: 'player',
     card_roles: [],
     card_factions: [],
+    card_mana_families: ['arcane'],
   },
   sources: [
     {
@@ -79,9 +80,11 @@ const buildPreview = (): CardMergePreview => ({
       card_pool: 'player',
       card_roles: [],
       card_factions: [],
+      card_mana_families: ['dark'],
     },
   ],
   aliases: [],
+  warnings: ["Source Card's mana families differ from Target Card; the target assignment will be kept."],
   relations: {
     deck_entry_collisions: 0,
     sideboard_entry_collisions: 0,

@@ -66,6 +66,7 @@
               {{ cardPoolLabel(selectedJobDetail.card_pool) }} ·
               roles {{ selectedJobDetail.card_role_mode }} · factions
               {{ selectedJobDetail.card_faction_mode }}
+              · Mana {{ selectedJobDetail.card_mana_family_mode }}
             </p>
           </div>
           <button
@@ -95,6 +96,9 @@
               </p>
               <p class="theme-section-muted text-xs">
                 Factions: {{ formatImportFactions(item.resolved_card_factions) }}
+              </p>
+              <p class="theme-section-muted text-xs">
+                Mana: {{ formatImportManaFamilies(item.resolved_card_mana_families) }}
               </p>
               <dl class="theme-section-muted grid gap-1 text-xs">
                 <div
@@ -214,6 +218,14 @@
                       : job.card_role_override.length > 0
                         ? `Override: ${job.card_role_override.join(', ')}`
                         : 'Override: Normal'
+                  }}
+                  ·
+                  {{
+                    job.card_mana_family_mode === 'automatic'
+                      ? 'Automatic Mana Families'
+                      : job.card_mana_family_override.length > 0
+                        ? `Mana override: ${job.card_mana_family_override.join(', ')}`
+                        : 'Mana override: Colorless'
                   }}
                   ·
                   {{
@@ -376,6 +388,7 @@ import type { ImportJob, ImportJobDetail } from '@/features/import-jobs/types';
 import {
   formatImportRoles,
   formatImportFactions,
+  formatImportManaFamilies,
   getImportEvidencePlaceholder,
   getImportEvidenceState,
   getInferenceEvidence,

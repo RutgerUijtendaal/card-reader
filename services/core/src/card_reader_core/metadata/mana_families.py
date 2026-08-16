@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import combinations
+from typing import Literal
+
+
+ManaFamily = Literal["arcane", "dark", "divine", "martial", "occult", "primal"]
 
 
 @dataclass(frozen=True)
 class ManaFamilyDefinition:
-    key: str
+    key: ManaFamily
     label: str
     rank: int
     mana_symbol_key: str
@@ -17,11 +21,15 @@ class ManaFamilyDefinition:
         return self.affinity_symbol_keys[0]
 
     @property
+    def display_symbol_key(self) -> str:
+        return self.mana_symbol_key
+
+    @property
     def symbol_keys(self) -> tuple[str, ...]:
         return (self.mana_symbol_key, *self.affinity_symbol_keys)
 
 
-_FAMILY_LABELS = (
+_FAMILY_LABELS: tuple[tuple[ManaFamily, str], ...] = (
     ("arcane", "Arcane"),
     ("dark", "Dark"),
     ("divine", "Divine"),
@@ -42,6 +50,9 @@ MANA_FAMILIES: tuple[ManaFamilyDefinition, ...] = tuple(
 )
 
 MANA_FAMILY_BY_KEY = {family.key: family for family in MANA_FAMILIES}
+MANA_FAMILY_CHOICES: tuple[tuple[ManaFamily, str], ...] = tuple(
+    (family.key, family.label) for family in MANA_FAMILIES
+)
 MANA_FAMILY_BY_SYMBOL_KEY = {
     symbol_key: family
     for family in MANA_FAMILIES
@@ -61,12 +72,14 @@ _MULTI_FAMILY_RANKS = {
 NO_MANA_FAMILY_SORT_KEY = len(MANA_FAMILIES) + len(_MULTI_FAMILY_COMBINATIONS)
 
 
-def normalize_mana_family_keys(values: list[str] | tuple[str, ...]) -> tuple[str, ...]:
+def normalize_mana_family_keys(values: list[str] | tuple[str, ...]) -> tuple[ManaFamily, ...]:
     selected = {value.strip().casefold() for value in values if value.strip().casefold() in MANA_FAMILY_BY_KEY}
     return tuple(family.key for family in MANA_FAMILIES if family.key in selected)
 
 
-def mana_family_keys_for_symbol_keys(symbol_keys: list[str] | tuple[str, ...]) -> tuple[str, ...]:
+def mana_family_keys_for_symbol_keys(
+    symbol_keys: list[str] | tuple[str, ...],
+) -> tuple[ManaFamily, ...]:
     selected = {
         family.key
         for raw_key in symbol_keys
@@ -83,10 +96,15 @@ def mana_family_symbol_keys(family_keys: list[str] | tuple[str, ...]) -> tuple[s
     )
 
 
-def mana_family_sort_key(symbol_keys: list[str] | tuple[str, ...]) -> int:
-    ranks = tuple(MANA_FAMILY_BY_KEY[key].rank for key in mana_family_keys_for_symbol_keys(symbol_keys))
+def mana_family_sort_key_for_family_keys(family_keys: list[str] | tuple[str, ...]) -> int:
+    ranks = tuple(MANA_FAMILY_BY_KEY[key].rank for key in normalize_mana_family_keys(family_keys))
     if len(ranks) == 1:
         return _SINGLE_FAMILY_RANKS[ranks]
     if len(ranks) > 1:
         return _MULTI_FAMILY_RANKS[ranks]
     return NO_MANA_FAMILY_SORT_KEY
+
+
+def mana_family_sort_key(symbol_keys: list[str] | tuple[str, ...]) -> int:
+    """Return the legacy symbol-derived key used by compatibility imports."""
+    return mana_family_sort_key_for_family_keys(mana_family_keys_for_symbol_keys(symbol_keys))

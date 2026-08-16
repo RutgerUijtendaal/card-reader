@@ -37,7 +37,7 @@ def rule(
 
 def snapshot(*rules: dict[str, object], card_pool: str = "evil") -> dict[str, object]:
     body: dict[str, object] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "card_pool": card_pool,
         "rules": list(rules),
     }
@@ -54,8 +54,11 @@ def classification_input(
     role_override: tuple[str, ...] = (),
     faction_mode: str = "automatic",
     faction_override: tuple[str, ...] = (),
+    mana_family_mode: str = "automatic",
+    mana_family_override: tuple[str, ...] = (),
     tags: tuple[tuple[str, str], ...] = (),
     types: tuple[tuple[str, str], ...] = (),
+    symbols: tuple[tuple[str, str], ...] = (),
 ) -> CardClassificationInput:
     return CardClassificationInput(
         card_pool="evil",
@@ -63,9 +66,14 @@ def classification_input(
         override_roles=role_override,  # type: ignore[arg-type]
         faction_mode=faction_mode,  # type: ignore[arg-type]
         override_factions=faction_override,  # type: ignore[arg-type]
+        mana_family_mode=mana_family_mode,  # type: ignore[arg-type]
+        override_mana_families=mana_family_override,  # type: ignore[arg-type]
         rule_snapshot=snapshot(*rules),
         matched_tags=tuple(DetectedClassificationSource(id=id_, key=key) for id_, key in tags),
         matched_types=tuple(DetectedClassificationSource(id=id_, key=key) for id_, key in types),
+        matched_symbols=tuple(
+            DetectedClassificationSource(id=id_, key=key) for id_, key in symbols
+        ),
     )
 
 
@@ -186,8 +194,76 @@ def test_unmatched_rules_are_a_resolved_empty_classification() -> None:
 
     assert result.roles == ()
     assert result.factions == ()
+    assert result.mana_families == ()
     assert result.evidence["roles"]["resolved_roles"] == []
     assert result.evidence["factions"]["resolved_factions"] == []
+    assert result.evidence["mana_families"]["resolved_mana_families"] == []
+
+
+def test_mana_family_inference_unions_symbol_tag_and_type_rules_with_evidence() -> None:
+    rules = (
+        rule(
+            "rule-arcane-symbol",
+            target_kind="mana_family",
+            target_key="arcane",
+            source_kind="symbol",
+            source_id="symbol-arcane",
+            source_key="arcane-affinity",
+        ),
+        rule(
+            "rule-dark-tag",
+            target_kind="mana_family",
+            target_key="dark",
+            source_kind="tag",
+            source_id="tag-dark",
+            source_key="dark",
+        ),
+        rule(
+            "rule-primal-type",
+            target_kind="mana_family",
+            target_key="primal",
+            source_kind="type",
+            source_id="type-primal",
+            source_key="primal-card",
+        ),
+    )
+
+    result = classify_import_card(
+        classification_input(
+            rules=rules,
+            tags=(("tag-dark", "dark"),),
+            types=(("type-primal", "primal-card"),),
+            symbols=(("symbol-arcane", "arcane-affinity"),),
+        )
+    )
+
+    assert result.mana_families == ("arcane", "dark", "primal")
+    assert result.evidence["mana_families"]["matched_symbol_sources"] == [
+        {"id": "symbol-arcane", "key": "arcane-affinity"}
+    ]
+
+
+def test_mana_family_override_is_independent_and_can_resolve_colorless() -> None:
+    result = classify_import_card(
+        classification_input(
+            rules=(
+                rule(
+                    "rule-arcane",
+                    target_kind="mana_family",
+                    target_key="arcane",
+                    source_kind="symbol",
+                    source_id="symbol-arcane",
+                    source_key="arcane-mana",
+                ),
+            ),
+            mana_family_mode="override",
+            mana_family_override=(),
+            symbols=(("symbol-arcane", "arcane-mana"),),
+        )
+    )
+
+    assert result.mana_families == ()
+    assert result.evidence["mana_families"]["matched_rules"] == []
 
 
 def test_snapshot_pool_and_digest_are_validated() -> None:

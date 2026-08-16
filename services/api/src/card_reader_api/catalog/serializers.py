@@ -85,6 +85,7 @@ def suggestion_occurrence_payload(row: SuggestionOccurrencePreview) -> dict[str,
         "card_pool": row["card_pool"],
         "card_roles": row["card_roles"],
         "card_factions": row["card_factions"],
+        "card_mana_families": row["card_mana_families"],
     }
 
 
@@ -98,6 +99,7 @@ def linked_card_payload(row: LinkedCardPreview) -> dict[str, object]:
         "card_pool": row["card_pool"],
         "card_roles": row["card_roles"],
         "card_factions": row["card_factions"],
+        "card_mana_families": row["card_mana_families"],
     }
 
 
@@ -147,6 +149,7 @@ def symbol_detail_payload(row: SymbolDetail) -> dict[str, object]:
     payload = symbol_payload(row["entry"])
     payload["linked_cards"] = [linked_card_payload(item) for item in row["linked_cards"]]
     payload["linked_card_count"] = row["linked_card_count"]
+    payload["classification_rules"] = row["classification_rules"]
     return payload
 
 

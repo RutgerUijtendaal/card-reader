@@ -3,6 +3,8 @@ from card_reader_core.metadata import (
     NO_MANA_FAMILY_SORT_KEY,
     mana_family_keys_for_symbol_keys,
     mana_family_sort_key,
+    mana_family_sort_key_for_family_keys,
+    normalize_mana_family_keys,
 )
 
 
@@ -15,6 +17,23 @@ def test_mana_family_catalog_has_the_release_owned_order() -> None:
         ("occult", "Occult", 4),
         ("primal", "Primal", 5),
     ]
+    assert [family.display_symbol_key for family in MANA_FAMILIES] == [
+        "arcane-mana",
+        "dark-mana",
+        "divine-mana",
+        "martial-mana",
+        "occult-mana",
+        "primal-mana",
+    ]
+
+
+def test_stored_family_normalization_is_canonical_and_empty_is_colorless() -> None:
+    assert normalize_mana_family_keys(("primal", "arcane", "primal", "unknown")) == (
+        "arcane",
+        "primal",
+    )
+    assert mana_family_sort_key_for_family_keys(()) == NO_MANA_FAMILY_SORT_KEY
+    assert mana_family_sort_key_for_family_keys(("arcane", "dark")) == 6
 
 
 def test_mana_and_affinity_aliases_resolve_to_one_family() -> None:

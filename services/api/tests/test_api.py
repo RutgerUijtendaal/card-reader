@@ -2,7 +2,6 @@ import hashlib
 import json
 from collections.abc import Iterator
 from datetime import timedelta
-from importlib import import_module
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
@@ -37,6 +36,7 @@ from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE  # noqa: 
 from card_reader_core.repositories.cards import (  # noqa: E402
     get_latest_card_version,
     save_parsed_card,
+    set_card_mana_families,
     update_latest_card_version,
 )
 from card_reader_core.repositories.import_jobs import create_import_job_with_files  # noqa: E402
@@ -59,7 +59,6 @@ from card_reader_core.storage import (
     resolve_storage_path,
 )  # noqa: E402
 from django.contrib.auth import get_user_model  # noqa: E402
-from django.apps import apps  # noqa: E402
 from django.db import connection  # noqa: E402
 from django.core.files.uploadedfile import SimpleUploadedFile  # noqa: E402
 from django.test.utils import CaptureQueriesContext  # noqa: E402
@@ -2481,10 +2480,6 @@ def test_cards_list_supports_name_and_mana_sorting() -> None:
 
 
 def test_cards_list_supports_indexed_mana_family_sorting_and_pagination() -> None:
-    arcane_mana = _get_or_create_symbol(key="arcane-mana", label="Arcane Mana", symbol_type="mana")
-    dark_affinity = _get_or_create_symbol(
-        key="dark-affinity", label="Dark Affinity", symbol_type="affinity"
-    )
     cards_and_versions = [
         _create_editable_card_version(name="Family Sort Zeta Arcane"),
         _create_editable_card_version(name="Family Sort Alpha Dark"),
@@ -2493,15 +2488,10 @@ def test_cards_list_supports_indexed_mana_family_sorting_and_pagination() -> Non
     ]
     for _card, version in cards_and_versions:
         _create_card_image(version)
-    replace_card_version_symbols(
-        card_version_id=cards_and_versions[0][1].id, symbol_ids=[arcane_mana.id]
-    )
-    replace_card_version_symbols(
-        card_version_id=cards_and_versions[1][1].id, symbol_ids=[dark_affinity.id]
-    )
-    replace_card_version_symbols(
-        card_version_id=cards_and_versions[2][1].id,
-        symbol_ids=[arcane_mana.id, dark_affinity.id],
+    set_card_mana_families(card=cards_and_versions[0][0], mana_families=("arcane",))
+    set_card_mana_families(card=cards_and_versions[1][0], mana_families=("dark",))
+    set_card_mana_families(
+        card=cards_and_versions[2][0], mana_families=("arcane", "dark")
     )
 
     client = Client(HTTP_HOST="localhost")
@@ -2537,12 +2527,7 @@ def test_cards_list_supports_indexed_mana_family_sorting_and_pagination() -> Non
     assert "LIMIT 2" in sql
 
 
-def test_cards_list_filters_mana_families_across_mana_and_affinity_aliases() -> None:
-    arcane_mana = _get_or_create_symbol(key="arcane-mana", label="Arcane Mana", symbol_type="mana")
-    arcane_affinity = _get_or_create_symbol(
-        key="arcane-affinity", label="Arcane Affinity", symbol_type="affinity"
-    )
-    dark_mana = _get_or_create_symbol(key="dark-mana", label="Dark Mana", symbol_type="mana")
+def test_cards_list_filters_stored_mana_family_assignments() -> None:
     rows = [
         _create_editable_card_version(name="Family Filter Mana"),
         _create_editable_card_version(name="Family Filter Affinity"),
@@ -2551,12 +2536,10 @@ def test_cards_list_filters_mana_families_across_mana_and_affinity_aliases() -> 
     ]
     for _card, version in rows:
         _create_card_image(version)
-    replace_card_version_symbols(card_version_id=rows[0][1].id, symbol_ids=[arcane_mana.id])
-    replace_card_version_symbols(card_version_id=rows[1][1].id, symbol_ids=[arcane_affinity.id])
-    replace_card_version_symbols(
-        card_version_id=rows[2][1].id, symbol_ids=[arcane_affinity.id, dark_mana.id]
-    )
-    replace_card_version_symbols(card_version_id=rows[3][1].id, symbol_ids=[dark_mana.id])
+    set_card_mana_families(card=rows[0][0], mana_families=("arcane",))
+    set_card_mana_families(card=rows[1][0], mana_families=("arcane",))
+    set_card_mana_families(card=rows[2][0], mana_families=("arcane", "dark"))
+    set_card_mana_families(card=rows[3][0], mana_families=("dark",))
 
     client = Client(HTTP_HOST="localhost")
     any_response = client.get("/cards", {"q": "Family Filter", "mana_family_keys": ["arcane"]})
@@ -2587,29 +2570,23 @@ def test_cards_list_filters_mana_families_across_mana_and_affinity_aliases() -> 
     }
 
 
-def test_mana_family_sort_key_backfill_and_symbol_mutations_stay_synchronized() -> None:
+def test_symbol_mutations_do_not_change_stored_mana_families() -> None:
     symbol = _get_or_create_symbol(
         key="family-sync-unmatched", label="Family Sync", symbol_type="affinity"
     )
-    _card, version = _create_editable_card_version(name="Family Synchronization")
+    card, version = _create_editable_card_version(name="Family Synchronization")
+    set_card_mana_families(card=card, mana_families=("arcane",))
     replace_card_version_symbols(card_version_id=version.id, symbol_ids=[symbol.id])
-    version.refresh_from_db()
-    assert version.mana_family_sort_key == 63
+    card.refresh_from_db()
+    assert card.mana_family_sort_key == 0
 
     update_symbol(entry_id=str(symbol.id), updates={"key": "primal-affinity"})
-    version.refresh_from_db()
-    assert version.mana_family_sort_key == 5
-
-    version.mana_family_sort_key = 63
-    version.save(update_fields=["mana_family_sort_key"])
-    migration = import_module("card_reader_core.migrations.0051_card_version_mana_family_sort_key")
-    migration.backfill_mana_family_sort_keys(apps, None)
-    version.refresh_from_db()
-    assert version.mana_family_sort_key == 5
+    card.refresh_from_db()
+    assert card.mana_family_sort_key == 0
 
     assert delete_symbol(entry_id=str(symbol.id)) is True
-    version.refresh_from_db()
-    assert version.mana_family_sort_key == 63
+    card.refresh_from_db()
+    assert card.mana_family_sort_key == 0
 
     arcane_symbol = _get_or_create_symbol(
         key="arcane-mana",
@@ -2617,7 +2594,7 @@ def test_mana_family_sort_key_backfill_and_symbol_mutations_stay_synchronized() 
         symbol_type="mana",
     )
     updated = update_latest_card_version(
-        card_id=_card.id,
+        card_id=card.id,
         updates={"symbol_ids": [arcane_symbol.id]},
         restore_fields=[],
         restore_metadata_groups=[],
@@ -2625,10 +2602,9 @@ def test_mana_family_sort_key_backfill_and_symbol_mutations_stay_synchronized() 
         unlock_metadata_groups=[],
     )
     assert updated is not None
-    _updated_card, updated_version = updated
-    assert updated_version.mana_family_sort_key == 0
-    updated_version.refresh_from_db()
-    assert updated_version.mana_family_sort_key == 0
+    updated_card, _updated_version = updated
+    updated_card.refresh_from_db()
+    assert updated_card.mana_family_sort_key == 0
 
 
 def test_cards_list_uses_pool_aware_player_default_before_pagination() -> None:
@@ -2658,21 +2634,21 @@ def test_cards_list_uses_pool_aware_player_default_before_pagination() -> None:
         dark_hero_version,
     ):
         _create_card_image(version)
-    for version, mana_value in (
-        (arcane_hero_version, 6),
-        (arcane_normal_low_version, 1),
-        (arcane_normal_high_version, 4),
-        (arcane_boss_version, 0),
+    for card, version, mana_value in (
+        (arcane_hero, arcane_hero_version, 6),
+        (arcane_normal_low, arcane_normal_low_version, 1),
+        (arcane_normal_high, arcane_normal_high_version, 4),
+        (arcane_boss, arcane_boss_version, 0),
     ):
-        version.mana_family_sort_key = 0
+        set_card_mana_families(card=card, mana_families=("arcane",))
         version.mana_value = mana_value
-        version.save(update_fields=["mana_family_sort_key", "mana_value"])
-    arcane_normal_null_version.mana_family_sort_key = 0
+        version.save(update_fields=["mana_value"])
+    set_card_mana_families(card=arcane_normal_null, mana_families=("arcane",))
     arcane_normal_null_version.mana_value = None
-    arcane_normal_null_version.save(update_fields=["mana_family_sort_key", "mana_value"])
-    dark_hero_version.mana_family_sort_key = 1
+    arcane_normal_null_version.save(update_fields=["mana_value"])
+    set_card_mana_families(card=dark_hero, mana_families=("dark",))
     dark_hero_version.mana_value = 0
-    dark_hero_version.save(update_fields=["mana_family_sort_key", "mana_value"])
+    dark_hero_version.save(update_fields=["mana_value"])
     CardRoleAssignment.objects.bulk_create(
         [
             CardRoleAssignment(card=arcane_hero, role="hero"),
@@ -3026,7 +3002,7 @@ def test_grouped_gallery_sort_uses_anchor_card_values() -> None:
     assert results[1]["anchor_card_id"] == anchor_card.id
 
 
-def test_grouped_gallery_mana_family_sort_uses_the_anchor_version() -> None:
+def test_grouped_gallery_mana_family_sort_uses_the_anchor_card() -> None:
     arcane_mana = _get_or_create_symbol(key="arcane-mana", label="Arcane Mana", symbol_type="mana")
     dark_affinity = _get_or_create_symbol(
         key="dark-affinity", label="Dark Affinity", symbol_type="affinity"
@@ -3043,6 +3019,9 @@ def test_grouped_gallery_mana_family_sort_uses_the_anchor_version() -> None:
     replace_card_version_symbols(
         card_version_id=standalone_version.id, symbol_ids=[dark_affinity.id]
     )
+    set_card_mana_families(card=group_anchor, mana_families=("arcane",))
+    set_card_mana_families(card=group_member, mana_families=("dark",))
+    set_card_mana_families(card=standalone, mana_families=("dark",))
     _create_card_group(
         "mana-family-sorted-group",
         anchor_card=group_anchor,
@@ -3144,15 +3123,15 @@ def test_grouped_gallery_default_sort_uses_anchor_card_values() -> None:
     )
     for version in (anchor_version, member_version, standalone_version):
         _create_card_image(version)
-    anchor_version.mana_family_sort_key = 0
-    member_version.mana_family_sort_key = 0
-    standalone_version.mana_family_sort_key = 0
+    set_card_mana_families(card=anchor_card, mana_families=("arcane",))
+    set_card_mana_families(card=member_card, mana_families=("arcane",))
+    set_card_mana_families(card=standalone_card, mana_families=("arcane",))
     anchor_version.mana_value = 0
     member_version.mana_value = 0
     standalone_version.mana_value = 9
-    anchor_version.save(update_fields=["mana_family_sort_key", "mana_value"])
-    member_version.save(update_fields=["mana_family_sort_key", "mana_value"])
-    standalone_version.save(update_fields=["mana_family_sort_key", "mana_value"])
+    anchor_version.save(update_fields=["mana_value"])
+    member_version.save(update_fields=["mana_value"])
+    standalone_version.save(update_fields=["mana_value"])
     CardRoleAssignment.objects.bulk_create(
         [
             CardRoleAssignment(card=anchor_card, role="boss"),
@@ -3257,6 +3236,8 @@ def test_export_cards_csv_honors_mana_family_sort() -> None:
     _create_card_image(arcane_version)
     replace_card_version_symbols(card_version_id=dark_version.id, symbol_ids=[dark_mana.id])
     replace_card_version_symbols(card_version_id=arcane_version.id, symbol_ids=[arcane_affinity.id])
+    set_card_mana_families(card=_dark_card, mana_families=("dark",))
+    set_card_mana_families(card=_arcane_card, mana_families=("arcane",))
 
     response = _staff_client("csv-export-family-sort-user").get(
         "/exports/csv",
@@ -3904,7 +3885,8 @@ def test_import_assigns_content_version_to_created_card_version() -> None:
 
 
 def test_targeted_reparse_preserves_existing_card_version_content_version() -> None:
-    _card, target_version = _create_editable_card_version(name="Content Version Reparse")
+    card, target_version = _create_editable_card_version(name="Content Version Reparse")
+    set_card_mana_families(card=card, mana_families=("arcane",))
     primal_symbol = _get_or_create_symbol(
         key="primal-affinity",
         label="Primal Affinity",
@@ -3961,9 +3943,8 @@ def test_targeted_reparse_preserves_existing_card_version_content_version() -> N
 
     assert version.id == target_version.id
     assert version.content_version == original_content_version
-    assert version.mana_family_sort_key == 5
-    version.refresh_from_db()
-    assert version.mana_family_sort_key == 5
+    card.refresh_from_db()
+    assert card.mana_family_sort_key == 0
 
 
 def test_ordinary_import_matching_latest_checksum_creates_new_content_version_snapshot() -> None:
@@ -4132,11 +4113,13 @@ def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
         card_pool="evil",
         resolved_card_roles=("hero", "event"),
         resolved_card_factions=("order", "dark", "metal"),
+        resolved_card_mana_families=("arcane", "dark"),
         classification_evidence={
             "roles": {
                 "mode": "automatic",
                 "matched_tag_sources": [{"id": "tag-hero", "key": "hero"}],
                 "matched_type_sources": [],
+                "matched_symbol_sources": [],
                 "matched_rules": [],
                 "override_roles": [],
                 "resolved_roles": ["hero", "event"],
@@ -4150,9 +4133,23 @@ def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
                     {"id": "tag-metal", "key": "metal"},
                 ],
                 "matched_type_sources": [],
+                "matched_symbol_sources": [],
                 "matched_rules": [],
                 "override_factions": [],
                 "resolved_factions": ["order", "dark", "metal"],
+                "snapshot_digest": "test-digest",
+            },
+            "mana_families": {
+                "mode": "automatic",
+                "matched_tag_sources": [],
+                "matched_type_sources": [],
+                "matched_symbol_sources": [
+                    {"id": "symbol-arcane", "key": "arcane-mana"},
+                    {"id": "symbol-dark", "key": "dark-affinity"},
+                ],
+                "matched_rules": [],
+                "override_mana_families": [],
+                "resolved_mana_families": ["arcane", "dark"],
                 "snapshot_digest": "test-digest",
             },
         },
@@ -4170,6 +4167,10 @@ def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
     assert item.status == "completed"
     assert item.resolved_card_roles_json == ["hero", "event"]
     assert item.resolved_card_factions_json == ["order", "dark", "metal"]
+    assert item.resolved_card_mana_families_json == ["arcane", "dark"]
+    assert set(
+        version.card.mana_family_assignments.values_list("mana_family", flat=True)
+    ) == {"arcane", "dark"}
     assert item.classification_inference_json["roles"]["matched_tag_sources"] == [
         {"id": "tag-hero", "key": "hero"}
     ]
@@ -4182,6 +4183,7 @@ def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifec
     card.lifecycle_status = "deprecated"
     card.card_pool = "evil"
     card.save(update_fields=["lifecycle_status", "card_pool"])
+    set_card_mana_families(card=card, mana_families=("arcane",))
     source_file = settings.storage_root_dir / "uploads" / "classification-mismatch.png"
     source_file.parent.mkdir(parents=True, exist_ok=True)
     source_file.write_bytes(b"classification-mismatch")
@@ -4206,11 +4208,13 @@ def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifec
         reparse_existing=False,
         card_pool="evil",
         resolved_card_roles=("event",),
+        resolved_card_mana_families=("dark",),
         classification_evidence={
             "roles": {
                 "mode": "automatic",
                 "matched_tag_sources": [],
                 "matched_type_sources": [],
+                "matched_symbol_sources": [],
                 "matched_rules": [],
                 "override_roles": [],
                 "resolved_roles": ["event"],
@@ -4220,9 +4224,22 @@ def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifec
                 "mode": "automatic",
                 "matched_tag_sources": [],
                 "matched_type_sources": [],
+                "matched_symbol_sources": [],
                 "matched_rules": [],
                 "override_factions": [],
                 "resolved_factions": [],
+                "snapshot_digest": "test-digest",
+            },
+            "mana_families": {
+                "mode": "automatic",
+                "matched_tag_sources": [],
+                "matched_type_sources": [],
+                "matched_symbol_sources": [
+                    {"id": "symbol-dark", "key": "dark-mana"}
+                ],
+                "matched_rules": [],
+                "override_mana_families": [],
+                "resolved_mana_families": ["dark"],
                 "snapshot_digest": "test-digest",
             },
         },
@@ -4234,11 +4251,25 @@ def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifec
     assert version.version_number == target_version.version_number + 1
     assert card.card_pool == "evil"
     assert not card.role_assignments.exists()
+    assert list(card.mana_family_assignments.values_list("mana_family", flat=True)) == [
+        "arcane"
+    ]
     assert item.status == "completed"
     assert [warning["code"] for warning in item.warnings_json] == [
         "matched_deprecated_card",
         "card_classification_mismatch",
     ]
+    mismatch = next(
+        warning
+        for warning in item.warnings_json
+        if warning["code"] == "card_classification_mismatch"
+    )
+    assert mismatch["details"]["stored"]["card_mana_families"] == ["arcane"]
+    assert mismatch["details"]["live"]["card_mana_families"] == ["arcane"]
+    assert mismatch["details"]["inferred"]["card_mana_families"] == ["dark"]
+    assert item.classification_inference_json["mana_families"][
+        "matched_symbol_sources"
+    ] == [{"id": "symbol-dark", "key": "dark-mana"}]
 
 
 def test_untargeted_import_does_not_match_same_name_or_image_hash_across_pools() -> None:

@@ -144,7 +144,7 @@ export const useDeckEditor = () => {
   const activateCards = (): void => {
     editorMode.value = 'cards';
     if (shouldApplyHeroCardPreset.value) {
-      filters.applyHeroAffinityManaPreset(deck.selectedHero.value);
+      filters.applyHeroManaFamilyPreset(deck.selectedHero.value);
       shouldApplyHeroCardPreset.value = false;
     }
   };

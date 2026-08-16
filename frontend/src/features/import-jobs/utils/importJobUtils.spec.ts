@@ -46,6 +46,8 @@ describe('importJobs utils', () => {
           card_role_override: [],
           card_faction_mode: 'automatic',
           card_faction_override: [],
+          card_mana_family_mode: 'automatic',
+          card_mana_family_override: [],
           classification_rule_snapshot: { schema_version: 1, card_pool: 'player', rules: [], digest: 'abc123' },
         },
       ]),
@@ -67,6 +69,8 @@ describe('importJobs utils', () => {
         card_role_override: [],
         card_faction_mode: 'automatic',
         card_faction_override: [],
+        card_mana_family_mode: 'automatic',
+        card_mana_family_override: [],
         classification_rule_snapshot: { schema_version: 1, card_pool: 'player', rules: [], digest: 'abc123' },
       }),
     ).toBe(0);

@@ -12,6 +12,7 @@ from card_reader_core.models import (
     ImportJob,
     Template,
 )
+from card_reader_core.metadata import ManaFamily
 
 SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
@@ -27,6 +28,7 @@ class ImportJobItemTarget:
     card_pool: CardPool = DEFAULT_CARD_POOL
     card_roles: tuple[CardRole, ...] = ()
     card_factions: tuple[CardFaction, ...] = ()
+    card_mana_families: tuple[ManaFamily, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,8 @@ class PreparedImportJobInputs:
     card_role_override: tuple[CardRole, ...]
     card_faction_mode: str
     card_faction_override: tuple[CardFaction, ...]
+    card_mana_family_mode: str
+    card_mana_family_override: tuple[ManaFamily, ...]
 
 
 class GroupedReparseSource(Protocol):
@@ -69,6 +73,9 @@ class GroupedReparseSource(Protocol):
 
     @property
     def card_factions(self) -> tuple[CardFaction, ...]: ...
+
+    @property
+    def card_mana_families(self) -> tuple[ManaFamily, ...]: ...
 
 
 @dataclass(frozen=True)

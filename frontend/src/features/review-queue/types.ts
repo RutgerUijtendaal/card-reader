@@ -1,5 +1,8 @@
 import type { PaginatedCardsResponse } from '@/domain/cards/types';
 import type { CardPool } from '@/domain/cards/cardPools';
+import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardFaction } from '@/domain/cards/cardFactions';
+import type { ManaFamily } from '@/domain/cards/manaFamilies';
 import type { ParseFlagPropertyKey } from '@/domain/review/types';
 
 export type ReviewCard = { id: string; name: string; confidence: number; card_pool: CardPool };
@@ -33,6 +36,9 @@ export type ParseFlagReviewReport = {
     label: string;
     name: string;
     card_pool: CardPool;
+    card_roles: CardRole[];
+    card_factions: CardFaction[];
+    card_mana_families: ManaFamily[];
     image_url: string | null;
   };
   version: {

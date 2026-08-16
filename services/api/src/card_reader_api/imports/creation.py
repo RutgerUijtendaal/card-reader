@@ -16,6 +16,7 @@ from filelock import FileLock, Timeout as FileLockTimeout
 
 from card_reader_core.imports import SUPPORTED_IMAGE_SUFFIXES
 from card_reader_core.models import CardFaction, CardPool, CardRole, ImportJob
+from card_reader_core.metadata import ManaFamily
 from card_reader_core.services.imports import (
     CardClassificationMode,
     ImportCreationKeyConflict,
@@ -185,6 +186,12 @@ class ImportUploadAdmission:
         card_faction_override = cast(
             list[CardFaction], validated_data["card_faction_override"]
         )
+        card_mana_family_mode = cast(
+            CardClassificationMode, validated_data["card_mana_family_mode"]
+        )
+        card_mana_family_override = cast(
+            list[ManaFamily], validated_data["card_mana_family_override"]
+        )
         fingerprint, uploads = _upload_fingerprint(
             template_id=template_id,
             content_version_base=content_version_base,
@@ -195,6 +202,8 @@ class ImportUploadAdmission:
             card_role_override=card_role_override,
             card_faction_mode=card_faction_mode,
             card_faction_override=card_faction_override,
+            card_mana_family_mode=card_mana_family_mode,
+            card_mana_family_override=card_mana_family_override,
             files=cast(list[UploadedFile], validated_data["files"]),
         )
         StagedImportUpload(
@@ -222,6 +231,8 @@ class ImportUploadAdmission:
                     card_role_override=card_role_override,
                     card_faction_mode=card_faction_mode,
                     card_faction_override=card_faction_override,
+                    card_mana_family_mode=card_mana_family_mode,
+                    card_mana_family_override=card_mana_family_override,
                     fingerprint=fingerprint,
                     uploads=uploads,
                 )
@@ -242,6 +253,8 @@ class ImportUploadAdmission:
         card_role_override: list[CardRole],
         card_faction_mode: CardClassificationMode,
         card_faction_override: list[CardFaction],
+        card_mana_family_mode: CardClassificationMode,
+        card_mana_family_override: list[ManaFamily],
         fingerprint: str,
         uploads: list[tuple[UploadedFile, str]],
     ) -> ImportAdmissionResult:
@@ -269,6 +282,8 @@ class ImportUploadAdmission:
                 card_role_override=card_role_override,
                 card_faction_mode=card_faction_mode,
                 card_faction_override=card_faction_override,
+                card_mana_family_mode=card_mana_family_mode,
+                card_mana_family_override=card_mana_family_override,
             )
         except ImportCreationRejected as exc:
             return self._reconcile_prevalidation_rejection(
@@ -300,6 +315,8 @@ class ImportUploadAdmission:
                 card_role_override=card_role_override,
                 card_faction_mode=card_faction_mode,
                 card_faction_override=card_faction_override,
+                card_mana_family_mode=card_mana_family_mode,
+                card_mana_family_override=card_mana_family_override,
             )
         except ImportCreationKeyConflict as exc:
             _discard_reconciled_stage(
@@ -486,6 +503,8 @@ def _upload_fingerprint(
     card_role_override: Sequence[str],
     card_faction_mode: str,
     card_faction_override: Sequence[str],
+    card_mana_family_mode: str,
+    card_mana_family_override: Sequence[str],
     files: list[UploadedFile],
 ) -> tuple[str, list[tuple[UploadedFile, str]]]:
     file_records: list[dict[str, object]] = []
@@ -510,6 +529,8 @@ def _upload_fingerprint(
         "card_role_override": list(card_role_override),
         "card_faction_mode": card_faction_mode,
         "card_faction_override": list(card_faction_override),
+        "card_mana_family_mode": card_mana_family_mode,
+        "card_mana_family_override": list(card_mana_family_override),
         "files": file_records,
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")

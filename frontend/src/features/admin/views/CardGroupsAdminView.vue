@@ -505,6 +505,7 @@ const addMember = (card: CardListItem): void => {
     card_name: card.name,
     card_pool: card.card_pool,
     card_factions: card.card_factions ?? [],
+    card_mana_families: card.card_mana_families ?? [],
     position: editor.value.members.length + 1,
     is_anchor: editor.value.anchor_card_id === card.id,
     image_url: card.image_url,

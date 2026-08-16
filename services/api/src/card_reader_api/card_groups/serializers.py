@@ -15,6 +15,8 @@ from card_reader_core.models import (
     CardVersion,
     CardVersionImage,
     card_faction_keys,
+    card_mana_family_keys,
+    card_role_keys,
     card_is_visible_for_lifecycle,
 )
 from card_reader_core.repositories.cards import get_card_image, resolve_image_file_path
@@ -86,6 +88,11 @@ def card_group_gallery_payload(
         "group_name": group.name,
         "anchor_card_id": anchor_card_id,
         "anchor_card_name": anchor_version.name if anchor_version is not None else group.anchor_card.label,
+        "card_pool": group.anchor_card.card_pool,
+        "card_roles": list(card_role_keys(group.anchor_card)),
+        "card_factions": list(card_faction_keys(group.anchor_card)),
+        "card_mana_families": list(card_mana_family_keys(group.anchor_card)),
+        "mana_family_sort_key": group.anchor_card.mana_family_sort_key,
         "member_count": len(members),
         "preview_cards": preview_cards,
     }
@@ -159,6 +166,7 @@ def card_group_member_admin_payload(member: CardGroupMember, anchor_card_id: str
         "card_name": version.name if version is not None else member.card.label,
         "card_pool": member.card.card_pool,
         "card_factions": list(card_faction_keys(member.card)),
+        "card_mana_families": list(card_mana_family_keys(member.card)),
         "position": member.position,
         "is_anchor": card_id == anchor_card_id,
         "image_url": card_image_asset_url(image, fallback_url=f"/cards/{card_id}/image") if version is not None else None,

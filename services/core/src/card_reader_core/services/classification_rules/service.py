@@ -8,9 +8,11 @@ from typing import cast
 from django.db import IntegrityError, transaction
 
 from card_reader_core.models import (
+    CARD_CLASSIFICATION_SOURCE_SYMBOL,
     CARD_CLASSIFICATION_SOURCE_TAG,
     CARD_CLASSIFICATION_SOURCE_TYPE,
     CARD_CLASSIFICATION_TARGET_FACTION,
+    CARD_CLASSIFICATION_TARGET_MANA_FAMILY,
     CARD_CLASSIFICATION_TARGET_ROLE,
     CARD_FACTION_DEFINITIONS,
     CARD_FACTIONS,
@@ -21,10 +23,12 @@ from card_reader_core.models import (
     CardClassificationRule,
     CardPool,
     CardPoolScope,
+    Symbol,
     Tag,
     Type,
     is_card_pool,
 )
+from card_reader_core.metadata import MANA_FAMILIES, MANA_FAMILY_BY_KEY
 from card_reader_core.repositories.classification_rules import (
     create_classification_rule,
     delete_classification_rule,
@@ -34,10 +38,11 @@ from card_reader_core.repositories.classification_rules import (
     list_rules_for_source,
     update_classification_rule,
 )
-from card_reader_core.repositories.metadata import get_tag, get_type
+from card_reader_core.repositories.metadata import get_symbol, get_tag, get_type, list_symbols
 
 
-CLASSIFICATION_RULE_SNAPSHOT_SCHEMA_VERSION = 1
+CLASSIFICATION_RULE_SNAPSHOT_SCHEMA_VERSION = 2
+SUPPORTED_CLASSIFICATION_RULE_SNAPSHOT_SCHEMA_VERSIONS = (1, 2)
 
 
 class ClassificationRuleError(ValueError):
@@ -61,21 +66,40 @@ def _target_keys(target_kind: str) -> tuple[str, ...]:
         return cast(tuple[str, ...], CARD_ROLES)
     if target_kind == CARD_CLASSIFICATION_TARGET_FACTION:
         return cast(tuple[str, ...], CARD_FACTIONS)
-    raise ClassificationRuleError("target_kind must be role or faction.")
+    if target_kind == CARD_CLASSIFICATION_TARGET_MANA_FAMILY:
+        return cast(tuple[str, ...], tuple(MANA_FAMILY_BY_KEY))
+    raise ClassificationRuleError("target_kind must be role, faction, or mana_family.")
 
 
-def _source(source_kind: str, source_id: str) -> tuple[Tag | None, Type | None]:
+def _source(
+    source_kind: str, source_id: str
+) -> tuple[Tag | None, Type | None, Symbol | None]:
     if source_kind == CARD_CLASSIFICATION_SOURCE_TAG:
         tag = get_tag(source_id)
         if tag is None:
             raise ClassificationRuleSourceNotFoundError("Tag source not found.")
-        return tag, None
+        return tag, None, None
     if source_kind == CARD_CLASSIFICATION_SOURCE_TYPE:
         type_row = get_type(source_id)
         if type_row is None:
             raise ClassificationRuleSourceNotFoundError("Type source not found.")
-        return None, type_row
-    raise ClassificationRuleError("source_kind must be tag or type.")
+        return None, type_row, None
+    if source_kind == CARD_CLASSIFICATION_SOURCE_SYMBOL:
+        symbol = get_symbol(source_id)
+        if symbol is None:
+            raise ClassificationRuleSourceNotFoundError("Symbol source not found.")
+        return None, None, symbol
+    raise ClassificationRuleError("source_kind must be tag, type, or symbol.")
+
+
+def _rule_source(rule: CardClassificationRule) -> Tag | Type | Symbol | None:
+    if rule.source_kind == CARD_CLASSIFICATION_SOURCE_TAG:
+        return rule.tag
+    if rule.source_kind == CARD_CLASSIFICATION_SOURCE_TYPE:
+        return rule.type
+    if rule.source_kind == CARD_CLASSIFICATION_SOURCE_SYMBOL:
+        return rule.symbol
+    return None
 
 
 def _validate_identity(*, card_pool: str, target_kind: str, target_key: str) -> CardPool:
@@ -87,7 +111,7 @@ def _validate_identity(*, card_pool: str, target_kind: str, target_key: str) -> 
 
 
 def classification_rule_payload(rule: CardClassificationRule) -> dict[str, object]:
-    source = rule.tag if rule.source_kind == CARD_CLASSIFICATION_SOURCE_TAG else rule.type
+    source = _rule_source(rule)
     if source is None:
         raise ClassificationRuleError(f"Rule {rule.id} has an invalid source reference.")
     return {
@@ -128,7 +152,7 @@ class ClassificationRuleService:
             target_kind=target_kind,
             target_key=target_key,
         )
-        tag, type_row = _source(source_kind, source_id)
+        tag, type_row, symbol = _source(source_kind, source_id)
         try:
             return create_classification_rule(
                 card_pool=normalized_pool,
@@ -137,6 +161,7 @@ class ClassificationRuleService:
                 source_kind=source_kind,
                 tag=tag,
                 type=type_row,
+                symbol=symbol,
                 enabled=enabled,
             )
         except IntegrityError as exc:
@@ -168,13 +193,11 @@ class ClassificationRuleService:
             target_key=next_target_key,
         )
         next_source_kind = source_kind if source_kind is not None else rule.source_kind
-        current_source = (
-            rule.tag if rule.source_kind == CARD_CLASSIFICATION_SOURCE_TAG else rule.type
-        )
+        current_source = _rule_source(rule)
         next_source_id = (
             source_id if source_id is not None else (current_source.id if current_source else "")
         )
-        tag, type_row = _source(next_source_kind, next_source_id)
+        tag, type_row, symbol = _source(next_source_kind, next_source_id)
         updates: dict[str, object] = {
             "card_pool": next_pool,
             "target_kind": next_target_kind,
@@ -182,6 +205,7 @@ class ClassificationRuleService:
             "source_kind": next_source_kind,
             "tag": tag,
             "type": type_row,
+            "symbol": symbol,
         }
         if enabled is not None:
             updates["enabled"] = enabled
@@ -200,8 +224,12 @@ class ClassificationRuleService:
         delete_classification_rule(rule)
 
     def rules_for_source(self, *, source_kind: str, source_id: str) -> list[CardClassificationRule]:
-        if source_kind not in {CARD_CLASSIFICATION_SOURCE_TAG, CARD_CLASSIFICATION_SOURCE_TYPE}:
-            raise ClassificationRuleError("source_kind must be tag or type.")
+        if source_kind not in {
+            CARD_CLASSIFICATION_SOURCE_TAG,
+            CARD_CLASSIFICATION_SOURCE_TYPE,
+            CARD_CLASSIFICATION_SOURCE_SYMBOL,
+        }:
+            raise ClassificationRuleError("source_kind must be tag, type, or symbol.")
         return list_rules_for_source(source_kind=source_kind, source_id=source_id)
 
     def build_snapshot(
@@ -210,12 +238,15 @@ class ClassificationRuleService:
         card_pool: CardPool,
         include_roles: bool,
         include_factions: bool,
+        include_mana_families: bool = False,
     ) -> dict[str, object]:
         target_kinds: list[str] = []
         if include_roles:
             target_kinds.append(CARD_CLASSIFICATION_TARGET_ROLE)
         if include_factions:
             target_kinds.append(CARD_CLASSIFICATION_TARGET_FACTION)
+        if include_mana_families:
+            target_kinds.append(CARD_CLASSIFICATION_TARGET_MANA_FAMILY)
         rules = (
             list_classification_rules(
                 card_pool=card_pool,
@@ -245,7 +276,7 @@ class ClassificationRuleService:
     ) -> dict[str, object]:
         if not isinstance(value, dict):
             raise ClassificationRuleError("Classification rule snapshot must be an object.")
-        if value.get("schema_version") != CLASSIFICATION_RULE_SNAPSHOT_SCHEMA_VERSION:
+        if value.get("schema_version") not in SUPPORTED_CLASSIFICATION_RULE_SNAPSHOT_SCHEMA_VERSIONS:
             raise ClassificationRuleError("Unsupported classification rule snapshot schema.")
         if value.get("card_pool") != card_pool:
             raise ClassificationRuleError(
@@ -277,6 +308,7 @@ class ClassificationRuleService:
             if rule.get("source_kind") not in {
                 CARD_CLASSIFICATION_SOURCE_TAG,
                 CARD_CLASSIFICATION_SOURCE_TYPE,
+                CARD_CLASSIFICATION_SOURCE_SYMBOL,
             }:
                 raise ClassificationRuleError("Snapshot contains an unsupported source kind.")
             if not isinstance(rule.get("source_id"), str) or not rule["source_id"]:
@@ -327,7 +359,7 @@ class ClassificationRuleService:
                     label=source_label,
                     identifiers_json=list(source_identifiers),
                 )
-            else:
+            elif source_kind == CARD_CLASSIFICATION_SOURCE_TYPE:
                 types[source_id] = Type(
                     id=source_id,
                     key=source_key,
@@ -348,6 +380,22 @@ class ClassificationRuleService:
             if definition.key in card_pool_scope.allowed_pools
         )
         usage_counts = get_classification_usage_counts(card_pools=allowed_pools)
+        display_symbol_keys = {
+            key
+            for key in (
+                *(
+                    definition.display_symbol_key
+                    for definition in CARD_ROLE_DEFINITIONS
+                ),
+                *(definition.display_symbol_key for definition in CARD_FACTION_DEFINITIONS),
+                *(definition.display_symbol_key for definition in MANA_FAMILIES),
+            )
+            if key is not None
+        }
+        symbols_by_key = {
+            symbol.key: symbol
+            for symbol in list_symbols(keys=display_symbol_keys)
+        }
         rule_counts: dict[tuple[str, str, str, str], int] = defaultdict(int)
         rules_by_target: dict[tuple[str, str], list[dict[str, object]]] = defaultdict(list)
         for rule in list_classification_rules():
@@ -367,6 +415,7 @@ class ClassificationRuleService:
             derived: bool,
             usage: dict[tuple[str, str], int] | None = None,
             derived_usage: dict[str, int] | None = None,
+            display_symbol_key: str | None = None,
         ) -> dict[str, object]:
             return {
                 "id": f"{target_kind}:{key}",
@@ -387,11 +436,22 @@ class ClassificationRuleService:
                         for source_kind in (
                             CARD_CLASSIFICATION_SOURCE_TAG,
                             CARD_CLASSIFICATION_SOURCE_TYPE,
+                            CARD_CLASSIFICATION_SOURCE_SYMBOL,
                         )
                     }
                     for pool in allowed_pools
                 },
                 "rules": [] if derived else rules_by_target[(target_kind, key)],
+                "display_symbol_key": display_symbol_key,
+                "display_symbol": (
+                    {
+                        "id": symbols_by_key[display_symbol_key].id,
+                        "key": symbols_by_key[display_symbol_key].key,
+                        "label": symbols_by_key[display_symbol_key].label,
+                    }
+                    if display_symbol_key in symbols_by_key
+                    else None
+                ),
             }
 
         roles = [
@@ -411,6 +471,7 @@ class ClassificationRuleService:
                     target_kind=CARD_CLASSIFICATION_TARGET_ROLE,
                     derived=False,
                     usage=usage_counts.roles,
+                    display_symbol_key=definition.display_symbol_key,
                 )
                 for definition in CARD_ROLE_DEFINITIONS
             ],
@@ -432,11 +493,38 @@ class ClassificationRuleService:
                     target_kind=CARD_CLASSIFICATION_TARGET_FACTION,
                     derived=False,
                     usage=usage_counts.factions,
+                    display_symbol_key=definition.display_symbol_key,
                 )
                 for definition in CARD_FACTION_DEFINITIONS
             ],
         ]
-        return {"roles": roles, "factions": factions}
+        mana_families = [
+            build_row(
+                key="none",
+                label="Colorless",
+                rank=-1,
+                target_kind=CARD_CLASSIFICATION_TARGET_MANA_FAMILY,
+                derived=True,
+                derived_usage=usage_counts.colorless,
+            ),
+            *[
+                build_row(
+                    key=definition.key,
+                    label=definition.label,
+                    rank=definition.rank,
+                    target_kind=CARD_CLASSIFICATION_TARGET_MANA_FAMILY,
+                    derived=False,
+                    usage=usage_counts.mana_families,
+                    display_symbol_key=definition.display_symbol_key,
+                )
+                for definition in MANA_FAMILIES
+            ],
+        ]
+        return {
+            "roles": roles,
+            "factions": factions,
+            "mana_families": mana_families,
+        }
 
     @staticmethod
     def _snapshot_rule(rule: CardClassificationRule) -> dict[str, object]:
@@ -446,7 +534,7 @@ class ClassificationRuleService:
             target_key=rule.target_key,
         )
         payload = classification_rule_payload(rule)
-        source = rule.tag if rule.source_kind == CARD_CLASSIFICATION_SOURCE_TAG else rule.type
+        source = _rule_source(rule)
         if source is None:
             raise ClassificationRuleError(f"Rule {rule.id} has an invalid source reference.")
         return {
@@ -456,7 +544,7 @@ class ClassificationRuleService:
             "source_id": payload["source_id"],
             "source_key": payload["source_key"],
             "source_label": source.label,
-            "source_identifiers": list(source.identifiers_json),
+            "source_identifiers": list(getattr(source, "identifiers_json", [])),
             "target_kind": payload["target_kind"],
             "target_key": payload["target_key"],
         }
@@ -475,15 +563,26 @@ def _snapshot_rule_sort_key(rule: dict[str, object]) -> tuple[int, int, int, str
             definition.rank for definition in CARD_ROLE_DEFINITIONS if definition.key == target_key
         )
         target_kind_rank = 0
-    else:
+    elif target_kind == CARD_CLASSIFICATION_TARGET_FACTION:
         target_rank = next(
             definition.rank
             for definition in CARD_FACTION_DEFINITIONS
             if definition.key == target_key
         )
         target_kind_rank = 1
+    else:
+        target_rank = next(
+            definition.rank
+            for definition in MANA_FAMILIES
+            if definition.key == target_key
+        )
+        target_kind_rank = 2
     source_kind = str(rule["source_kind"])
-    source_kind_rank = 0 if source_kind == CARD_CLASSIFICATION_SOURCE_TAG else 1
+    source_kind_rank = {
+        CARD_CLASSIFICATION_SOURCE_TAG: 0,
+        CARD_CLASSIFICATION_SOURCE_TYPE: 1,
+        CARD_CLASSIFICATION_SOURCE_SYMBOL: 2,
+    }[source_kind]
     return (
         target_kind_rank,
         target_rank,

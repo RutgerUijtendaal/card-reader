@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1250" viewBox="0 0 2000 1250" role="img" aria-labelledby="title desc">
   <title id="title">Card Reader card database relationships</title>
-  <desc id="desc">Linear database diagram with Card pool, role, faction, identity namespace, and persistent TTS sheet assignments in the center, card consumers and deck tags on the left, parsed version data and pool-specific classification rules on the right, and import lineage above.</desc>
+  <desc id="desc">Linear database diagram with Card pool, role, faction, mana-family classification, identity namespace, and persistent TTS sheet assignments in the center, card consumers and deck tags on the left, parsed version data and pool-specific classification rules on the right, and import lineage above.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
       <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
@@ -34,7 +34,7 @@
 
   <rect class="bg" width="2000" height="1250"/>
   <text x="70" y="58" style="font: 800 34px Arial, sans-serif; fill: #0f172a;">Card Reader: card model relationships</text>
-  <text x="70" y="88" class="small">Left: structures built from cards. Center: stable identity, pool/role/faction classification, and TTS sheets. Right: parsed versions, metadata, images, parse results, and review flags. Top: import lineage, auth, and notifications.</text>
+  <text x="70" y="88" class="small">Left: structures built from cards. Center: stable identity, pool/role/faction/mana-family classification, and TTS sheets. Right: parsed versions, metadata, images, parse results, and review flags. Top: import lineage, auth, and notifications.</text>
 
   <rect class="band" x="55" y="130" width="1890" height="190"/>
   <text class="band-title" x="80" y="162">Import lineage / parser output</text>
@@ -147,20 +147,27 @@
   <text class="field" x="763" y="645">id, label; key unique per pool/factions</text>
   <text class="field" x="775" y="670">card_pool (Player / Evil / Neutral)</text>
   <text class="field" x="775" y="695">faction_identity_key</text>
-  <text class="field" x="775" y="720">lifecycle + deck config</text>
-  <text class="field" x="775" y="745">latest_version</text>
+  <text class="field" x="775" y="718">mana_family_sort_key</text>
+  <text class="field" x="775" y="741">lifecycle + deck config • latest_version</text>
 
-  <rect class="box card" x="715" y="805" width="135" height="92"/>
-  <text x="744" y="832" class="title-small">CardRole</text>
-  <text x="731" y="851" class="title-small">Assignment</text>
-  <text x="728" y="874" class="small">role varchar(64)</text>
-  <text x="728" y="891" class="small">none = Normal</text>
+  <rect class="box card" x="705" y="805" width="95" height="92"/>
+  <text x="719" y="832" class="title-small">CardRole</text>
+  <text x="716" y="852" class="small">Assignment</text>
+  <text x="716" y="874" class="small">role key</text>
+  <text x="712" y="891" class="small">none=Normal</text>
 
-  <rect class="box card" x="870" y="805" width="135" height="92"/>
-  <text x="881" y="832" class="title-small">CardFaction</text>
-  <text x="886" y="851" class="title-small">Assignment</text>
-  <text x="883" y="874" class="small">faction varchar(64)</text>
-  <text x="883" y="891" class="small">unique per card</text>
+  <rect class="box card" x="815" y="805" width="95" height="92"/>
+  <text x="818" y="832" class="title-small">CardFaction</text>
+  <text x="826" y="852" class="small">Assignment</text>
+  <text x="826" y="874" class="small">faction key</text>
+  <text x="822" y="891" class="small">identity input</text>
+
+  <rect class="box card" x="925" y="805" width="80" height="92"/>
+  <text x="932" y="829" class="small">CardMana</text>
+  <text x="936" y="847" class="small">Family</text>
+  <text x="932" y="865" class="small">Assignment</text>
+  <text x="936" y="883" class="small">none =</text>
+  <text x="931" y="896" class="small">Colorless</text>
 
   <rect class="box tts" x="725" y="935" width="270" height="104"/>
   <text class="title" x="785" y="970">TtsCardSheet</text>
@@ -181,7 +188,7 @@
   <text class="title" x="1180" y="492">CardVersion</text>
   <text class="field" x="1155" y="520">parsed card snapshot</text>
   <text class="field" x="1155" y="545">name, type_line, rules_text</text>
-  <text class="field" x="1155" y="570">mana + mana-family sort key</text>
+  <text class="field" x="1155" y="570">printed mana, value + symbols</text>
   <text class="field" x="1155" y="595">previous_version</text>
   <text class="field" x="1155" y="620">content_version</text>
 
@@ -207,8 +214,8 @@
 
   <rect class="box meta" x="1125" y="660" width="250" height="100"/>
   <text class="title-small" x="1150" y="690">CardClassificationRule</text>
-  <text class="field" x="1145" y="716">pool + role/faction target</text>
-  <text class="field" x="1145" y="738">exactly one Tag or Type source</text>
+  <text class="field" x="1145" y="716">pool + role/faction/mana target</text>
+  <text class="field" x="1145" y="738">exactly one Tag, Type, or Symbol source</text>
   <text class="small" x="1145" y="756">enabled • protected source</text>
 
   <rect class="box meta" x="1350" y="775" width="260" height="66"/>
@@ -303,10 +310,12 @@
   <path class="soft" d="M1125 595 C1048 645, 1040 725, 975 745"/>
   <text class="label" x="1015" y="710">latest_version</text>
 
-  <path class="line" d="M820 765 L782 805"/>
+  <path class="line" d="M820 765 L752 805"/>
   <text class="label" x="748" y="792">roles</text>
-  <path class="line" d="M900 765 L937 805"/>
-  <text class="label" x="914" y="792">factions</text>
+  <path class="line" d="M860 765 L862 805"/>
+  <text class="label" x="832" y="792">factions</text>
+  <path class="line" d="M900 765 L965 805"/>
+  <text class="label" x="922" y="792">mana</text>
 
   <path class="line" d="M860 1070 L860 1039"/>
   <text class="label" x="872" y="1058">sheet</text>
@@ -337,7 +346,8 @@
 
   <path class="thin" d="M1375 700 C1550 700, 1600 790, 1665 808"/>
   <path class="thin" d="M1375 730 C1540 810, 1585 1015, 1665 1078"/>
-  <text class="label" x="1450" y="758">Type or Tag source</text>
+  <path class="thin" d="M1375 742 C1500 820, 1570 900, 1665 898"/>
+  <text class="label" x="1435" y="758">Tag, Type, or Symbol source</text>
 
   <path class="thin" d="M1850 1155 C1965 1115, 1975 835, 1850 808"/>
   <path class="thin" d="M1850 1175 C1955 1150, 1970 1090, 1850 1078"/>

@@ -10,6 +10,7 @@ from card_reader_core.models import (
     CardRoleAssignment,
     CardVersion,
     card_faction_keys,
+    card_mana_family_keys,
     card_role_keys,
     now_utc,
 )
@@ -40,6 +41,12 @@ def preview_card_merge(*, target_card_id: str, source_card_ids: list[str]) -> Ca
         source.faction_identity_key != target.faction_identity_key for source in sources
     ):
         blocking_conflicts.append("Cards from different faction namespaces cannot be merged.")
+    warnings = []
+    target_mana_families = card_mana_family_keys(target)
+    if any(card_mana_family_keys(source) != target_mana_families for source in sources):
+        warnings.append(
+            "Mana Families differ; the target Card's Mana Families will be preserved."
+        )
     source_ids = [source.id for source in sources]
     return CardMergePreview(
         target=_card_summary(target),
@@ -48,6 +55,7 @@ def preview_card_merge(*, target_card_id: str, source_card_ids: list[str]) -> Ca
         relations=preview_relation_changes(target_id=target.id, source_ids=source_ids),
         resulting_version_count=CardVersion.objects.filter(card_id__in=[target.id, *source_ids]).count(),
         blocking_conflicts=blocking_conflicts,
+        warnings=warnings,
     )
 
 
@@ -121,6 +129,7 @@ def _load_merge_cards(
     queryset = Card.objects.select_related("latest_version").prefetch_related(
         "role_assignments",
         "faction_assignments",
+        "mana_family_assignments",
     )
     if for_update:
         queryset = queryset.select_for_update()
@@ -145,4 +154,5 @@ def _card_summary(card: Card) -> CardMergeCardSummary:
         card_pool=card.card_pool,
         card_roles=card_role_keys(card),
         card_factions=card_faction_keys(card),
+        card_mana_families=card_mana_family_keys(card),
     )

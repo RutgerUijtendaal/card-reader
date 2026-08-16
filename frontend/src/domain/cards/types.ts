@@ -1,7 +1,8 @@
 import type { CardHoverTooltipModel, CardTooltipSymbolLookup } from '@/domain/cards/types/cardModels';
-import type { CardRoleFilter } from '@/domain/cards/cardRoles';
+import type { CardRole, CardRoleFilter } from '@/domain/cards/cardRoles';
 import type { CardPool } from '@/domain/cards/cardPools';
 import type { CardFaction } from '@/domain/cards/cardFactions';
+import type { ManaFamily } from '@/domain/cards/manaFamilies';
 
 export type ScalarFieldName = 'name' | 'type_line' | 'mana_cost' | 'attack' | 'health' | 'rules_text';
 export type MetadataGroupName = 'keywords' | 'tags' | 'types' | 'symbols';
@@ -20,9 +21,11 @@ export type SymbolFilterOption = MetadataOption & {
 };
 
 export type ManaFamilyOption = {
-  key: string;
+  key: ManaFamily;
   label: string;
   rank: number;
+  display_symbol_key?: string;
+  display_symbol?: SymbolFilterOption | null;
   mana_symbol: SymbolFilterOption | null;
   affinity_symbol: SymbolFilterOption | null;
 };
@@ -119,6 +122,11 @@ export type CardGroupGalleryItem = {
   group_name: string;
   anchor_card_id: string;
   anchor_card_name: string;
+  card_pool: CardPool;
+  card_roles: CardRole[];
+  card_factions: CardFaction[];
+  card_mana_families: ManaFamily[];
+  mana_family_sort_key: number;
   member_count: number;
   preview_cards: CardGroupPreviewCard[];
 };

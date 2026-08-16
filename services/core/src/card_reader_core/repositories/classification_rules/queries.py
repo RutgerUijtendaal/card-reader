@@ -10,6 +10,7 @@ from card_reader_core.models import (
     Card,
     CardClassificationRule,
     CardFactionAssignment,
+    CardManaFamilyAssignment,
     CardPool,
     CardRoleAssignment,
 )
@@ -19,12 +20,14 @@ from card_reader_core.models import (
 class ClassificationUsageCounts:
     roles: dict[tuple[str, str], int]
     factions: dict[tuple[str, str], int]
+    mana_families: dict[tuple[str, str], int]
     normal: dict[str, int]
     no_faction: dict[str, int]
+    colorless: dict[str, int]
 
 
 def classification_rule_queryset() -> QuerySet[CardClassificationRule]:
-    return CardClassificationRule.objects.select_related("tag", "type")
+    return CardClassificationRule.objects.select_related("tag", "type", "symbol")
 
 
 def get_classification_rule(rule_id: str) -> CardClassificationRule | None:
@@ -52,6 +55,7 @@ def list_classification_rules(
             "source_kind",
             "tag__key",
             "type__key",
+            "symbol__key",
             "id",
         )
     )
@@ -92,6 +96,17 @@ def get_classification_usage_counts(
             .annotate(count=Count("card_id"))
         )
     }
+    mana_family_usage = {
+        (str(row["mana_family"]), str(row["card__card_pool"])): int(row["count"])
+        for row in (
+            CardManaFamilyAssignment.objects.filter(
+                card__card_pool__in=allowed_pools,
+                card__lifecycle_status=ACTIVE_CARD_LIFECYCLE_STATUS,
+            )
+            .values("mana_family", "card__card_pool")
+            .annotate(count=Count("card_id"))
+        )
+    }
     normal_usage: dict[str, int] = {
         pool: Card.objects.filter(
             card_pool=pool,
@@ -108,9 +123,19 @@ def get_classification_usage_counts(
         ).count()
         for pool in allowed_pools
     }
+    colorless_usage: dict[str, int] = {
+        pool: Card.objects.filter(
+            card_pool=pool,
+            lifecycle_status=ACTIVE_CARD_LIFECYCLE_STATUS,
+            mana_family_assignments__isnull=True,
+        ).count()
+        for pool in allowed_pools
+    }
     return ClassificationUsageCounts(
         roles=role_usage,
         factions=faction_usage,
+        mana_families=mana_family_usage,
         normal=normal_usage,
         no_faction=no_faction_usage,
+        colorless=colorless_usage,
     )

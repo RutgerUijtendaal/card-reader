@@ -62,6 +62,7 @@ describe('ClassificationDefinitionDetail', () => {
         },
       ],
       types: [],
+      symbols: [],
     });
     app.mount(host);
     await nextTick();
@@ -93,12 +94,75 @@ describe('ClassificationDefinitionDetail', () => {
       },
       tags: [],
       types: [],
+      symbols: [],
     });
     app.mount(host);
     await nextTick();
 
     expect(host.textContent).toContain('derived empty state');
     expect(host.textContent).not.toContain('Add inference rule');
+
+    app.unmount();
+  });
+
+  test('shows mana-family symbol rules in the shared classification editor', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const app = createApp(ClassificationDefinitionDetail, {
+      definition: {
+        id: 'mana_family:arcane',
+        key: 'arcane',
+        label: 'Arcane',
+        rank: 0,
+        target_kind: 'mana_family',
+        derived: false,
+        linked_card_counts: { player: 12 },
+        rule_counts: { player: { tag: 0, type: 0, symbol: 1 } },
+        rules: [
+          {
+            id: 'rule-arcane-mana',
+            card_pool: 'player',
+            target_kind: 'mana_family',
+            target_key: 'arcane',
+            source_kind: 'symbol',
+            source_id: 'symbol-arcane-mana',
+            source_key: 'arcane-mana',
+            source_label: 'Arcane Mana',
+            enabled: true,
+            created_at: '2026-08-16T10:00:00Z',
+            updated_at: '2026-08-16T10:00:00Z',
+          },
+        ],
+        display_symbol_key: 'arcane-mana',
+        display_symbol: {
+          id: 'symbol-arcane-mana',
+          key: 'arcane-mana',
+          label: 'Arcane Mana',
+        },
+      },
+      tags: [],
+      types: [],
+      symbols: [
+        {
+          id: 'symbol-arcane-mana',
+          key: 'arcane-mana',
+          label: 'Arcane Mana',
+          symbol_type: 'mana',
+          detector_type: 'template',
+          detection_config_json: '{}',
+          text_enrichment_json: '{}',
+          reference_assets_json: '[]',
+          text_token: '{AM}',
+          enabled: true,
+        },
+      ],
+    });
+    app.mount(host);
+    await nextTick();
+
+    expect(host.textContent).toContain('Mana Family');
+    expect(host.textContent).toContain('12 linked cards · 1 rules');
+    expect(host.textContent).toContain('symbol');
 
     app.unmount();
   });

@@ -16,9 +16,14 @@ from card_reader_core.models import (
     CardRoleFilter,
     normalize_card_factions,
 )
+from card_reader_core.metadata import (
+    ManaFamily,
+    mana_family_keys_for_symbol_keys,
+    normalize_mana_family_keys,
+)
 
-DEVELOPER_DATA_FORMAT_VERSION = 2
-SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, DEVELOPER_DATA_FORMAT_VERSION)
+DEVELOPER_DATA_FORMAT_VERSION = 3
+SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, DEVELOPER_DATA_FORMAT_VERSION)
 
 
 def _default_pool_coverage() -> dict[CardPool, int]:
@@ -51,15 +56,17 @@ class ClassificationRuleRecord(StrictModel):
     @field_validator("target_kind")
     @classmethod
     def validate_target_kind(cls, value: str) -> str:
-        if value not in {"role", "faction"}:
-            raise ValueError("Classification rule target_kind must be role or faction.")
+        if value not in {"role", "faction", "mana_family"}:
+            raise ValueError(
+                "Classification rule target_kind must be role, faction, or mana_family."
+            )
         return value
 
     @field_validator("source_kind")
     @classmethod
     def validate_source_kind(cls, value: str) -> str:
-        if value not in {"tag", "type"}:
-            raise ValueError("Classification rule source_kind must be tag or type.")
+        if value not in {"tag", "type", "symbol"}:
+            raise ValueError("Classification rule source_kind must be tag, type, or symbol.")
         return value
 
 
@@ -68,6 +75,7 @@ class CoverageRequirements(StrictModel):
     min_cards_by_pool: dict[CardPool, int] = Field(default_factory=_default_pool_coverage)
     min_cards_by_role: dict[CardRoleFilter, int] = Field(default_factory=_default_role_coverage)
     min_cards_by_faction: dict[CardFaction, int] = Field(default_factory=_default_faction_coverage)
+    min_cards_by_mana_family: dict[ManaFamily, int] = Field(default_factory=dict)
     min_deprecated_cards: int = Field(default=1, ge=0)
     min_card_groups: int = Field(default=1, ge=0)
     min_cards_with_multiple_versions: int = Field(default=1, ge=0)
@@ -167,6 +175,7 @@ class CardReferenceRecord(StrictModel):
     key: str
     card_pool: CardPool
     card_factions: list[CardFaction]
+    card_mana_families: list[ManaFamily]
 
     @field_validator("card_factions")
     @classmethod
@@ -177,6 +186,16 @@ class CardReferenceRecord(StrictModel):
         if len(value) != len(set(value)):
             raise ValueError("Card reference factions must be unique.")
         return list(normalize_card_factions(value))
+
+    @field_validator("card_mana_families")
+    @classmethod
+    def validate_unique_card_mana_families(
+        cls,
+        value: list[ManaFamily],
+    ) -> list[ManaFamily]:
+        if len(value) != len(set(value)):
+            raise ValueError("Card mana families must be unique.")
+        return list(normalize_mana_family_keys(tuple(value)))
 
 
 type CardReferenceIdentity = tuple[CardPool, tuple[CardFaction, ...], str]
@@ -198,6 +217,7 @@ class CardRecord(StrictModel):
     card_pool: CardPool
     card_roles: list[CardRole]
     card_factions: list[CardFaction]
+    card_mana_families: list[ManaFamily]
     deck_building_config: dict[str, Any]
     lifecycle_status: str
     latest_version_number: int | None
@@ -223,6 +243,16 @@ class CardRecord(StrictModel):
         if len(value) != len(set(value)):
             raise ValueError("Card factions must be unique.")
         return list(normalize_card_factions(value))
+
+    @field_validator("card_mana_families")
+    @classmethod
+    def validate_unique_card_mana_families(
+        cls,
+        value: list[ManaFamily],
+    ) -> list[ManaFamily]:
+        if len(value) != len(set(value)):
+            raise ValueError("Card mana families must be unique.")
+        return list(normalize_mana_family_keys(tuple(value)))
 
 
 class CardGroupMemberRecord(StrictModel):
@@ -294,10 +324,11 @@ class DeveloperDataLock(StrictModel):
 
 def adopt_payload_for_format(value: object, *, format_version: int) -> object:
     """Adopt older bundle payloads into the current strict schema."""
-    if format_version != 1 or not isinstance(value, dict):
+    if format_version not in {1, 2} or not isinstance(value, dict):
         return value
     adopted = dict(value)
-    adopted["classification_rules"] = []
+    if format_version == 1:
+        adopted["classification_rules"] = []
     cards = adopted.get("cards")
     if not isinstance(cards, list):
         return adopted
@@ -307,19 +338,44 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
             adopted_cards.append(card)
             continue
         adopted_card = dict(card)
-        if "is_hero" not in adopted_card or type(adopted_card["is_hero"]) is not bool:
-            raise ValueError("Legacy developer-data card is_hero must be a Boolean.")
-        was_hero = adopted_card.pop("is_hero")
-        adopted_card["card_pool"] = "player"
-        adopted_card["card_roles"] = ["hero"] if was_hero is True else []
-        adopted_card["card_factions"] = []
+        if format_version == 1:
+            if "is_hero" not in adopted_card or type(adopted_card["is_hero"]) is not bool:
+                raise ValueError("Legacy developer-data card is_hero must be a Boolean.")
+            was_hero = adopted_card.pop("is_hero")
+            adopted_card["card_pool"] = "player"
+            adopted_card["card_roles"] = ["hero"] if was_hero is True else []
+            adopted_card["card_factions"] = []
+        latest_number = adopted_card.get("latest_version_number")
+        versions = adopted_card.get("versions", [])
+        latest_version = next(
+            (
+                version
+                for version in versions
+                if isinstance(version, dict)
+                and version.get("version_number") == latest_number
+            ),
+            None,
+        )
+        symbol_keys = (
+            latest_version.get("symbol_keys", [])
+            if isinstance(latest_version, dict)
+            else []
+        )
+        adopted_card["card_mana_families"] = list(
+            mana_family_keys_for_symbol_keys(
+                tuple(str(key) for key in symbol_keys if isinstance(key, str))
+            )
+        )
         adopted_cards.append(adopted_card)
     adopted["cards"] = adopted_cards
+    if format_version != 1:
+        return adopted
     cards_by_key = {
         card["key"]: {
             "key": card["key"],
             "card_pool": card["card_pool"],
             "card_factions": card["card_factions"],
+            "card_mana_families": card["card_mana_families"],
         }
         for card in adopted_cards
         if isinstance(card, dict)

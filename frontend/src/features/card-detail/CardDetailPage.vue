@@ -136,6 +136,7 @@
             @update-card-pool="updateCardPool"
             @toggle-card-role="toggleCardRole"
             @toggle-card-faction="toggleCardFaction"
+            @toggle-card-mana-family="toggleCardManaFamily"
             @update-deck-building-config="updateDeckBuildingConfig"
             @update-lifecycle-status="updateLifecycleStatus"
           />
@@ -175,6 +176,7 @@ import type { ScalarFieldName } from '@/domain/cards/types';
 import type { CardRole } from '@/domain/cards/cardRoles';
 import type { CardFaction } from '@/domain/cards/cardFactions';
 import type { CardPool } from '@/domain/cards/cardPools';
+import type { ManaFamily } from '@/domain/cards/manaFamilies';
 
 const {
   card,
@@ -257,6 +259,12 @@ const toggleCardFaction = (faction: CardFaction, checked: boolean): void => {
   form.card_factions = checked
     ? [...new Set([...form.card_factions, faction])]
     : form.card_factions.filter((value) => value !== faction);
+};
+
+const toggleCardManaFamily = (manaFamily: ManaFamily, checked: boolean): void => {
+  form.card_mana_families = checked
+    ? [...new Set([...form.card_mana_families, manaFamily])]
+    : form.card_mana_families.filter((value) => value !== manaFamily);
 };
 
 const updateDeckBuildingConfig = (value: string): void => {

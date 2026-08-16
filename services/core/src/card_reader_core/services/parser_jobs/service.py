@@ -13,6 +13,7 @@ from card_reader_core.models import (
     Tag,
     Type,
 )
+from card_reader_core.metadata import ManaFamily
 from card_reader_core.repositories.import_jobs import (
     bump_job_processed,
     fetch_job,
@@ -162,6 +163,7 @@ class ImportProcessorService:
         type_keys_by_id = {type_row.id: type_row.key for type_row in detection_types}
         live_tag_ids = {tag.id for tag in resources.known_tags}
         live_type_ids = {type_row.id for type_row in resources.known_types}
+        symbol_keys_by_id = {symbol.id: symbol.key for symbol in resources.detectable_symbols}
         matched_tags = tuple(
             DetectedClassificationSource(id=tag_id, key=tag_keys_by_id[tag_id])
             for tag_id in parsed.tag_ids
@@ -172,6 +174,11 @@ class ImportProcessorService:
             for type_id in parsed.type_ids
             if type_id in type_keys_by_id
         )
+        matched_symbols = tuple(
+            DetectedClassificationSource(id=symbol_id, key=symbol_keys_by_id[symbol_id])
+            for symbol_id in parsed.symbol_ids
+            if symbol_id in symbol_keys_by_id
+        )
         classification = classify_import_card(
             CardClassificationInput(
                 card_pool=cast(CardPool, job.card_pool),
@@ -181,9 +188,16 @@ class ImportProcessorService:
                 override_factions=cast(
                     tuple[CardFaction, ...], tuple(job.card_faction_override_json)
                 ),
+                mana_family_mode=cast(
+                    CardClassificationMode, job.card_mana_family_mode
+                ),
+                override_mana_families=cast(
+                    tuple[ManaFamily, ...], tuple(job.card_mana_family_override_json)
+                ),
                 rule_snapshot=snapshot,
                 matched_tags=matched_tags,
                 matched_types=matched_types,
+                matched_symbols=matched_symbols,
             )
         )
         save_parsed_card_with_notifications(
@@ -219,6 +233,7 @@ class ImportProcessorService:
             card_pool=classification.card_pool,
             resolved_card_roles=classification.roles,
             resolved_card_factions=classification.factions,
+            resolved_card_mana_families=classification.mana_families,
             classification_evidence=classification.evidence,
         )
         tag_count = len(parsed.tag_ids)

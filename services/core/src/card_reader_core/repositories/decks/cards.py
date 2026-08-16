@@ -20,6 +20,7 @@ def get_cards_by_ids(card_ids: list[str]) -> dict[str, Card]:
         ).prefetch_related(
             "role_assignments",
             "faction_assignments",
+            "mana_family_assignments",
             *latest_version_metadata_prefetches("latest_version"),
         )
     }
@@ -35,6 +36,7 @@ def get_deck_card(card_id: str) -> Card | None:
         .prefetch_related(
             "role_assignments",
             "faction_assignments",
+            "mana_family_assignments",
             *latest_version_metadata_prefetches("latest_version"),
         )
         .first()

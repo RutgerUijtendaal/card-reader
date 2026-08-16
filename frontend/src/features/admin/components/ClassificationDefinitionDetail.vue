@@ -9,7 +9,7 @@
     <template v-else>
       <div class="theme-divider border-b pb-4">
         <p class="theme-kicker text-xs font-medium uppercase tracking-[0.18em]">
-          {{ definition.target_kind === 'role' ? 'Card Role' : 'Card Faction' }}
+          {{ definition.target_kind === 'role' ? 'Card Role' : definition.target_kind === 'faction' ? 'Card Faction' : 'Mana Family' }}
         </p>
         <h4 class="theme-section-title mt-2 text-lg font-semibold">
           {{ definition.label }}
@@ -19,7 +19,7 @@
             This is a derived empty state. It cannot receive inference rules.
           </template>
           <template v-else>
-            Automatic imports union every enabled Tag or Type rule matching the selected pool.
+            Automatic imports union every enabled Tag, Type, or Symbol rule matching the selected pool.
           </template>
         </p>
       </div>
@@ -69,7 +69,7 @@
             >
               <span
                 class="theme-pill"
-                :class="rule.source_kind === 'tag' ? 'theme-pill-success' : 'theme-pill-warning'"
+                :class="rule.source_kind === 'tag' ? 'theme-pill-success' : rule.source_kind === 'type' ? 'theme-pill-warning' : 'theme-pill-neutral'"
               >
                 {{ rule.source_kind }}
               </span>
@@ -160,18 +160,21 @@ import type {
   ClassificationSourceKind,
   TagRecord,
   TypeRecord,
+  SymbolRecord,
 } from '@/features/admin/types';
 
 const props = defineProps<{
   definition: ClassificationDefinitionRecord | null;
   tags: TagRecord[];
   types: TypeRecord[];
+  symbols: SymbolRecord[];
 }>();
 
 const emit = defineEmits<{ (event: 'changed'): void }>();
 const SOURCE_KIND_OPTIONS = [
   { value: 'tag', label: 'Tag' },
   { value: 'type', label: 'Type' },
+  { value: 'symbol', label: 'Symbol' },
 ] as const;
 const creating = ref(false);
 const savingRuleIds = ref(new Set<string>());
@@ -186,7 +189,7 @@ watch(() => props.definition?.id, () => {
 });
 
 const sourceOptions = (kind: ClassificationSourceKind) =>
-  (kind === 'tag' ? props.tags : props.types).map((row) => ({
+  (kind === 'tag' ? props.tags : kind === 'type' ? props.types : props.symbols).map((row) => ({
     value: row.id,
     label: `${row.label} (${row.key})`,
   }));
@@ -196,7 +199,7 @@ const rulesForPool = (pool: CardPool): ClassificationRuleRecord[] =>
 
 const ruleCount = (pool: CardPool): number => {
   const counts = props.definition?.rule_counts[pool];
-  return (counts?.tag ?? 0) + (counts?.type ?? 0);
+  return (counts?.tag ?? 0) + (counts?.type ?? 0) + (counts?.symbol ?? 0);
 };
 
 const withRuleMutation = async (ruleId: string, mutation: () => Promise<void>): Promise<void> => {

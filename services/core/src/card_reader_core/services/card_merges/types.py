@@ -17,6 +17,7 @@ class CardMergeCardSummary:
     card_pool: str
     card_roles: tuple[str, ...]
     card_factions: tuple[str, ...]
+    card_mana_families: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -43,3 +44,4 @@ class CardMergePreview:
     relations: CardMergeRelationPreview
     resulting_version_count: int
     blocking_conflicts: list[str]
+    warnings: list[str]

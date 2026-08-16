@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from card_reader_core.models import CardClassificationRule, Tag, Type, now_utc
+from card_reader_core.models import CardClassificationRule, Symbol, Tag, Type, now_utc
 
 
 def create_classification_rule(
@@ -11,6 +11,7 @@ def create_classification_rule(
     source_kind: str,
     tag: Tag | None,
     type: Type | None,
+    symbol: Symbol | None,
     enabled: bool,
 ) -> CardClassificationRule:
     return CardClassificationRule.objects.create(
@@ -20,6 +21,7 @@ def create_classification_rule(
         source_kind=source_kind,
         tag=tag,
         type=type,
+        symbol=symbol,
         enabled=enabled,
     )
 

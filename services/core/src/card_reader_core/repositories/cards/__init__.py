@@ -4,6 +4,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 from .images import list_latest_active_card_image_sources, resolve_image_file_path
+from .classification import set_card_mana_families
 from .identity import (
     change_card_identity,
     conflicting_card_id_for_key,
@@ -145,5 +146,6 @@ __all__ = [
     "resolve_card_by_name_key",
     "save_parsed_card",
     "save_parsed_card_result",
+    "set_card_mana_families",
     "update_latest_card_version",
 ]

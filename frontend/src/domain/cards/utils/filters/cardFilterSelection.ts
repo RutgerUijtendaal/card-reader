@@ -23,7 +23,7 @@ export const LEGACY_MANA_SYMBOL_ID_PREFIX = 'legacy-mana-symbol:';
 export const createCardFilterCatalog = (filters: CardFiltersResponse): CardFilterCatalog => {
   const manaFamilyBySymbolKey: Record<string, string> = {};
   const manaSymbols = (filters.mana_families ?? []).map((family): SymbolFilterOption => {
-    const displaySymbol = family.mana_symbol ?? family.affinity_symbol;
+    const displaySymbol = family.display_symbol ?? family.mana_symbol ?? family.affinity_symbol;
     [family.mana_symbol, family.affinity_symbol].forEach((symbol) => {
       if (symbol) manaFamilyBySymbolKey[symbol.key] = family.key;
     });

@@ -59,18 +59,22 @@ class Type(TimestampedModel):
 
 CARD_CLASSIFICATION_TARGET_ROLE: Literal["role"] = "role"
 CARD_CLASSIFICATION_TARGET_FACTION: Literal["faction"] = "faction"
-CardClassificationTargetKind = Literal["role", "faction"]
+CARD_CLASSIFICATION_TARGET_MANA_FAMILY: Literal["mana_family"] = "mana_family"
+CardClassificationTargetKind = Literal["role", "faction", "mana_family"]
 CARD_CLASSIFICATION_TARGET_KIND_CHOICES = (
     (CARD_CLASSIFICATION_TARGET_ROLE, "Role"),
     (CARD_CLASSIFICATION_TARGET_FACTION, "Faction"),
+    (CARD_CLASSIFICATION_TARGET_MANA_FAMILY, "Mana Family"),
 )
 
 CARD_CLASSIFICATION_SOURCE_TAG: Literal["tag"] = "tag"
 CARD_CLASSIFICATION_SOURCE_TYPE: Literal["type"] = "type"
-CardClassificationSourceKind = Literal["tag", "type"]
+CARD_CLASSIFICATION_SOURCE_SYMBOL: Literal["symbol"] = "symbol"
+CardClassificationSourceKind = Literal["tag", "type", "symbol"]
 CARD_CLASSIFICATION_SOURCE_KIND_CHOICES = (
     (CARD_CLASSIFICATION_SOURCE_TAG, "Tag"),
     (CARD_CLASSIFICATION_SOURCE_TYPE, "Type"),
+    (CARD_CLASSIFICATION_SOURCE_SYMBOL, "Symbol"),
 )
 
 
@@ -110,6 +114,15 @@ class CardClassificationRule(TimestampedModel):
         blank=True,
         default=None,
     )
+    symbol: models.ForeignKey[Symbol | None, Symbol | None] = models.ForeignKey(
+        "Symbol",
+        on_delete=models.PROTECT,
+        related_name="classification_rules",
+        db_column="symbol_id",
+        null=True,
+        blank=True,
+        default=None,
+    )
     enabled: models.BooleanField[bool, bool] = models.BooleanField(default=True, db_index=True)
 
     class Meta:
@@ -121,11 +134,19 @@ class CardClassificationRule(TimestampedModel):
                         source_kind=CARD_CLASSIFICATION_SOURCE_TAG,
                         tag__isnull=False,
                         type__isnull=True,
+                        symbol__isnull=True,
                     )
                     | models.Q(
                         source_kind=CARD_CLASSIFICATION_SOURCE_TYPE,
                         tag__isnull=True,
                         type__isnull=False,
+                        symbol__isnull=True,
+                    )
+                    | models.Q(
+                        source_kind=CARD_CLASSIFICATION_SOURCE_SYMBOL,
+                        tag__isnull=True,
+                        type__isnull=True,
+                        symbol__isnull=False,
                     )
                 ),
                 name="ck_classification_rule_source_fk",
@@ -140,10 +161,16 @@ class CardClassificationRule(TimestampedModel):
                 condition=models.Q(source_kind=CARD_CLASSIFICATION_SOURCE_TYPE),
                 name="uq_class_rule_type_target",
             ),
+            models.UniqueConstraint(
+                fields=("card_pool", "target_kind", "target_key", "symbol"),
+                condition=models.Q(source_kind=CARD_CLASSIFICATION_SOURCE_SYMBOL),
+                name="uq_class_rule_symbol_target",
+            ),
         ]
         indexes = [
             models.Index(fields=("card_pool", "enabled", "tag"), name="ix_class_rule_pool_tag"),
             models.Index(fields=("card_pool", "enabled", "type"), name="ix_class_rule_pool_type"),
+            models.Index(fields=("card_pool", "enabled", "symbol"), name="ix_class_rule_pool_symbol"),
         ]
 
 

@@ -21,7 +21,12 @@ def get_parse_flag(flag_id: str) -> CardVersionParseFlag | None:
             "card_version__content_version",
             "submitted_by",
         )
-        .prefetch_related("items")
+        .prefetch_related(
+            "items",
+            "card_version__card__role_assignments",
+            "card_version__card__faction_assignments",
+            "card_version__card__mana_family_assignments",
+        )
         .filter(id=flag_id)
         .first()
     )
@@ -64,6 +69,9 @@ def list_parse_flags(
         .prefetch_related(
             Prefetch("items", queryset=item_queryset),
             Prefetch("card_version__images"),
+            "card_version__card__role_assignments",
+            "card_version__card__faction_assignments",
+            "card_version__card__mana_family_assignments",
         )
         .annotate(latest_item_created_at=latest_item_created_at)
         .filter(card_version__card__card_pool__in=card_pool_scope.allowed_pools)

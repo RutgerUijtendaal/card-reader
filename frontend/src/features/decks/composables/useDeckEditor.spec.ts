@@ -48,7 +48,7 @@ const {
   toastErrorMock,
   toastInfoMock,
   resetFiltersMock,
-  applyHeroAffinityManaPresetMock,
+  applyHeroManaFamilyPresetMock,
   loadFiltersMock,
   searchCardsMock,
   fetchCardMock,
@@ -68,7 +68,7 @@ const {
   toastErrorMock: vi.fn(),
   toastInfoMock: vi.fn(),
   resetFiltersMock: vi.fn(),
-  applyHeroAffinityManaPresetMock: vi.fn(),
+  applyHeroManaFamilyPresetMock: vi.fn(),
   loadFiltersMock: vi.fn(async (): Promise<void> => undefined),
   searchCardsMock: vi.fn(async () => undefined),
   fetchCardMock: vi.fn(),
@@ -117,7 +117,7 @@ vi.mock('@/features/decks/composables/useDeckEditorFilters', () => ({
     cardScale: { value: 'normal' },
     loadFilters: loadFiltersMock,
     resetFilters: resetFiltersMock,
-    applyHeroAffinityManaPreset: applyHeroAffinityManaPresetMock,
+    applyHeroManaFamilyPreset: applyHeroManaFamilyPresetMock,
   }),
 }));
 
@@ -487,13 +487,13 @@ describe('useDeckEditor', () => {
     const resumePromise = mounted.controller.resumeLocalDraft();
     await nextTick();
 
-    expect(applyHeroAffinityManaPresetMock).not.toHaveBeenCalled();
+    expect(applyHeroManaFamilyPresetMock).not.toHaveBeenCalled();
 
     resolveFilters();
     await resumePromise;
 
-    expect(applyHeroAffinityManaPresetMock).toHaveBeenCalledTimes(1);
-    expect(applyHeroAffinityManaPresetMock).toHaveBeenCalledWith(
+    expect(applyHeroManaFamilyPresetMock).toHaveBeenCalledTimes(1);
+    expect(applyHeroManaFamilyPresetMock).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Refreshed Hero' }),
     );
 
@@ -1737,7 +1737,7 @@ describe('useDeckEditor', () => {
     mounted.controller.openCards();
     expect(mounted.controller.editorMode.value).toBe('cards');
     expect(mounted.controller.canAutosync.value).toBe(true);
-    expect(applyHeroAffinityManaPresetMock).toHaveBeenCalledTimes(1);
+    expect(applyHeroManaFamilyPresetMock).toHaveBeenCalledTimes(1);
     await vi.waitFor(() => {
       expect(mounted.router.currentRoute.value.query.editor_mode).toBe('cards');
     });
@@ -1772,7 +1772,7 @@ describe('useDeckEditor', () => {
     expect(updateDeckMock).not.toHaveBeenCalled();
 
     mounted.controller.openCards();
-    expect(applyHeroAffinityManaPresetMock).toHaveBeenLastCalledWith(
+    expect(applyHeroManaFamilyPresetMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ id: 'hero-2' }),
     );
 

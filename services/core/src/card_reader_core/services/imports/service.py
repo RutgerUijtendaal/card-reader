@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from django.db import IntegrityError, transaction
 
 from card_reader_core.models import CardFaction, CardPool, CardRole, ImportClassificationMode, ImportJob
+from card_reader_core.metadata import ManaFamily
 from card_reader_core.imports import (
     ImportJobCreationResult,
     ImportJobInputValidationError,
@@ -51,6 +52,8 @@ class ImportService:
         card_role_override: Sequence[CardRole] = (),
         card_faction_mode: CardClassificationMode = "automatic",
         card_faction_override: Sequence[CardFaction] = (),
+        card_mana_family_mode: CardClassificationMode = "automatic",
+        card_mana_family_override: Sequence[ManaFamily] = (),
     ) -> ImportJobCreationResult:
         existing = self.get_job_by_creation_key(creation_key=creation_key)
         if existing is not None:
@@ -67,6 +70,8 @@ class ImportService:
             card_role_override=card_role_override,
             card_faction_mode=card_faction_mode,
             card_faction_override=card_faction_override,
+            card_mana_family_mode=card_mana_family_mode,
+            card_mana_family_override=card_mana_family_override,
         )
 
         try:
@@ -75,6 +80,7 @@ class ImportService:
                     card_pool=card_pool,
                     card_role_mode=card_role_mode,
                     card_faction_mode=card_faction_mode,
+                    card_mana_family_mode=card_mana_family_mode,
                 )
                 content_version = create_next_content_version(
                     base_version=content_version_base,
@@ -92,6 +98,8 @@ class ImportService:
                     card_role_override=card_role_override,
                     card_faction_mode=card_faction_mode,
                     card_faction_override=card_faction_override,
+                    card_mana_family_mode=card_mana_family_mode,
+                    card_mana_family_override=card_mana_family_override,
                     classification_rule_snapshot=rule_snapshot,
                 )
         except ImportJobInputValidationError as exc:
@@ -120,6 +128,7 @@ class ImportService:
                 card_pool=card_pool,
                 card_role_mode=ImportClassificationMode.automatic,
                 card_faction_mode=ImportClassificationMode.automatic,
+                card_mana_family_mode=ImportClassificationMode.automatic,
             )
             return create_import_job_with_files(
                 source_path=source_path,
@@ -142,6 +151,8 @@ class ImportService:
         card_role_override: Sequence[CardRole],
         card_faction_mode: CardClassificationMode,
         card_faction_override: Sequence[CardFaction],
+        card_mana_family_mode: CardClassificationMode,
+        card_mana_family_override: Sequence[ManaFamily],
     ) -> None:
         try:
             parse_base_version(content_version_base)
@@ -153,6 +164,8 @@ class ImportService:
                 card_role_override=card_role_override,
                 card_faction_mode=card_faction_mode,
                 card_faction_override=card_faction_override,
+                card_mana_family_mode=card_mana_family_mode,
+                card_mana_family_override=card_mana_family_override,
             )
         except ValueError as exc:
             raise ImportCreationRejected(str(exc)) from exc
@@ -176,9 +189,13 @@ class ImportService:
         card_pool: CardPool,
         card_role_mode: str,
         card_faction_mode: str,
+        card_mana_family_mode: str,
     ) -> dict[str, object]:
         return ClassificationRuleService().build_snapshot(
             card_pool=card_pool,
             include_roles=card_role_mode == ImportClassificationMode.automatic,
             include_factions=card_faction_mode == ImportClassificationMode.automatic,
+            include_mana_families=(
+                card_mana_family_mode == ImportClassificationMode.automatic
+            ),
         )

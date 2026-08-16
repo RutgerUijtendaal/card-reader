@@ -33,6 +33,7 @@ class SuggestionOccurrencePreview(TypedDict):
     card_pool: str
     card_roles: list[str]
     card_factions: list[str]
+    card_mana_families: list[str]
 
 
 class LinkedCardPreview(TypedDict):
@@ -44,6 +45,7 @@ class LinkedCardPreview(TypedDict):
     card_pool: str
     card_roles: list[str]
     card_factions: list[str]
+    card_mana_families: list[str]
 
 
 class CatalogSuggestionDetail(TypedDict):
@@ -82,3 +84,4 @@ class SymbolDetail(TypedDict):
     entry: Symbol
     linked_cards: list[LinkedCardPreview]
     linked_card_count: int
+    classification_rules: list[dict[str, object]]

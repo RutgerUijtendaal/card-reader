@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Literal, TypedDict
 from django.db import models
 
 from .base import TimestampedModel, uuid_str
+from card_reader_core.metadata import ManaFamily
+
 from .card import DEFAULT_CARD_POOL, CardFaction, CardRole
 
 if TYPE_CHECKING:
@@ -32,10 +34,10 @@ class ImportClassificationMode(StrEnum):
 class ClassificationRuleEvidence(TypedDict):
     rule_id: str
     card_pool: str
-    source_kind: Literal["tag", "type"]
+    source_kind: Literal["tag", "type", "symbol"]
     source_id: str
     source_key: str
-    target_kind: Literal["role", "faction"]
+    target_kind: Literal["role", "faction", "mana_family"]
     target_key: str
 
 
@@ -48,6 +50,7 @@ class CardRoleInferenceEvidence(TypedDict):
     mode: Literal["automatic", "override"]
     matched_tag_sources: list[ClassificationSourceEvidence]
     matched_type_sources: list[ClassificationSourceEvidence]
+    matched_symbol_sources: list[ClassificationSourceEvidence]
     matched_rules: list[ClassificationRuleEvidence]
     override_roles: list[CardRole]
     resolved_roles: list[CardRole]
@@ -58,15 +61,28 @@ class CardFactionInferenceEvidence(TypedDict):
     mode: Literal["automatic", "override"]
     matched_tag_sources: list[ClassificationSourceEvidence]
     matched_type_sources: list[ClassificationSourceEvidence]
+    matched_symbol_sources: list[ClassificationSourceEvidence]
     matched_rules: list[ClassificationRuleEvidence]
     override_factions: list[CardFaction]
     resolved_factions: list[CardFaction]
     snapshot_digest: str
 
 
+class CardManaFamilyInferenceEvidence(TypedDict):
+    mode: Literal["automatic", "override"]
+    matched_tag_sources: list[ClassificationSourceEvidence]
+    matched_type_sources: list[ClassificationSourceEvidence]
+    matched_symbol_sources: list[ClassificationSourceEvidence]
+    matched_rules: list[ClassificationRuleEvidence]
+    override_mana_families: list[ManaFamily]
+    resolved_mana_families: list[ManaFamily]
+    snapshot_digest: str
+
+
 class CardClassificationInferenceEvidence(TypedDict):
     roles: CardRoleInferenceEvidence
     factions: CardFactionInferenceEvidence
+    mana_families: CardManaFamilyInferenceEvidence
 
 
 class ImportJob(TimestampedModel):
@@ -101,6 +117,10 @@ class ImportJob(TimestampedModel):
         default=ImportClassificationMode.automatic
     )
     card_faction_override_json = models.JSONField(default=list)
+    card_mana_family_mode: models.TextField[str, str] = models.TextField(
+        default=ImportClassificationMode.automatic
+    )
+    card_mana_family_override_json = models.JSONField(default=list)
     classification_rule_snapshot_json = models.JSONField(default=dict)
     status: models.TextField[str, str] = models.TextField(default=ImportJobStatus.queued)
     total_items: models.IntegerField[int, int] = models.IntegerField(default=0)
@@ -156,6 +176,7 @@ class ImportJobItem(TimestampedModel):
     )
     resolved_card_roles_json = models.JSONField(default=list)
     resolved_card_factions_json = models.JSONField(default=list)
+    resolved_card_mana_families_json = models.JSONField(default=list)
     classification_inference_json = models.JSONField(default=dict)
     target_card_pool_snapshot: models.TextField[str | None, str | None] = models.TextField(
         default=None,
@@ -164,6 +185,7 @@ class ImportJobItem(TimestampedModel):
     )
     target_card_roles_snapshot_json = models.JSONField(default=list)
     target_card_factions_snapshot_json = models.JSONField(default=list)
+    target_card_mana_families_snapshot_json = models.JSONField(default=list)
     warnings_json = models.JSONField(default=list)
 
     class Meta:

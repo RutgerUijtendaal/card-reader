@@ -54,6 +54,11 @@ const buildCardGroup = (): CardGroupGalleryItem => ({
   group_name: 'Group 1',
   anchor_card_id: 'card-1',
   anchor_card_name: 'Card 1',
+  card_pool: 'player',
+  card_roles: [],
+  card_factions: [],
+  card_mana_families: ['arcane'],
+  mana_family_sort_key: 0,
   member_count: 3,
   preview_cards: [
     {

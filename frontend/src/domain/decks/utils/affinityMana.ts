@@ -1,50 +1,47 @@
 import type { CardHoverTooltipModel } from '@/domain/cards/types/cardModels';
 import type { SymbolFilterOption } from '@/domain/cards/types';
 
-export type HeroAffinityManaPreset = {
-  includedManaSymbolKeys: string[];
-  excludedManaSymbolKeys: string[];
+export type HeroManaFamilyPreset = {
+  includedManaFamilyKeys: string[];
+  excludedManaFamilyKeys: string[];
 };
 
 const uniqueSorted = (values: readonly string[]): string[] =>
   [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort((left, right) => left.localeCompare(right));
 
-export const getManaSymbolKeysForAffinityKeys = (
-  affinitySymbolKeys: readonly string[],
+export const getManaFamilyKeysForSymbolKeys = (
+  symbolKeys: readonly string[],
   manaFamilyBySymbolKey: Readonly<Record<string, string>>,
 ): string[] => uniqueSorted(
-  affinitySymbolKeys.map((key) => manaFamilyBySymbolKey[key]).filter((key): key is string => Boolean(key)),
+  symbolKeys.map((key) => manaFamilyBySymbolKey[key]).filter((key): key is string => Boolean(key)),
 );
 
-const getHeroManaFamilySymbolKeys = (
-  hero: Pick<CardHoverTooltipModel, 'symbols'> | null,
-  manaFamilyBySymbolKey: Readonly<Record<string, string>>,
+const getHeroManaFamilyKeys = (
+  hero: Pick<CardHoverTooltipModel, 'card_mana_families'> | null,
 ): string[] => {
   if (!hero) {
     return [];
   }
-  return uniqueSorted(hero.symbols.map((symbol) => symbol.key).filter((key) => manaFamilyBySymbolKey[key]));
+  return uniqueSorted(hero.card_mana_families ?? []);
 };
 
-export const buildHeroAffinityManaPreset = (
-  hero: Pick<CardHoverTooltipModel, 'symbols'> | null,
+export const buildHeroManaFamilyPreset = (
+  hero: Pick<CardHoverTooltipModel, 'card_mana_families'> | null,
   manaSymbols: readonly SymbolFilterOption[],
-  manaFamilyBySymbolKey: Readonly<Record<string, string>>,
-): HeroAffinityManaPreset | null => {
-  const manaSymbolKeys = uniqueSorted(manaSymbols.map((symbol) => symbol.key));
-  const availableManaSymbolKeys = new Set(manaSymbolKeys);
-  const includedManaSymbolKeys = getManaSymbolKeysForAffinityKeys(
-    getHeroManaFamilySymbolKeys(hero, manaFamilyBySymbolKey),
-    manaFamilyBySymbolKey,
-  ).filter((key) => availableManaSymbolKeys.has(key));
+): HeroManaFamilyPreset | null => {
+  const manaFamilyKeys = uniqueSorted(manaSymbols.map((symbol) => symbol.key));
+  const availableManaFamilyKeys = new Set(manaFamilyKeys);
+  const includedManaFamilyKeys = getHeroManaFamilyKeys(hero).filter((key) =>
+    availableManaFamilyKeys.has(key),
+  );
 
-  if (includedManaSymbolKeys.length === 0) {
+  if (includedManaFamilyKeys.length === 0) {
     return null;
   }
 
-  const includedManaSymbolKeySet = new Set(includedManaSymbolKeys);
+  const includedManaFamilyKeySet = new Set(includedManaFamilyKeys);
   return {
-    includedManaSymbolKeys,
-    excludedManaSymbolKeys: manaSymbolKeys.filter((key) => !includedManaSymbolKeySet.has(key)),
+    includedManaFamilyKeys,
+    excludedManaFamilyKeys: manaFamilyKeys.filter((key) => !includedManaFamilyKeySet.has(key)),
   };
 };
