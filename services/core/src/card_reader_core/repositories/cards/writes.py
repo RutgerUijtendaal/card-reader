@@ -155,6 +155,11 @@ def save_parsed_card_result(
     # A failed atomic attempt can leave relation assignments cached on the Python
     # instance even though the database transaction rolled them back. Every retry
     # must therefore start from the authoritative persisted item state.
+    was_targeted = (
+        item.target_card_pool_snapshot is not None
+        or item.target_card is not None
+        or item.target_card_version is not None
+    )
     item = (
         ImportJobItem.objects.select_related(
             "job__content_version",
@@ -164,7 +169,7 @@ def save_parsed_card_result(
         )
         .get(id=item.id)
     )
-    if item.target_card_pool_snapshot is not None and (
+    if was_targeted and (
         item.target_card is None or item.target_card_version is None
     ):
         raise ValueError("The target Card no longer exists; queue a new reparse.")

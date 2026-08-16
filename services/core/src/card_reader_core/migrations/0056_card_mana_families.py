@@ -463,7 +463,9 @@ def guard_mana_family_downgrade(apps: Any, _schema_editor: Any) -> None:
     active_statuses = ("queued", "running", "canceling")
     target_rows = list(
         ImportJobItem.objects.filter(
-            target_card_pool_snapshot__isnull=False,
+            models.Q(target_card_pool_snapshot__isnull=False)
+            | models.Q(target_card_version_id__isnull=False)
+            | ~models.Q(target_card_mana_families_snapshot_json=[])
         ).values_list(
             "job__card_pool",
             "job__status",

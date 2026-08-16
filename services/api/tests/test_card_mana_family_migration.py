@@ -248,9 +248,22 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
         MigratedJob.objects.get(id=completed_job.id).classification_rule_snapshot_json
         == pre_mana_snapshot
     )
-    assert MigratedItem.objects.get(
-        id=queued_target_item.id
-    ).target_card_mana_families_snapshot_json == ["arcane", "dark"]
+    migrated_legacy_target = MigratedItem.objects.get(id=queued_target_item.id)
+    assert migrated_legacy_target.target_card_pool_snapshot is None
+    assert migrated_legacy_target.target_card_mana_families_snapshot_json == [
+        "arcane",
+        "dark",
+    ]
+    migrated_legacy_target.target_card_mana_families_snapshot_json = []
+    migrated_legacy_target.save(
+        update_fields=["target_card_mana_families_snapshot_json"]
+    )
+    with pytest.raises(RuntimeError, match="target Card mana-family snapshots"):
+        _migrate_to(BASE_MIGRATION)
+    migrated_legacy_target.target_card_mana_families_snapshot_json = ["arcane", "dark"]
+    migrated_legacy_target.save(
+        update_fields=["target_card_mana_families_snapshot_json"]
+    )
 
     edited_snapshot = json.loads(json.dumps(queued_snapshot))
     edited_arcane_rule = next(

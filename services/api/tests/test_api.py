@@ -883,7 +883,7 @@ def test_processor_revalidates_target_pool_after_ocr_before_persisting() -> None
     assert target_version.name == "In-flight Pool Drift"
 
 
-def test_processor_rejects_a_target_deleted_during_ocr() -> None:
+def test_processor_rejects_a_legacy_target_deleted_during_ocr() -> None:
     card, target_version = _create_editable_card_version(name="In-flight Target Delete")
     source_file = build_storage_relative_path("uploads", "in-flight-target-delete.png")
     source_path = resolve_storage_path(source_file)
@@ -907,7 +907,6 @@ def test_processor_rejects_a_target_deleted_during_ocr() -> None:
         source_file=source_file,
         target_card=card,
         target_card_version=target_version,
-        target_card_pool_snapshot="player",
     )
 
     class TargetDeletingParser:

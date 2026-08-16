@@ -52,15 +52,34 @@ def fetch_items_for_job(job_id: str) -> list[ImportJobItem]:
 def fetch_import_item_target_state(item_id: str) -> ImportItemTargetState | None:
     row = (
         ImportJobItem.objects.filter(id=item_id)
-        .values_list("target_card_pool_snapshot", "target_card__card_pool")
+        .values_list(
+            "target_card_pool_snapshot",
+            "target_card_id",
+            "target_card_version_id",
+            "target_card__card_pool",
+            "target_card_version__card__card_pool",
+        )
         .first()
     )
     if row is None:
         return None
-    target_pool_snapshot, live_card_pool = row
+    (
+        target_pool_snapshot,
+        target_card_id,
+        target_card_version_id,
+        target_card_pool,
+        target_version_card_pool,
+    ) = row
     return ImportItemTargetState(
-        was_targeted=target_pool_snapshot is not None,
-        live_card_pool=cast(CardPool | None, live_card_pool),
+        was_targeted=(
+            target_pool_snapshot is not None
+            or target_card_id is not None
+            or target_card_version_id is not None
+        ),
+        live_card_pool=cast(
+            CardPool | None,
+            target_card_pool or target_version_card_pool,
+        ),
     )
 
 
