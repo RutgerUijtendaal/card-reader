@@ -169,13 +169,25 @@ def test_mana_role_migration_reuses_type_seeds_rules_and_backfills_latest_types(
 
 @pytest.mark.django_db(transaction=True)
 def test_mana_role_migration_refuses_to_orphan_custom_mana_classification() -> None:
+    _migrate_to(BASE_MIGRATION)
     apps = _migrate_to(MANA_ROLE_MIGRATION)
+    Card = apps.get_model("card_reader_core", "Card")
     CardClassificationRule = apps.get_model(
         "card_reader_core",
         "CardClassificationRule",
     )
+    CardRoleAssignment = apps.get_model("card_reader_core", "CardRoleAssignment")
     Type = apps.get_model("card_reader_core", "Type")
     mana_type = Type.objects.get(key="mana")
+    custom_card = Card.objects.create(
+        key="custom-mana-role-migration",
+        label="Custom Mana role migration",
+        card_pool="neutral",
+    )
+    custom_assignment = CardRoleAssignment.objects.create(
+        card_id=custom_card.id,
+        role="mana",
+    )
     custom_rule = CardClassificationRule.objects.create(
         card_pool="neutral",
         target_kind="role",
@@ -189,5 +201,6 @@ def test_mana_role_migration_refuses_to_orphan_custom_mana_classification() -> N
         _migrate_to(BASE_MIGRATION)
 
     CardClassificationRule.objects.filter(id=custom_rule.id).delete()
+    CardRoleAssignment.objects.filter(id=custom_assignment.id).delete()
     _migrate_to(BASE_MIGRATION)
     _restore_leaf()
