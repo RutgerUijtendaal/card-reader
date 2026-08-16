@@ -6,7 +6,7 @@ from uuid import UUID
 from django.db.models import Case, IntegerField, Q, QuerySet, Value, When
 from django.utils import timezone
 
-from card_reader_core.models import CardPoolScope, Deck, DeckCreation, DeckVisibility
+from card_reader_core.models import Deck, DeckCreation, DeckVisibility
 
 from .filters import apply_deck_filters
 from .prefetch import deck_queryset, deck_summary_queryset, deck_validation_queryset
@@ -18,7 +18,6 @@ PAGINATED_DECK_ORDERING = ("-created_at", "id")
 
 def list_public_decks(
     *,
-    card_pool_scope: CardPoolScope,
     search_query: str | None = None,
     hero_query: str | None = None,
     author_query: str | None = None,
@@ -43,7 +42,6 @@ def list_public_decks(
             deck_tag_ids=deck_tag_ids,
             deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
-            card_pool_scope=card_pool_scope,
         ).order_by("-updated_at", "-created_at")
     )
 
@@ -60,7 +58,6 @@ def list_owner_decks(
     deck_tag_ids: list[str] | None = None,
     deck_tag_exclude_ids: list[str] | None = None,
     deck_tag_match: str | None = None,
-    card_pool_scope: CardPoolScope,
 ) -> list[Deck]:
     return list(
         apply_deck_filters(
@@ -75,14 +72,12 @@ def list_owner_decks(
             deck_tag_ids=deck_tag_ids,
             deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
-            card_pool_scope=card_pool_scope,
         ).order_by("-updated_at", "-created_at")
     )
 
 
 def list_public_deck_summaries(
     *,
-    card_pool_scope: CardPoolScope,
     search_query: str | None = None,
     hero_query: str | None = None,
     author_query: str | None = None,
@@ -107,7 +102,6 @@ def list_public_deck_summaries(
             deck_tag_ids=deck_tag_ids,
             deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
-            card_pool_scope=card_pool_scope,
         ).order_by("-updated_at", "-created_at")
     )
 
@@ -124,7 +118,6 @@ def list_owner_deck_summaries(
     deck_tag_ids: list[str] | None = None,
     deck_tag_exclude_ids: list[str] | None = None,
     deck_tag_match: str | None = None,
-    card_pool_scope: CardPoolScope,
 ) -> list[Deck]:
     return list(
         apply_deck_filters(
@@ -139,14 +132,12 @@ def list_owner_deck_summaries(
             deck_tag_ids=deck_tag_ids,
             deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
-            card_pool_scope=card_pool_scope,
         ).order_by("-updated_at", "-created_at")
     )
 
 
 def list_public_deck_summary_candidates(
     *,
-    card_pool_scope: CardPoolScope,
     snapshot_at: datetime,
     search_query: str | None = None,
     hero_query: str | None = None,
@@ -175,7 +166,6 @@ def list_public_deck_summary_candidates(
             deck_tag_ids=deck_tag_ids,
             deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
-            card_pool_scope=card_pool_scope,
         ).order_by(*PAGINATED_DECK_ORDERING)
     )
 
@@ -248,7 +238,6 @@ def list_owner_deck_summary_page(
     deck_tag_ids: list[str] | None = None,
     deck_tag_exclude_ids: list[str] | None = None,
     deck_tag_match: str | None = None,
-    card_pool_scope: CardPoolScope,
 ) -> DeckSummaryPage:
     effective_snapshot_at = snapshot_at or timezone.now()
     queryset = apply_deck_filters(
@@ -266,7 +255,6 @@ def list_owner_deck_summary_page(
         deck_tag_ids=deck_tag_ids,
         deck_tag_exclude_ids=deck_tag_exclude_ids,
         deck_tag_match=deck_tag_match,
-        card_pool_scope=card_pool_scope,
     ).order_by(*PAGINATED_DECK_ORDERING)
     return _paginate_deck_summary_queryset(
         queryset,

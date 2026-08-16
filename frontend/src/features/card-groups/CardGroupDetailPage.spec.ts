@@ -296,38 +296,6 @@ describe('CardGroupDetailPage', () => {
     mounted.unmount();
   });
 
-  test('discards a restricted group response after the workspace scope changes', async () => {
-    let resolveInitialGroup: ((value: { data: CardGroupDetail }) => void) | undefined;
-    let groupRequestCount = 0;
-    apiGet.mockImplementation((url: string) => {
-      if (url === '/card-groups/group-1') {
-        groupRequestCount += 1;
-        if (groupRequestCount === 1) {
-          return new Promise((resolve) => {
-            resolveInitialGroup = resolve;
-          });
-        }
-        return new Promise(() => {});
-      }
-      if (url === '/cards/filters') {
-        return Promise.resolve({ data: filters });
-      }
-      return Promise.reject(new Error(`unexpected GET ${url}`));
-    });
-    const mounted = await mountView('/card-groups/group-1', { flush: false });
-    await vi.waitFor(() => expect(groupRequestCount).toBe(1));
-
-    mounted.workspace.synchronizeSession(['player'], 'signed-in-user');
-    await vi.waitFor(() => expect(groupRequestCount).toBe(2));
-    resolveInitialGroup?.({ data: buildGroup() });
-    await flushPromises();
-    await nextTick();
-
-    expect(mounted.container.textContent).not.toContain('Anchor Card');
-    expect(mounted.container.querySelector('[aria-label="Loading card group detail"]')).not.toBeNull();
-    mounted.unmount();
-  });
-
   test('renders group members vertically with anchor deck references', async () => {
     apiGet.mockImplementation((url: string) => {
       if (url === '/card-groups/group-1') {

@@ -94,7 +94,7 @@ const buildDeck = (): DeckRecord => ({
     label: 'Ready',
     issues: [],
   },
-  has_restricted_cards: false,
+  has_non_player_cards: false,
   tags: [
     { id: 'role-damage', kind: 'role', key: 'damage', label: 'Damage' },
     { id: 'type-armor', kind: 'type', key: 'armor', label: 'Armor' },

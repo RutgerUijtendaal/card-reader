@@ -13,15 +13,9 @@ from card_reader_api.card_groups.serializers import (
 )
 from card_reader_api.cards.deck_references import card_deck_references_payload
 from card_reader_api.cards.serializers import CardFiltersQuerySerializer
-from card_reader_api.common.auth_access import card_pool_scope_for_user, is_authenticated
+from card_reader_api.common.auth_access import is_authenticated
 from card_reader_api.common.permissions import StaffAllowed
-from card_reader_api.common.responses import (
-    RESTRICTED_CARD_POOL_DETAIL,
-    bad_request,
-    forbidden,
-    not_found,
-    serializer_error,
-)
+from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_core.services.card_groups import CardGroupMemberInput, CardGroupService
 
 
@@ -29,15 +23,12 @@ class PublicCardGroupDetailView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request, group_id: str) -> Response:
-        card_pool_scope = card_pool_scope_for_user(request.user)
         serializer = CardFiltersQuerySerializer(data=_lifecycle_query_data(request))
         if not serializer.is_valid():
             return serializer_error(serializer)
         filters = serializer.validated_filters()
         lifecycle_status = filters["lifecycle_status"]
         card_pool = filters["card_pool"]
-        if not card_pool_scope.allows_card_pool(card_pool):
-            return forbidden(RESTRICTED_CARD_POOL_DETAIL)
         group = CardGroupService().get_group_for_pool(group_id, card_pool=card_pool)
         if group is None:
             return not_found("Card group not found")
@@ -46,11 +37,9 @@ class PublicCardGroupDetailView(APIView):
             card_group_detail_payload(
                 group,
                 lifecycle_status=lifecycle_status,
-                card_pool_scope=card_pool_scope,
                 anchor_deck_references=card_deck_references_payload(
                     group.anchor_card.id,
                     viewer_id=viewer_id,
-                    card_pool_scope=card_pool_scope,
                 ),
             )
         )

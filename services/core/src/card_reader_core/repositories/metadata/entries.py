@@ -8,7 +8,6 @@ from django.db.models.functions import Lower
 
 from card_reader_core.models import (
     CardPool,
-    CardPoolScope,
     CardVersion,
     CardVersionKeyword,
     CardVersionTag,
@@ -59,21 +58,13 @@ def list_types(*, keys: set[str] | None = None) -> list[Type]:
 def list_types_for_card_sort(
     *,
     card_pool: CardPool | None = None,
-    card_pool_scope: CardPoolScope | None = None,
     available_only: bool = False,
 ) -> list[Type]:
-    if (card_pool is None) == (card_pool_scope is None):
-        raise ValueError("Provide exactly one card pool or card pool scope.")
     linked_card_filter = Q(card_version_types__card_version__is_latest=True) & active_card_lifecycle_q(
         field_path="card_version_types__card_version__card__lifecycle_status",
     )
     if card_pool is not None:
         linked_card_filter &= Q(card_version_types__card_version__card__card_pool=card_pool)
-    else:
-        assert card_pool_scope is not None
-        linked_card_filter &= Q(
-            card_version_types__card_version__card__card_pool__in=card_pool_scope.allowed_pools
-        )
     query = Type.objects.annotate(
         linked_card_count=Count(
             "card_version_types",
@@ -97,14 +88,14 @@ def _available_metadata_exists(
     link_model: Any,
     *,
     metadata_field: str,
-    card_pool_scope: CardPoolScope,
+    card_pool: CardPool,
 ) -> Exists:
     return Exists(
         link_model.objects.filter(
             **{
                 f"{metadata_field}_id": OuterRef("pk"),
                 "card_version__is_latest": True,
-                "card_version__card__card_pool__in": card_pool_scope.allowed_pools,
+                "card_version__card__card_pool": card_pool,
             }
         ).filter(
             active_card_lifecycle_q(
@@ -114,13 +105,13 @@ def _available_metadata_exists(
     )
 
 
-def list_available_keywords(*, card_pool_scope: CardPoolScope) -> list[Keyword]:
+def list_available_keywords(*, card_pool: CardPool) -> list[Keyword]:
     return list(
         Keyword.objects.annotate(
             has_available_card=_available_metadata_exists(
                 CardVersionKeyword,
                 metadata_field="keyword",
-                card_pool_scope=card_pool_scope,
+                card_pool=card_pool,
             )
         )
         .filter(has_available_card=True)
@@ -128,13 +119,13 @@ def list_available_keywords(*, card_pool_scope: CardPoolScope) -> list[Keyword]:
     )
 
 
-def list_available_tags(*, card_pool_scope: CardPoolScope) -> list[Tag]:
+def list_available_tags(*, card_pool: CardPool) -> list[Tag]:
     return list(
         Tag.objects.annotate(
             has_available_card=_available_metadata_exists(
                 CardVersionTag,
                 metadata_field="tag",
-                card_pool_scope=card_pool_scope,
+                card_pool=card_pool,
             )
         )
         .filter(has_available_card=True)
@@ -285,15 +276,12 @@ def append_metadata_identifier(*, entry: Tag | Type, identifier: str) -> None:
     entry.save(update_fields=["identifiers_json", "updated_at"])
 
 
-def list_keywords_with_linked_card_counts(*, card_pool_scope: CardPoolScope) -> list[Keyword]:
+def list_keywords_with_linked_card_counts() -> list[Keyword]:
     return list(
         Keyword.objects.order_by("label").annotate(
             linked_card_count=Count(
                 "card_version_keywords",
                 filter=Q(card_version_keywords__card_version__is_latest=True)
-                & Q(
-                    card_version_keywords__card_version__card__card_pool__in=card_pool_scope.allowed_pools
-                )
                 & active_card_lifecycle_q(
                     field_path="card_version_keywords__card_version__card__lifecycle_status",
                 ),
@@ -303,15 +291,12 @@ def list_keywords_with_linked_card_counts(*, card_pool_scope: CardPoolScope) -> 
     )
 
 
-def list_tags_with_linked_card_counts(*, card_pool_scope: CardPoolScope) -> list[Tag]:
+def list_tags_with_linked_card_counts() -> list[Tag]:
     return list(
         Tag.objects.order_by("label").annotate(
             linked_card_count=Count(
                 "card_version_tags",
                 filter=Q(card_version_tags__card_version__is_latest=True)
-                & Q(
-                    card_version_tags__card_version__card__card_pool__in=card_pool_scope.allowed_pools
-                )
                 & active_card_lifecycle_q(
                     field_path="card_version_tags__card_version__card__lifecycle_status",
                 ),
@@ -321,15 +306,12 @@ def list_tags_with_linked_card_counts(*, card_pool_scope: CardPoolScope) -> list
     )
 
 
-def list_types_with_linked_card_counts(*, card_pool_scope: CardPoolScope) -> list[Type]:
+def list_types_with_linked_card_counts() -> list[Type]:
     return list(
         Type.objects.order_by("label").annotate(
             linked_card_count=Count(
                 "card_version_types",
                 filter=Q(card_version_types__card_version__is_latest=True)
-                & Q(
-                    card_version_types__card_version__card__card_pool__in=card_pool_scope.allowed_pools
-                )
                 & active_card_lifecycle_q(
                     field_path="card_version_types__card_version__card__lifecycle_status",
                 ),
@@ -339,15 +321,12 @@ def list_types_with_linked_card_counts(*, card_pool_scope: CardPoolScope) -> lis
     )
 
 
-def list_symbols_with_linked_card_counts(*, card_pool_scope: CardPoolScope) -> list[Symbol]:
+def list_symbols_with_linked_card_counts() -> list[Symbol]:
     return list(
         Symbol.objects.order_by("label").annotate(
             linked_card_count=Count(
                 "card_version_symbols",
                 filter=Q(card_version_symbols__card_version__is_latest=True)
-                & Q(
-                    card_version_symbols__card_version__card__card_pool__in=card_pool_scope.allowed_pools
-                )
                 & active_card_lifecycle_q(
                     field_path="card_version_symbols__card_version__card__lifecycle_status",
                 ),
@@ -358,45 +337,41 @@ def list_symbols_with_linked_card_counts(*, card_pool_scope: CardPoolScope) -> l
 
 
 def list_latest_versions_for_keyword_detail(
-    *, entry_id: str, card_pool_scope: CardPoolScope, limit: int = 12
+    *, entry_id: str, limit: int = 12
 ) -> tuple[list[CardVersion], int]:
     return _list_latest_versions_for_detail(
         relation_filter="card_version_keywords__keyword_id",
         entry_id=entry_id,
-        card_pool_scope=card_pool_scope,
         limit=limit,
     )
 
 
 def list_latest_versions_for_tag_detail(
-    *, entry_id: str, card_pool_scope: CardPoolScope, limit: int = 12
+    *, entry_id: str, limit: int = 12
 ) -> tuple[list[CardVersion], int]:
     return _list_latest_versions_for_detail(
         relation_filter="card_version_tags__tag_id",
         entry_id=entry_id,
-        card_pool_scope=card_pool_scope,
         limit=limit,
     )
 
 
 def list_latest_versions_for_type_detail(
-    *, entry_id: str, card_pool_scope: CardPoolScope, limit: int = 12
+    *, entry_id: str, limit: int = 12
 ) -> tuple[list[CardVersion], int]:
     return _list_latest_versions_for_detail(
         relation_filter="card_version_types__type_id",
         entry_id=entry_id,
-        card_pool_scope=card_pool_scope,
         limit=limit,
     )
 
 
 def list_latest_versions_for_symbol_detail(
-    *, entry_id: str, card_pool_scope: CardPoolScope, limit: int = 12
+    *, entry_id: str, limit: int = 12
 ) -> tuple[list[CardVersion], int]:
     return _list_latest_versions_for_detail(
         relation_filter="card_version_symbols__symbol_id",
         entry_id=entry_id,
-        card_pool_scope=card_pool_scope,
         limit=limit,
     )
 
@@ -405,13 +380,11 @@ def _list_latest_versions_for_detail(
     *,
     relation_filter: str,
     entry_id: str,
-    card_pool_scope: CardPoolScope,
     limit: int,
 ) -> tuple[list[CardVersion], int]:
     versions = (
         CardVersion.objects.filter(
             is_latest=True,
-            card__card_pool__in=card_pool_scope.allowed_pools,
             **{relation_filter: entry_id},
         )
         .filter(active_card_lifecycle_q())

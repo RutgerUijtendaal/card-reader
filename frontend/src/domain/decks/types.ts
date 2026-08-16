@@ -91,7 +91,7 @@ export type DeckRecord = {
     deprecated_card_count?: number;
     deprecated_card_ids?: string[];
   };
-  has_restricted_cards: boolean;
+  has_non_player_cards: boolean;
   deck_building_rules?: DeckBuildingRules;
   created_at: string;
   updated_at: string;
@@ -105,7 +105,6 @@ export type DeckHeroSummary = Pick<
   | 'name'
   | 'image_url'
   | 'symbols'
-  | 'restricted'
   | 'card_pool'
   | 'card_roles'
 >;
@@ -133,7 +132,7 @@ export type DeckSummaryRecord = {
     label: string;
     deprecated_card_count?: number;
   };
-  has_restricted_cards: boolean;
+  has_non_player_cards: boolean;
   created_at: string;
   updated_at: string;
 };

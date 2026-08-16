@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { LocationQuery, RouteMeta } from 'vue-router';
 import {
-  resolveResourceWorkspaceAccessDecision,
   resolveWorkspaceSelectionDecision,
   type WorkspaceRouteCapability,
 } from '@/app/router/workspaceCapabilities';
@@ -24,7 +23,6 @@ describe('workspace route capabilities', () => {
         route('global'),
         'evil',
         'player',
-        ['player', 'evil', 'neutral'],
       ),
     ).toEqual({ kind: 'stay' });
   });
@@ -35,7 +33,6 @@ describe('workspace route capabilities', () => {
         route('gallery', '/cards', { q: 'hero', card_pool: 'evil' }),
         'neutral',
         'evil',
-        ['player', 'evil', 'neutral'],
       ),
     ).toEqual({
       kind: 'replace-gallery',
@@ -47,7 +44,6 @@ describe('workspace route capabilities', () => {
         route('gallery', '/cards', { q: 'hero', card_pool: 'evil' }),
         'player',
         'evil',
-        ['player', 'evil', 'neutral'],
       ),
     ).toEqual({
       kind: 'replace-gallery',
@@ -59,7 +55,6 @@ describe('workspace route capabilities', () => {
         route('gallery', '/cards', { card_pool: 'evil' }),
         'player',
         'player',
-        ['player', 'evil', 'neutral'],
       ),
     ).toEqual({
       kind: 'replace-gallery',
@@ -78,7 +73,6 @@ describe('workspace route capabilities', () => {
         }),
         'neutral',
         'player',
-        ['player', 'evil', 'neutral'],
       ),
     ).toEqual({
       kind: 'update-resource-context',
@@ -95,44 +89,12 @@ describe('workspace route capabilities', () => {
     });
   });
 
-  test('preserves a public resource when only its return workspace becomes inaccessible', () => {
-    expect(
-      resolveResourceWorkspaceAccessDecision(
-        route('resource', '/cards/player-card', {
-          return_card_pool: 'evil',
-          tab: 'versions',
-        }),
-        ['player'],
-      ),
-    ).toEqual({
-      kind: 'strip-return-context',
-      location: {
-        path: '/cards/player-card',
-        query: { tab: 'versions' },
-        hash: '',
-      },
-    });
-  });
-
-  test('falls back when the resource itself belongs to an inaccessible pool', () => {
-    expect(
-      resolveResourceWorkspaceAccessDecision(
-        route('resource', '/cards/evil-card', {
-          card_pool: 'evil',
-          return_card_pool: 'player',
-        }),
-        ['player'],
-      ),
-    ).toEqual({ kind: 'fallback-gallery' });
-  });
-
-  test('falls back from Player-only routes only for restricted workspaces', () => {
+  test('falls back from Player-only routes only for non-Player workspaces', () => {
     expect(
       resolveWorkspaceSelectionDecision(
         route('player-only', '/playtester/deck-1'),
         'evil',
         'player',
-        ['player', 'evil', 'neutral'],
       ),
     ).toEqual({
       kind: 'fallback-gallery',
@@ -144,26 +106,16 @@ describe('workspace route capabilities', () => {
         route('player-only', '/playtester/deck-1'),
         'player',
         'player',
-        ['player', 'evil', 'neutral'],
       ),
     ).toEqual({ kind: 'stay' });
   });
 
-  test('rejects inaccessible workspaces and undeclared routes', () => {
-    expect(
-      resolveWorkspaceSelectionDecision(
-        route('global'),
-        'evil',
-        'player',
-        ['player'],
-      ),
-    ).toEqual({ kind: 'reject' });
+  test('rejects undeclared routes', () => {
     expect(
       resolveWorkspaceSelectionDecision(
         { path: '/unknown', query: {}, hash: '', meta: {} },
         'evil',
         'player',
-        ['player', 'evil'],
       ),
     ).toEqual({ kind: 'reject' });
   });

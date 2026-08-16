@@ -8,7 +8,6 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 
 
-RESTRICTED_CARD_POOL_DETAIL = "Restricted card pools require staff access."
 
 
 class PaginatedResult(Protocol):

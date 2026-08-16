@@ -81,7 +81,7 @@ describe('useTtsCardExport', () => {
 
   test('drops side effects when the originating request is no longer current', async () => {
     vi.mocked(exportTtsCards).mockResolvedValue({
-      encodedPayload: 'restricted-pool-payload',
+      encodedPayload: 'stale-request-payload',
       exportedCount: 1,
       skippedCount: 0,
       sheetCount: 1,

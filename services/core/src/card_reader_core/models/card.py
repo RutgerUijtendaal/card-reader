@@ -57,27 +57,6 @@ CARD_POOL_CHOICES: tuple[tuple[CardPool, str], ...] = tuple(
 )
 
 
-@dataclass(frozen=True)
-class CardPoolScope:
-    """Explicit visibility boundary for card-derived reads and payloads."""
-
-    allowed_pools: frozenset[CardPool]
-
-    def __post_init__(self) -> None:
-        normalized = frozenset(self.allowed_pools)
-        invalid_pools = normalized.difference(CARD_POOLS)
-        if invalid_pools:
-            invalid = ", ".join(sorted(invalid_pools))
-            raise ValueError(f"Unsupported card pool scope values: {invalid}.")
-        object.__setattr__(self, "allowed_pools", normalized)
-
-    def allows_card_pool(self, card_pool: str) -> bool:
-        return card_pool in self.allowed_pools
-
-
-PLAYER_CARD_POOL_SCOPE = CardPoolScope(frozenset({PLAYER_CARD_POOL}))
-ALL_CARD_POOLS_SCOPE = CardPoolScope(frozenset(CARD_POOLS))
-
 HERO_CARD_ROLE: Literal["hero"] = "hero"
 BOSS_CARD_ROLE: Literal["boss"] = "boss"
 BOON_CARD_ROLE: Literal["boon"] = "boon"
@@ -493,4 +472,3 @@ class CardMergeRedirect(TimestampedModel):
 
     class Meta:
         db_table = "card_merge_redirect"
-

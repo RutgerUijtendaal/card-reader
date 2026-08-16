@@ -5,7 +5,6 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from card_reader_api.common.auth_access import card_pool_scope_for_user
 from card_reader_api.common.responses import paginated_payload, serializer_error
 from card_reader_api.review.serializers import (
     ClassificationReviewItemsQuerySerializer,
@@ -30,13 +29,8 @@ from card_reader_core.services.parse_flags import review_parse_flag_item
 
 class ReviewSummaryView(APIView):
     def get(self, request: Request) -> Response:
-        card_pool_scope = card_pool_scope_for_user(request.user)
-        open_parse_flag_item_count = count_open_parse_flag_items(
-            card_pool_scope=card_pool_scope
-        )
-        open_classification_review_count = count_open_classification_review_items(
-            card_pool_scope=card_pool_scope
-        )
+        open_parse_flag_item_count = count_open_parse_flag_items()
+        open_classification_review_count = count_open_classification_review_items()
         return Response(
             {
                 "open_parse_flag_item_count": open_parse_flag_item_count,
@@ -54,7 +48,6 @@ class ClassificationReviewItemsView(APIView):
         if not serializer.is_valid():
             return serializer_error(serializer)
         page = list_classification_review_items(
-            card_pool_scope=card_pool_scope_for_user(request.user),
             status=serializer.validated_data["status"],
             page=serializer.validated_data["page"],
             page_size=serializer.validated_data["page_size"],
@@ -72,13 +65,11 @@ class ClassificationReviewItemDetailView(APIView):
         serializer = ClassificationReviewItemUpdateSerializer(data=request.data)
         if not serializer.is_valid():
             return serializer_error(serializer)
-        card_pool_scope = card_pool_scope_for_user(request.user)
         try:
             item = review_classification_item(
                 item_id=item_id,
                 status=serializer.validated_data["status"],
                 reviewed_by_id=str(getattr(request.user, "pk", "")),
-                card_pool_scope=card_pool_scope,
                 review_note=str(serializer.validated_data.get("review_note") or ""),
             )
         except ValueError as exc:
@@ -97,7 +88,6 @@ class ParseFlagItemsView(APIView):
         if not serializer.is_valid():
             return serializer_error(serializer)
         page = list_parse_flags(
-            card_pool_scope=card_pool_scope_for_user(request.user),
             status=serializer.validated_data["status"],
             page=serializer.validated_data["page"],
             page_size=serializer.validated_data["page_size"],

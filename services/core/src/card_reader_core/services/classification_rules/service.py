@@ -22,7 +22,6 @@ from card_reader_core.models import (
     STANDARD_CARD_ROLE,
     CardClassificationRule,
     CardPool,
-    CardPoolScope,
     Symbol,
     Tag,
     Type,
@@ -401,15 +400,11 @@ class ClassificationRuleService:
             sorted(symbols.values(), key=lambda source: (source.key, source.id)),
         )
 
-    def definition_catalog(
-        self, *, card_pool_scope: CardPoolScope
-    ) -> dict[str, list[dict[str, object]]]:
-        allowed_pools = tuple(
-            definition.key
-            for definition in CARD_POOL_DEFINITIONS
-            if definition.key in card_pool_scope.allowed_pools
+    def definition_catalog(self) -> dict[str, list[dict[str, object]]]:
+        allowed_pools = tuple(definition.key for definition in CARD_POOL_DEFINITIONS)
+        usage_counts = get_classification_usage_counts(
+            card_pools=allowed_pools
         )
-        usage_counts = get_classification_usage_counts(card_pools=allowed_pools)
         display_symbol_keys = {
             key
             for key in (

@@ -7,14 +7,12 @@ from card_reader_core.models import (
     CLASSIFICATION_REVIEW_STATUSES,
     Card,
     CardClassificationReviewItem,
-    CardPoolScope,
     CardVersion,
     ImportJobItem,
     now_utc,
 )
 
 from .types import ClassificationReviewStatus
-from .queries import classification_review_card_pool_scope_q
 
 
 def create_classification_review_item(
@@ -45,7 +43,6 @@ def update_classification_review_item_status(
     item_id: str,
     status: ClassificationReviewStatus,
     reviewed_by_id: str,
-    card_pool_scope: CardPoolScope,
     review_note: str = "",
 ) -> CardClassificationReviewItem | None:
     if status == CLASSIFICATION_REVIEW_OPEN or status not in CLASSIFICATION_REVIEW_STATUSES:
@@ -62,7 +59,6 @@ def update_classification_review_item_status(
                 "reviewed_by",
             )
             .filter(id=item_id)
-            .filter(classification_review_card_pool_scope_q(card_pool_scope))
             .first()
         )
         if item is None:

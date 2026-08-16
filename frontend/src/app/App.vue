@@ -110,9 +110,6 @@ import {
   buildWorkspaceGalleryLocation,
   useCardPoolWorkspaceStore,
 } from '@/domain/cards/cardPoolWorkspace';
-import { isCardPool } from '@/domain/cards/cardPools';
-import { clearGalleryNavigationState } from '@/domain/cards/utils/gallery/galleryNavigation';
-import { resolveResourceWorkspaceAccessDecision } from '@/app/router/workspaceCapabilities';
 
 const route = useRoute();
 const router = useRouter();
@@ -210,45 +207,12 @@ watch(isDesktop, (desktop) => {
 });
 
 watch(
-  () => ({
-    sessionKey: auth.authenticated
-      ? `user:${auth.user?.id ?? auth.user?.username ?? 'authenticated'}`
-      : 'anonymous',
-    accessiblePools: [...auth.accessibleCardPools],
-  }),
-  ({ sessionKey, accessiblePools }) => {
-    const previousGeneration = workspace.generation;
-    const previousPool = workspace.activePool;
-    const changedPool = workspace.synchronizeSession(accessiblePools, sessionKey);
-    if (workspace.generation === previousGeneration) {
-      return;
-    }
-    clearGalleryNavigationState();
-    const routePool = isCardPool(route.query.card_pool)
-      ? route.query.card_pool
-      : null;
-    const routePoolIsNoLongerAccessible = routePool !== null
-      && !workspace.accessiblePools.includes(routePool);
-    const lostRestrictedWorkspace = previousPool !== 'player'
-      && workspace.activePool === 'player'
-      && !workspace.accessiblePools.includes(previousPool);
-    const resourceAccessDecision = route.meta.workspaceCapability === 'resource'
-      ? resolveResourceWorkspaceAccessDecision(route, workspace.accessiblePools)
-      : { kind: 'allow' } as const;
-    if (route.meta.requiresStaff && !auth.canAccessStaffRoutes) {
-      void router.replace(buildWorkspaceGalleryLocation(workspace.activePool));
-    } else if (resourceAccessDecision.kind === 'fallback-gallery') {
-      void router.replace(buildWorkspaceGalleryLocation(workspace.activePool));
-    } else if (resourceAccessDecision.kind === 'strip-return-context') {
-      void router.replace(resourceAccessDecision.location);
-    } else if (
-      routePoolIsNoLongerAccessible
-      || (changedPool && route.meta.workspaceCapability === 'gallery')
-      || (lostRestrictedWorkspace && route.meta.workspaceCapability === 'gallery')
-    ) {
+  () => auth.canAccessStaffRoutes,
+  (canAccessStaffRoutes) => {
+    if (route.meta.requiresStaff && !canAccessStaffRoutes) {
       void router.replace(buildWorkspaceGalleryLocation(workspace.activePool));
     }
   },
-  { deep: true, flush: 'sync' },
+  { flush: 'sync' },
 );
 </script>

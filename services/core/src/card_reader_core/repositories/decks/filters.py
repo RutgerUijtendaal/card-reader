@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.db.models import Q, QuerySet
 
-from card_reader_core.models import CardPoolScope, Deck
+from card_reader_core.models import Deck
 
 
 def apply_deck_filters(
@@ -18,7 +18,6 @@ def apply_deck_filters(
     deck_tag_ids: list[str] | None,
     deck_tag_exclude_ids: list[str] | None,
     deck_tag_match: str | None,
-    card_pool_scope: CardPoolScope,
 ) -> QuerySet[Deck]:
     filtered = queryset
 
@@ -27,14 +26,14 @@ def apply_deck_filters(
         filtered = filtered.filter(
             Q(name__icontains=normalized_search_query)
             | Q(owner__username__icontains=normalized_search_query)
-            | _hero_text_query(normalized_search_query, card_pool_scope)
-            | _entry_text_query(normalized_search_query, card_pool_scope)
-            | _sideboard_text_query(normalized_search_query, card_pool_scope)
+            | _hero_text_query(normalized_search_query)
+            | _entry_text_query(normalized_search_query)
+            | _sideboard_text_query(normalized_search_query)
         )
 
     normalized_hero_query = (hero_query or "").strip()
     if normalized_hero_query:
-        filtered = filtered.filter(_hero_text_query(normalized_hero_query, card_pool_scope))
+        filtered = filtered.filter(_hero_text_query(normalized_hero_query))
 
     normalized_author_query = (author_query or "").strip()
     if normalized_author_query:
@@ -43,8 +42,8 @@ def apply_deck_filters(
     normalized_card_query = (card_query or "").strip()
     if normalized_card_query:
         filtered = filtered.filter(
-            _entry_text_query(normalized_card_query, card_pool_scope)
-            | _sideboard_text_query(normalized_card_query, card_pool_scope)
+            _entry_text_query(normalized_card_query)
+            | _sideboard_text_query(normalized_card_query)
         )
 
     normalized_affinity_symbol_ids = [symbol_id.strip() for symbol_id in affinity_symbol_ids or [] if symbol_id.strip()]
@@ -52,11 +51,11 @@ def apply_deck_filters(
         match_all = affinity_symbol_match == "all"
         if match_all:
             for symbol_id in normalized_affinity_symbol_ids:
-                filtered = filtered.filter(_affinity_symbol_query(symbol_id, card_pool_scope))
+                filtered = filtered.filter(_affinity_symbol_query(symbol_id))
         else:
             affinity_query = Q()
             for symbol_id in normalized_affinity_symbol_ids:
-                affinity_query |= _affinity_symbol_query(symbol_id, card_pool_scope)
+                affinity_query |= _affinity_symbol_query(symbol_id)
             filtered = filtered.filter(affinity_query)
 
     normalized_affinity_symbol_exclude_ids = [
@@ -65,7 +64,7 @@ def apply_deck_filters(
     if normalized_affinity_symbol_exclude_ids:
         excluded_affinity_query = Q()
         for symbol_id in normalized_affinity_symbol_exclude_ids:
-            excluded_affinity_query |= _affinity_symbol_query(symbol_id, card_pool_scope)
+            excluded_affinity_query |= _affinity_symbol_query(symbol_id)
         filtered = filtered.exclude(excluded_affinity_query)
 
     normalized_deck_tag_ids = [tag_id.strip() for tag_id in deck_tag_ids or [] if tag_id.strip()]
@@ -85,28 +84,25 @@ def apply_deck_filters(
     return filtered.distinct()
 
 
-def _hero_text_query(query: str, card_pool_scope: CardPoolScope) -> Q:
-    result = Q(hero_card__label__icontains=query) | Q(
+def _hero_text_query(query: str) -> Q:
+    return Q(hero_card__label__icontains=query) | Q(
         hero_card__latest_version__name__icontains=query
     )
-    return result & Q(hero_card__card_pool__in=card_pool_scope.allowed_pools)
 
 
-def _entry_text_query(query: str, card_pool_scope: CardPoolScope) -> Q:
-    result = Q(entries__card__label__icontains=query) | Q(
+def _entry_text_query(query: str) -> Q:
+    return Q(entries__card__label__icontains=query) | Q(
         entries__card__latest_version__name__icontains=query
     )
-    return result & Q(entries__card__card_pool__in=card_pool_scope.allowed_pools)
 
 
-def _sideboard_text_query(query: str, card_pool_scope: CardPoolScope) -> Q:
-    result = Q(sideboards__entries__card__label__icontains=query) | Q(
+def _sideboard_text_query(query: str) -> Q:
+    return Q(sideboards__entries__card__label__icontains=query) | Q(
         sideboards__entries__card__latest_version__name__icontains=query
     )
-    return result & Q(sideboards__entries__card__card_pool__in=card_pool_scope.allowed_pools)
 
 
-def _affinity_symbol_query(symbol_id: str, card_pool_scope: CardPoolScope) -> Q:
+def _affinity_symbol_query(symbol_id: str) -> Q:
     hero_query = Q(
             hero_card__latest_version__card_version_symbols__symbol_id=symbol_id,
             hero_card__latest_version__card_version_symbols__symbol__symbol_type="affinity",
@@ -119,7 +115,4 @@ def _affinity_symbol_query(symbol_id: str, card_pool_scope: CardPoolScope) -> Q:
             sideboards__entries__card__latest_version__card_version_symbols__symbol_id=symbol_id,
             sideboards__entries__card__latest_version__card_version_symbols__symbol__symbol_type="affinity",
         )
-    hero_query &= Q(hero_card__card_pool__in=card_pool_scope.allowed_pools)
-    entry_query &= Q(entries__card__card_pool__in=card_pool_scope.allowed_pools)
-    sideboard_query &= Q(sideboards__entries__card__card_pool__in=card_pool_scope.allowed_pools)
     return hero_query | entry_query | sideboard_query

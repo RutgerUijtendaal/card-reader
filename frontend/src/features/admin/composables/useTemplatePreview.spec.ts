@@ -73,7 +73,6 @@ describe('useTemplatePreview', () => {
     vi.useFakeTimers();
     localStorage.clear();
     setActivePinia(createPinia());
-    useCardPoolWorkspaceStore().synchronizeSession(['player', 'evil', 'neutral'], 'staff:1');
     mockedGet.mockReset();
     mockedGet.mockImplementation(async (url) => {
       if (url === '/admin/templates/preview-cards') {

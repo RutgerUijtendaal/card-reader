@@ -538,7 +538,7 @@ def test_parse_flag_review_creates_submitter_notification() -> None:
     assert payload["metadata"] == notification.metadata_json
 
 
-def test_parse_flag_review_notification_is_hidden_after_card_moves_out_of_submitter_scope() -> None:
+def test_parse_flag_review_notification_remains_visible_after_card_pool_change() -> None:
     _clear_notifications()
     submitter = _create_user("notification-gm-flag-submit", "password")
     reviewer = _create_user("notification-gm-flag-reviewer", "password", is_staff=True)
@@ -573,7 +573,7 @@ def test_parse_flag_review_notification_is_hidden_after_card_moves_out_of_submit
 
     assert review_response.status_code == 200
     assert UserNotification.objects.filter(recipient_id=str(submitter.pk)).exists()
-    assert submit_client.get("/notifications?status=all").json()["count"] == 0
+    assert submit_client.get("/notifications?status=all").json()["count"] == 1
 
 
 def test_staff_submitter_receives_parse_review_notification_for_evil_card() -> None:
@@ -769,7 +769,7 @@ def test_card_version_change_notifies_hero_deck_owner_but_not_actor() -> None:
 
 
 @pytest.mark.django_db(transaction=True)
-def test_evil_reclassification_hides_card_notifications_and_stops_future_deck_delivery() -> None:
+def test_evil_reclassification_keeps_card_notifications_and_stops_future_deck_delivery() -> None:
     _clear_notifications()
     owner = _create_user("notification-reclassified-owner", "password")
     hero = _create_card(name="Notification Reclassified Hero", hero=True)
@@ -834,7 +834,7 @@ def test_evil_reclassification_hides_card_notifications_and_stops_future_deck_de
     assert UserNotification.objects.filter(recipient_id=str(owner.pk), archived_at__isnull=True).count() == 3
     client = Client(HTTP_HOST="localhost")
     client.force_login(owner)
-    assert client.get("/notifications?status=all").json()["count"] == 0
+    assert client.get("/notifications?status=all").json()["count"] == 3
     assert service.notify_deck_owners_card_version_changed(
         card_id=card.id,
         card_version_id=version.id,
@@ -906,8 +906,8 @@ def test_evil_reclassification_keeps_notifications_stored_while_reconciling_tts(
     assert synced_card_ids == [card.id]
     client = Client(HTTP_HOST="localhost")
     client.force_login(owner)
-    assert client.get("/notifications?status=all").json()["count"] == 0
-    assert client.get("/notifications/summary").json()["unread_count"] == 0
+    assert client.get("/notifications?status=all").json()["count"] == 2
+    assert client.get("/notifications/summary").json()["unread_count"] == 2
 
 
 def test_noop_card_promotion_does_not_notify_deck_owner() -> None:

@@ -119,19 +119,19 @@ Core stack:
   - Stable human-readable card identity is scoped by pool plus the exact canonical faction set: normalized primary names, aliases, and ordinary untargeted image-hash matching must resolve inside one explicit `(card_pool, card_factions)` namespace. Same-name cards may coexist in different faction namespaces. Roles and mana families never participate in identity matching.
   - Empty factions on an untargeted Evil import mean unknown classification rather than an intentional stable Evil namespace. After ordinary empty-namespace matching, search currently factioned Evil Cards across all historical image checksums and then normalized primary names and aliases. Reuse only one unambiguous Card: either evidence set may resolve alone, both singleton sets must agree, and any multiple or conflicting candidates must refuse the merge. Preserve a matched Card's stored roles, factions, and mana families and create a durable staff classification-review item when inferred values differ. An unmatched or ambiguous import may create or reuse a transitional no-faction Evil Card, must emit `evil_faction_unresolved` with candidate counts, and must link reviewers to its Card tab. Targeted reparses, known-faction imports, other pools, and imports with reparse matching disabled do not use this fallback.
   - Faction assignments and the derived faction identity key form one invariant. Runtime faction mutations must go through the cards identity seam so assignments plus card and alias namespace keys update atomically.
-  - Neutral remains a separate stable pool. Do not include it implicitly in Player or Evil queries; any future Neutral overlay must be an explicit, authorized multi-pool view state.
+  - Neutral remains a separate stable pool. Do not include it implicitly in Player or Evil queries; any future Neutral overlay must be an explicit multi-pool view state.
 - Ordinary Gallery filter visibility is code-owned frontend presentation policy, not card validity, authorization, or import inference:
   - Hide the Roles facet in Player, Evil, and Neutral. Roles remain persisted code-owned classification for inference, overrides, manual editing, business logic, Admin, Review, and explicit API queries.
   - Show Factions only in Evil. Show Mana, including its mana-cost range, Affinity, and Devotion only in Player. All other Gallery facets retain their current visibility until another approved filter pass changes them.
   - Keep the facet matrix and sanitation in one cards-domain Gallery policy. Do not infer it from card data, result counts, Tags, Types, symbols, or classification rules, and do not add database/Admin/developer-data configuration for it.
   - Before loading Gallery results, remove every hidden facet's include, exclude, match-mode, and numeric state from the canonical route and request. Admin, Review, global maintenance, and purpose-specific Player deck filters must not inherit this Gallery-only policy.
 - Ordinary Gallery filter value availability is a separate backend-derived concern:
-  - For Keywords, Tags, and Types, an exact authorized `card_pool` request returns only values linked to the latest version of at least one active Card in that pool. It is independent of the Gallery's other active filters rather than a fully dynamic facet count.
-  - Omitting `card_pool` preserves the complete authorized-scope catalog used by Admin, Review, maintenance, and other global consumers. An invalid pool is rejected, and an unauthorized restricted pool follows the centralized pool-access policy.
+  - For Keywords, Tags, and Types, an exact `card_pool` request returns only values linked to the latest version of at least one active Card in that pool. It is independent of the Gallery's other active filters rather than a fully dynamic facet count.
+  - Omitting `card_pool` preserves the complete all-pool catalog used by Admin, Review, maintenance, and other global consumers. Invalid pool values are rejected.
   - Gallery must discard stale cross-pool catalog responses and reconcile unavailable route selections so hidden values cannot remain as ghost filters. A failed catalog request must not be treated as a successful empty catalog or erase route state.
   - Keep the initial implementation query-backed and bounded, with query-count coverage and no cache, persistence, migration, or developer-data change. Measure before introducing caching, and leave Symbols, Mana, Templates, numeric ranges, Roles, Factions, and whole-facet visibility unchanged.
-- The Player/Evil/Neutral workspace scopes ordinary browsing and workspace-owned card collections, not global staff operations. Admin and Review always use the staff user's complete authorized pool scope regardless of the selected shell workspace; their mixed-pool records, counts, queues, searches, suggestions, and previews must retain explicit pool labels where ambiguity is possible. Every new import must start without a template or card-pool default and require both selections explicitly; imports must not inherit the shell workspace.
-- Evil and Neutral card access must use the centralized backend card-pool scope whose initial policy is staff-only for both pools. Enforce it on direct objects, collections, embedded payloads, exports, and image/assets; frontend visibility is not the security boundary. Persistent TTS card-sheet images are the deliberate exception: export creation remains staff-scoped, but Player, Evil, and Neutral sheets are pool-partitioned public derived artifacts with stable URLs so existing TTS objects receive later rerenders. Session/frontend code consumes ordered accessible pools rather than separate Evil and Neutral booleans. Keep the policy centralized so it can later expand without card-data migration.
+- The Player/Evil/Neutral workspace scopes ordinary browsing and workspace-owned card collections, not global staff operations. Admin and Review always cover all pools regardless of the selected shell workspace; their mixed-pool records, counts, queues, searches, suggestions, and previews must retain explicit pool labels where ambiguity is possible. Every new import must start without a template or card-pool default and require both selections explicitly; imports must not inherit the shell workspace.
+- Player, Evil, and Neutral card data are equally public for anonymous, ordinary, inactive-session, and staff viewers. This includes direct objects, collections, filter catalogs, generations, groups, embedded payloads, exports returned from otherwise-authorized endpoints, and direct or immutable images. Do not add viewer-dependent card-pool scopes, pool capability fields, redacted card placeholders, or pool-specific visibility checks. Global reads cover all pools, exact-pool reads use an explicit `card_pool`, and genuine Player-only workflows use an explicit Player predicate. Persistent TTS card sheets remain pool-partitioned public derived artifacts with stable URLs.
 - SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.
 - Import flow remains async:
   - API creates jobs and items.
@@ -178,16 +178,16 @@ Core stack:
   - Create one immutable evidence snapshot per mismatching import item; do not coalesce separate imports for the same Card.
   - Classification review is resolved or dismissed explicitly after staff inspection. Card edits do not silently close review items.
   - Card merges retarget open and historical classification review items to the surviving Card while preserving their captured snapshots and reviewed version.
-  - Classification review authorization follows the live Card pool; use the immutable pool snapshot only when the Card no longer exists.
+  - Classification review rows remain global staff work records across card-pool changes; use the immutable pool snapshot only as historical evidence when the Card no longer exists.
   - Classification mismatches belong in Review rather than import warnings. Do not reintroduce a parallel `card_classification_mismatch` warning path.
 
 ## Auth Rules
 - Auth is enabled by default.
-- Player card gallery and direct card assets are public; Evil and Neutral direct data/assets remain
-  staff-only. Pool-partitioned TTS card-sheet images are public at stable URLs for all three pools.
+- Player, Evil, and Neutral card galleries, details, groups, generations, embedded payloads, and
+  direct assets are public. Pool-partitioned TTS card-sheet images are public at stable URLs for all three pools.
   Deck TTS exports follow deck visibility; gallery and content-version TTS export creation requires
   staff access.
-- Player cards remain the public/default pool. Evil and Neutral cards and their direct details, embedded payloads, exports, and assets are staff-only until the centralized restricted-pool scope policy is deliberately expanded.
+- Player remains the default workspace. Player-only deck building, Playtester, deck TTS eligibility, and developer-data publication are product contracts rather than card-visibility permissions.
 - Import jobs, review, admin, catalog, templates, and user-selected exports require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
 - Developer-data metadata, browser downloads, and bootstrap-code creation require an active
@@ -196,7 +196,7 @@ Core stack:
   user remains active and still has developer-data access. Bundle creation and build history are
   staff-only.
 - The Vue app uses Django session auth with CSRF protection.
-- `/auth/me` and `/auth/login` return a CSRF token for unsafe browser requests.
+- `/auth/me` and `/auth/login` return a CSRF token for unsafe browser requests and do not return card-pool entitlement fields.
 
 ## Seed And Fixture Files
 - Catalog seed fixtures used by integration tests live in

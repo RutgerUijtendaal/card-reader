@@ -6,7 +6,7 @@ from uuid import UUID
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from card_reader_core.models import CardPoolScope, Deck, DeckDifficulty, DeckVisibility
+from card_reader_core.models import Deck, DeckDifficulty, DeckVisibility
 from card_reader_core.services.deck_tags import DeckTagService
 from card_reader_core.repositories.decks import (
     DeckSummaryPage,
@@ -55,7 +55,6 @@ class DeckService:
     def list_public_decks(
         self,
         *,
-        card_pool_scope: CardPoolScope,
         search_query: str | None = None,
         hero_query: str | None = None,
         author_query: str | None = None,
@@ -70,7 +69,6 @@ class DeckService:
         return [
             deck
             for deck in list_public_decks(
-                card_pool_scope=card_pool_scope,
                 search_query=search_query,
                 hero_query=hero_query,
                 author_query=author_query,
@@ -98,7 +96,6 @@ class DeckService:
         deck_tag_ids: list[str] | None = None,
         deck_tag_exclude_ids: list[str] | None = None,
         deck_tag_match: str | None = None,
-        card_pool_scope: CardPoolScope,
     ) -> list[Deck]:
         return list_owner_decks(
             owner_id,
@@ -111,13 +108,11 @@ class DeckService:
             deck_tag_ids=deck_tag_ids,
             deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
-            card_pool_scope=card_pool_scope,
         )
 
     def list_public_deck_summaries(
         self,
         *,
-        card_pool_scope: CardPoolScope,
         search_query: str | None = None,
         hero_query: str | None = None,
         author_query: str | None = None,
@@ -132,7 +127,6 @@ class DeckService:
         return [
             deck
             for deck in list_public_deck_summaries(
-                card_pool_scope=card_pool_scope,
                 search_query=search_query,
                 hero_query=hero_query,
                 author_query=author_query,
@@ -160,7 +154,6 @@ class DeckService:
         deck_tag_ids: list[str] | None = None,
         deck_tag_exclude_ids: list[str] | None = None,
         deck_tag_match: str | None = None,
-        card_pool_scope: CardPoolScope,
     ) -> list[Deck]:
         return list_owner_deck_summaries(
             owner_id,
@@ -173,14 +166,12 @@ class DeckService:
             deck_tag_ids=deck_tag_ids,
             deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
-            card_pool_scope=card_pool_scope,
         )
 
     @transaction.atomic
     def list_public_deck_summary_page(
         self,
         *,
-        card_pool_scope: CardPoolScope,
         page: int,
         page_size: int,
         snapshot_at: datetime | None = None,
@@ -199,7 +190,6 @@ class DeckService:
     ) -> DeckSummaryPage:
         effective_snapshot_at = snapshot_at or timezone.now()
         candidates = list_public_deck_summary_candidates(
-            card_pool_scope=card_pool_scope,
             snapshot_at=effective_snapshot_at,
             search_query=search_query,
             hero_query=hero_query,
@@ -240,7 +230,6 @@ class DeckService:
         deck_tag_ids: list[str] | None = None,
         deck_tag_exclude_ids: list[str] | None = None,
         deck_tag_match: str | None = None,
-        card_pool_scope: CardPoolScope,
     ) -> DeckSummaryPage:
         return list_owner_deck_summary_page_query(
             owner_id,
@@ -258,7 +247,6 @@ class DeckService:
             deck_tag_ids=deck_tag_ids,
             deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
-            card_pool_scope=card_pool_scope,
         )
 
     def list_card_decks_for_viewer(self, card_id: str, *, viewer_id: str | None = None) -> list[Deck]:

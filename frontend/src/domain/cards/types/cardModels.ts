@@ -40,7 +40,6 @@ export type CardHoverTooltipModel = {
   // older cached payloads normalize safely while the API contract always emits it.
   card_factions?: CardFaction[];
   card_mana_families?: ManaFamily[];
-  restricted?: boolean;
   deck_building_config?: DeckBuildingConfig;
   lifecycle_status?: CardLifecycleStatus;
   template_id: string;

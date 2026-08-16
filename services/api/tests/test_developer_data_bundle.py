@@ -695,18 +695,18 @@ def test_bundle_selection_can_include_complete_card_and_group_catalogs(
         selection = _build_synthetic_source(source_storage)
         Card.objects.create(key="additional-public-card", label="Additional Public Card")
         Card.objects.create(
-            key="restricted-game-master-card",
-            label="Restricted Evil Card",
+            key="non-player-game-master-card",
+            label="Non-Player Evil Card",
             card_pool="evil",
         )
         Card.objects.create(
             key="synthetic-hero",
-            label="Restricted Evil Twin",
+            label="Non-Player Evil Twin",
             card_pool="evil",
         )
         Card.objects.create(
             key="synthetic-hero",
-            label="Restricted Neutral Twin",
+            label="Non-Player Neutral Twin",
             card_pool="neutral",
         )
         selection.update(
@@ -1049,7 +1049,7 @@ def test_archive_validation_rejects_unsafe_paths(tmp_path: Path) -> None:
         ("synthetic-mainboard", "evil", "cross-pool card groups: synthetic-group"),
     ],
 )
-def test_archive_validation_rejects_restricted_cards_and_cross_pool_groups(
+def test_archive_validation_rejects_non_player_cards_and_cross_pool_groups(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     card_key: str,
@@ -1058,7 +1058,7 @@ def test_archive_validation_rejects_restricted_cards_and_cross_pool_groups(
 ) -> None:
     source_storage = tmp_path / "source-storage"
     archive_path = tmp_path / "synthetic-dev-data.tar.gz"
-    restricted_archive_path = tmp_path / "restricted-dev-data.tar.gz"
+    invalid_archive_path = tmp_path / "non-player-dev-data.tar.gz"
     selection_path = tmp_path / "selection.json"
 
     with transaction.atomic():
@@ -1070,18 +1070,18 @@ def test_archive_validation_rejects_restricted_cards_and_cross_pool_groups(
         export_developer_data(
             selection_path=selection_path,
             output_path=archive_path,
-            source_revision="restricted-archive-test-revision",
+            source_revision="non-player-archive-test-revision",
         )
         _build_reclassified_archive(
             archive_path,
-            restricted_archive_path,
-            tmp_path / "restricted-archive",
+            invalid_archive_path,
+            tmp_path / "non-player-archive",
             card_key=card_key,
             card_pool=card_pool,
         )
 
         with pytest.raises(DeveloperDataError, match=expected_error):
-            validate_archive(restricted_archive_path)
+            validate_archive(invalid_archive_path)
         transaction.set_rollback(True)
 
 

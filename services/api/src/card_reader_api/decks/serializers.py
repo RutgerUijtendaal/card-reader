@@ -4,18 +4,14 @@ from collections.abc import Iterable
 from datetime import datetime
 from typing import TypedDict, cast
 
-from django.utils.crypto import salted_hmac
 from rest_framework import serializers
 
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload, symbol_option
 from card_reader_api.common.serializer_values import ValidatedStringValuesMixin
-from card_reader_core.metadata import NO_MANA_FAMILY_SORT_KEY
 from card_reader_core.models import (
     PLAYER_CARD_POOL,
-    PLAYER_CARD_POOL_SCOPE,
     Card,
-    CardPoolScope,
     CardVersion,
     CardVersionImage,
     Deck,
@@ -49,24 +45,16 @@ class DeckListFilterParams(TypedDict):
 def deck_summary_payload(
     deck: Deck,
     *,
-    card_pool_scope: CardPoolScope,
     include_pending_suggestions: bool = False,
 ) -> dict[str, object]:
     entries = list(deck.entries.all())
     sideboards = list(deck.sideboards.all())
-    has_restricted_cards = _deck_contains_restricted_cards(
+    has_non_player_cards = _deck_contains_non_player_cards(
         deck,
-        card_pool_scope=card_pool_scope,
         entries=entries,
         sideboards=sideboards,
     )
-    has_player_deck_restrictions = _deck_contains_restricted_cards(
-        deck,
-        card_pool_scope=PLAYER_CARD_POOL_SCOPE,
-        entries=entries,
-        sideboards=sideboards,
-    )
-    validation = None if has_restricted_cards else DeckService().get_deck_validation(deck)
+    validation = DeckService().get_deck_validation(deck)
     totals = DeckService().get_deck_totals(deck)
     return {
         "id": deck.id,
@@ -78,21 +66,18 @@ def deck_summary_payload(
             "id": str(getattr(deck.owner, "pk", "")),
             "username": deck.owner.get_username(),
         },
-        "hero_card": deck_hero_summary_payload(
-            deck.hero_card,
-            card_pool_scope=card_pool_scope,
-        ),
+        "hero_card": deck_hero_summary_payload(deck.hero_card),
         "mainboard": {
             "total_cards": totals.mainboard_total_cards,
             "unique_cards": totals.mainboard_unique_cards,
         },
         "sideboard_count": len(sideboards),
         "status": {
-            "is_valid": False if validation is None else validation.is_valid,
-            "label": "In Progress" if validation is None else validation.status_label,
-            "deprecated_card_count": 0 if validation is None else validation.deprecated_card_count,
+            "is_valid": validation.is_valid,
+            "label": validation.status_label,
+            "deprecated_card_count": validation.deprecated_card_count,
         },
-        "has_restricted_cards": has_player_deck_restrictions,
+        "has_non_player_cards": has_non_player_cards,
         "tags": deck_tags_payload(deck),
         "pending_tag_suggestions": pending_deck_tag_suggestions_payload(deck)
         if include_pending_suggestions
@@ -105,35 +90,25 @@ def deck_summary_payload(
 def deck_payload(
     deck: Deck,
     *,
-    card_pool_scope: CardPoolScope,
     include_pending_suggestions: bool = False,
 ) -> dict[str, object]:
     totals = DeckService().get_deck_totals(deck)
     entries = list(deck.entries.all())
     sideboards = list(deck.sideboards.all())
-    has_restricted_cards = _deck_contains_restricted_cards(
+    has_non_player_cards = _deck_contains_non_player_cards(
         deck,
-        card_pool_scope=card_pool_scope,
         entries=entries,
         sideboards=sideboards,
     )
-    has_player_deck_restrictions = _deck_contains_restricted_cards(
-        deck,
-        card_pool_scope=PLAYER_CARD_POOL_SCOPE,
-        entries=entries,
-        sideboards=sideboards,
-    )
-    validation = None if has_restricted_cards else DeckService().get_deck_validation(deck)
+    validation = DeckService().get_deck_validation(deck)
     constraint_entries = [
         DeckConstraintEntry(card=entry.card, quantity=int(entry.quantity), board="mainboard")
         for entry in entries
-        if card_pool_scope.allows_card_pool(entry.card.card_pool)
     ]
     constraint_entries.extend(
         DeckConstraintEntry(card=entry.card, quantity=int(entry.quantity), board="sideboard")
         for sideboard in sideboards
         for entry in sideboard.entries.all()
-        if card_pool_scope.allows_card_pool(entry.card.card_pool)
     )
     return {
         "id": deck.id,
@@ -146,20 +121,14 @@ def deck_payload(
             "id": str(getattr(deck.owner, "pk", "")),
             "username": deck.owner.get_username(),
         },
-        "hero_card": deck_card_payload(
-            deck.hero_card,
-            card_pool_scope=card_pool_scope,
-        ),
+        "hero_card": deck_card_payload(deck.hero_card),
         "mainboard": {
             "total_cards": totals.mainboard_total_cards,
             "unique_cards": totals.mainboard_unique_cards,
             "entries": [
                 {
                     "quantity": entry.quantity,
-                    "card": deck_card_payload(
-                        entry.card,
-                        card_pool_scope=card_pool_scope,
-                    ),
+                    "card": deck_card_payload(entry.card),
                 }
                 for entry in entries
             ],
@@ -173,10 +142,7 @@ def deck_payload(
                 "entries": [
                     {
                         "quantity": entry.quantity,
-                        "card": deck_card_payload(
-                            entry.card,
-                            card_pool_scope=card_pool_scope,
-                        ),
+                        "card": deck_card_payload(entry.card),
                     }
                     for entry in sideboard.entries.all()
                 ],
@@ -190,24 +156,16 @@ def deck_payload(
             "mainboard_unique_cards": totals.mainboard_unique_cards,
         },
         "status": {
-            "is_valid": False if validation is None else validation.is_valid,
-            "label": "In Progress" if validation is None else validation.status_label,
-            "issues": (
-                ["Deck contains cards that are unavailable in the Player workspace."]
-                if validation is None
-                else validation.issues
-            ),
-            "warnings": [] if validation is None else validation.warnings,
-            "deprecated_card_count": 0 if validation is None else validation.deprecated_card_count,
-            "deprecated_card_ids": [] if validation is None else validation.deprecated_card_ids or [],
+            "is_valid": validation.is_valid,
+            "label": validation.status_label,
+            "issues": validation.issues,
+            "warnings": validation.warnings,
+            "deprecated_card_count": validation.deprecated_card_count,
+            "deprecated_card_ids": validation.deprecated_card_ids or [],
         },
-        "has_restricted_cards": has_player_deck_restrictions,
+        "has_non_player_cards": has_non_player_cards,
         "deck_building_rules": effective_deck_building_rules_json(
-            hero_card=(
-                deck.hero_card
-                if card_pool_scope.allows_card_pool(deck.hero_card.card_pool)
-                else None
-            ),
+            hero_card=deck.hero_card,
             entries=constraint_entries,
         ),
         "tags": deck_tags_payload(deck),
@@ -219,19 +177,18 @@ def deck_payload(
     }
 
 
-def _deck_contains_restricted_cards(
+def _deck_contains_non_player_cards(
     deck: Deck,
     *,
-    card_pool_scope: CardPoolScope,
     entries: Iterable[DeckEntry],
     sideboards: Iterable[DeckSideboard],
 ) -> bool:
-    if not card_pool_scope.allows_card_pool(deck.hero_card.card_pool):
+    if deck.hero_card.card_pool != PLAYER_CARD_POOL:
         return True
-    if any(not card_pool_scope.allows_card_pool(entry.card.card_pool) for entry in entries):
+    if any(entry.card.card_pool != PLAYER_CARD_POOL for entry in entries):
         return True
     return any(
-        not card_pool_scope.allows_card_pool(entry.card.card_pool)
+        entry.card.card_pool != PLAYER_CARD_POOL
         for sideboard in sideboards
         for entry in sideboard.entries.all()
     )
@@ -288,13 +245,7 @@ def deck_tag_suggestion_results_payload(
     ]
 
 
-def deck_hero_summary_payload(
-    card: Card,
-    *,
-    card_pool_scope: CardPoolScope,
-) -> dict[str, object]:
-    if not card_pool_scope.allows_card_pool(card.card_pool):
-        return _restricted_deck_card_summary(card)
+def deck_hero_summary_payload(card: Card) -> dict[str, object]:
     version = card.latest_version
     if version is None:
         return {
@@ -345,13 +296,7 @@ def _prefetched_card_image_asset_url(
     return card_image_asset_url(first_image, fallback_url=fallback_url)
 
 
-def deck_card_payload(
-    card: Card,
-    *,
-    card_pool_scope: CardPoolScope,
-) -> dict[str, object]:
-    if not card_pool_scope.allows_card_pool(card.card_pool):
-        return _restricted_deck_card_payload(card)
+def deck_card_payload(card: Card) -> dict[str, object]:
     version = card.latest_version
     if version is None:
         return {
@@ -396,75 +341,6 @@ def deck_card_payload(
         image_url=card_image_asset_url(image, fallback_url=f"/cards/{card.id}/image"),
         metadata=metadata,
     )
-
-
-def _restricted_deck_card_summary(card: Card) -> dict[str, object]:
-    return {
-        "id": _restricted_deck_card_id(card),
-        "key": "restricted-card",
-        "label": "Restricted card",
-        "card_pool": PLAYER_CARD_POOL,
-        "card_roles": [],
-        "card_factions": [],
-        "card_mana_families": [],
-        "name": "Restricted card",
-        "image_url": None,
-        "symbols": [],
-        "restricted": True,
-    }
-
-
-def _restricted_deck_card_payload(card: Card) -> dict[str, object]:
-    return {
-        "id": _restricted_deck_card_id(card),
-        "result_type": "card",
-        "key": "restricted-card",
-        "label": "Restricted card",
-        "card_pool": PLAYER_CARD_POOL,
-        "card_roles": [],
-        "card_factions": [],
-        "card_mana_families": [],
-        "deck_building_config": normalize_deck_building_config({}),
-        "lifecycle_status": "active",
-        "template_id": "",
-        "version_id": "",
-        "version_number": 0,
-        "previous_version_id": None,
-        "is_latest": True,
-        "name": "Restricted card",
-        "type_line": "",
-        "mana_cost": "",
-        "mana_symbols": [],
-        "mana_value": None,
-        "mana_family_sort_key": NO_MANA_FAMILY_SORT_KEY,
-        "attack": None,
-        "health": None,
-        "rules_text": "",
-        "confidence": 0.0,
-        "created_at": "",
-        "updated_at": "",
-        "image_url": None,
-        "keywords": [],
-        "tags": [],
-        "symbols": [],
-        "types": [],
-        "restricted": True,
-    }
-
-
-def deck_card_reference_id(card: Card, *, card_pool_scope: CardPoolScope) -> str:
-    if card_pool_scope.allows_card_pool(card.card_pool):
-        return card.id
-    return _restricted_deck_card_id(card)
-
-
-def _restricted_deck_card_id(card: Card) -> str:
-    digest = salted_hmac(
-        "card-reader.restricted-deck-card",
-        card.id,
-        algorithm="sha256",
-    ).hexdigest()
-    return f"restricted-card-{digest[:24]}"
 
 
 def _deck_card_metadata(version: CardVersion) -> CardMetadata:

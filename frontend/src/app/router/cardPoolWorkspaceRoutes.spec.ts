@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import { createMemoryHistory } from 'vue-router';
 import { createPinia, setActivePinia } from 'pinia';
+import { nextTick } from 'vue';
 import { APP_ROUTES, createAppRouter } from '@/app/router';
 import { useAuthStore } from '@/domain/session/store';
 import {
@@ -8,9 +9,7 @@ import {
   useCardPoolWorkspaceStore,
 } from '@/domain/cards/cardPoolWorkspace';
 
-const setSession = (
-  accessibleCardPools: ('player' | 'evil' | 'neutral')[],
-): void => {
+const setSession = (): void => {
   const auth = useAuthStore();
   auth.$patch({
     initialized: true,
@@ -18,9 +17,8 @@ const setSession = (
       authenticated: true,
       id: 'staff-1',
       username: 'staff',
-      is_staff: accessibleCardPools.length > 1,
-      can_access_admin: accessibleCardPools.length > 1,
-      accessible_card_pools: accessibleCardPools,
+      is_staff: false,
+      can_access_admin: false,
     },
   });
 };
@@ -43,7 +41,7 @@ describe('card pool workspace routes', () => {
     'restores a permitted %s preference when opening the Gallery root',
     async (preferredPool) => {
       localStorage.setItem(CARD_POOL_WORKSPACE_PREFERENCE_KEY, preferredPool);
-      setSession(['player', 'evil', 'neutral']);
+      setSession();
       const router = createAppRouter(createMemoryHistory());
 
       await router.push('/cards');
@@ -53,28 +51,46 @@ describe('card pool workspace routes', () => {
     },
   );
 
-  test('rejects a restricted deep link when the session cannot access its pool', async () => {
-    setSession(['player']);
-    const router = createAppRouter(createMemoryHistory());
+  test.each(['evil', 'neutral'] as const)(
+    'allows an anonymous %s Gallery deep link',
+    async (cardPool) => {
+      setAnonymousSession();
+      const router = createAppRouter(createMemoryHistory());
 
-    await router.push('/cards?card_pool=evil');
+      await router.push(`/cards?card_pool=${cardPool}`);
 
-    expect(router.currentRoute.value.fullPath).toBe('/cards');
-    expect(useCardPoolWorkspaceStore().activePool).toBe('player');
-  });
+      expect(router.currentRoute.value.fullPath).toBe(`/cards?card_pool=${cardPool}`);
+      expect(useCardPoolWorkspaceStore().activePool).toBe(cardPool);
+    },
+  );
 
-  test('rejects a restricted Gallery deep link with a trailing slash', async () => {
-    setSession(['player']);
+  test('allows an ordinary user to open a non-Player Gallery deep link with a trailing slash', async () => {
+    setSession();
     const router = createAppRouter(createMemoryHistory());
 
     await router.push('/cards/?card_pool=evil');
 
-    expect(router.currentRoute.value.fullPath).toBe('/cards');
-    expect(useCardPoolWorkspaceStore().activePool).toBe('player');
+    expect(router.currentRoute.value.query.card_pool).toBe('evil');
+    expect(useCardPoolWorkspaceStore().activePool).toBe('evil');
+  });
+
+  test('preserves the selected workspace across login and logout session changes', async () => {
+    setAnonymousSession();
+    const router = createAppRouter(createMemoryHistory());
+    await router.push('/cards?card_pool=neutral');
+    const workspace = useCardPoolWorkspaceStore();
+
+    setSession();
+    expect(workspace.activePool).toBe('neutral');
+    setAnonymousSession();
+    await nextTick();
+
+    expect(workspace.activePool).toBe('neutral');
+    expect(localStorage.getItem(CARD_POOL_WORKSPACE_PREFERENCE_KEY)).toBe('neutral');
   });
 
   test('does not commit route-derived workspace state when a later guard rejects navigation', async () => {
-    setSession(['player', 'evil', 'neutral']);
+    setSession();
     const router = createAppRouter(createMemoryHistory());
     router.beforeEach((to) => to.query.card_pool !== 'evil');
     await router.push('/cards');
@@ -88,35 +104,21 @@ describe('card pool workspace routes', () => {
     expect(workspace.generation).toBe(generation);
   });
 
-  test('removes unauthorized pool context from direct card routes', async () => {
-    setSession(['player']);
+  test('keeps public pool context on direct card routes', async () => {
+    setAnonymousSession();
     const router = createAppRouter(createMemoryHistory());
 
-    await router.push('/cards/restricted-card?card_pool=evil');
+    await router.push('/cards/evil-card?card_pool=evil&return_card_pool=neutral');
 
-    expect(router.currentRoute.value.fullPath).toBe('/cards');
-    expect(useCardPoolWorkspaceStore().activePool).toBe('player');
-  });
-
-  test.each([
-    '/cards/player-card?card_pool=player&return_card_pool=evil&tab=versions',
-    '/card-groups/player-group?return_card_pool=neutral&view=compact',
-  ])('keeps a public resource while removing an inaccessible return pool from %s', async (url) => {
-    setSession(['player']);
-    const router = createAppRouter(createMemoryHistory());
-
-    await router.push(url);
-
-    expect(router.currentRoute.value.path).toMatch(/^\/(?:cards|card-groups)\//);
-    expect(router.currentRoute.value.query.return_card_pool).toBeUndefined();
-    expect(router.currentRoute.value.query.card_pool).not.toBe('evil');
-    expect(router.currentRoute.value.query.card_pool).not.toBe('neutral');
-    expect(useCardPoolWorkspaceStore().activePool).toBe('player');
+    expect(router.currentRoute.value.fullPath).toBe(
+      '/cards/evil-card?card_pool=evil&return_card_pool=neutral',
+    );
+    expect(useCardPoolWorkspaceStore().activePool).toBe('neutral');
   });
 
   test('initializes a resource workspace from its explicit card pool', async () => {
     localStorage.setItem(CARD_POOL_WORKSPACE_PREFERENCE_KEY, 'player');
-    setSession(['player', 'evil', 'neutral']);
+    setSession();
     const router = createAppRouter(createMemoryHistory());
 
     await router.push('/cards/evil-card?card_pool=evil');
@@ -127,7 +129,7 @@ describe('card pool workspace routes', () => {
 
   test('prefers a resource return pool over the target card pool', async () => {
     localStorage.setItem(CARD_POOL_WORKSPACE_PREFERENCE_KEY, 'player');
-    setSession(['player', 'evil', 'neutral']);
+    setSession();
     const router = createAppRouter(createMemoryHistory());
 
     await router.push('/cards/neutral-card?card_pool=neutral&return_card_pool=evil');
@@ -135,21 +137,21 @@ describe('card pool workspace routes', () => {
     expect(useCardPoolWorkspaceStore().activePool).toBe('evil');
   });
 
-  test('preserves a restricted staff-route deep link through login', async () => {
+  test('preserves a non-Player staff-route deep link through login', async () => {
     setAnonymousSession();
     const router = createAppRouter(createMemoryHistory());
 
-    await router.push('/cards/restricted-card/edit?card_pool=evil');
+    await router.push('/cards/evil-card/edit?card_pool=evil');
 
     expect(router.currentRoute.value.path).toBe('/login');
     expect(router.currentRoute.value.query.redirect).toBe(
-      '/cards/restricted-card/edit?card_pool=evil',
+      '/cards/evil-card/edit?card_pool=evil',
     );
   });
 
   test('normalizes an obsolete Gallery pool to Player instead of a stored preference', async () => {
     localStorage.setItem(CARD_POOL_WORKSPACE_PREFERENCE_KEY, 'neutral');
-    setSession(['player', 'evil', 'neutral']);
+    setSession();
     const router = createAppRouter(createMemoryHistory());
 
     await router.push('/cards?card_pool=unsupported');
@@ -159,7 +161,7 @@ describe('card pool workspace routes', () => {
   });
 
   test('makes deck and Playtester routes explicitly return to Player', async () => {
-    setSession(['player', 'evil', 'neutral']);
+    setSession();
     const router = createAppRouter(createMemoryHistory());
     await router.push('/cards?card_pool=evil');
 
@@ -170,8 +172,8 @@ describe('card pool workspace routes', () => {
     expect(useCardPoolWorkspaceStore().activePool).toBe('player');
   });
 
-  test('strips an inaccessible pool query instead of rejecting a Player-only route', async () => {
-    setSession(['player']);
+  test('strips a non-Player pool query from a Player-only route', async () => {
+    setSession();
     const router = createAppRouter(createMemoryHistory());
 
     await router.push('/playtester?card_pool=evil');
@@ -180,12 +182,12 @@ describe('card pool workspace routes', () => {
     expect(useCardPoolWorkspaceStore().activePool).toBe('player');
   });
 
-  test('marks card-derived routes for safe fallback after workspace access loss', () => {
-    setSession(['player', 'evil', 'neutral']);
+  test('marks card-derived routes with their workspace capabilities', () => {
+    setSession();
     const router = createAppRouter(createMemoryHistory());
 
-    expect(router.resolve('/cards/restricted-card').meta.workspaceCapability).toBe('resource');
-    expect(router.resolve('/card-groups/restricted-group').meta.workspaceCapability).toBe('resource');
+    expect(router.resolve('/cards/evil-card').meta.workspaceCapability).toBe('resource');
+    expect(router.resolve('/card-groups/neutral-group').meta.workspaceCapability).toBe('resource');
     expect(router.resolve('/settings').meta.workspaceCapability).toBe('global');
   });
 
@@ -198,10 +200,10 @@ describe('card pool workspace routes', () => {
 
   test.each(['evil', 'neutral'] as const)(
     'switches from %s back to canonical Player Gallery',
-    async (restrictedPool) => {
-      setSession(['player', 'evil', 'neutral']);
+    async (nonPlayerPool) => {
+      setSession();
       const router = createAppRouter(createMemoryHistory());
-      await router.push(`/cards?card_pool=${restrictedPool}`);
+      await router.push(`/cards?card_pool=${nonPlayerPool}`);
 
       await router.push({ path: '/cards', query: { card_pool: 'player' } });
 

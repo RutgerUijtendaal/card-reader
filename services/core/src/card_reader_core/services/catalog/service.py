@@ -6,8 +6,6 @@ from django.db import transaction
 from django.db.models.deletion import ProtectedError
 
 from card_reader_core.models import (
-    ALL_CARD_POOLS_SCOPE,
-    CardPoolScope,
     CardVersion,
     CardVersionImage,
     Keyword,
@@ -96,17 +94,17 @@ class CatalogService:
     def __init__(self, normalizer: CatalogInputNormalizer | None = None) -> None:
         self._normalizer = normalizer or CatalogInputNormalizer()
 
-    def list_catalog(self, *, card_pool_scope: CardPoolScope) -> CatalogData:
+    def list_catalog(self) -> CatalogData:
         return {
             "known": {
-                "keywords": list_keywords_with_linked_card_counts(card_pool_scope=card_pool_scope),
-                "tags": list_tags_with_linked_card_counts(card_pool_scope=card_pool_scope),
-                "symbols": list_symbols_with_linked_card_counts(card_pool_scope=card_pool_scope),
-                "types": list_types_with_linked_card_counts(card_pool_scope=card_pool_scope),
+                "keywords": list_keywords_with_linked_card_counts(),
+                "tags": list_tags_with_linked_card_counts(),
+                "symbols": list_symbols_with_linked_card_counts(),
+                "types": list_types_with_linked_card_counts(),
             },
             "suggested": {
-                "tags": self.list_suggestions(kind="tag", card_pool_scope=card_pool_scope),
-                "types": self.list_suggestions(kind="type", card_pool_scope=card_pool_scope),
+                "tags": self.list_suggestions(kind="tag"),
+                "types": self.list_suggestions(kind="type"),
             },
         }
 
@@ -114,23 +112,20 @@ class CatalogService:
         self,
         *,
         kind: str,
-        card_pool_scope: CardPoolScope,
         status: str | None = None,
     ) -> list[CatalogSuggestionDetail]:
         rows = list_metadata_suggestions(
             kind=kind,
-            card_pool_scope=card_pool_scope,
             status=status,
         )
         return [
-            self._suggestion_detail_from_row(row, card_pool_scope=card_pool_scope) for row in rows
+            self._suggestion_detail_from_row(row) for row in rows
         ]
 
     def get_suggestion_detail(
         self,
         *,
         suggestion_id: str,
-        card_pool_scope: CardPoolScope,
     ) -> CatalogSuggestionDetail | None:
         suggestion = get_metadata_suggestion(suggestion_id)
         if suggestion is None:
@@ -138,7 +133,6 @@ class CatalogService:
         occurrence_count = len(
             list_card_version_suggestion_occurrences(
                 suggestion_id,
-                card_pool_scope=card_pool_scope,
             )
         )
         if occurrence_count == 0:
@@ -146,14 +140,13 @@ class CatalogService:
         return self._suggestion_detail(
             suggestion,
             occurrence_count=occurrence_count,
-            card_pool_scope=card_pool_scope,
         )
 
     def reject_suggestion(self, *, suggestion_id: str) -> MetadataSuggestion | None:
         return reject_metadata_suggestion(suggestion_id=suggestion_id)
 
     def get_keyword_detail(
-        self, *, entry_id: str, card_pool_scope: CardPoolScope
+        self, *, entry_id: str
     ) -> KeywordDetail | None:
         entry = get_keyword(entry_id)
         if entry is None:
@@ -161,7 +154,6 @@ class CatalogService:
         linked_cards, linked_card_count = self._linked_cards_for_versions(
             *list_latest_versions_for_keyword_detail(
                 entry_id=entry_id,
-                card_pool_scope=card_pool_scope,
             )
         )
         return {
@@ -170,14 +162,13 @@ class CatalogService:
             "linked_card_count": linked_card_count,
         }
 
-    def get_tag_detail(self, *, entry_id: str, card_pool_scope: CardPoolScope) -> TagDetail | None:
+    def get_tag_detail(self, *, entry_id: str) -> TagDetail | None:
         entry = get_tag(entry_id)
         if entry is None:
             return None
         linked_cards, linked_card_count = self._linked_cards_for_versions(
             *list_latest_versions_for_tag_detail(
                 entry_id=entry_id,
-                card_pool_scope=card_pool_scope,
             )
         )
         return {
@@ -194,7 +185,7 @@ class CatalogService:
         }
 
     def get_type_detail(
-        self, *, entry_id: str, card_pool_scope: CardPoolScope
+        self, *, entry_id: str
     ) -> TypeDetail | None:
         entry = get_type(entry_id)
         if entry is None:
@@ -202,7 +193,6 @@ class CatalogService:
         linked_cards, linked_card_count = self._linked_cards_for_versions(
             *list_latest_versions_for_type_detail(
                 entry_id=entry_id,
-                card_pool_scope=card_pool_scope,
             )
         )
         return {
@@ -219,7 +209,7 @@ class CatalogService:
         }
 
     def get_symbol_detail(
-        self, *, entry_id: str, card_pool_scope: CardPoolScope
+        self, *, entry_id: str
     ) -> SymbolDetail | None:
         entry = get_symbol(entry_id)
         if entry is None:
@@ -227,7 +217,6 @@ class CatalogService:
         linked_cards, linked_card_count = self._linked_cards_for_versions(
             *list_latest_versions_for_symbol_detail(
                 entry_id=entry_id,
-                card_pool_scope=card_pool_scope,
             )
         )
         return {
@@ -597,13 +586,10 @@ class CatalogService:
     def _suggestion_detail_from_row(
         self,
         row: MetadataSuggestionListRow,
-        *,
-        card_pool_scope: CardPoolScope,
     ) -> CatalogSuggestionDetail:
         return self._suggestion_detail(
             row.suggestion,
             occurrence_count=row.occurrence_count,
-            card_pool_scope=card_pool_scope,
         )
 
     def _suggestion_detail(
@@ -611,11 +597,9 @@ class CatalogService:
         suggestion: MetadataSuggestion,
         *,
         occurrence_count: int,
-        card_pool_scope: CardPoolScope,
     ) -> CatalogSuggestionDetail:
         occurrences = list_card_version_suggestion_occurrences(
             suggestion.id,
-            card_pool_scope=card_pool_scope,
         )
         previews: list[SuggestionOccurrencePreview] = []
         for occurrence in occurrences[:5]:
@@ -663,7 +647,6 @@ class CatalogService:
 
         occurrences = list_card_version_suggestion_occurrences(
             suggestion.id,
-            card_pool_scope=ALL_CARD_POOLS_SCOPE,
         )
         for occurrence in occurrences:
             version = occurrence.card_version

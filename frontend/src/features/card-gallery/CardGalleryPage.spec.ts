@@ -110,7 +110,6 @@ const mountGallery = async (
 
   const pinia = createPinia();
   const workspace = useCardPoolWorkspaceStore(pinia);
-  workspace.synchronizeSession(['player', 'evil', 'neutral'], 'staff-user');
   workspace.selectPool(activePool);
 
   const app = createApp({ render: () => h(RouterView) });

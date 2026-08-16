@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from django.db.models import Prefetch, Q, QuerySet
+from django.db.models import Prefetch, QuerySet
 
 from card_reader_core.models import (
     CLASSIFICATION_REVIEW_OPEN,
     CardClassificationReviewItem,
-    CardPoolScope,
     CardVersionImage,
 )
 
@@ -35,33 +34,19 @@ def _review_items() -> QuerySet[CardClassificationReviewItem]:
     )
 
 
-def classification_review_card_pool_scope_q(
-    card_pool_scope: CardPoolScope,
-) -> Q:
-    return Q(card__card_pool__in=card_pool_scope.allowed_pools) | Q(
-        card__isnull=True,
-        card_pool__in=card_pool_scope.allowed_pools,
-    )
-
-
-def count_open_classification_review_items(*, card_pool_scope: CardPoolScope) -> int:
-    return CardClassificationReviewItem.objects.filter(
-        status=CLASSIFICATION_REVIEW_OPEN,
-    ).filter(classification_review_card_pool_scope_q(card_pool_scope)).count()
+def count_open_classification_review_items() -> int:
+    return CardClassificationReviewItem.objects.filter(status=CLASSIFICATION_REVIEW_OPEN).count()
 
 
 def list_classification_review_items(
     *,
-    card_pool_scope: CardPoolScope,
     status: ClassificationReviewStatusFilter = CLASSIFICATION_REVIEW_OPEN_STATUS,
     page: int = 1,
     page_size: int = 50,
 ) -> PaginatedClassificationReviewItems:
     normalized_page = max(page, 1)
     normalized_page_size = max(1, min(page_size, 100))
-    queryset = _review_items().filter(
-        classification_review_card_pool_scope_q(card_pool_scope)
-    )
+    queryset = _review_items()
     if status != "all":
         queryset = queryset.filter(status=status)
     queryset = queryset.order_by("-created_at", "id")
