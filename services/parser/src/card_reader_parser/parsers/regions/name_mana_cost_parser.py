@@ -31,7 +31,13 @@ _MANA_COST_SOURCE_BY_POOL: dict[CardPool, ManaCostSource] = {
 
 class NameManaCostParser:
     _EXPECTED_SYMBOL_TYPES = {"mana"}
+    _MANA_BADGE_LEFT_RATIO = 0.86
+    _MANA_BADGE_OCR_SCALES = (3, 2)
     _trailing_integer_pattern = re.compile(r"(\d+)\s*$")
+    _trailing_variable_x_pattern = re.compile(
+        r"(?<![a-zA-Z0-9])x\s*$",
+        re.IGNORECASE,
+    )
     _leading_noise_number_pattern = re.compile(r"^\s*\d+(?:\s+\d+)?\s+")
     _integer_pattern = re.compile(r"\d+")
     _variable_x_pattern = re.compile(r"(?<![a-zA-Z0-9])x(?![a-zA-Z0-9])", re.IGNORECASE)
@@ -73,6 +79,8 @@ class NameManaCostParser:
         mana_cost = ""
         mana_total = ""
         has_mana = False
+        has_variable_x = False
+        mana_badge_ocr_text = ""
 
         if mana_source == "symbols":
             candidate_symbols = self._select_mana_candidate_symbols(symbols)
@@ -99,13 +107,27 @@ class NameManaCostParser:
             mana_total = str(parsed_total)
             has_mana = parsed_total > 0 or bool(mana_symbol_keys) or has_variable_x
         elif mana_source == "trailing_ocr_integer":
-            evil_total = self._extract_trailing_ocr_integer(full_text)
-            if evil_total is not None:
-                mana_cost = str(evil_total)
-                mana_total = str(evil_total)
+            evil_mana = self._extract_trailing_ocr_mana(full_text)
+            if evil_mana is None:
+                evil_mana, mana_badge_ocr_text = self._read_evil_mana_badge(
+                    image=image,
+                    ocr_config=ocr_text.ocr_config,
+                )
+            if evil_mana is not None:
+                mana_cost, parsed_total = evil_mana
+                mana_total = str(parsed_total)
                 has_mana = True
+                has_variable_x = mana_cost == "X"
+                if has_variable_x:
+                    mana_symbol_keys.append("x")
 
-        name = self._extract_name(full_text, has_mana=has_mana) or image_stem
+        name = self._extract_name(
+            full_text,
+            has_mana=has_mana,
+            has_variable_x=(
+                has_variable_x and mana_source == "trailing_ocr_integer"
+            ),
+        ) or image_stem
 
         logger.info(
             "Name/mana parse summary. text=%r card_pool=%s mana_source=%s symbols=%s symbol_keys=%s name=%r mana_cost=%r mana_total=%r",
@@ -165,6 +187,7 @@ class NameManaCostParser:
                     sorted(self._EXPECTED_SYMBOL_TYPES) if mana_source == "symbols" else []
                 ),
                 "full_ocr_text": full_text,
+                "mana_badge_ocr_text": mana_badge_ocr_text,
                 "candidate_symbol_count": len(candidate_symbols),
                 "ocr_config": ocr_text.ocr_config,
                 "ocr_line_count_raw": ocr_text.raw_line_count,
@@ -188,24 +211,62 @@ class NameManaCostParser:
         )
         return mana_typed
 
-    def _extract_name(self, text: str, *, has_mana: bool) -> str:
+    def _extract_name(
+        self,
+        text: str,
+        *,
+        has_mana: bool,
+        has_variable_x: bool,
+    ) -> str:
         compact = normalize_name_text(text)
         if not compact:
             return ""
         if has_mana:
             compact = self._trailing_integer_pattern.sub("", compact).strip()
+            if has_variable_x:
+                compact = self._trailing_variable_x_pattern.sub("", compact).strip()
             compact = self._leading_noise_number_pattern.sub("", compact).strip()
         return compact.strip()
 
-    def _extract_trailing_ocr_integer(self, text: str) -> int | None:
+    def _extract_trailing_ocr_mana(self, text: str) -> tuple[str, int] | None:
         compact = " ".join(text.split())
         match = self._trailing_integer_pattern.search(compact)
-        if match is None:
-            return None
-        try:
-            return int(match.group(1))
-        except ValueError:
-            return None
+        if match is not None:
+            try:
+                value = int(match.group(1))
+            except ValueError:
+                return None
+            return str(value), value
+        if self._trailing_variable_x_pattern.search(compact) is not None:
+            return "X", 0
+        return None
+
+    def _read_evil_mana_badge(
+        self,
+        *,
+        image: Image.Image,
+        ocr_config: dict[str, object],
+    ) -> tuple[tuple[str, int] | None, str]:
+        left = min(
+            image.width - 1,
+            max(0, round(image.width * self._MANA_BADGE_LEFT_RATIO)),
+        )
+        badge = image.crop((left, 0, image.width, image.height))
+        attempted_texts: list[str] = []
+        for scale in self._MANA_BADGE_OCR_SCALES:
+            scaled_badge = badge.resize(
+                (badge.width * scale, badge.height * scale),
+                Image.Resampling.LANCZOS,
+            )
+            ocr_data = self._ocr_runner.run(scaled_badge, config=ocr_config)
+            badge_text = str(ocr_data.get("text", "")).strip()
+            attempted_texts.append(badge_text)
+            compact = " ".join(badge_text.split())
+            if self._trailing_integer_pattern.fullmatch(compact) is not None:
+                return self._extract_trailing_ocr_mana(compact), badge_text
+            if self._trailing_variable_x_pattern.fullmatch(compact) is not None:
+                return self._extract_trailing_ocr_mana(compact), badge_text
+        return None, " | ".join(attempted_texts)
 
     def _mana_symbol_keys(self, rows: list[DetectedSymbol]) -> list[str]:
         ordered = sorted(rows, key=lambda row: row.bbox.x)

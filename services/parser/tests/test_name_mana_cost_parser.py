@@ -18,16 +18,20 @@ from card_reader_parser.parsers.symbol_detector import DetectedSymbol, Detection
 
 
 class StubOcrRunner:
-    def __init__(self, text: str, *, lines: list[str] | None = None) -> None:
-        self._text = text
-        self._lines = lines or [text]
+    def __init__(self, text: str | list[str], *, lines: list[str] | None = None) -> None:
+        self._texts = text if isinstance(text, list) else [text]
+        self._lines = lines or [self._texts[0]]
+        self.calls: list[tuple[int, int]] = []
 
-    def run(self, _image: Image.Image, config: dict[str, object] | None = None) -> dict[str, object]:
+    def run(self, image: Image.Image, config: dict[str, object] | None = None) -> dict[str, object]:
         _ = config
+        self.calls.append(image.size)
+        text = self._texts[min(len(self.calls) - 1, len(self._texts) - 1)]
+        lines = self._lines if len(self.calls) == 1 else [text]
         return {
-            "text": self._text,
+            "text": text,
             "confidence": 0.9,
-            "lines": [{"text": line, "confidence": 0.9} for line in self._lines],
+            "lines": [{"text": line, "confidence": 0.9} for line in lines],
         }
 
 
@@ -155,19 +159,47 @@ def test_evil_name_mana_cost_parser_combines_split_ocr_lines() -> None:
     assert result.normalized_fields["mana_total"] == "4"
 
 
-@pytest.mark.parametrize("text", ["Devourer", "Devourer X"])
-def test_evil_name_mana_cost_parser_leaves_missing_or_invalid_cost_empty(text: str) -> None:
+def test_evil_name_mana_cost_parser_leaves_missing_cost_empty() -> None:
     result = _parse(
-        text=text,
+        text="Devourer",
         detections=[],
         card_pool=EVIL_CARD_POOL,
         expected_detector_calls=0,
     )
 
-    assert result.normalized_fields["name"] == text
+    assert result.normalized_fields["name"] == "Devourer"
     assert result.normalized_fields["mana_cost"] == ""
     assert result.normalized_fields["mana_total"] == ""
     assert result.normalized_fields["mana_symbols"] == ""
+
+
+@pytest.mark.parametrize(
+    ("badge_text", "expected_cost", "expected_total", "expected_symbols"),
+    [
+        ("X", "X", "0", "x"),
+        ("1", "1", "1", ""),
+    ],
+)
+def test_evil_name_mana_cost_parser_reads_isolated_badge_with_scaled_fallback(
+    badge_text: str,
+    expected_cost: str,
+    expected_total: str,
+    expected_symbols: str,
+) -> None:
+    result, ocr_runner = _parse_with_runner(
+        text=["Counter Rune" if badge_text == "X" else "Amulet of Order", badge_text],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+    )
+
+    assert result.normalized_fields["name"] == (
+        "Counter Rune" if badge_text == "X" else "Amulet of Order"
+    )
+    assert result.normalized_fields["mana_cost"] == expected_cost
+    assert result.normalized_fields["mana_total"] == expected_total
+    assert result.normalized_fields["mana_symbols"] == expected_symbols
+    assert ocr_runner.calls == [(200, 40), (84, 120)]
 
 
 def test_neutral_name_mana_cost_parser_leaves_cost_fields_empty() -> None:
@@ -187,14 +219,33 @@ def test_neutral_name_mana_cost_parser_leaves_cost_fields_empty() -> None:
 
 def _parse(
     *,
-    text: str,
+    text: str | list[str],
     detections: list[DetectedSymbol],
     lines: list[str] | None = None,
     card_pool: CardPool = PLAYER_CARD_POOL,
     expected_detector_calls: int = 1,
 ) -> Any:
+    result, _ocr_runner = _parse_with_runner(
+        text=text,
+        detections=detections,
+        lines=lines,
+        card_pool=card_pool,
+        expected_detector_calls=expected_detector_calls,
+    )
+    return result
+
+
+def _parse_with_runner(
+    *,
+    text: str | list[str],
+    detections: list[DetectedSymbol],
+    lines: list[str] | None = None,
+    card_pool: CardPool = PLAYER_CARD_POOL,
+    expected_detector_calls: int = 1,
+) -> tuple[Any, StubOcrRunner]:
     detector = StubSymbolDetector(detections)
-    parser = NameManaCostParser(StubOcrRunner(text, lines=lines), detector)
+    ocr_runner = StubOcrRunner(text, lines=lines)
+    parser = NameManaCostParser(ocr_runner, detector)
     result = parser.parse(
         region_name="top_bar",
         image=Image.new("RGB", (200, 40), "white"),
@@ -207,7 +258,7 @@ def _parse(
         ],
     )
     assert detector.call_count == expected_detector_calls
-    return result
+    return result, ocr_runner
 
 
 def _symbol(key: str) -> Symbol:
