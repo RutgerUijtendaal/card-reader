@@ -1526,7 +1526,7 @@ def _seed_migration_defaults() -> None:
     )
     mana_role_migration.add_mana_role_defaults_and_backfill(django_apps, None)
     directive_reminder_migration = importlib.import_module(
-        "card_reader_core.migrations.0059_add_evil_directive_reminder_roles"
+        "card_reader_core.migrations.0060_add_evil_directive_reminder_roles"
     )
     directive_reminder_migration.add_evil_directive_reminder_defaults_and_backfill(
         django_apps, None

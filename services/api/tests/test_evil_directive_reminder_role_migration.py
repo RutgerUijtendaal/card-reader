@@ -7,8 +7,8 @@ from django.db.migrations.executor import MigrationExecutor
 import pytest
 
 
-BASE_MIGRATION = ("card_reader_core", "0058_add_mana_card_role")
-ROLE_MIGRATION = ("card_reader_core", "0059_add_evil_directive_reminder_roles")
+BASE_MIGRATION = ("card_reader_core", "0059_add_mtg_like_mana_badge_ocr")
+ROLE_MIGRATION = ("card_reader_core", "0060_add_evil_directive_reminder_roles")
 
 
 def _migrate_to(target: tuple[str, str]) -> Any:

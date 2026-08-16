@@ -158,7 +158,7 @@ def remove_evil_directive_reminder_defaults_and_backfill(
 
 
 class Migration(migrations.Migration):
-    dependencies = [("card_reader_core", "0058_add_mana_card_role")]
+    dependencies = [("card_reader_core", "0059_add_mtg_like_mana_badge_ocr")]
 
     operations = [
         migrations.AlterField(
