@@ -377,6 +377,78 @@ def test_reimport_reuses_corrected_card_when_provenance_version_is_not_latest() 
 
 
 @pytest.mark.django_db
+def test_reimport_does_not_treat_targeted_classification_mismatch_as_correction() -> None:
+    template = Template.objects.create(key="targeted-mismatch-import", label="Targeted Mismatch")
+    corrected_card, _created = create_card_identity(
+        name="Targeted Mismatch Card",
+        card_pool="evil",
+        card_factions=("order",),
+    )
+    target_version = CardVersion.objects.create(
+        card=corrected_card,
+        template=template,
+        image_hash="targeted-mismatch-art",
+        name=corrected_card.label,
+    )
+    corrected_card.latest_version = target_version
+    corrected_card.save(update_fields=["latest_version"])
+    source_path = build_storage_relative_path("uploads", "targeted-mismatch", "source.webp")
+    path = settings.storage_root_dir / source_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"targeted-mismatch-art")
+    reparse_job = ImportJob.objects.create(
+        source_path="uploads/targeted-mismatch",
+        template=template,
+        card_pool="evil",
+        total_items=1,
+    )
+    reparse_item = ImportJobItem.objects.create(
+        job=reparse_job,
+        source_file=source_path,
+        target_card=corrected_card,
+        target_card_version=target_version,
+        target_card_pool_snapshot="evil",
+        target_card_factions_snapshot_json=["order"],
+    )
+    save_parsed_card(
+        item=reparse_item,
+        template_id=template.key,
+        checksum="targeted-mismatch-art",
+        normalized_fields={"name": "Targeted Mismatch Card"},
+        confidence={"overall": 1.0},
+        raw_ocr={},
+        card_pool="evil",
+        resolved_card_factions=(),
+    )
+    reparse_item.refresh_from_db()
+    assert reparse_item.warning_code == "card_classification_mismatch"
+
+    untargeted_job = ImportJob.objects.create(
+        source_path="uploads/targeted-mismatch",
+        template=template,
+        card_pool="evil",
+        total_items=1,
+    )
+    untargeted_item = ImportJobItem.objects.create(
+        job=untargeted_job,
+        source_file=source_path,
+    )
+    untargeted_version = save_parsed_card(
+        item=untargeted_item,
+        template_id=template.key,
+        checksum="targeted-mismatch-art",
+        normalized_fields={"name": "Independent Mismatch Card"},
+        confidence={"overall": 1.0},
+        raw_ocr={},
+        card_pool="evil",
+        resolved_card_factions=(),
+    )
+
+    assert untargeted_version.card_id != corrected_card.id
+    assert card_faction_keys(untargeted_version.card) == ()
+
+
+@pytest.mark.django_db
 def test_reimport_does_not_cross_faction_namespace_when_corrected_image_is_ambiguous() -> None:
     template = Template.objects.create(key="ambiguous-faction-import", label="Ambiguous Faction")
     corrected_cards = []

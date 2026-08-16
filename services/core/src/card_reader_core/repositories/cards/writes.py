@@ -356,7 +356,12 @@ def _resolve_corrected_import_card(
         ImportJobItem.objects.filter(
             status=ImportJobStatus.completed,
             job__card_pool=card_pool,
+            target_card_pool_snapshot__isnull=True,
             resolved_card_factions_json=list(resolved_card_factions),
+            classification_inference_json__live_classification__card_pool=card_pool,
+            classification_inference_json__live_classification__card_factions=list(
+                resolved_card_factions
+            ),
             target_card__card_pool=card_pool,
             target_card_version__card_id=F("target_card_id"),
             target_card_version__image_hash=checksum,
