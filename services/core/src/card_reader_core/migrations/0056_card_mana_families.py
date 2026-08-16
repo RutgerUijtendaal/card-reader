@@ -305,12 +305,22 @@ def remove_symbol_rules_for_downgrade(apps, _schema_editor) -> None:  # type: ig
 def _is_reversible_seed_rule(rule: Any) -> bool:
     symbol = getattr(rule, "symbol", None)
     symbol_key = getattr(symbol, "key", None)
+    family_key = FAMILY_BY_SYMBOL.get(symbol_key)
+    expected_id = (
+        uuid5(
+            RULE_NAMESPACE,
+            f"player:mana_family:{family_key}:symbol:{symbol_key}",
+        )
+        if family_key is not None
+        else None
+    )
     return (
         rule.card_pool == "player"
         and rule.target_kind == "mana_family"
-        and rule.target_key == FAMILY_BY_SYMBOL.get(symbol_key)
+        and rule.target_key == family_key
         and rule.source_kind == "symbol"
         and rule.enabled is True
+        and str(rule.id) == str(expected_id)
     )
 
 
@@ -450,16 +460,23 @@ def guard_mana_family_downgrade(apps: Any, _schema_editor: Any) -> None:
     if ImportJobItem.objects.exclude(resolved_card_mana_families_json=[]).exists():
         unsupported.append("resolved import mana-family evidence")
 
-    target_rows = ImportJobItem.objects.filter(
-        target_card_pool_snapshot__isnull=False
-    ).values_list(
-        "target_card_version_id",
-        "target_card_mana_families_snapshot_json",
+    active_statuses = ("queued", "running", "canceling")
+    target_rows = list(
+        ImportJobItem.objects.filter(
+            target_card_pool_snapshot__isnull=False,
+        ).values_list(
+            "job__card_pool",
+            "job__status",
+            "target_card_version_id",
+            "target_card_mana_families_snapshot_json",
+        )
     )
     target_version_ids = {
         str(version_id)
-        for version_id, _families in target_rows
-        if version_id is not None
+        for card_pool, status, version_id, _families in target_rows
+        if card_pool == "player"
+        and status in active_statuses
+        and version_id is not None
     }
     symbol_families_by_version: dict[str, set[str]] = {}
     version_symbol_links = VersionSymbol.objects.filter(
@@ -471,9 +488,15 @@ def guard_mana_family_downgrade(apps: Any, _schema_editor: Any) -> None:
             FAMILY_BY_SYMBOL[str(symbol_key)]
         )
     if any(
-        version_id is None
-        or set(families) != symbol_families_by_version.get(str(version_id), set())
-        for version_id, families in target_rows
+        (
+            bool(families)
+            if card_pool != "player"
+            or status not in active_statuses
+            or version_id is None
+            else set(families)
+            != symbol_families_by_version.get(str(version_id), set())
+        )
+        for card_pool, status, version_id, families in target_rows
     ):
         unsupported.append("target Card mana-family snapshots")
 

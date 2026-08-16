@@ -339,11 +339,12 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
         source_kind="symbol",
         symbol__key="arcane-mana",
     )
+    deleted_seed_rule_id = deleted_seed_rule.id
     deleted_seed_symbol_id = deleted_seed_rule.symbol_id
     deleted_seed_rule.delete()
     with pytest.raises(RuntimeError, match="Symbol classification rules"):
         _migrate_to(BASE_MIGRATION)
-    Rule.objects.create(
+    recreated_seed_rule = Rule.objects.create(
         card_pool="player",
         target_kind="mana_family",
         target_key="arcane",
@@ -351,6 +352,50 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
         symbol_id=deleted_seed_symbol_id,
         enabled=True,
     )
+    with pytest.raises(RuntimeError, match="Symbol classification rules"):
+        _migrate_to(BASE_MIGRATION)
+    recreated_seed_rule.delete()
+    Rule.objects.create(
+        id=deleted_seed_rule_id,
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="arcane",
+        source_kind="symbol",
+        symbol_id=deleted_seed_symbol_id,
+        enabled=True,
+    )
+
+    completed_target_item = MigratedItem.objects.create(
+        job_id=completed_job.id,
+        source_file="imports/pre-mana-completed/targeted.png",
+        target_card_id=multicolor.id,
+        target_card_version_id=multicolor.latest_version_id,
+        target_card_pool_snapshot="player",
+        target_card_mana_families_snapshot_json=["arcane", "dark"],
+    )
+    with pytest.raises(RuntimeError, match="target Card mana-family snapshots"):
+        _migrate_to(BASE_MIGRATION)
+    completed_target_item.delete()
+
+    non_player_job = MigratedJob.objects.create(
+        source_path="imports/non-player-target",
+        template_id=template.id,
+        card_pool="evil",
+        status="queued",
+        classification_rule_snapshot_json={"rules": []},
+    )
+    non_player_target_item = MigratedItem.objects.create(
+        job_id=non_player_job.id,
+        source_file="imports/non-player-target/targeted.png",
+        target_card_id=evil.id,
+        target_card_version_id=evil.latest_version_id,
+        target_card_pool_snapshot="evil",
+        target_card_mana_families_snapshot_json=["arcane"],
+    )
+    with pytest.raises(RuntimeError, match="target Card mana-family snapshots"):
+        _migrate_to(BASE_MIGRATION)
+    non_player_target_item.delete()
+    non_player_job.delete()
 
     Assignment.objects.filter(card_id=multicolor.id).delete()
     with pytest.raises(RuntimeError, match="card mana-family assignments"):
