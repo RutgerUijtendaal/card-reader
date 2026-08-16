@@ -77,6 +77,22 @@ describe('import evidence presentation', () => {
     expect(getWarningEvidence({ code: 'future_warning', message: 'Future warning.' })).toEqual([]);
   });
 
+  test('renders unknown Evil faction match evidence without exposing candidates', () => {
+    expect(getWarningEvidence({
+      code: 'evil_faction_unresolved',
+      message: 'Review the Card faction.',
+      details: {
+        reason: 'conflicting_evidence',
+        checksum_candidate_count: 1,
+        name_candidate_count: 1,
+      },
+    })).toEqual([
+      { label: 'Match result', value: 'Image and name disagree' },
+      { label: 'Image candidates', value: '1' },
+      { label: 'Name candidates', value: '1' },
+    ]);
+  });
+
   test('labels historical missing facet evidence as unavailable', () => {
     const evidence = getInferenceEvidence(item({
       status: 'completed',

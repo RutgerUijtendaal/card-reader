@@ -133,6 +133,28 @@ export const getWarningEvidence = (warning: ImportWarning): ImportEvidenceEntry[
   const details = warning.details;
   if (!details) return [];
   const entries: ImportEvidenceEntry[] = [];
+  if (warning.code === 'evil_faction_unresolved') {
+    const reasonLabels: Record<string, string> = {
+      existing_unresolved_card: 'Existing unresolved Card',
+      no_candidate: 'No existing candidate',
+      ambiguous_checksum: 'Ambiguous image history',
+      ambiguous_name: 'Ambiguous name or alias',
+      conflicting_evidence: 'Image and name disagree',
+    };
+    const reason = details.reason;
+    if (typeof reason === 'string' && reasonLabels[reason]) {
+      entries.push({ label: 'Match result', value: reasonLabels[reason] });
+    }
+    const checksumCount = details.checksum_candidate_count;
+    if (typeof checksumCount === 'number' && Number.isInteger(checksumCount)) {
+      entries.push({ label: 'Image candidates', value: String(checksumCount) });
+    }
+    const nameCount = details.name_candidate_count;
+    if (typeof nameCount === 'number' && Number.isInteger(nameCount)) {
+      entries.push({ label: 'Name candidates', value: String(nameCount) });
+    }
+    return entries;
+  }
   const labels: Array<[string, string]> = [
     ['inferred', 'Inferred'],
     ['existing', 'Existing'],

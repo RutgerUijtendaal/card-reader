@@ -180,6 +180,15 @@ describe('ImportActivityPanel', () => {
                 live: { card_pool: 'player', card_roles: [] },
               },
             },
+            {
+              code: 'evil_faction_unresolved',
+              message: 'No Evil faction was inferred.',
+              details: {
+                reason: 'ambiguous_name',
+                checksum_candidate_count: 0,
+                name_candidate_count: 2,
+              },
+            },
           ],
           resolved_card_roles: ['event'],
           resolved_card_factions: ['order'],
@@ -207,6 +216,9 @@ describe('ImportActivityPanel', () => {
     expect(mounted.host.textContent).toContain('Matched a deprecated card.');
     expect(mounted.host.textContent).toContain('Inferred roles differ from the existing card.');
     expect(mounted.host.textContent).toContain('Classification changed while queued.');
+    expect(mounted.host.textContent).toContain('No Evil faction was inferred.');
+    expect(mounted.host.textContent).toContain('Ambiguous name or alias');
+    expect(mounted.host.textContent).toContain('Name candidates:');
     expect(mounted.host.textContent).toContain('Role types');
     expect(mounted.host.textContent).toContain('Inferred');
     expect(mounted.host.textContent).toContain('Evil');
@@ -218,6 +230,9 @@ describe('ImportActivityPanel', () => {
     expect(
       mounted.host.querySelector('a[href="/cards/card-id/edit?tab=card"]')?.textContent,
     ).toContain('Review card classification');
+    expect(
+      mounted.host.querySelectorAll('a[href="/cards/card-id/edit?tab=card"]'),
+    ).toHaveLength(2);
 
     mounted.app.unmount();
   });

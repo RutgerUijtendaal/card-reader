@@ -137,7 +137,10 @@
                 </div>
               </dl>
               <RouterLink
-                v-if="warning.code === 'card_classification_mismatch' && item.card_tab_url"
+                v-if="(
+                  warning.code === 'card_classification_mismatch'
+                  || warning.code === 'evil_faction_unresolved'
+                ) && item.card_tab_url"
                 class="mt-1 inline-flex font-semibold underline"
                 :to="item.card_tab_url"
               >
