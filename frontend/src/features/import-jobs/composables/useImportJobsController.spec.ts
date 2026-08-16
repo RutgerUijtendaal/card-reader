@@ -49,6 +49,8 @@ const activeJob = (id = 'active-job'): ImportJob => ({
   card_role_override: [],
   card_faction_mode: 'automatic',
   card_faction_override: [],
+  card_mana_family_mode: 'automatic',
+  card_mana_family_override: [],
   classification_rule_snapshot: {
     schema_version: 1,
     card_pool: 'player',
@@ -527,12 +529,14 @@ describe('useImportJobsController', () => {
       warnings: [],
       resolved_card_roles: [],
       resolved_card_factions: [],
+      resolved_card_mana_families: [],
       classification_inference: {},
       target_card_id: null,
       target_card_version_id: null,
       target_card_pool_snapshot: null,
       target_card_roles_snapshot: [],
       target_card_factions_snapshot: [],
+      target_card_mana_families_snapshot: [],
       card_tab_url: null,
     };
     vi.mocked(fetchImportJobDetail).mockResolvedValueOnce({
@@ -713,6 +717,8 @@ describe('useImportJobsController', () => {
       cardRoleOverride: [],
       cardFactionMode: 'automatic',
       cardFactionOverride: [],
+      cardManaFamilyMode: 'automatic',
+      cardManaFamilyOverride: [],
     });
     expect(mounted.controller.pickedFiles.value).toEqual([]);
     expect(mounted.controller.fileInputKey.value).toBe(initialInputKey + 1);
@@ -736,6 +742,8 @@ describe('useImportJobsController', () => {
     mounted.controller.cardRoleOverride.value = ['boon'];
     mounted.controller.cardFactionMode.value = 'override';
     mounted.controller.cardFactionOverride.value = ['blood'];
+    mounted.controller.cardManaFamilyMode.value = 'override';
+    mounted.controller.cardManaFamilyOverride.value = ['dark'];
     vi.mocked(createImportJob).mockRejectedValueOnce(new Error('connection lost'));
     vi.mocked(fetchImportJobByCreationKey).mockResolvedValueOnce(null);
 
@@ -761,6 +769,8 @@ describe('useImportJobsController', () => {
     expect(mounted.controller.cardRoleOverride.value).toEqual([]);
     expect(mounted.controller.cardFactionMode.value).toBe('automatic');
     expect(mounted.controller.cardFactionOverride.value).toEqual([]);
+    expect(mounted.controller.cardManaFamilyMode.value).toBe('automatic');
+    expect(mounted.controller.cardManaFamilyOverride.value).toEqual([]);
     expect(mounted.controller.pickerTemplateId.value).toBeNull();
     expect(mounted.controller.cardPool.value).toBeNull();
     expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(true);

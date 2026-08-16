@@ -14,7 +14,7 @@ const buildVersion = (overrides: Partial<CardVersionDetail> = {}): CardVersionDe
   id: 'card-1',
   key: 'card-1',
   label: 'Card 1',
-  card_pool: 'player' as const, card_roles: [], card_factions: [],
+  card_pool: 'player' as const, card_roles: [], card_factions: [], card_mana_families: [],
   deck_building_config: { overrides: {} },
   template_id: 'template-1',
   version_id: 'version-1',
@@ -86,7 +86,7 @@ const buildForm = (overrides: Partial<EditorForm> = {}): EditorForm => ({
   attack: '',
   health: '',
   rules_text: '',
-  card_pool: 'player' as const, card_roles: [], card_factions: [],
+  card_pool: 'player' as const, card_roles: [], card_factions: [], card_mana_families: [],
   deck_building_config: JSON.stringify({ overrides: {} }, null, 2),
   lifecycle_status: 'active',
   keyword_ids: [],
@@ -118,6 +118,7 @@ const mountPane = async ({
   const saveVersion = vi.fn();
   const toggleCardRole = vi.fn();
   const toggleCardFaction = vi.fn();
+  const toggleCardManaFamily = vi.fn();
   const form = reactive(buildForm(formOverrides));
   const reparseTemplateId = ref('template-1');
   const reparseTemplates: ReparseTemplateOption[] = [
@@ -178,6 +179,7 @@ const mountPane = async ({
             onUpdateLifecycleStatus: updateLifecycleStatus,
             onToggleCardRole: toggleCardRole,
             onToggleCardFaction: toggleCardFaction,
+            onToggleCardManaFamily: toggleCardManaFamily,
           });
       },
     }),
@@ -192,6 +194,7 @@ const mountPane = async ({
     updateLifecycleStatus,
     toggleCardRole,
     toggleCardFaction,
+    toggleCardManaFamily,
     unmount: () => {
       app.unmount();
       container.remove();
@@ -271,6 +274,8 @@ describe('CardVersionEditorPane tabs', () => {
     expect(mounted.container.textContent).toContain('Location');
     expect(mounted.container.textContent).toContain('Shop Item');
     expect(mounted.container.textContent).toContain('Order');
+    expect(mounted.container.textContent).toContain('Mana Families');
+    expect(mounted.container.textContent).toContain('Arcane');
     expect(mounted.container.textContent).toContain('Deck-Building Config JSON');
     expect(mounted.container.textContent).toContain('Card Status');
     expect(mounted.container.textContent).not.toContain('Mana Cost');
@@ -292,11 +297,12 @@ describe('CardVersionEditorPane tabs', () => {
     mounted.unmount();
   });
 
-  test('presents roles and factions as compact multi-select buttons', async () => {
+  test('presents roles, factions, and mana families as compact multi-select buttons', async () => {
     const mounted = await mountPane({
       formOverrides: {
         card_roles: ['boss'],
         card_factions: ['order'],
+        card_mana_families: ['arcane'],
       },
     });
     await clickButton(mounted.container, 'Card');
@@ -306,30 +312,37 @@ describe('CardVersionEditorPane tabs', () => {
     const order = mounted.container.querySelector('[data-testid="card-faction-option-order"]');
     const dark = mounted.container.querySelector('[data-testid="card-faction-option-dark"]');
     const metal = mounted.container.querySelector('[data-testid="card-faction-option-metal"]');
+    const arcane = mounted.container.querySelector('[data-testid="card-mana-family-option-arcane"]');
+    const primal = mounted.container.querySelector('[data-testid="card-mana-family-option-primal"]');
 
     expect(boss?.getAttribute('aria-pressed')).toBe('true');
     expect(hero?.getAttribute('aria-pressed')).toBe('false');
     expect(order?.getAttribute('aria-pressed')).toBe('true');
     expect(dark?.getAttribute('aria-pressed')).toBe('false');
     expect(metal?.getAttribute('aria-pressed')).toBe('false');
+    expect(arcane?.getAttribute('aria-pressed')).toBe('true');
+    expect(primal?.getAttribute('aria-pressed')).toBe('false');
 
     (hero as HTMLButtonElement).click();
     (order as HTMLButtonElement).click();
     (metal as HTMLButtonElement).click();
+    (primal as HTMLButtonElement).click();
     await nextTick();
 
     expect(mounted.toggleCardRole).toHaveBeenCalledWith('hero', true);
     expect(mounted.toggleCardFaction).toHaveBeenCalledWith('order', false);
     expect(mounted.toggleCardFaction).toHaveBeenCalledWith('metal', true);
+    expect(mounted.toggleCardManaFamily).toHaveBeenCalledWith('primal', true);
     mounted.unmount();
   });
 
-  test('explains empty role and faction selections as derived states', async () => {
+  test('explains empty role, faction, and mana selections as derived states', async () => {
     const mounted = await mountPane();
     await clickButton(mounted.container, 'Card');
 
     expect(mounted.container.textContent).toContain('Normal');
     expect(mounted.container.textContent).toContain('No faction');
+    expect(mounted.container.textContent).toContain('Colorless');
 
     mounted.unmount();
   });

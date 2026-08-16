@@ -11,7 +11,6 @@ from card_reader_core.models import (
     CardPoolScope,
     CardVersion,
     CardVersionKeyword,
-    CardVersionSymbol,
     CardVersionTag,
     Keyword,
     Symbol,
@@ -21,7 +20,6 @@ from card_reader_core.models import (
     now_utc,
 )
 
-from .links import refresh_card_version_mana_family_sort_keys
 from .types import MetadataRow
 
 
@@ -44,6 +42,10 @@ def list_tags(*, keys: set[str] | None = None) -> list[Tag]:
 
 def list_symbols(*, keys: set[str] | None = None) -> list[Symbol]:
     return _list(Symbol, keys=keys)
+
+
+def list_symbol_ids() -> set[str]:
+    return set(Symbol.objects.values_list("id", flat=True))
 
 
 def list_detectable_symbols() -> list[Symbol]:
@@ -244,11 +246,7 @@ def update_symbol(*, entry_id: str, updates: dict[str, object]) -> Symbol | None
     row = get_symbol(entry_id)
     if row is None:
         return None
-    linked_version_ids = list(
-        CardVersionSymbol.objects.filter(symbol_id=row.id).values_list("card_version_id", flat=True)
-    )
     updated = _update(row, updates)
-    refresh_card_version_mana_family_sort_keys([str(version_id) for version_id in linked_version_ids])
     return updated
 
 
@@ -272,11 +270,7 @@ def delete_symbol(*, entry_id: str) -> bool:
     row = get_symbol(entry_id)
     if row is None:
         return False
-    linked_version_ids = list(
-        CardVersionSymbol.objects.filter(symbol_id=row.id).values_list("card_version_id", flat=True)
-    )
     deleted, _ = row.delete()
-    refresh_card_version_mana_family_sort_keys([str(version_id) for version_id in linked_version_ids])
     return deleted > 0
 
 
@@ -422,7 +416,12 @@ def _list_latest_versions_for_detail(
         )
         .filter(active_card_lifecycle_q())
         .select_related("card")
-        .prefetch_related("images", "card__role_assignments", "card__faction_assignments")
+        .prefetch_related(
+            "images",
+            "card__role_assignments",
+            "card__faction_assignments",
+            "card__mana_family_assignments",
+        )
         .order_by("-updated_at")
         .distinct()
     )

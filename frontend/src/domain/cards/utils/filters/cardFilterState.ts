@@ -22,7 +22,7 @@ export type CardFilterState = {
   keywordMatch: FilterMatch;
   tagMatch: FilterMatch;
   typeMatch: FilterMatch;
-  manaSymbolMatch: FilterMatch;
+  manaFamilyMatch: FilterMatch;
   affinitySymbolMatch: FilterMatch;
   devotionSymbolMatch: FilterMatch;
   otherSymbolMatch: FilterMatch;
@@ -35,8 +35,8 @@ export type CardFilterState = {
   healthMax: string;
   keywordKeys: string[];
   tagKeys: string[];
-  manaSymbolKeys: string[];
-  manaSymbolExcludeKeys: string[];
+  manaFamilyKeys: string[];
+  manaFamilyExcludeKeys: string[];
   affinitySymbolKeys: string[];
   affinitySymbolExcludeKeys: string[];
   devotionSymbolKeys: string[];
@@ -60,7 +60,7 @@ export type CardFilterSelectionState = {
   keywordMatch: FilterMatch;
   tagMatch: FilterMatch;
   typeMatch: FilterMatch;
-  manaSymbolMatch: FilterMatch;
+  manaFamilyMatch: FilterMatch;
   affinitySymbolMatch: FilterMatch;
   devotionSymbolMatch: FilterMatch;
   otherSymbolMatch: FilterMatch;
@@ -73,8 +73,8 @@ export type CardFilterSelectionState = {
   healthMax: string;
   keywordIds: string[];
   tagIds: string[];
-  manaTypeSymbolIds: string[];
-  manaTypeSymbolExcludeIds: string[];
+  manaFamilyIds: string[];
+  manaFamilyExcludeIds: string[];
   affinitySymbolIds: string[];
   affinitySymbolExcludeIds: string[];
   devotionSymbolIds: string[];
@@ -98,7 +98,7 @@ export const createEmptyCardFilterState = (cardPool: CardPool = 'player'): CardF
   keywordMatch: 'any',
   tagMatch: 'any',
   typeMatch: 'any',
-  manaSymbolMatch: 'any',
+  manaFamilyMatch: 'any',
   affinitySymbolMatch: 'any',
   devotionSymbolMatch: 'any',
   otherSymbolMatch: 'any',
@@ -111,8 +111,8 @@ export const createEmptyCardFilterState = (cardPool: CardPool = 'player'): CardF
   healthMax: '',
   keywordKeys: [],
   tagKeys: [],
-  manaSymbolKeys: [],
-  manaSymbolExcludeKeys: [],
+  manaFamilyKeys: [],
+  manaFamilyExcludeKeys: [],
   affinitySymbolKeys: [],
   affinitySymbolExcludeKeys: [],
   devotionSymbolKeys: [],
@@ -138,7 +138,7 @@ export const createEmptyCardFilterSelectionState = (
   keywordMatch: 'any',
   tagMatch: 'any',
   typeMatch: 'any',
-  manaSymbolMatch: 'any',
+  manaFamilyMatch: 'any',
   affinitySymbolMatch: 'any',
   devotionSymbolMatch: 'any',
   otherSymbolMatch: 'any',
@@ -151,8 +151,8 @@ export const createEmptyCardFilterSelectionState = (
   healthMax: '',
   keywordIds: [],
   tagIds: [],
-  manaTypeSymbolIds: [],
-  manaTypeSymbolExcludeIds: [],
+  manaFamilyIds: [],
+  manaFamilyExcludeIds: [],
   affinitySymbolIds: [],
   affinitySymbolExcludeIds: [],
   devotionSymbolIds: [],
@@ -192,7 +192,7 @@ export const normalizeCardFilterState = (state: CardFilterState): CardFilterStat
   keywordMatch: normalizeMatch(state.keywordMatch),
   tagMatch: normalizeMatch(state.tagMatch),
   typeMatch: normalizeMatch(state.typeMatch),
-  manaSymbolMatch: normalizeMatch(state.manaSymbolMatch),
+  manaFamilyMatch: normalizeMatch(state.manaFamilyMatch),
   affinitySymbolMatch: normalizeMatch(state.affinitySymbolMatch),
   devotionSymbolMatch: normalizeMatch(state.devotionSymbolMatch),
   otherSymbolMatch: normalizeMatch(state.otherSymbolMatch),
@@ -205,8 +205,8 @@ export const normalizeCardFilterState = (state: CardFilterState): CardFilterStat
   healthMax: normalizeStringValue(state.healthMax),
   keywordKeys: normalizeStringArray(state.keywordKeys),
   tagKeys: normalizeStringArray(state.tagKeys),
-  manaSymbolKeys: normalizeStringArray(state.manaSymbolKeys),
-  manaSymbolExcludeKeys: normalizeStringArray(state.manaSymbolExcludeKeys),
+  manaFamilyKeys: normalizeStringArray(state.manaFamilyKeys),
+  manaFamilyExcludeKeys: normalizeStringArray(state.manaFamilyExcludeKeys),
   affinitySymbolKeys: normalizeStringArray(state.affinitySymbolKeys),
   affinitySymbolExcludeKeys: normalizeStringArray(state.affinitySymbolExcludeKeys),
   devotionSymbolKeys: normalizeStringArray(state.devotionSymbolKeys),
@@ -232,7 +232,7 @@ export const normalizeCardFilterSelectionState = (
   keywordMatch: normalizeMatch(state.keywordMatch),
   tagMatch: normalizeMatch(state.tagMatch),
   typeMatch: normalizeMatch(state.typeMatch),
-  manaSymbolMatch: normalizeMatch(state.manaSymbolMatch),
+  manaFamilyMatch: normalizeMatch(state.manaFamilyMatch),
   affinitySymbolMatch: normalizeMatch(state.affinitySymbolMatch),
   devotionSymbolMatch: normalizeMatch(state.devotionSymbolMatch),
   otherSymbolMatch: normalizeMatch(state.otherSymbolMatch),
@@ -245,8 +245,8 @@ export const normalizeCardFilterSelectionState = (
   healthMax: normalizeStringValue(state.healthMax),
   keywordIds: normalizeStringArray(state.keywordIds),
   tagIds: normalizeStringArray(state.tagIds),
-  manaTypeSymbolIds: normalizeStringArray(state.manaTypeSymbolIds),
-  manaTypeSymbolExcludeIds: normalizeStringArray(state.manaTypeSymbolExcludeIds),
+  manaFamilyIds: normalizeStringArray(state.manaFamilyIds),
+  manaFamilyExcludeIds: normalizeStringArray(state.manaFamilyExcludeIds),
   affinitySymbolIds: normalizeStringArray(state.affinitySymbolIds),
   affinitySymbolExcludeIds: normalizeStringArray(state.affinitySymbolExcludeIds),
   devotionSymbolIds: normalizeStringArray(state.devotionSymbolIds),

@@ -22,5 +22,6 @@ def card_merge_preview_payload(preview: CardMergePreview) -> dict[str, object]:
         "relations": preview.relations.__dict__,
         "resulting_version_count": preview.resulting_version_count,
         "blocking_conflicts": preview.blocking_conflicts,
+        "warnings": preview.warnings,
         "can_apply": len(preview.blocking_conflicts) == 0,
     }

@@ -102,7 +102,7 @@ describe('cardFilterSelection', () => {
         keywordMatch: 'all',
         tagMatch: 'any',
         typeMatch: 'all',
-        manaSymbolMatch: 'all',
+        manaFamilyMatch: 'all',
         affinitySymbolMatch: 'any',
         devotionSymbolMatch: 'any',
         otherSymbolMatch: 'any',
@@ -115,8 +115,8 @@ describe('cardFilterSelection', () => {
         healthMax: '',
         keywordKeys: ['flying'],
         tagKeys: ['rare'],
-        manaSymbolKeys: ['arcane-mana'],
-        manaSymbolExcludeKeys: [],
+        manaFamilyKeys: ['arcane-mana'],
+        manaFamilyExcludeKeys: [],
         affinitySymbolKeys: ['sola-affinity'],
         affinitySymbolExcludeKeys: [],
         devotionSymbolKeys: ['pray'],
@@ -133,13 +133,13 @@ describe('cardFilterSelection', () => {
       query: 'dragon',
       keywordMatch: 'all',
       typeMatch: 'all',
-      manaSymbolMatch: 'all',
+      manaFamilyMatch: 'all',
       manaCostMin: '2',
       manaCostMax: '5',
       keywordIds: ['kw-1'],
       tagIds: ['tag-1'],
-      manaTypeSymbolIds: ['arcane'],
-      manaTypeSymbolExcludeIds: [],
+      manaFamilyIds: ['arcane'],
+      manaFamilyExcludeIds: [],
       affinitySymbolIds: ['sym-2b'],
       affinitySymbolExcludeIds: [],
       devotionSymbolIds: ['sym-3'],
@@ -162,7 +162,7 @@ describe('cardFilterSelection', () => {
         keywordMatch: 'all',
         tagMatch: 'all',
         typeMatch: 'any',
-        manaSymbolMatch: 'all',
+        manaFamilyMatch: 'all',
         affinitySymbolMatch: 'all',
         devotionSymbolMatch: 'any',
         otherSymbolMatch: 'any',
@@ -175,8 +175,8 @@ describe('cardFilterSelection', () => {
         healthMax: '',
         keywordIds: ['kw-1'],
         tagIds: ['tag-1'],
-        manaTypeSymbolIds: ['arcane'],
-        manaTypeSymbolExcludeIds: ['arcane'],
+        manaFamilyIds: ['arcane'],
+        manaFamilyExcludeIds: ['arcane'],
         affinitySymbolIds: ['sym-2b'],
         affinitySymbolExcludeIds: ['sym-2b'],
         devotionSymbolIds: ['sym-3'],
@@ -192,14 +192,14 @@ describe('cardFilterSelection', () => {
     expect(state).toMatchObject({
       keywordMatch: 'all',
       tagMatch: 'all',
-      manaSymbolMatch: 'all',
+      manaFamilyMatch: 'all',
       affinitySymbolMatch: 'all',
       manaCostMin: '1',
       manaCostMax: '6',
       keywordKeys: ['flying'],
       tagKeys: ['rare'],
-      manaSymbolKeys: ['arcane'],
-      manaSymbolExcludeKeys: ['arcane'],
+      manaFamilyKeys: ['arcane'],
+      manaFamilyExcludeKeys: ['arcane'],
       affinitySymbolKeys: ['sola-affinity'],
       affinitySymbolExcludeKeys: ['sola-affinity'],
       devotionSymbolKeys: ['pray'],
@@ -211,10 +211,10 @@ describe('cardFilterSelection', () => {
     });
   });
 
-  test('excludes colorless mana symbols from the mana toggle catalog', () => {
+  test('builds the mana toggle catalog from card classification definitions', () => {
     const catalog = createCardFilterCatalog(filters);
 
-    expect(catalog.manaSymbols.map((row) => row.key)).toEqual(['arcane']);
+    expect(catalog.manaFamilies.map((row) => row.key)).toEqual(['arcane']);
     expect(catalog.affinitySymbols.map((row) => row.key)).toEqual(['sola-affinity']);
   });
 
@@ -227,7 +227,7 @@ describe('cardFilterSelection', () => {
       createCardFilterCatalog(filters),
     );
 
-    expect(selection.manaTypeSymbolIds).toEqual(['arcane']);
+    expect(selection.manaFamilyIds).toEqual(['arcane']);
     expect(selection.affinitySymbolIds).toEqual([]);
   });
 
@@ -241,8 +241,8 @@ describe('cardFilterSelection', () => {
       createCardFilterCatalog(filters),
     );
 
-    expect(selection.manaSymbolMatch).toBe('all');
-    expect(selection.manaTypeSymbolIds).toEqual(['arcane']);
+    expect(selection.manaFamilyMatch).toBe('all');
+    expect(selection.manaFamilyIds).toEqual(['arcane']);
   });
 
   test('keeps mixed legacy affinities in one literal predicate', () => {
@@ -256,7 +256,7 @@ describe('cardFilterSelection', () => {
       catalog,
     );
 
-    expect(selection.manaTypeSymbolIds).toEqual([]);
+    expect(selection.manaFamilyIds).toEqual([]);
     expect(selection.affinitySymbolIds).toEqual(['sym-2', 'sym-2b']);
     expect(buildCardFilterStateFromSelection(selection, catalog).affinitySymbolKeys).toEqual([
       'arcane-affinity',
@@ -264,10 +264,31 @@ describe('cardFilterSelection', () => {
     ]);
   });
 
-  test('marks fallback mana options for the literal symbol API contract', () => {
+  test('does not infer filter families from raw symbols when classifications are absent', () => {
     const catalog = createCardFilterCatalog({ ...filters, mana_families: undefined });
 
-    expect(catalog.manaSymbols.map((row) => row.id)).toEqual(['legacy-mana-symbol:sym-1']);
+    expect(catalog.manaFamilies).toEqual([]);
+  });
+
+  test('preserves code-owned mana-family route keys without a hydrated catalog', () => {
+    const catalog = createCardFilterCatalog({ ...filters, mana_families: undefined });
+    const selection = buildCardFilterSelectionState(
+      {
+        ...createEmptyCardFilterState(),
+        manaFamilyMatch: 'all',
+        manaFamilyKeys: ['arcane'],
+        manaFamilyExcludeKeys: ['dark'],
+      },
+      catalog,
+    );
+
+    expect(selection.manaFamilyMatch).toBe('all');
+    expect(selection.manaFamilyIds).toEqual(['arcane']);
+    expect(selection.manaFamilyExcludeIds).toEqual(['dark']);
+    expect(buildCardFilterStateFromSelection(selection, catalog)).toMatchObject({
+      manaFamilyKeys: ['arcane'],
+      manaFamilyExcludeKeys: ['dark'],
+    });
   });
 
   test('reconciles only unavailable keyword, tag, and type keys', () => {

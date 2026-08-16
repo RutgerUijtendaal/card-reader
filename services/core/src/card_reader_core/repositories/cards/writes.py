@@ -23,10 +23,12 @@ from card_reader_core.models import (
     ParseResult,
     card_faction_identity_key,
     card_faction_keys,
+    card_mana_family_keys,
     card_is_deprecated,
     card_role_keys,
     now_utc,
 )
+from card_reader_core.metadata import ManaFamily
 from card_reader_core.repositories.import_jobs import (
     CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING,
     CARD_CLASSIFICATION_MISMATCH_WARNING,
@@ -51,6 +53,7 @@ from ..metadata import (
 )
 from ..templates import get_template_by_key
 from .images import save_image_record
+from .classification import set_card_mana_families
 from .identity import change_card_identity, create_card_identity, resolve_card_by_name_key
 from .queries import get_latest_card_version
 from .snapshots import (
@@ -100,6 +103,7 @@ def save_parsed_card(
     card_pool: CardPool = DEFAULT_CARD_POOL,
     resolved_card_roles: tuple[CardRole, ...] = (),
     resolved_card_factions: tuple[CardFaction, ...] = (),
+    resolved_card_mana_families: tuple[ManaFamily, ...] = (),
     classification_evidence: CardClassificationInferenceEvidence | None = None,
 ) -> CardVersion:
     return save_parsed_card_result(
@@ -119,6 +123,7 @@ def save_parsed_card(
         card_pool=card_pool,
         resolved_card_roles=resolved_card_roles,
         resolved_card_factions=resolved_card_factions,
+        resolved_card_mana_families=resolved_card_mana_families,
         classification_evidence=classification_evidence,
     ).version
 
@@ -142,6 +147,7 @@ def save_parsed_card_result(
     card_pool: CardPool = DEFAULT_CARD_POOL,
     resolved_card_roles: tuple[CardRole, ...] = (),
     resolved_card_factions: tuple[CardFaction, ...] = (),
+    resolved_card_mana_families: tuple[ManaFamily, ...] = (),
     classification_evidence: CardClassificationInferenceEvidence | None = None,
 ) -> ParsedCardSaveResult:
     resolved_evidence: CardClassificationInferenceEvidence = classification_evidence or {
@@ -149,6 +155,7 @@ def save_parsed_card_result(
             "mode": "automatic",
             "matched_tag_sources": [],
             "matched_type_sources": [],
+            "matched_symbol_sources": [],
             "matched_rules": [],
             "override_roles": [],
             "resolved_roles": list(resolved_card_roles),
@@ -158,9 +165,20 @@ def save_parsed_card_result(
             "mode": "automatic",
             "matched_tag_sources": [],
             "matched_type_sources": [],
+            "matched_symbol_sources": [],
             "matched_rules": [],
             "override_factions": [],
             "resolved_factions": list(resolved_card_factions),
+            "snapshot_digest": "",
+        },
+        "mana_families": {
+            "mode": "automatic",
+            "matched_tag_sources": [],
+            "matched_type_sources": [],
+            "matched_symbol_sources": [],
+            "matched_rules": [],
+            "override_mana_families": [],
+            "resolved_mana_families": list(resolved_card_mana_families),
             "snapshot_digest": "",
         },
     }
@@ -193,6 +211,7 @@ def save_parsed_card_result(
                 card_pool=card_pool,
                 resolved_card_roles=resolved_card_roles,
                 resolved_card_factions=resolved_card_factions,
+                resolved_card_mana_families=resolved_card_mana_families,
                 evidence=resolved_evidence,
                 is_new_card=False,
             )
@@ -247,6 +266,7 @@ def save_parsed_card_result(
                 card_pool=card_pool,
                 resolved_card_roles=resolved_card_roles,
                 resolved_card_factions=resolved_card_factions,
+                resolved_card_mana_families=resolved_card_mana_families,
                 evidence=resolved_evidence,
                 is_new_card=False,
                 unknown_evil_faction_match=(
@@ -309,6 +329,10 @@ def save_parsed_card_result(
             CardRoleAssignment.objects.bulk_create(
                 [CardRoleAssignment(card=card, role=role) for role in resolved_card_roles]
             )
+            set_card_mana_families(
+                card=card,
+                mana_families=resolved_card_mana_families,
+            )
 
         latest = get_latest_card_version(card.id)
         if latest and latest.image_hash == checksum and reparse_existing:
@@ -351,6 +375,7 @@ def save_parsed_card_result(
                 card_pool=card_pool,
                 resolved_card_roles=resolved_card_roles,
                 resolved_card_factions=resolved_card_factions,
+                resolved_card_mana_families=resolved_card_mana_families,
                 evidence=resolved_evidence,
                 is_new_card=created_new_card,
                 unknown_evil_faction_match=unknown_evil_faction_match,
@@ -382,6 +407,7 @@ def save_parsed_card_result(
             card_pool=card_pool,
             resolved_card_roles=resolved_card_roles,
             resolved_card_factions=resolved_card_factions,
+            resolved_card_mana_families=resolved_card_mana_families,
             evidence=resolved_evidence,
             is_new_card=created_new_card,
             unknown_evil_faction_match=unknown_evil_faction_match,
@@ -525,7 +551,7 @@ def create_parsed_card_version(
     replace_card_version_keywords(card_version_id=version.id, keyword_ids=keyword_ids)
     replace_card_version_tags(card_version_id=version.id, tag_ids=tag_ids)
     replace_card_version_types(card_version_id=version.id, type_ids=type_ids)
-    version.mana_family_sort_key = replace_card_version_symbols(
+    replace_card_version_symbols(
         card_version_id=version.id,
         symbol_ids=symbol_ids,
     )
@@ -660,7 +686,7 @@ def clone_card_version_for_content_version_snapshot(
         card_version_id=version.id,
         type_ids=[row.id for row in get_types_for_card_version(source_version.id)],
     )
-    version.mana_family_sort_key = replace_card_version_symbols(
+    replace_card_version_symbols(
         card_version_id=version.id,
         symbol_ids=[row.id for row in get_symbols_for_card_version(source_version.id)],
     )
@@ -855,6 +881,7 @@ def finalize_import_item(
     card_pool: CardPool,
     resolved_card_roles: tuple[CardRole, ...],
     resolved_card_factions: tuple[CardFaction, ...],
+    resolved_card_mana_families: tuple[ManaFamily, ...],
     evidence: CardClassificationInferenceEvidence,
     is_new_card: bool,
     unknown_evil_faction_match: UnknownEvilFactionMatch | None = None,
@@ -862,25 +889,30 @@ def finalize_import_item(
     card = version.card
     live_roles = card_role_keys(card)
     live_factions = card_faction_keys(card)
+    live_mana_families = card_mana_family_keys(card)
     evidence_payload: dict[str, object] = dict(evidence)
     evidence_payload["live_classification"] = {
         "card_pool": card.card_pool,
         "card_roles": list(live_roles),
         "card_factions": list(live_factions),
+        "card_mana_families": list(live_mana_families),
     }
 
     if item.target_card_pool_snapshot is not None:
         queued_roles = tuple(item.target_card_roles_snapshot_json)
         queued_factions = tuple(item.target_card_factions_snapshot_json)
+        queued_mana_families = tuple(item.target_card_mana_families_snapshot_json)
         evidence_payload["queued_target_classification"] = {
             "card_pool": item.target_card_pool_snapshot,
             "card_roles": list(queued_roles),
             "card_factions": list(queued_factions),
+            "card_mana_families": list(queued_mana_families),
         }
         if (
             item.target_card_pool_snapshot != card.card_pool
             or queued_roles != live_roles
             or queued_factions != live_factions
+            or queued_mana_families != live_mana_families
         ):
             upsert_import_warning(
                 item,
@@ -900,27 +932,36 @@ def finalize_import_item(
         card.card_pool == card_pool
         and live_roles == resolved_card_roles
         and live_factions == resolved_card_factions
+        and live_mana_families == resolved_card_mana_families
     ):
         remove_import_warning(item, CARD_CLASSIFICATION_MISMATCH_WARNING)
     else:
+        mismatch_details: dict[str, object] = {
+            "stored": evidence_payload["live_classification"],
+            "live": evidence_payload["live_classification"],
+            "inferred": {
+                "card_pool": card_pool,
+                "card_roles": list(resolved_card_roles),
+                "card_factions": list(resolved_card_factions),
+                "card_mana_families": list(resolved_card_mana_families),
+            },
+        }
+        if "queued_target_classification" in evidence_payload:
+            mismatch_details["queued"] = evidence_payload[
+                "queued_target_classification"
+            ]
         upsert_import_warning(
             item,
             {
                 "code": CARD_CLASSIFICATION_MISMATCH_WARNING,
                 "message": "Inferred classification differs from the existing card; the existing classification was preserved.",
-                "details": {
-                    "inferred": {
-                        "card_pool": card_pool,
-                        "card_roles": list(resolved_card_roles),
-                        "card_factions": list(resolved_card_factions),
-                    },
-                    "existing": evidence_payload["live_classification"],
-                },
+                "details": mismatch_details,
             },
         )
 
     item.resolved_card_roles_json = list(resolved_card_roles)
     item.resolved_card_factions_json = list(resolved_card_factions)
+    item.resolved_card_mana_families_json = list(resolved_card_mana_families)
     item.classification_inference_json = evidence_payload
     item.target_card = card
     item.target_card_version = version
@@ -1028,6 +1069,7 @@ def mark_item_completed(item: ImportJobItem) -> None:
             "warnings_json",
             "resolved_card_roles_json",
             "resolved_card_factions_json",
+            "resolved_card_mana_families_json",
             "classification_inference_json",
             "target_card",
             "target_card_version",
@@ -1077,7 +1119,7 @@ def apply_parsed_output_to_version(
     if field_sources["metadata"]["types"] == FIELD_SOURCE_AUTO:
         replace_card_version_types(card_version_id=version.id, type_ids=type_ids)
     if field_sources["metadata"]["symbols"] == FIELD_SOURCE_AUTO:
-        version.mana_family_sort_key = replace_card_version_symbols(
+        replace_card_version_symbols(
             card_version_id=version.id,
             symbol_ids=symbol_ids,
         )

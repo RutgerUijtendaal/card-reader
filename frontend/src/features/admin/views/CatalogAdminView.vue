@@ -31,6 +31,7 @@
         :definition="selectedClassificationRow"
         :tags="catalog.tags"
         :types="catalog.types"
+        :symbols="catalog.symbols"
         @changed="loadCatalog"
       />
 

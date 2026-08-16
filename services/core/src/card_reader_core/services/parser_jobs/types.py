@@ -33,6 +33,7 @@ class ParserResources:
     known_keywords: list[Keyword]
     known_tags: list[Tag]
     known_types: list[Type]
+    known_symbol_ids: set[str]
     detectable_symbols: list[Symbol]
 
 

@@ -136,6 +136,7 @@ def list_card_version_suggestion_occurrences(
             "card_version__images",
             "card_version__card__role_assignments",
             "card_version__card__faction_assignments",
+            "card_version__card__mana_family_assignments",
         )
         .order_by("-created_at")
     )

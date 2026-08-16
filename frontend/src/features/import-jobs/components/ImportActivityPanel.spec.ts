@@ -20,6 +20,8 @@ const activeJob: ImportJob = {
   card_role_override: [],
   card_faction_mode: 'automatic',
   card_faction_override: [],
+  card_mana_family_mode: 'automatic',
+  card_mana_family_override: [],
   classification_rule_snapshot: {
     schema_version: 1,
     card_pool: 'player',
@@ -192,6 +194,7 @@ describe('ImportActivityPanel', () => {
           ],
           resolved_card_roles: ['event'],
           resolved_card_factions: ['order'],
+          resolved_card_mana_families: ['arcane'],
           classification_inference: {
             roles: {
               mode: 'automatic',
@@ -201,12 +204,17 @@ describe('ImportActivityPanel', () => {
               mode: 'automatic',
               matched_tag_sources: [{ id: 'tag-order', key: 'order' }],
             },
+            mana_families: {
+              mode: 'automatic',
+              matched_symbol_sources: [{ id: 'symbol-arcane', key: 'arcane-mana' }],
+            },
           },
           target_card_id: 'card-id',
           target_card_version_id: 'version-id',
           target_card_pool_snapshot: null,
           target_card_roles_snapshot: [],
           target_card_factions_snapshot: [],
+          target_card_mana_families_snapshot: [],
           card_tab_url: '/cards/card-id/edit?tab=card',
         },
       ],
@@ -227,6 +235,7 @@ describe('ImportActivityPanel', () => {
     expect(mounted.host.textContent).toContain('Live');
     expect(mounted.host.textContent).toContain('Normal');
     expect(mounted.host.textContent).toContain('Factions: Order');
+    expect(mounted.host.textContent).toContain('Mana: Arcane');
     expect(
       mounted.host.querySelector('a[href="/cards/card-id/edit?tab=card"]')?.textContent,
     ).toContain('Review card classification');
@@ -251,12 +260,14 @@ describe('ImportActivityPanel', () => {
           warnings: [],
           resolved_card_roles: [],
           resolved_card_factions: [],
+          resolved_card_mana_families: [],
           classification_inference: {},
           target_card_id: null,
           target_card_version_id: null,
           target_card_pool_snapshot: null,
           target_card_roles_snapshot: [],
           target_card_factions_snapshot: [],
+          target_card_mana_families_snapshot: [],
           card_tab_url: null,
         },
         {
@@ -269,12 +280,14 @@ describe('ImportActivityPanel', () => {
           warnings: [],
           resolved_card_roles: [],
           resolved_card_factions: [],
+          resolved_card_mana_families: [],
           classification_inference: {},
           target_card_id: null,
           target_card_version_id: null,
           target_card_pool_snapshot: null,
           target_card_roles_snapshot: [],
           target_card_factions_snapshot: [],
+          target_card_mana_families_snapshot: [],
           card_tab_url: null,
         },
       ],

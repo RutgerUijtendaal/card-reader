@@ -98,6 +98,36 @@
               </fieldset>
 
               <p class="theme-section-title self-start pt-2 text-xs font-semibold">
+                Mana Families
+              </p>
+              <fieldset>
+                <legend class="sr-only">
+                  Mana Families
+                </legend>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    v-for="option in manaFamilyOptions"
+                    :key="option.value"
+                    type="button"
+                    class="theme-section-title min-h-9 rounded-lg border px-3 py-1.5 text-xs font-semibold transition"
+                    :class="form.card_mana_families.includes(option.value) ? 'theme-selected-surface' : 'theme-card-frame-muted'"
+                    :aria-pressed="form.card_mana_families.includes(option.value)"
+                    :disabled="!version.editable || isBusy"
+                    :data-testid="`card-mana-family-option-${option.value}`"
+                    @click="$emit('toggle-card-mana-family', option.value, !form.card_mana_families.includes(option.value))"
+                  >
+                    {{ option.label }}
+                  </button>
+                  <span
+                    v-if="form.card_mana_families.length === 0"
+                    class="theme-section-muted text-xs"
+                  >
+                    Colorless
+                  </span>
+                </div>
+              </fieldset>
+
+              <p class="theme-section-title self-start pt-2 text-xs font-semibold">
                 Factions
               </p>
               <fieldset>
@@ -626,6 +656,7 @@ import type {
 } from '@/domain/cards/types';
 import type { ParseFlagPropertyKey } from '@/domain/review/types';
 import { CARD_POOL_OPTIONS, isCardPool, type CardPool } from '@/domain/cards/cardPools';
+import { MANA_FAMILY_OPTIONS, type ManaFamily } from '@/domain/cards/manaFamilies';
 import type { EditorForm, MetadataSearchState, ReparseTemplateOption } from '@/features/card-detail/types';
 import { metadataGroups, scalarFields } from '@/features/card-detail/types';
 
@@ -676,6 +707,7 @@ const emit = defineEmits<{
   (e: 'update-card-pool', value: CardPool): void;
   (e: 'toggle-card-role', role: CardRole, checked: boolean): void;
   (e: 'toggle-card-faction', faction: CardFaction, checked: boolean): void;
+  (e: 'toggle-card-mana-family', manaFamily: ManaFamily, checked: boolean): void;
   (e: 'update-deck-building-config', value: string): void;
   (e: 'update-lifecycle-status', value: CardLifecycleStatus): void;
 }>();
@@ -693,6 +725,7 @@ const lifecycleOptions = [
 ] as const;
 const cardRoleOptions = CARD_ROLE_OPTIONS;
 const cardFactionOptions = CARD_FACTION_OPTIONS;
+const manaFamilyOptions = MANA_FAMILY_OPTIONS;
 const cardPoolOptions = CARD_POOL_OPTIONS;
 const symbolInsertOptions = computed(() => props.optionsForGroup('symbols') as SymbolFilterOption[]);
 const rulesTextSymbolIds = computed(() => props.ruleTextSymbols.map((symbol) => symbol.id));

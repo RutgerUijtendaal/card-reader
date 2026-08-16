@@ -190,7 +190,11 @@ const classificationRuleLocation = (rule: ClassificationRuleRecord) => ({
   path: '/admin',
   query: {
     admin_tab: 'catalog',
-    admin_kind: rule.target_kind === 'role' ? 'card-roles' : 'card-factions',
+    admin_kind: rule.target_kind === 'role'
+      ? 'card-roles'
+      : rule.target_kind === 'faction'
+        ? 'card-factions'
+        : 'card-mana-families',
     admin_entry: `${rule.target_kind}:${rule.target_key}`,
   },
 });

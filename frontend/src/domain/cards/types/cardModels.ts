@@ -3,6 +3,7 @@ import type { DeckBuildingConfig } from '@/domain/deck-building/types';
 import type { CardRole } from '@/domain/cards/cardRoles';
 import type { CardPool } from '@/domain/cards/cardPools';
 import type { CardFaction } from '@/domain/cards/cardFactions';
+import type { ManaFamily } from '@/domain/cards/manaFamilies';
 
 export type CardTooltipSymbolLookup = {
   asset_url?: string | null;
@@ -38,6 +39,7 @@ export type CardHoverTooltipModel = {
   // Optional only at the shared rendering boundary so persisted client drafts and
   // older cached payloads normalize safely while the API contract always emits it.
   card_factions?: CardFaction[];
+  card_mana_families?: ManaFamily[];
   restricted?: boolean;
   deck_building_config?: DeckBuildingConfig;
   lifecycle_status?: CardLifecycleStatus;

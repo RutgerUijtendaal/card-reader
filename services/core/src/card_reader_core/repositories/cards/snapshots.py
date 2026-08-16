@@ -179,7 +179,7 @@ def restore_metadata_group_from_snapshot(
             type_ids=string_list(metadata.get("type_ids")),
         )
     elif group_name == "symbols":
-        card_version.mana_family_sort_key = replace_card_version_symbols(
+        replace_card_version_symbols(
             card_version_id=card_version.id,
             symbol_ids=string_list(metadata.get("symbol_ids")),
         )

@@ -18,7 +18,7 @@ describe('catalogAdminUtils', () => {
       },
       {
         label: 'Card classification',
-        kinds: ['card-roles', 'card-factions'],
+        kinds: ['card-roles', 'card-factions', 'card-mana-families'],
       },
       { label: 'Deck tags', kinds: ['deck-roles', 'deck-types', 'suggested-deck-types'] },
     ]);

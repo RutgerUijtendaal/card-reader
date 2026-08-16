@@ -16,6 +16,7 @@ from filelock import FileLock, Timeout as FileLockTimeout
 
 from card_reader_core.imports import SUPPORTED_IMAGE_SUFFIXES
 from card_reader_core.models import CardFaction, CardPool, CardRole, ImportJob
+from card_reader_core.metadata import ManaFamily
 from card_reader_core.services.imports import (
     CardClassificationMode,
     ImportCreationKeyConflict,
@@ -185,6 +186,12 @@ class ImportUploadAdmission:
         card_faction_override = cast(
             list[CardFaction], validated_data["card_faction_override"]
         )
+        card_mana_family_mode = cast(
+            CardClassificationMode, validated_data["card_mana_family_mode"]
+        )
+        card_mana_family_override = cast(
+            list[ManaFamily], validated_data["card_mana_family_override"]
+        )
         fingerprint, uploads = _upload_fingerprint(
             template_id=template_id,
             content_version_base=content_version_base,
@@ -195,8 +202,30 @@ class ImportUploadAdmission:
             card_role_override=card_role_override,
             card_faction_mode=card_faction_mode,
             card_faction_override=card_faction_override,
+            card_mana_family_mode=card_mana_family_mode,
+            card_mana_family_override=card_mana_family_override,
             files=cast(list[UploadedFile], validated_data["files"]),
         )
+        accepted_fingerprints: tuple[str, ...] = (fingerprint,)
+        if card_mana_family_mode == "automatic" and not card_mana_family_override:
+            legacy_fingerprint, _legacy_uploads = _upload_fingerprint(
+                template_id=template_id,
+                content_version_base=content_version_base,
+                content_version_description=str(
+                    validated_data["content_version_description"]
+                ),
+                options=cast(dict[str, object], validated_data["options_json"]),
+                card_pool=card_pool,
+                card_role_mode=card_role_mode,
+                card_role_override=card_role_override,
+                card_faction_mode=card_faction_mode,
+                card_faction_override=card_faction_override,
+                card_mana_family_mode=card_mana_family_mode,
+                card_mana_family_override=card_mana_family_override,
+                files=cast(list[UploadedFile], validated_data["files"]),
+                include_mana_families=False,
+            )
+            accepted_fingerprints = (fingerprint, legacy_fingerprint)
         StagedImportUpload(
             creation_key=creation_key,
             fingerprint=fingerprint,
@@ -222,7 +251,10 @@ class ImportUploadAdmission:
                     card_role_override=card_role_override,
                     card_faction_mode=card_faction_mode,
                     card_faction_override=card_faction_override,
+                    card_mana_family_mode=card_mana_family_mode,
+                    card_mana_family_override=card_mana_family_override,
                     fingerprint=fingerprint,
+                    accepted_fingerprints=accepted_fingerprints,
                     uploads=uploads,
                 )
         except FileLockTimeout as exc:
@@ -242,12 +274,15 @@ class ImportUploadAdmission:
         card_role_override: list[CardRole],
         card_faction_mode: CardClassificationMode,
         card_faction_override: list[CardFaction],
+        card_mana_family_mode: CardClassificationMode,
+        card_mana_family_override: list[ManaFamily],
         fingerprint: str,
+        accepted_fingerprints: tuple[str, ...],
         uploads: list[tuple[UploadedFile, str]],
     ) -> ImportAdmissionResult:
         existing = self._service.get_job_by_creation_key(creation_key=creation_key)
         if existing is not None:
-            if existing.creation_fingerprint != fingerprint:
+            if existing.creation_fingerprint not in accepted_fingerprints:
                 _discard_reconciled_stage(
                     uploads,
                     creation_key=creation_key,
@@ -269,11 +304,14 @@ class ImportUploadAdmission:
                 card_role_override=card_role_override,
                 card_faction_mode=card_faction_mode,
                 card_faction_override=card_faction_override,
+                card_mana_family_mode=card_mana_family_mode,
+                card_mana_family_override=card_mana_family_override,
             )
         except ImportCreationRejected as exc:
             return self._reconcile_prevalidation_rejection(
                 creation_key=creation_key,
                 fingerprint=fingerprint,
+                accepted_fingerprints=accepted_fingerprints,
                 uploads=uploads,
                 error=exc,
             )
@@ -295,11 +333,14 @@ class ImportUploadAdmission:
                 content_version_description=str(validated_data["content_version_description"]),
                 creation_key=creation_key,
                 creation_fingerprint=fingerprint,
+                accepted_creation_fingerprints=accepted_fingerprints,
                 card_pool=card_pool,
                 card_role_mode=card_role_mode,
                 card_role_override=card_role_override,
                 card_faction_mode=card_faction_mode,
                 card_faction_override=card_faction_override,
+                card_mana_family_mode=card_mana_family_mode,
+                card_mana_family_override=card_mana_family_override,
             )
         except ImportCreationKeyConflict as exc:
             _discard_reconciled_stage(
@@ -322,20 +363,38 @@ class ImportUploadAdmission:
                 staged=staged,
                 uploads=uploads,
                 fingerprint=fingerprint,
+                accepted_fingerprints=accepted_fingerprints,
                 error=exc,
             )
 
-        staged.claim()
+        self._settle_successful_stage(
+            staged=staged,
+            job=result.job,
+            idempotent_replay=result.idempotent_replay,
+        )
         return ImportAdmissionResult(
             job=result.job,
             idempotent_replay=result.idempotent_replay,
         )
+
+    @staticmethod
+    def _settle_successful_stage(
+        *,
+        staged: StagedImportUpload,
+        job: ImportJob,
+        idempotent_replay: bool,
+    ) -> None:
+        if not idempotent_replay or job.creation_fingerprint == staged.fingerprint:
+            staged.claim()
+            return
+        staged.discard()
 
     def _reconcile_prevalidation_rejection(
         self,
         *,
         creation_key: str,
         fingerprint: str,
+        accepted_fingerprints: tuple[str, ...],
         uploads: list[tuple[UploadedFile, str]],
         error: ImportCreationRejected,
     ) -> ImportAdmissionResult:
@@ -352,7 +411,7 @@ class ImportUploadAdmission:
                 "Failed to reconcile rejected import upload. See API logs."
             ) from error
         if existing is not None:
-            if existing.creation_fingerprint != fingerprint:
+            if existing.creation_fingerprint not in accepted_fingerprints:
                 _discard_reconciled_stage(
                     uploads,
                     creation_key=creation_key,
@@ -378,6 +437,7 @@ class ImportUploadAdmission:
         staged: StagedImportUpload,
         uploads: list[tuple[UploadedFile, str]],
         fingerprint: str,
+        accepted_fingerprints: tuple[str, ...],
         error: Exception,
     ) -> ImportAdmissionResult:
         try:
@@ -391,7 +451,7 @@ class ImportUploadAdmission:
                 "Failed to create import job from upload. See API logs."
             ) from error
         if existing is not None:
-            if existing.creation_fingerprint != fingerprint:
+            if existing.creation_fingerprint not in accepted_fingerprints:
                 _discard_reconciled_stage(
                     uploads,
                     creation_key=staged.creation_key,
@@ -401,7 +461,11 @@ class ImportUploadAdmission:
                 raise ImportAdmissionConflict(
                     "This creation key has already been used for a different import payload."
                 ) from error
-            staged.claim()
+            self._settle_successful_stage(
+                staged=staged,
+                job=existing,
+                idempotent_replay=True,
+            )
             logger.warning(
                 "Recovered committed import after an unexpected creation error. job_id=%s",
                 existing.id,
@@ -487,6 +551,9 @@ def _upload_fingerprint(
     card_faction_mode: str,
     card_faction_override: Sequence[str],
     files: list[UploadedFile],
+    card_mana_family_mode: str = "automatic",
+    card_mana_family_override: Sequence[str] = (),
+    include_mana_families: bool = True,
 ) -> tuple[str, list[tuple[UploadedFile, str]]]:
     file_records: list[dict[str, object]] = []
     uploads: list[tuple[UploadedFile, str]] = []
@@ -500,7 +567,7 @@ def _upload_fingerprint(
             {"name": Path(upload.name or "upload.img").name, "size": upload.size, "sha256": checksum}
         )
         uploads.append((upload, checksum))
-    payload = {
+    payload: dict[str, object] = {
         "template_id": template_id,
         "content_version_base": content_version_base,
         "content_version_description": content_version_description,
@@ -512,6 +579,9 @@ def _upload_fingerprint(
         "card_faction_override": list(card_faction_override),
         "files": file_records,
     }
+    if include_mana_families:
+        payload["card_mana_family_mode"] = card_mana_family_mode
+        payload["card_mana_family_override"] = list(card_mana_family_override)
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest(), uploads
 

@@ -75,6 +75,7 @@ export const useCardDetailState = () => {
     card_pool: 'player',
     card_roles: [],
     card_factions: [],
+    card_mana_families: [],
     deck_building_config: formatDeckBuildingConfigJson(fallbackDeckBuildingDefaultConfig),
     lifecycle_status: ACTIVE_CARD_LIFECYCLE_STATUS,
     keyword_ids: [],
@@ -193,6 +194,7 @@ export const useCardDetailState = () => {
     form.card_pool = version.card_pool;
     form.card_roles = [...version.card_roles];
     form.card_factions = [...(version.card_factions ?? [])];
+    form.card_mana_families = [...(version.card_mana_families ?? [])];
     form.deck_building_config = formatDeckBuildingConfigJson(
       Object.keys(version.deck_building_config ?? {}).length > 0
         ? version.deck_building_config
@@ -612,6 +614,12 @@ const buildCardUpdatePayload = (
   ) {
     updates.card_factions = form.card_factions;
   }
+  if (
+    JSON.stringify([...form.card_mana_families].sort())
+    !== JSON.stringify([...(version.card_mana_families ?? [])].sort())
+  ) {
+    updates.card_mana_families = form.card_mana_families;
+  }
   const deckBuildingConfig = parseJsonObject(form.deck_building_config);
   if (JSON.stringify(deckBuildingConfig) !== JSON.stringify(version.deck_building_config ?? {})) {
     updates.deck_building_config = deckBuildingConfig;
@@ -673,6 +681,7 @@ export type CardClassificationFields = Pick<
   | 'card_pool'
   | 'card_roles'
   | 'card_factions'
+  | 'card_mana_families'
   | 'deck_building_config'
   | 'lifecycle_status'
 >;
@@ -689,6 +698,7 @@ export const synchronizeCardClassification = <T extends CardClassificationFields
           card_pool: updated.card_pool,
           card_roles: [...updated.card_roles],
           card_factions: [...(updated.card_factions ?? [])],
+          card_mana_families: [...(updated.card_mana_families ?? [])],
           deck_building_config: updated.deck_building_config,
           lifecycle_status: updated.lifecycle_status,
         },

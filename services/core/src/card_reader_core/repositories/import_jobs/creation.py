@@ -25,6 +25,7 @@ from card_reader_core.models import (
     normalize_card_factions,
     normalize_card_roles,
 )
+from card_reader_core.metadata import ManaFamily, normalize_mana_family_keys
 from card_reader_core.repositories.templates import get_template_by_key
 from card_reader_core.storage import relativize_storage_path
 
@@ -45,6 +46,8 @@ def create_import_job(
     card_role_override: Sequence[CardRole] = (),
     card_faction_mode: str = ImportClassificationMode.automatic,
     card_faction_override: Sequence[CardFaction] = (),
+    card_mana_family_mode: str = ImportClassificationMode.automatic,
+    card_mana_family_override: Sequence[ManaFamily] = (),
     classification_rule_snapshot: dict[str, object],
 ) -> ImportJob:
     files = collect_supported_files(source_path)
@@ -62,6 +65,8 @@ def create_import_job(
         card_role_override=card_role_override,
         card_faction_mode=card_faction_mode,
         card_faction_override=card_faction_override,
+        card_mana_family_mode=card_mana_family_mode,
+        card_mana_family_override=card_mana_family_override,
         classification_rule_snapshot=classification_rule_snapshot,
     )
 
@@ -81,6 +86,8 @@ def create_import_job_with_files(
     card_role_override: Sequence[CardRole] = (),
     card_faction_mode: str = ImportClassificationMode.automatic,
     card_faction_override: Sequence[CardFaction] = (),
+    card_mana_family_mode: str = ImportClassificationMode.automatic,
+    card_mana_family_override: Sequence[ManaFamily] = (),
     classification_rule_snapshot: dict[str, object],
 ) -> ImportJob:
     normalized_targets = list(item_targets) if item_targets is not None else [None] * len(files)
@@ -93,6 +100,8 @@ def create_import_job_with_files(
         card_role_override=card_role_override,
         card_faction_mode=card_faction_mode,
         card_faction_override=card_faction_override,
+        card_mana_family_mode=card_mana_family_mode,
+        card_mana_family_override=card_mana_family_override,
     )
     resolved_creation_key = creation_key or str(uuid4())
     resolved_fingerprint = creation_fingerprint or f"internal:{resolved_creation_key}"
@@ -114,6 +123,8 @@ def create_import_job_with_files(
             card_role_override_json=list(prepared.card_role_override),
             card_faction_mode=prepared.card_faction_mode,
             card_faction_override_json=list(prepared.card_faction_override),
+            card_mana_family_mode=prepared.card_mana_family_mode,
+            card_mana_family_override_json=list(prepared.card_mana_family_override),
             classification_rule_snapshot_json=classification_rule_snapshot,
             total_items=len(files),
             processed_items=0,
@@ -136,6 +147,9 @@ def create_import_job_with_files(
                     target_card_factions_snapshot_json=(
                         list(target.card_factions) if target is not None else []
                     ),
+                    target_card_mana_families_snapshot_json=(
+                        list(target.card_mana_families) if target is not None else []
+                    ),
                     status=ImportJobStatus.queued,
                 )
                 for image_file, target in zip(files, normalized_targets, strict=True)
@@ -152,6 +166,8 @@ def prepare_import_job_inputs(
     card_role_override: Sequence[CardRole],
     card_faction_mode: str,
     card_faction_override: Sequence[CardFaction],
+    card_mana_family_mode: str,
+    card_mana_family_override: Sequence[ManaFamily],
 ) -> PreparedImportJobInputs:
     if not is_card_pool(card_pool):
         raise ImportJobInputValidationError(f"Unsupported card pool: {card_pool}")
@@ -192,6 +208,28 @@ def prepare_import_job_inputs(
         raise ImportJobInputValidationError(
             "Automatic faction inference cannot include faction overrides."
         )
+    if card_mana_family_mode not in {
+        ImportClassificationMode.automatic,
+        ImportClassificationMode.override,
+    }:
+        raise ImportJobInputValidationError(
+            "card_mana_family_mode must be either 'automatic' or 'override'."
+        )
+    normalized_mana_family_mode = str(card_mana_family_mode)
+    normalized_mana_family_override = normalize_mana_family_keys(
+        tuple(card_mana_family_override)
+    )
+    if len(set(card_mana_family_override)) != len(normalized_mana_family_override):
+        raise ImportJobInputValidationError(
+            "card_mana_family_override contains unsupported or duplicate families."
+        )
+    if (
+        normalized_mana_family_mode == ImportClassificationMode.automatic
+        and normalized_mana_family_override
+    ):
+        raise ImportJobInputValidationError(
+            "Automatic mana family inference cannot include mana family overrides."
+        )
     template = get_template_by_key(key=template_id)
     if template is None:
         raise ImportJobInputValidationError(f"Unknown template_id '{template_id}'")
@@ -202,4 +240,6 @@ def prepare_import_job_inputs(
         card_role_override=normalized_override,
         card_faction_mode=normalized_faction_mode,
         card_faction_override=normalized_faction_override,
+        card_mana_family_mode=normalized_mana_family_mode,
+        card_mana_family_override=normalized_mana_family_override,
     )

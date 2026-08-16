@@ -43,12 +43,12 @@
 
     <SymbolToggleGroup
       v-if="isSectionVisible('mana')"
-      v-model:included-value="selectedManaTypeSymbolIds"
-      v-model:excluded-value="excludedManaTypeSymbolIds"
-      v-model:match-mode="manaSymbolMatch"
+      v-model:included-value="selectedManaFamilyIds"
+      v-model:excluded-value="excludedManaFamilyIds"
+      v-model:match-mode="manaFamilyMatch"
       :default-open="isSectionOpenByDefault('mana', true)"
       label="Mana"
-      :options="state.manaTypeOptions"
+      :options="state.manaFamilyOptions"
       @reset="state.resetManaGroup"
     >
       <div class="theme-divider border-t pt-3">
@@ -250,17 +250,17 @@ const cardFactionMatch = computed({
   set: props.state.onUpdateCardFactionMatch,
 });
 
-const selectedManaTypeSymbolIds = computed({
-  get: () => props.state.selectedManaTypeSymbolIds,
-  set: props.state.onUpdateSelectedManaTypeSymbolIds,
+const selectedManaFamilyIds = computed({
+  get: () => props.state.selectedManaFamilyIds,
+  set: props.state.onUpdateSelectedManaFamilyIds,
 });
-const excludedManaTypeSymbolIds = computed({
-  get: () => props.state.excludedManaTypeSymbolIds,
-  set: props.state.onUpdateExcludedManaTypeSymbolIds,
+const excludedManaFamilyIds = computed({
+  get: () => props.state.excludedManaFamilyIds,
+  set: props.state.onUpdateExcludedManaFamilyIds,
 });
-const manaSymbolMatch = computed({
-  get: () => props.state.manaSymbolMatch,
-  set: props.state.onUpdateManaSymbolMatch,
+const manaFamilyMatch = computed({
+  get: () => props.state.manaFamilyMatch,
+  set: props.state.onUpdateManaFamilyMatch,
 });
 const manaCostMin = computed({
   get: () => props.state.manaCostMin,

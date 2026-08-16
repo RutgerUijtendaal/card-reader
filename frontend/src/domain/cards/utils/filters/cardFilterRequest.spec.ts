@@ -12,7 +12,7 @@ const selection: CardFilterSelectionState = {
   keywordMatch: 'all',
   tagMatch: 'all',
   typeMatch: 'any',
-  manaSymbolMatch: 'all',
+  manaFamilyMatch: 'all',
   affinitySymbolMatch: 'all',
   devotionSymbolMatch: 'any',
   otherSymbolMatch: 'any',
@@ -25,8 +25,8 @@ const selection: CardFilterSelectionState = {
   healthMax: '',
   keywordIds: ['kw-1'],
   tagIds: ['tag-1'],
-  manaTypeSymbolIds: ['arcane'],
-  manaTypeSymbolExcludeIds: ['arcane'],
+  manaFamilyIds: ['arcane'],
+  manaFamilyExcludeIds: ['arcane'],
   affinitySymbolIds: ['sym-2'],
   affinitySymbolExcludeIds: ['sym-2'],
   devotionSymbolIds: ['sym-3'],
@@ -87,20 +87,5 @@ describe('cardFilterRequest', () => {
       mana_cost_min: '2',
       mana_cost_max: '7',
     });
-  });
-
-  test('uses literal mana-symbol params for a catalog fallback selection', () => {
-    const fallbackSelection: CardFilterSelectionState = {
-      ...selection,
-      manaTypeSymbolIds: ['legacy-mana-symbol:sym-1'],
-      manaTypeSymbolExcludeIds: ['legacy-mana-symbol:sym-2'],
-    };
-
-    const params = buildCardFilterApiSearchParams(fallbackSelection);
-
-    expect(params.getAll('mana_symbol_ids')).toEqual(['sym-1']);
-    expect(params.getAll('mana_symbol_exclude_ids')).toEqual(['sym-2']);
-    expect(params.get('mana_symbol_match')).toBe('all');
-    expect(params.getAll('mana_family_keys')).toEqual([]);
   });
 });

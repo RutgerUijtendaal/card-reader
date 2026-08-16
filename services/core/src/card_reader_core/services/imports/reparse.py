@@ -14,6 +14,7 @@ from card_reader_core.models import (
     normalize_card_factions,
     normalize_card_roles,
 )
+from card_reader_core.metadata import normalize_mana_family_keys
 from .service import ImportService
 
 
@@ -51,6 +52,9 @@ def queue_grouped_reparse_jobs(
                         card_pool=source.card_pool,
                         card_roles=normalize_card_roles(source.card_roles),
                         card_factions=normalize_card_factions(source.card_factions),
+                        card_mana_families=normalize_mana_family_keys(
+                            tuple(source.card_mana_families)
+                        ),
                     )
                     for source in group
                 ],

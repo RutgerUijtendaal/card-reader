@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from django.db import IntegrityError, transaction
 
 from card_reader_core.models import CardFaction, CardPool, CardRole, ImportClassificationMode, ImportJob
+from card_reader_core.metadata import ManaFamily
 from card_reader_core.imports import (
     ImportJobCreationResult,
     ImportJobInputValidationError,
@@ -46,16 +47,22 @@ class ImportService:
         content_version_description: str,
         creation_key: str,
         creation_fingerprint: str,
+        accepted_creation_fingerprints: Sequence[str] = (),
         card_pool: CardPool,
         card_role_mode: CardClassificationMode = "automatic",
         card_role_override: Sequence[CardRole] = (),
         card_faction_mode: CardClassificationMode = "automatic",
         card_faction_override: Sequence[CardFaction] = (),
+        card_mana_family_mode: CardClassificationMode = "automatic",
+        card_mana_family_override: Sequence[ManaFamily] = (),
     ) -> ImportJobCreationResult:
+        accepted_fingerprints = tuple(
+            dict.fromkeys((creation_fingerprint, *accepted_creation_fingerprints))
+        )
         existing = self.get_job_by_creation_key(creation_key=creation_key)
         if existing is not None:
             return ImportJobCreationResult(
-                job=self._matching_replay(existing, creation_fingerprint),
+                job=self._matching_replay(existing, accepted_fingerprints),
                 outcome="replayed",
             )
         self.prevalidate_job_creation(
@@ -67,6 +74,8 @@ class ImportService:
             card_role_override=card_role_override,
             card_faction_mode=card_faction_mode,
             card_faction_override=card_faction_override,
+            card_mana_family_mode=card_mana_family_mode,
+            card_mana_family_override=card_mana_family_override,
         )
 
         try:
@@ -75,6 +84,7 @@ class ImportService:
                     card_pool=card_pool,
                     card_role_mode=card_role_mode,
                     card_faction_mode=card_faction_mode,
+                    card_mana_family_mode=card_mana_family_mode,
                 )
                 content_version = create_next_content_version(
                     base_version=content_version_base,
@@ -92,6 +102,8 @@ class ImportService:
                     card_role_override=card_role_override,
                     card_faction_mode=card_faction_mode,
                     card_faction_override=card_faction_override,
+                    card_mana_family_mode=card_mana_family_mode,
+                    card_mana_family_override=card_mana_family_override,
                     classification_rule_snapshot=rule_snapshot,
                 )
         except ImportJobInputValidationError as exc:
@@ -101,7 +113,7 @@ class ImportService:
             if existing is None:
                 raise
             return ImportJobCreationResult(
-                job=self._matching_replay(existing, creation_fingerprint),
+                job=self._matching_replay(existing, accepted_fingerprints),
                 outcome="replayed",
             )
         return ImportJobCreationResult(job=job, outcome="created")
@@ -120,6 +132,7 @@ class ImportService:
                 card_pool=card_pool,
                 card_role_mode=ImportClassificationMode.automatic,
                 card_faction_mode=ImportClassificationMode.automatic,
+                card_mana_family_mode=ImportClassificationMode.automatic,
             )
             return create_import_job_with_files(
                 source_path=source_path,
@@ -142,6 +155,8 @@ class ImportService:
         card_role_override: Sequence[CardRole],
         card_faction_mode: CardClassificationMode,
         card_faction_override: Sequence[CardFaction],
+        card_mana_family_mode: CardClassificationMode,
+        card_mana_family_override: Sequence[ManaFamily],
     ) -> None:
         try:
             parse_base_version(content_version_base)
@@ -153,6 +168,8 @@ class ImportService:
                 card_role_override=card_role_override,
                 card_faction_mode=card_faction_mode,
                 card_faction_override=card_faction_override,
+                card_mana_family_mode=card_mana_family_mode,
+                card_mana_family_override=card_mana_family_override,
             )
         except ValueError as exc:
             raise ImportCreationRejected(str(exc)) from exc
@@ -160,8 +177,12 @@ class ImportService:
     def get_job_by_creation_key(self, *, creation_key: str) -> ImportJob | None:
         return fetch_job_by_creation_key(creation_key)
 
-    def _matching_replay(self, job: ImportJob, fingerprint: str) -> ImportJob:
-        if job.creation_fingerprint != fingerprint:
+    def _matching_replay(
+        self,
+        job: ImportJob,
+        accepted_fingerprints: Sequence[str],
+    ) -> ImportJob:
+        if job.creation_fingerprint not in accepted_fingerprints:
             raise ImportCreationKeyConflict(
                 "This creation key has already been used for a different import payload."
             )
@@ -176,9 +197,13 @@ class ImportService:
         card_pool: CardPool,
         card_role_mode: str,
         card_faction_mode: str,
+        card_mana_family_mode: str,
     ) -> dict[str, object]:
         return ClassificationRuleService().build_snapshot(
             card_pool=card_pool,
             include_roles=card_role_mode == ImportClassificationMode.automatic,
             include_factions=card_faction_mode == ImportClassificationMode.automatic,
+            include_mana_families=(
+                card_mana_family_mode == ImportClassificationMode.automatic
+            ),
         )

@@ -8,6 +8,14 @@ from typing import TYPE_CHECKING, Literal, Protocol, TypeGuard, TypeVar
 from django.db import models
 from django.db.models import Q, QuerySet
 
+from card_reader_core.metadata import (
+    MANA_FAMILY_CHOICES,
+    NO_MANA_FAMILY_SORT_KEY,
+    ManaFamily,
+    mana_family_sort_key_for_family_keys,
+    normalize_mana_family_keys,
+)
+
 from .base import TimestampedModel, uuid_str
 
 if TYPE_CHECKING:
@@ -94,6 +102,7 @@ class CardRoleDefinition:
     key: CardRole
     label: str
     rank: int
+    display_symbol_key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -102,6 +111,7 @@ class CardRoleFilterDefinition:
     label: str
     rank: int
     derived: bool
+    display_symbol_key: str | None = None
 
 
 CARD_ROLE_DEFINITIONS: tuple[CardRoleDefinition, ...] = (
@@ -130,6 +140,7 @@ CARD_ROLE_FILTER_DEFINITIONS: tuple[CardRoleFilterDefinition, ...] = (
             label=definition.label,
             rank=definition.rank,
             derived=False,
+            display_symbol_key=definition.display_symbol_key,
         )
         for definition in CARD_ROLE_DEFINITIONS
     ),
@@ -147,6 +158,7 @@ class CardFactionDefinition:
     key: CardFaction
     label: str
     rank: int
+    display_symbol_key: str | None = None
 
 
 CARD_FACTION_DEFINITIONS: tuple[CardFactionDefinition, ...] = (
@@ -190,6 +202,7 @@ class Card(TimestampedModel):
         deck_sideboard_entries: Manager[DeckSideboardEntry]
         role_assignments: Manager[CardRoleAssignment]
         faction_assignments: Manager[CardFactionAssignment]
+        mana_family_assignments: Manager[CardManaFamilyAssignment]
         versions: Manager[CardVersion]
 
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
@@ -204,6 +217,9 @@ class Card(TimestampedModel):
     faction_identity_key: models.TextField[str, str] = models.TextField(
         default="[]",
         editable=False,
+    )
+    mana_family_sort_key: models.PositiveSmallIntegerField[int, int] = (
+        models.PositiveSmallIntegerField(default=NO_MANA_FAMILY_SORT_KEY, db_index=True)
     )
     deck_building_config_json = models.JSONField(default=dict)
     lifecycle_status: models.CharField[str, str] = models.CharField(
@@ -294,6 +310,30 @@ class CardFactionAssignment(TimestampedModel):
         ]
 
 
+class CardManaFamilyAssignment(TimestampedModel):
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    card: models.ForeignKey[Card, Card] = models.ForeignKey(
+        "Card",
+        on_delete=models.CASCADE,
+        related_name="mana_family_assignments",
+        db_column="card_id",
+    )
+    mana_family: models.CharField[str, str] = models.CharField(
+        max_length=64,
+        choices=MANA_FAMILY_CHOICES,
+        db_index=True,
+    )
+
+    class Meta:
+        db_table = "card_mana_family_assignment"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("card", "mana_family"),
+                name="uq_card_mana_family_card_family",
+            ),
+        ]
+
+
 def is_card_pool(value: object) -> TypeGuard[CardPool]:
     return value in CARD_POOLS
 
@@ -336,6 +376,18 @@ def card_has_faction(card: Card, faction: CardFaction) -> bool:
     if prefetched is not None:
         return any(assignment.faction == faction for assignment in prefetched)
     return card.faction_assignments.filter(faction=faction).exists()
+
+
+def card_mana_family_keys(card: Card) -> tuple[ManaFamily, ...]:
+    prefetched = getattr(card, "_prefetched_objects_cache", {}).get("mana_family_assignments")
+    assignments = prefetched if prefetched is not None else card.mana_family_assignments.all()
+    return normalize_mana_family_keys(tuple(assignment.mana_family for assignment in assignments))
+
+
+def card_mana_family_sort_key(values: Iterable[object]) -> int:
+    return mana_family_sort_key_for_family_keys(
+        tuple(value for value in values if isinstance(value, str))
+    )
 
 
 def normalize_card_lifecycle_filter(value: object) -> CardLifecycleFilter:

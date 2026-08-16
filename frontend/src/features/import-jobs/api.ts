@@ -2,6 +2,7 @@ import { api } from '@/shared/api/client';
 import type { CardRole } from '@/domain/cards/cardRoles';
 import type { CardFaction } from '@/domain/cards/cardFactions';
 import type { CardPool } from '@/domain/cards/cardPools';
+import type { ManaFamily } from '@/domain/cards/manaFamilies';
 import type {
   ContentVersion,
   CreateImportJobResponse,
@@ -30,6 +31,8 @@ export type CreateImportJobInput = {
   cardRoleOverride: CardRole[];
   cardFactionMode: 'automatic' | 'override';
   cardFactionOverride: CardFaction[];
+  cardManaFamilyMode: 'automatic' | 'override';
+  cardManaFamilyOverride: ManaFamily[];
 };
 
 export const createImportJob = async (
@@ -46,6 +49,11 @@ export const createImportJob = async (
   formData.append('card_role_override', JSON.stringify(input.cardRoleOverride));
   formData.append('card_faction_mode', input.cardFactionMode);
   formData.append('card_faction_override', JSON.stringify(input.cardFactionOverride));
+  formData.append('card_mana_family_mode', input.cardManaFamilyMode);
+  formData.append(
+    'card_mana_family_override',
+    JSON.stringify(input.cardManaFamilyOverride),
+  );
   input.files.forEach((file) => formData.append('files', file));
 
   const response = await api.post<CreateImportJobResponse>('/imports/upload', formData, {

@@ -25,6 +25,7 @@ from card_reader_core.models import (
     Type,
     card_role_keys,
     card_faction_keys,
+    card_mana_family_keys,
     normalize_card_lifecycle_filter,
 )
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE, CardListRow
@@ -81,6 +82,7 @@ def card_payload(
         "card_pool": card.card_pool,
         "card_roles": list(card_role_keys(card)),
         "card_factions": list(card_faction_keys(card)),
+        "card_mana_families": list(card_mana_family_keys(card)),
         "deck_building_config": normalize_deck_building_config(card.deck_building_config_json),
         "lifecycle_status": card.lifecycle_status,
         "template_id": version.template.key,
@@ -95,7 +97,7 @@ def card_payload(
         "mana_cost": version.mana_cost,
         "mana_symbols": _decode_mana_symbols(version.mana_symbols_json),
         "mana_value": version.mana_value,
-        "mana_family_sort_key": version.mana_family_sort_key,
+        "mana_family_sort_key": card.mana_family_sort_key,
         "attack": version.attack,
         "health": version.health,
         "rules_text_enriched": version.rules_text_enriched or version.rules_text,
@@ -523,6 +525,11 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
         required=False,
         allow_empty=True,
     )
+    card_mana_families = serializers.ListField(
+        child=serializers.ChoiceField(choices=MANA_FAMILY_KEYS),
+        required=False,
+        allow_empty=True,
+    )
     deck_building_config = serializers.JSONField(required=False)
     lifecycle_status = serializers.ChoiceField(choices=CARD_LIFECYCLE_STATUSES, required=False)
     keyword_ids = serializers.ListField(child=serializers.CharField(), required=False)
@@ -573,6 +580,8 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
             updates["card_roles"] = self.validated_data["card_roles"]
         if "card_factions" in self.validated_data:
             updates["card_factions"] = self.validated_data["card_factions"]
+        if "card_mana_families" in self.validated_data:
+            updates["card_mana_families"] = self.validated_data["card_mana_families"]
         if "deck_building_config" in self.validated_data:
             updates["deck_building_config"] = self.validated_data["deck_building_config"]
         if "lifecycle_status" in self.validated_data:

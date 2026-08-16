@@ -73,6 +73,7 @@ const buildGroup = (
         card_name: 'Anchor Card',
         card_pool: cardPool,
         card_factions: ['order'],
+        card_mana_families: [],
         position: 1,
         is_anchor: true,
         image_url: '/anchor.png',

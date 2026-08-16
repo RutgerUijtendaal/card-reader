@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import IntegrityError
 
 from card_reader_api.imports.creation import (
     ImportAdmissionConflict,
@@ -41,6 +42,8 @@ def _validated_data(*, creation_key: str | None = None) -> dict[str, object]:
         "card_role_override": [],
         "card_faction_mode": "automatic",
         "card_faction_override": [],
+        "card_mana_family_mode": "automatic",
+        "card_mana_family_override": [],
     }
 
 
@@ -256,6 +259,135 @@ def test_matching_replay_returns_before_staging(
     assert result.job.id == "existing"
 
 
+def test_legacy_fingerprint_replays_when_mana_fields_have_compatibility_defaults() -> None:
+    data = _validated_data()
+    legacy_fingerprint, _uploads = _upload_fingerprint(
+        template_id=str(data["template_id"]),
+        content_version_base=str(data["content_version_base"]),
+        content_version_description=str(data["content_version_description"]),
+        options={},
+        card_pool="player",
+        card_role_mode="automatic",
+        card_role_override=[],
+        card_faction_mode="automatic",
+        card_faction_override=[],
+        files=data["files"],  # type: ignore[arg-type]
+        include_mana_families=False,
+    )
+    service = _FakeImportService()
+    service.existing = SimpleNamespace(
+        id="legacy-existing",
+        creation_fingerprint=legacy_fingerprint,
+    )
+
+    result = ImportUploadAdmission(service=service).admit(data)  # type: ignore[arg-type]
+
+    assert result.idempotent_replay is True
+    assert result.job.id == "legacy-existing"
+
+
+def test_legacy_fingerprint_is_passed_through_the_inner_creation_race() -> None:
+    data = _validated_data()
+    creation_key = str(data["creation_key"])
+    legacy_fingerprint, _uploads = _upload_fingerprint(
+        template_id=str(data["template_id"]),
+        content_version_base=str(data["content_version_base"]),
+        content_version_description=str(data["content_version_description"]),
+        options={},
+        card_pool="player",
+        card_role_mode="automatic",
+        card_role_override=[],
+        card_faction_mode="automatic",
+        card_faction_override=[],
+        files=data["files"],  # type: ignore[arg-type]
+        include_mana_families=False,
+    )
+    service = _FakeImportService()
+
+    def win_legacy_race(**kwargs: object) -> object:
+        accepted = kwargs["accepted_creation_fingerprints"]
+        assert isinstance(accepted, tuple)
+        assert legacy_fingerprint in accepted
+        return SimpleNamespace(
+            job=SimpleNamespace(
+                id="legacy-race-winner",
+                creation_fingerprint=legacy_fingerprint,
+            ),
+            idempotent_replay=True,
+        )
+
+    service.create_job = win_legacy_race  # type: ignore[method-assign]
+
+    result = ImportUploadAdmission(service=service).admit(data)  # type: ignore[arg-type]
+
+    assert result.idempotent_replay is True
+    assert result.job.id == "legacy-race-winner"
+    creation_dir = resolve_storage_path(build_storage_relative_path("uploads", creation_key))
+    assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
+
+
+def test_legacy_fingerprint_recovery_discards_the_unused_current_stage() -> None:
+    data = _validated_data()
+    creation_key = str(data["creation_key"])
+    legacy_fingerprint, _uploads = _upload_fingerprint(
+        template_id=str(data["template_id"]),
+        content_version_base=str(data["content_version_base"]),
+        content_version_description=str(data["content_version_description"]),
+        options={},
+        card_pool="player",
+        card_role_mode="automatic",
+        card_role_override=[],
+        card_faction_mode="automatic",
+        card_faction_override=[],
+        files=data["files"],  # type: ignore[arg-type]
+        include_mana_families=False,
+    )
+    service = _FakeImportService()
+
+    def commit_then_lose_response(**_kwargs: object) -> object:
+        service.existing = SimpleNamespace(
+            id="legacy-recovered-winner",
+            creation_fingerprint=legacy_fingerprint,
+        )
+        raise RuntimeError("database response lost")
+
+    service.create_job = commit_then_lose_response  # type: ignore[method-assign]
+
+    result = ImportUploadAdmission(service=service).admit(data)  # type: ignore[arg-type]
+
+    assert result.idempotent_replay is True
+    assert result.job.id == "legacy-recovered-winner"
+    creation_dir = resolve_storage_path(build_storage_relative_path("uploads", creation_key))
+    assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
+
+
+def test_legacy_fingerprint_does_not_match_an_explicit_mana_override() -> None:
+    data = _validated_data()
+    data["card_mana_family_mode"] = "override"
+    data["card_mana_family_override"] = ["arcane"]
+    legacy_fingerprint, _uploads = _upload_fingerprint(
+        template_id=str(data["template_id"]),
+        content_version_base=str(data["content_version_base"]),
+        content_version_description=str(data["content_version_description"]),
+        options={},
+        card_pool="player",
+        card_role_mode="automatic",
+        card_role_override=[],
+        card_faction_mode="automatic",
+        card_faction_override=[],
+        files=data["files"],  # type: ignore[arg-type]
+        include_mana_families=False,
+    )
+    service = _FakeImportService()
+    service.existing = SimpleNamespace(
+        id="legacy-existing",
+        creation_fingerprint=legacy_fingerprint,
+    )
+
+    with pytest.raises(ImportAdmissionConflict, match="different import payload"):
+        ImportUploadAdmission(service=service).admit(data)  # type: ignore[arg-type]
+
+
 def test_creation_key_conflict_discards_a_preserved_losing_fingerprint() -> None:
     data = _validated_data()
     creation_key = str(data["creation_key"])
@@ -405,6 +537,44 @@ def test_core_creation_rolls_back_content_version_when_job_creation_fails(
 
     assert ContentVersion.objects.count() == content_version_count
     assert not ImportJob.objects.exists()
+
+
+def test_core_creation_accepts_a_legacy_fingerprint_after_an_integrity_race(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    current_fingerprint = "a" * 64
+    legacy_fingerprint = "b" * 64
+    existing = SimpleNamespace(
+        id="legacy-race-winner",
+        creation_fingerprint=legacy_fingerprint,
+    )
+    lookups = iter((None, existing))
+    service = ImportService()
+    monkeypatch.setattr(
+        service,
+        "get_job_by_creation_key",
+        lambda **_kwargs: next(lookups),
+    )
+    monkeypatch.setattr(
+        import_service_module,
+        "create_import_job",
+        lambda **_kwargs: (_ for _ in ()).throw(IntegrityError("creation race")),
+    )
+
+    result = service.create_job(
+        source_path="uploads/test/source",
+        template_id="mtg-like-v1",
+        options={},
+        content_version_base="14.1",
+        content_version_description="Legacy race.",
+        creation_key=str(uuid4()),
+        creation_fingerprint=current_fingerprint,
+        accepted_creation_fingerprints=(current_fingerprint, legacy_fingerprint),
+        card_pool="player",
+    )
+
+    assert result.outcome == "replayed"
+    assert result.job.id == "legacy-race-winner"
 
 
 def test_core_creation_converts_authoritative_input_validation_to_rejection(

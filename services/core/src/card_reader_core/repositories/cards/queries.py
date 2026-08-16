@@ -5,7 +5,7 @@ from typing import Any, cast
 
 from django.db.models import Count, F, Prefetch, Q, QuerySet
 
-from card_reader_core.metadata import mana_family_symbol_keys, normalize_mana_family_keys
+from card_reader_core.metadata import normalize_mana_family_keys
 from card_reader_core.models import (
     DEFAULT_CARD_POOL,
     STANDARD_CARD_ROLE,
@@ -21,12 +21,14 @@ from card_reader_core.models import (
     CardVersionImage,
     CardVersionKeyword,
     CardVersionSymbol,
+    CardManaFamilyAssignment,
     CardVersionTag,
     CardVersionType,
     Type,
     active_card_lifecycle_q,
     card_role_keys,
     card_faction_keys,
+    card_mana_family_keys,
     filter_queryset_by_card_lifecycle,
 )
 from card_reader_core.search.cards import apply_card_search
@@ -380,7 +382,9 @@ def _get_card(
     *,
     card_pool_scope: CardPoolScope | None = None,
 ) -> Card | None:
-    cards = Card.objects.prefetch_related("role_assignments", "faction_assignments").filter(
+    cards = Card.objects.prefetch_related(
+        "role_assignments", "faction_assignments", "mana_family_assignments"
+    ).filter(
         id=card_id
     )
     if card_pool_scope is not None:
@@ -390,7 +394,11 @@ def _get_card(
         return card
     redirects = (
         CardMergeRedirect.objects.select_related("target_card")
-        .prefetch_related("target_card__role_assignments", "target_card__faction_assignments")
+        .prefetch_related(
+            "target_card__role_assignments",
+            "target_card__faction_assignments",
+            "target_card__mana_family_assignments",
+        )
         .filter(old_card_id=card_id)
     )
     if card_pool_scope is not None:
@@ -403,7 +411,11 @@ def get_latest_card_version(card_id: str) -> CardVersion | None:
     return (
         CardVersion.objects.filter(card_id=card_id, is_latest=True)
         .select_related("card", "template", "previous_version", "parse_result", "content_version")
-        .prefetch_related("card__role_assignments", "card__faction_assignments")
+        .prefetch_related(
+            "card__role_assignments",
+            "card__faction_assignments",
+            "card__mana_family_assignments",
+        )
         .order_by("-version_number")
         .first()
     )
@@ -428,7 +440,12 @@ def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseS
         for card in Card.objects.exclude(latest_version__isnull=True)
         .filter(active_card_lifecycle_q(field_path="lifecycle_status"))
         .select_related("latest_version__template")
-        .prefetch_related("role_assignments", "faction_assignments", "latest_version__images")
+        .prefetch_related(
+            "role_assignments",
+            "faction_assignments",
+            "mana_family_assignments",
+            "latest_version__images",
+        )
         .order_by("id")
         if card.latest_version is not None
     ]
@@ -452,6 +469,7 @@ def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseS
                 card_pool=cast(CardPool, card.card_pool),
                 card_roles=card_role_keys(card),
                 card_factions=card_faction_keys(card),
+                card_mana_families=card_mana_family_keys(card),
             )
         )
     return out
@@ -564,6 +582,7 @@ def list_filtered_latest_card_version_reparse_sources(
                 card_pool=cast(CardPool, version.card.card_pool),
                 card_roles=card_role_keys(version.card),
                 card_factions=card_faction_keys(version.card),
+                card_mana_families=card_mana_family_keys(version.card),
             )
         )
     return out
@@ -576,7 +595,11 @@ def list_card_generations(card_id: str) -> list[CardVersion]:
     return list(
         CardVersion.objects.filter(card_id=card.id)
         .select_related("card", "template", "previous_version", "parse_result", "content_version")
-        .prefetch_related("card__role_assignments", "card__faction_assignments")
+        .prefetch_related(
+            "card__role_assignments",
+            "card__faction_assignments",
+            "card__mana_family_assignments",
+        )
         .order_by("-version_number")
     )
 
@@ -595,7 +618,11 @@ def list_card_generations_in_scope(
             card__card_pool__in=card_pool_scope.allowed_pools,
         )
         .select_related("card", "template", "previous_version", "parse_result", "content_version")
-        .prefetch_related("card__role_assignments", "card__faction_assignments")
+        .prefetch_related(
+            "card__role_assignments",
+            "card__faction_assignments",
+            "card__mana_family_assignments",
+        )
         .order_by("-version_number")
     )
 
@@ -612,6 +639,7 @@ def list_cards_for_content_version(
         .prefetch_related(
             "card__role_assignments",
             "card__faction_assignments",
+            "card__mana_family_assignments",
             "images",
             Prefetch(
                 "card_version_keywords",
@@ -809,15 +837,13 @@ def filter_by_mana_families(
         return queryset
     if match_mode == "all":
         for family_key in normalized_keys:
-            version_ids = CardVersionSymbol.objects.filter(
-                symbol__key__in=mana_family_symbol_keys([family_key]),
-            ).values_list("card_version_id", flat=True)
-            queryset = queryset.filter(id__in=version_ids)
-        return queryset
-    version_ids = CardVersionSymbol.objects.filter(
-        symbol__key__in=mana_family_symbol_keys(list(normalized_keys)),
-    ).values_list("card_version_id", flat=True)
-    return queryset.filter(id__in=version_ids)
+            queryset = queryset.filter(
+                card__mana_family_assignments__mana_family=family_key
+            )
+        return queryset.distinct()
+    return queryset.filter(
+        card__mana_family_assignments__mana_family__in=normalized_keys
+    ).distinct()
 
 
 def exclude_by_mana_families(
@@ -827,10 +853,10 @@ def exclude_by_mana_families(
     normalized_keys = normalize_mana_family_keys(family_keys or [])
     if not normalized_keys:
         return queryset
-    version_ids = CardVersionSymbol.objects.filter(
-        symbol__key__in=mana_family_symbol_keys(list(normalized_keys)),
-    ).values_list("card_version_id", flat=True)
-    return queryset.exclude(id__in=version_ids)
+    card_ids = CardManaFamilyAssignment.objects.filter(
+        mana_family__in=normalized_keys
+    ).values_list("card_id", flat=True)
+    return queryset.exclude(card_id__in=card_ids)
 
 
 def _build_filtered_versions_queryset(
@@ -1043,7 +1069,7 @@ def _apply_sql_card_sort(
         )
     if sort == CARD_SORT_MANA_TYPE_ASC:
         return queryset.order_by(
-            "mana_family_sort_key",
+            "card__mana_family_sort_key",
             "name",
             "card__label",
             "card__id",
@@ -1103,7 +1129,11 @@ def _hydrate_card_list_candidates(
         version.id: version
         for version in CardVersion.objects.filter(id__in=card_version_ids)
         .select_related("card")
-        .prefetch_related("card__role_assignments", "card__faction_assignments")
+        .prefetch_related(
+            "card__role_assignments",
+            "card__faction_assignments",
+            "card__mana_family_assignments",
+        )
     }
     types_by_version_id = _types_by_card_version_ids(card_version_ids) if include_types else {}
     return [
@@ -1120,6 +1150,7 @@ def _card_list_prefetches() -> tuple[Any, ...]:
     return (
         "card__role_assignments",
         "card__faction_assignments",
+        "card__mana_family_assignments",
         Prefetch("images", queryset=CardVersionImage.objects.order_by("-created_at")),
         Prefetch(
             "card_version_keywords",

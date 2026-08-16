@@ -21,6 +21,7 @@ from card_reader_core.models import (
     CardBack,
     CardClassificationRule,
     CardFactionAssignment,
+    CardManaFamilyAssignment,
     CardGroup,
     CardGroupMember,
     CardRoleAssignment,
@@ -57,7 +58,11 @@ from card_reader_core.operations.developer_data.importer import (
 )
 from card_reader_core.operations.developer_data.exporter import _build_payload
 from card_reader_core.operations.developer_data.schema import CardRecord, adopt_payload_for_format
-from card_reader_core.services.classification_rules import ClassificationRuleService
+from card_reader_core.repositories.cards import set_card_mana_families
+from card_reader_core.services.classification_rules import (
+    ClassificationRuleService,
+    ensure_default_mana_family_classification_rules,
+)
 
 
 def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
@@ -74,12 +79,14 @@ def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
                 "card_pool": "player",
                 "card_roles": ["hero"],
                 "card_factions": [],
+                "card_mana_families": [],
             },
             {
                 "key": "standard",
                 "card_pool": "player",
                 "card_roles": [],
                 "card_factions": [],
+                "card_mana_families": [],
             },
         ],
     }
@@ -104,6 +111,7 @@ def test_version_two_card_record_rejects_duplicate_roles() -> None:
                 "card_pool": "player",
                 "card_roles": ["hero", "hero"],
                 "card_factions": [],
+                "card_mana_families": [],
                 "deck_building_config": {},
                 "lifecycle_status": "active",
                 "latest_version_number": None,
@@ -122,6 +130,7 @@ def test_version_two_card_record_rejects_duplicate_factions() -> None:
                 "card_pool": "evil",
                 "card_roles": ["boss"],
                 "card_factions": ["order", "order"],
+                "card_mana_families": [],
                 "deck_building_config": {},
                 "lifecycle_status": "active",
                 "latest_version_number": None,
@@ -184,6 +193,7 @@ def test_legacy_payload_adoption_namespaces_card_group_references() -> None:
         "key": "legacy-card",
         "card_pool": "player",
         "card_factions": [],
+        "card_mana_families": [],
     }
     assert adopted["card_groups"] == [  # type: ignore[index]
         {
@@ -193,6 +203,61 @@ def test_legacy_payload_adoption_namespaces_card_group_references() -> None:
             "members": [{"position": 1, "card_ref": reference}],
         }
     ]
+
+
+def test_version_two_adoption_backfills_only_player_cards_and_group_references() -> None:
+    adopted = adopt_payload_for_format(
+        {
+            "cards": [
+                {
+                    "key": "legacy-player",
+                    "card_pool": "player",
+                    "card_factions": [],
+                    "latest_version_number": 1,
+                    "versions": [
+                        {"version_number": 1, "symbol_keys": ["arcane-mana"]}
+                    ],
+                },
+                {
+                    "key": "legacy-evil",
+                    "card_pool": "evil",
+                    "card_factions": ["dark"],
+                    "latest_version_number": 1,
+                    "versions": [
+                        {"version_number": 1, "symbol_keys": ["dark-affinity"]}
+                    ],
+                },
+            ],
+            "card_groups": [
+                {
+                    "key": "legacy-v2-group",
+                    "anchor_card_ref": {
+                        "key": "legacy-player",
+                        "card_pool": "player",
+                        "card_factions": [],
+                    },
+                    "members": [
+                        {
+                            "position": 1,
+                            "card_ref": {
+                                "key": "legacy-evil",
+                                "card_pool": "evil",
+                                "card_factions": ["dark"],
+                            },
+                        }
+                    ],
+                }
+            ],
+        },
+        format_version=2,
+    )
+
+    assert [
+        card["card_mana_families"] for card in adopted["cards"]  # type: ignore[index]
+    ] == [["arcane"], []]
+    group = adopted["card_groups"][0]  # type: ignore[index]
+    assert group["anchor_card_ref"]["card_mana_families"] == ["arcane"]
+    assert group["members"][0]["card_ref"]["card_mana_families"] == []
 
 
 def test_developer_data_coverage_rejects_missing_required_classification_rule(
@@ -260,7 +325,62 @@ def test_import_accepts_only_unmodified_migration_defaults(
 
         assert result.counts["cards"] == 4
         assert Template.objects.filter(key="full-height", label="Full height").exists()
-        assert CardClassificationRule.objects.count() == 13
+        assert CardClassificationRule.objects.count() == 14
+        transaction.set_rollback(True)
+
+
+def test_version_three_import_preserves_an_intentionally_omitted_default_rule(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    target_storage = tmp_path / "target-storage"
+    selection_path = tmp_path / "selection.json"
+    archive_path = tmp_path / "omitted-mana-rule.tar.gz"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        selection["include_all_cards"] = True
+        CardClassificationRule.objects.filter(
+            card_pool="player",
+            target_kind="mana_family",
+            target_key="arcane",
+            source_kind="symbol",
+            symbol__key="arcane-mana",
+        ).delete()
+        coverage = selection["coverage"]
+        assert isinstance(coverage, dict)
+        required_rules = coverage["required_classification_rules"]
+        assert isinstance(required_rules, list)
+        coverage["required_classification_rules"] = [
+            rule
+            for rule in required_rules
+            if not (
+                isinstance(rule, dict)
+                and rule.get("target_kind") == "mana_family"
+            )
+        ]
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+        export_developer_data(
+            selection_path=selection_path,
+            output_path=archive_path,
+            source_revision="omitted-mana-rule-test",
+        )
+
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", target_storage)
+        import_developer_data(archive_path=archive_path)
+
+        assert Symbol.objects.filter(key="arcane-mana").exists()
+        assert not CardClassificationRule.objects.filter(
+            card_pool="player",
+            target_kind="mana_family",
+            target_key="arcane",
+            source_kind="symbol",
+            symbol__key="arcane-mana",
+        ).exists()
         transaction.set_rollback(True)
 
 
@@ -287,7 +407,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         )
         assert manifest.counts["cards"] == 4
         assert manifest.counts["card_versions"] == 5
-        assert manifest.format_version == 2
+        assert manifest.format_version == 3
 
         _, validated_payload = validate_archive(archive_path)
         mainboard_record = next(
@@ -307,6 +427,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         assert '"card_pool"' in payload_text
         assert '"card_roles"' in payload_text
         assert '"card_factions"' in payload_text
+        assert '"card_mana_families"' in payload_text
         assert '"is_hero"' not in payload_text
         assert "synthetic-user" not in payload_text
         published_store = PublishedBundleStore(root=tmp_path / "published")
@@ -357,7 +478,21 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         ).exists()
         assert CardAlias.objects.filter(key="synthetic-hero-alias").exists()
         assert CardGroup.objects.filter(key="synthetic-group").exists()
-        assert CardClassificationRule.objects.count() == 8
+        assert CardClassificationRule.objects.count() == 9
+        imported_hero = Card.objects.get(key="synthetic-hero")
+        assert list(
+            CardManaFamilyAssignment.objects.filter(card=imported_hero).values_list(
+                "mana_family", flat=True
+            )
+        ) == ["arcane"]
+        assert CardClassificationRule.objects.filter(
+            card_pool="player",
+            target_kind="mana_family",
+            target_key="arcane",
+            source_kind="symbol",
+            symbol__key="arcane-mana",
+            enabled=True,
+        ).exists()
         assert CardClassificationRule.objects.filter(
             card_pool="evil",
             target_kind="faction",
@@ -1001,6 +1136,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         text_token="{AM}",
         enabled=True,
     )
+    ensure_default_mana_family_classification_rules()
     template = Template.objects.create(
         key="synthetic-template",
         label="Synthetic Template",
@@ -1057,6 +1193,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         label="Synthetic Hero",
         deck_building_config_json={"mainboard_card_count": {"value": 60}},
     )
+    set_card_mana_families(card=hero, mana_families=("arcane",))
     CardRoleAssignment.objects.create(card=hero, role="hero")
     hero_v1 = _create_version(
         card=hero,
@@ -1184,6 +1321,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
                 "shop_item": 0,
             },
             "min_cards_by_faction": {"order": 1, "blood": 1, "dark": 0, "metal": 0},
+            "min_cards_by_mana_family": {"arcane": 1},
             "min_deprecated_cards": 1,
             "min_card_groups": 1,
             "min_cards_with_multiple_versions": 1,
@@ -1199,6 +1337,16 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
                     "enabled": True,
                 }
                 for card_pool, target_kind, target_key, source_key in rule_definitions
+            ]
+            + [
+                {
+                    "card_pool": "player",
+                    "target_kind": "mana_family",
+                    "target_key": "arcane",
+                    "source_kind": "symbol",
+                    "source_key": "arcane-mana",
+                    "enabled": True,
+                }
             ],
         },
     }

@@ -7,6 +7,7 @@ from rest_framework import serializers
 
 from card_reader_core.models import ContentVersion, ImportJob, ImportJobItem
 from card_reader_core.models import CARD_FACTIONS, CARD_POOLS, CARD_ROLES
+from card_reader_core.metadata import MANA_FAMILIES
 from card_reader_core.repositories.content_versions import parse_base_version
 
 
@@ -37,6 +38,8 @@ def import_job_payload(job: ImportJob) -> dict[str, object]:
         "card_role_override": list(job.card_role_override_json),
         "card_faction_mode": job.card_faction_mode,
         "card_faction_override": list(job.card_faction_override_json),
+        "card_mana_family_mode": job.card_mana_family_mode,
+        "card_mana_family_override": list(job.card_mana_family_override_json),
         "classification_rule_snapshot": job.classification_rule_snapshot_json,
     }
 
@@ -55,6 +58,7 @@ def import_detail_payload(job: ImportJob, items: list[ImportJobItem]) -> dict[st
                 "warnings": item.warnings_json,
                 "resolved_card_roles": item.resolved_card_roles_json,
                 "resolved_card_factions": item.resolved_card_factions_json,
+                "resolved_card_mana_families": item.resolved_card_mana_families_json,
                 "classification_inference": item.classification_inference_json,
                 "target_card_id": item.target_card.id if item.target_card is not None else None,
                 "target_card_version_id": (
@@ -63,6 +67,9 @@ def import_detail_payload(job: ImportJob, items: list[ImportJobItem]) -> dict[st
                 "target_card_pool_snapshot": item.target_card_pool_snapshot,
                 "target_card_roles_snapshot": item.target_card_roles_snapshot_json,
                 "target_card_factions_snapshot": item.target_card_factions_snapshot_json,
+                "target_card_mana_families_snapshot": (
+                    item.target_card_mana_families_snapshot_json
+                ),
                 "card_tab_url": (
                     f"/cards/{item.target_card.id}/edit?tab=card"
                     if item.target_card is not None
@@ -94,6 +101,12 @@ class ImportUploadSerializer(serializers.Serializer[dict[str, object]]):
         default="automatic",
     )
     card_faction_override = serializers.CharField(required=False, default="[]")
+    card_mana_family_mode = serializers.ChoiceField(
+        choices=("automatic", "override"),
+        required=False,
+        default="automatic",
+    )
+    card_mana_family_override = serializers.CharField(required=False, default="[]")
 
     def validate_files(self, value: list[UploadedFile]) -> list[UploadedFile]:
         if not value:
@@ -153,6 +166,29 @@ class ImportUploadSerializer(serializers.Serializer[dict[str, object]]):
             raise serializers.ValidationError(f"Unsupported card factions: {', '.join(invalid)}")
         return [faction for faction in CARD_FACTIONS if faction in payload]
 
+    def validate_card_mana_family_override(self, value: str) -> list[str]:
+        try:
+            payload = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise serializers.ValidationError(
+                "card_mana_family_override must be valid JSON"
+            ) from exc
+        if not isinstance(payload, list):
+            raise serializers.ValidationError(
+                "card_mana_family_override must decode to an array"
+            )
+        if len(payload) != len(set(map(str, payload))):
+            raise serializers.ValidationError(
+                "card_mana_family_override families must be unique"
+            )
+        family_keys = tuple(family.key for family in MANA_FAMILIES)
+        invalid = sorted({str(family) for family in payload if family not in family_keys})
+        if invalid:
+            raise serializers.ValidationError(
+                f"Unsupported mana families: {', '.join(invalid)}"
+            )
+        return [family for family in family_keys if family in payload]
+
     def validate(self, attrs: dict[str, object]) -> dict[str, object]:
         if attrs.get("card_role_mode") == "automatic" and attrs.get("card_role_override"):
             raise serializers.ValidationError(
@@ -161,5 +197,15 @@ class ImportUploadSerializer(serializers.Serializer[dict[str, object]]):
         if attrs.get("card_faction_mode") == "automatic" and attrs.get("card_faction_override"):
             raise serializers.ValidationError(
                 {"card_faction_override": ("Automatic faction inference cannot include overrides.")}
+            )
+        if attrs.get("card_mana_family_mode") == "automatic" and attrs.get(
+            "card_mana_family_override"
+        ):
+            raise serializers.ValidationError(
+                {
+                    "card_mana_family_override": (
+                        "Automatic mana family inference cannot include overrides."
+                    )
+                }
             )
         return attrs

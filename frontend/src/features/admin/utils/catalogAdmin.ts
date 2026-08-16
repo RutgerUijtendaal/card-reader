@@ -25,11 +25,15 @@ import { getApiErrorMessageWithCause } from '@/shared/api/errors';
 
 export const KNOWN_CATALOG_KINDS: KnownCatalogKind[] = ['keywords', 'tags', 'symbols', 'types', 'deck-roles', 'deck-types'];
 export const SUGGESTED_CATALOG_KINDS: SuggestedCatalogKind[] = ['suggested-tags', 'suggested-types', 'suggested-deck-types'];
-export const CLASSIFICATION_CATALOG_KINDS: CatalogKind[] = ['card-roles', 'card-factions'];
+export const CLASSIFICATION_CATALOG_KINDS: CatalogKind[] = [
+  'card-roles',
+  'card-factions',
+  'card-mana-families',
+];
 export const CATALOG_KINDS: CatalogKind[] = [...KNOWN_CATALOG_KINDS, ...SUGGESTED_CATALOG_KINDS, ...CLASSIFICATION_CATALOG_KINDS];
 export const CATALOG_KIND_GROUPS = [
   { label: 'Card catalog', kinds: ['keywords', 'tags', 'symbols', 'types', 'suggested-tags', 'suggested-types'] as CatalogKind[] },
-  { label: 'Card classification', kinds: ['card-roles', 'card-factions'] as CatalogKind[] },
+  { label: 'Card classification', kinds: ['card-roles', 'card-factions', 'card-mana-families'] as CatalogKind[] },
   { label: 'Deck tags', kinds: ['deck-roles', 'deck-types', 'suggested-deck-types'] as CatalogKind[] },
 ] as const;
 
@@ -40,7 +44,7 @@ export const isSuggestedCatalogKind = (kind: CatalogKind): kind is SuggestedCata
   SUGGESTED_CATALOG_KINDS.includes(kind as SuggestedCatalogKind);
 
 export const isClassificationCatalogKind = (kind: CatalogKind): boolean =>
-  kind === 'card-roles' || kind === 'card-factions';
+  kind === 'card-roles' || kind === 'card-factions' || kind === 'card-mana-families';
 
 export const isSuggestionRecord = (row: CatalogRow): row is SuggestionRecord =>
   'status' in row && 'occurrence_count' in row;
@@ -54,6 +58,7 @@ export const kindLabel = (kind: CatalogKind): string => {
   if (kind === 'suggested-types') return 'Suggested types';
   if (kind === 'card-roles') return 'Card Roles';
   if (kind === 'card-factions') return 'Card Factions';
+  if (kind === 'card-mana-families') return 'Mana Families';
   if (kind === 'deck-roles') return 'Roles';
   if (kind === 'deck-types') return 'Types';
   if (kind === 'suggested-deck-types') return 'Suggested types';
@@ -68,6 +73,7 @@ export const kindItemLabel = (kind: CatalogKind): string => {
   if (kind === 'suggested-tags') return 'Tag Suggestion';
   if (kind === 'card-roles') return 'Card Role';
   if (kind === 'card-factions') return 'Card Faction';
+  if (kind === 'card-mana-families') return 'Mana Family';
   if (kind === 'deck-roles') return 'Role Tag';
   if (kind === 'deck-types') return 'Type Tag';
   if (kind === 'suggested-deck-types') return 'Type Tag Suggestion';
@@ -447,6 +453,7 @@ export const normalizeCatalogResponse = (data: CatalogApiResponse): CatalogRespo
   classification: {
     roles: data.classification?.roles ?? [],
     factions: data.classification?.factions ?? [],
+    mana_families: data.classification?.mana_families ?? [],
   },
 });
 

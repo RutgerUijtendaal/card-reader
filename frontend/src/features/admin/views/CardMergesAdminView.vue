@@ -210,6 +210,23 @@
             <p>Group collisions: {{ preview.relations.group_member_collisions }}</p>
             <p>Hero references: {{ preview.relations.hero_references }}</p>
             <p>Anchored groups: {{ preview.relations.anchored_groups }}</p>
+            <p>Target Mana: {{ displayManaFamilyLabels(preview.target.card_mana_families).join(', ') }}</p>
+          </div>
+
+          <div
+            v-if="preview.warnings.length > 0"
+            class="theme-card-frame-muted rounded-xl border border-amber-400/40 p-3"
+          >
+            <h5 class="theme-section-title text-sm font-semibold">
+              Warnings
+            </h5>
+            <p
+              v-for="warning in preview.warnings"
+              :key="warning"
+              class="theme-section-muted mt-2 text-sm"
+            >
+              {{ warning }}
+            </p>
           </div>
 
           <div>
@@ -270,6 +287,7 @@ import { parseAdminMergeSourceId, parseAdminMergeTargetId } from '@/features/adm
 import type { CardMergePreview } from '@/features/admin/types';
 import type { CardListItem } from '@/domain/cards/types';
 import { CARD_POOL_OPTIONS, type CardPool } from '@/domain/cards/cardPools';
+import { displayManaFamilyLabels } from '@/domain/cards/manaFamilies';
 import { useAdminRouteSync } from '@/features/admin/composables/useAdminRouteSync';
 import { applyCardMerge, previewCardMerge } from '@/features/admin/api/cardMerges';
 

@@ -184,7 +184,7 @@ def apply_default_card_sort(
     ordering: list[str | Combinable] = []
     for component in components:
         if isinstance(component, ManaFamilyDefaultSort):
-            ordering.append("mana_family_sort_key")
+            ordering.append("card__mana_family_sort_key")
         elif isinstance(component, FactionDefaultSort):
             annotated = _annotate_faction_sort(annotated, component=component)
             ordering.extend(("default_faction_rank", "default_faction_mask"))

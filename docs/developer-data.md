@@ -20,37 +20,39 @@ shares the group's member key.
 
 Bundles contain complete catalogs, parsing-only templates, pool-specific classification rules, deck
 tags, symbol assets, the current card back, and cards with the public relationships needed for
-gallery, history, metadata, deck building, and Playtester workflows. Version 2 classification-rule
-records identify their Tag or Type source by stable natural key; template records contain no role or
-faction hints. Card records include the
-required `card_pool`, canonical `card_roles`, and canonical `card_factions` fields; they never emit
+gallery, history, metadata, deck building, and Playtester workflows. Version 3 classification-rule
+records identify their Tag, Type, or Symbol source by stable natural key; template records contain no
+classification hints. Card records include the required `card_pool`, canonical `card_roles`,
+canonical `card_factions`, and canonical `card_mana_families` fields; they never emit
 the removed Hero boolean or internal faction identity key. Card-group anchors and members use a
-structured card reference containing the pool, canonical faction set, and normalized card key, so
+structured card reference containing the pool, canonical faction set, mana-family context, and normalized card key, so
 same-key cards in different faction namespaces remain distinct throughout validation and import.
 
-The importer supports current Version 2 archives and explicitly adopts pinned Version 1 archives.
+The importer supports current Version 3 archives and explicitly adopts pinned Version 1 and Version 2 archives.
 Version 1 adoption assigns every card to the Player pool and converts `is_hero=true` to the Hero role
-before strict current-schema validation. It also supplies empty factions and an empty rule catalog.
+before strict current-schema validation. Older formats derive missing Player mana-family assignments
+from each Card's latest-version Symbols. After all Symbols are present, import idempotently reconciles
+the default Player mana and affinity Symbol rules without creating placeholder Symbols.
 Import reconstructs the
 pool-plus-faction natural identity namespace rather than trusting a serialized internal key. This
 compatibility keeps older immutable bundles usable without making current classification fields optional.
 
-Selection coverage is evaluated by pool, role, and faction through `min_cards_by_pool`,
-`min_cards_by_role`, and `min_cards_by_faction`. The existing Hero minimum is retained under the Hero
+Selection coverage is evaluated by pool, role, faction, and mana family through `min_cards_by_pool`,
+`min_cards_by_role`, `min_cards_by_faction`, and `min_cards_by_mana_family`. The existing Hero minimum is retained under the Hero
 role. Evil and Neutral pool coverage remains zero while those pools are excluded; newly introduced
 roles and Order, Blood, Dark, and Metal may remain at zero until reviewed source data is available. The
 lock file is still generated only by publishing a validated immutable bundle and must not be edited by
 hand.
 
 `required_tag_keys` and `required_classification_rules` in the reviewed selection make expected
-inference inputs explicit. Version 2 bundle validation and normal `doctor_dev_data` source-readiness
-checks fail when a source Tag/Type or exact pool/target/source rule is missing.
+inference inputs explicit. Version 3 bundle validation and normal `doctor_dev_data` source-readiness
+checks fail when a source Tag, Type, or Symbol or exact pool/target/source rule is missing.
 `bootstrap_dev` passes the pinned source format to the doctor so the immutable Version 1 bundle is
 checked only against fields it can represent. Templates and catalogs are supplied by developer-data
 on a clean checkout; there is no parallel built-in catalog seed to keep in sync. The committed lock
-continues to pin Version 1 so clean checkouts remain bootstrappable, but that bundle cannot contain
-the new classification-rule catalog. After the compatible application is deployed, publish a Version
-2 bundle through the normal staff workflow and commit its generated lock; never hand-edit the lock as
+continues to pin Version 1 so clean checkouts remain bootstrappable; Version 3 adoption derives its
+missing Card mana families after import. After the compatible application is deployed, publish a Version
+3 bundle through the normal staff workflow and commit its generated lock; never hand-edit the lock as
 a substitute for that publish.
 
 They exclude accounts, decks, notifications, access and activity records, import jobs, uploads, raw

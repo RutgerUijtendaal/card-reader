@@ -2,7 +2,9 @@ import { describe, expect, test } from 'vitest';
 import type { ImportJobItem } from '@/features/import-jobs/types';
 import {
   formatImportFactions,
+  formatImportManaFamilies,
   formatImportRoles,
+  formatResolvedImportManaFamilies,
   getImportEvidenceState,
   getInferenceEvidence,
   getWarningEvidence,
@@ -18,12 +20,14 @@ const item = (overrides: Partial<ImportJobItem> = {}): ImportJobItem => ({
   warnings: [],
   resolved_card_roles: [],
   resolved_card_factions: [],
+  resolved_card_mana_families: [],
   classification_inference: {},
   target_card_id: null,
   target_card_version_id: null,
   target_card_pool_snapshot: null,
   target_card_roles_snapshot: [],
   target_card_factions_snapshot: [],
+  target_card_mana_families_snapshot: [],
   card_tab_url: null,
   ...overrides,
 });
@@ -54,26 +58,51 @@ describe('import evidence presentation', () => {
     expect(formatImportFactions(['dark', 'metal'])).toBe('Dark, Metal');
   });
 
+  test('distinguishes explicit Colorless from unavailable legacy mana evidence', () => {
+    expect(formatImportManaFamilies([])).toBe('Colorless');
+    expect(formatImportManaFamilies(undefined)).toBe('Unavailable');
+    expect(formatResolvedImportManaFamilies(item({
+      status: 'completed',
+      resolved_card_mana_families: [],
+      classification_inference: { roles: { mode: 'automatic' } },
+    }))).toBe('Unavailable');
+    expect(formatResolvedImportManaFamilies(item({
+      status: 'completed',
+      resolved_card_mana_families: [],
+      classification_inference: { mana_families: { mode: 'automatic' } },
+    }))).toBe('Colorless');
+  });
+
   test('renders structured inference and keeps generic warnings safe', () => {
     const evidence = getInferenceEvidence(item({
       resolved_card_roles: ['event', 'location'],
       resolved_card_factions: ['order'],
+      resolved_card_mana_families: ['arcane'],
       classification_inference: {
         roles: {
           mode: 'automatic',
           matched_tag_sources: [{ id: 'tag-event', key: 'event' }],
           matched_type_sources: [{ id: 'type-location', key: 'location' }],
+          matched_symbol_sources: [{ id: 'symbol-hero', key: 'hero-crown' }],
         },
         factions: {
           mode: 'automatic',
           matched_tag_sources: [{ id: 'tag-order', key: 'order' }],
+          matched_symbol_sources: [{ id: 'symbol-order', key: 'order-crest' }],
+        },
+        mana_families: {
+          mode: 'automatic',
+          matched_symbol_sources: [{ id: 'symbol-arcane', key: 'arcane-mana' }],
         },
       },
     }));
 
     expect(evidence).toContainEqual({ label: 'Role tags', value: 'event' });
     expect(evidence).toContainEqual({ label: 'Role types', value: 'location' });
+    expect(evidence).toContainEqual({ label: 'Role symbols', value: 'hero-crown' });
     expect(evidence).toContainEqual({ label: 'Faction tags', value: 'order' });
+    expect(evidence).toContainEqual({ label: 'Faction symbols', value: 'order-crest' });
+    expect(evidence).toContainEqual({ label: 'Mana symbols', value: 'arcane-mana' });
     expect(getWarningEvidence({ code: 'future_warning', message: 'Future warning.' })).toEqual([]);
   });
 
@@ -104,6 +133,7 @@ describe('import evidence presentation', () => {
 
     expect(evidence).toContainEqual({ label: 'Role resolution', value: 'Automatic' });
     expect(evidence).toContainEqual({ label: 'Faction resolution', value: 'Unavailable' });
+    expect(evidence).toContainEqual({ label: 'Mana resolution', value: 'Unavailable' });
     expect(evidence).not.toContainEqual({ label: 'Faction signals', value: 'None matched' });
   });
 });

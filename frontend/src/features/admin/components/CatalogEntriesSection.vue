@@ -125,7 +125,9 @@ const emit = defineEmits<{
 }>();
 
 const searchPlaceholder = computed(() =>
-  props.selectedKind === 'card-roles' || props.selectedKind === 'card-factions'
+  props.selectedKind === 'card-roles'
+  || props.selectedKind === 'card-factions'
+  || props.selectedKind === 'card-mana-families'
     ? `Search ${props.kindLabel(props.selectedKind).toLowerCase()} by label or key`
     : props.canCreate
     ? `Search ${props.kindLabel(props.selectedKind).toLowerCase()} by label, key, or metadata`
@@ -133,7 +135,9 @@ const searchPlaceholder = computed(() =>
 );
 
 const emptyState = computed(() =>
-  props.selectedKind === 'card-roles' || props.selectedKind === 'card-factions'
+  props.selectedKind === 'card-roles'
+  || props.selectedKind === 'card-factions'
+  || props.selectedKind === 'card-mana-families'
     ? 'No supported classification values were returned.'
     : props.canCreate
     ? `No entries yet. Create the first ${props.kindItemLabel(props.selectedKind).toLowerCase()} from here.`
@@ -159,6 +163,7 @@ const metadataToneForKind = (kind: CatalogKind): string => {
       return 'theme-pill-keyword';
     case 'card-roles':
     case 'card-factions':
+    case 'card-mana-families':
       return 'theme-pill-accent';
     default:
       return 'theme-pill-neutral';

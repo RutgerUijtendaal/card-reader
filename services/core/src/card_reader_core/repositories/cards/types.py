@@ -18,6 +18,7 @@ from card_reader_core.models import (
     Tag,
     Type,
 )
+from card_reader_core.metadata import ManaFamily
 
 CardSort = Literal[
     "default",
@@ -59,6 +60,7 @@ class LatestCardVersionReparseSource:
     card_pool: CardPool
     card_roles: tuple[CardRole, ...]
     card_factions: tuple[CardFaction, ...]
+    card_mana_families: tuple[ManaFamily, ...]
 
 
 @dataclass(frozen=True)

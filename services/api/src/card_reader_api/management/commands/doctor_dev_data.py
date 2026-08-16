@@ -33,7 +33,13 @@ from card_reader_core.storage import build_storage_relative_path, resolve_storag
 
 
 def _classification_rule_source_key(rule: CardClassificationRule) -> str:
-    source = rule.tag if rule.source_kind == "tag" else rule.type
+    source = (
+        rule.tag
+        if rule.source_kind == "tag"
+        else rule.type
+        if rule.source_kind == "type"
+        else rule.symbol
+    )
     if source is None:
         return ""
     return source.key
@@ -95,9 +101,15 @@ class Command(BaseCommand):
                         _classification_rule_source_key(rule),
                         rule.enabled,
                     )
-                    for rule in CardClassificationRule.objects.select_related("tag", "type")
+                    for rule in CardClassificationRule.objects.select_related(
+                        "tag", "type", "symbol"
+                    )
                 }
                 for rule in selection.coverage.required_classification_rules:
+                    if source_format_version == 2 and (
+                        rule.target_kind == "mana_family" or rule.source_kind == "symbol"
+                    ):
+                        continue
                     identity = (
                         rule.card_pool,
                         rule.target_kind,

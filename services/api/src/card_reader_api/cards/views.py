@@ -190,6 +190,12 @@ class CardFiltersView(APIView):
                         "key": family.key,
                         "label": family.label,
                         "rank": family.rank,
+                        "display_symbol_key": family.display_symbol_key,
+                        "display_symbol": symbol_option(
+                            symbols_by_key[family.display_symbol_key]
+                        )
+                        if family.display_symbol_key in symbols_by_key
+                        else None,
                         "mana_symbol": symbol_option(symbols_by_key[family.mana_symbol_key])
                         if family.mana_symbol_key in symbols_by_key
                         else None,

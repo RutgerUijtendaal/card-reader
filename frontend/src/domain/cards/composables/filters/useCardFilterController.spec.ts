@@ -23,9 +23,9 @@ describe('useCardFilterController', () => {
     const controller = useCardFilterController();
     const state = controller.filterSectionsState.value;
 
-    state.onUpdateSelectedManaTypeSymbolIds(['mana-1']);
-    state.onUpdateExcludedManaTypeSymbolIds(['mana-2']);
-    state.onUpdateManaSymbolMatch('all');
+    state.onUpdateSelectedManaFamilyIds(['mana-1']);
+    state.onUpdateExcludedManaFamilyIds(['mana-2']);
+    state.onUpdateManaFamilyMatch('all');
     state.onUpdateManaCostMin('1');
     state.onUpdateManaCostMax('4');
     state.onUpdateSelectedKeywordIds(['keyword-1']);
@@ -56,9 +56,9 @@ describe('useCardFilterController', () => {
 
     state.resetCardFactionGroup();
 
-    expect(controller.selectionState.value.manaTypeSymbolIds).toEqual([]);
-    expect(controller.selectionState.value.manaTypeSymbolExcludeIds).toEqual([]);
-    expect(controller.selectionState.value.manaSymbolMatch).toBe('any');
+    expect(controller.selectionState.value.manaFamilyIds).toEqual([]);
+    expect(controller.selectionState.value.manaFamilyExcludeIds).toEqual([]);
+    expect(controller.selectionState.value.manaFamilyMatch).toBe('any');
     expect(controller.selectionState.value.manaCostMin).toBe('');
     expect(controller.selectionState.value.manaCostMax).toBe('');
     expect(controller.selectionState.value.keywordIds).toEqual([]);

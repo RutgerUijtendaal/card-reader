@@ -90,6 +90,8 @@ const buildHero = (): DeckCardSummary =>
     key: 'hero-1',
     label: 'Hero',
     card_pool: 'player' as const, card_roles: ['hero' as const],
+    card_factions: [],
+    card_mana_families: ['martial'],
     template_id: '',
     version_id: 'hero-version',
     version_number: 1,
@@ -227,7 +229,7 @@ describe('useDeckEditorFilters', () => {
     await controller.loadFilters();
     controller.updateQuery('old search');
     controller.setCurrentDeckOnly(true);
-    controller.applyHeroAffinityManaPreset(buildHero());
+    controller.applyHeroManaFamilyPreset(buildHero());
 
     const params = controller.buildSearchParams();
     expect(controller.query.value).toBe('');
@@ -246,7 +248,7 @@ describe('useDeckEditorFilters', () => {
     });
 
     await controller.loadFilters();
-    controller.applyHeroAffinityManaPreset(buildHero());
+    controller.applyHeroManaFamilyPreset(buildHero());
     editorMode.value = 'hero';
 
     const params = controller.buildSearchParams();

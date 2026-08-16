@@ -8,11 +8,18 @@ from card_reader_core.models import (
     Card,
     CardClassificationRule,
     CardFactionAssignment,
+    CardManaFamilyAssignment,
     CardRoleAssignment,
+    Symbol,
     Tag,
     Type,
 )
-from card_reader_core.services.classification_rules import ClassificationRuleService
+from card_reader_core.repositories.cards import set_card_mana_families
+from card_reader_core.services.classification_rules import (
+    ClassificationRuleService,
+    ensure_default_mana_family_classification_rules,
+)
+from card_reader_core.services.catalog import CatalogService
 
 
 def staff_client(username: str = "classification-admin") -> Client:
@@ -93,6 +100,7 @@ def test_catalog_definitions_are_global_and_sources_have_reverse_references() ->
     )
     CardRoleAssignment.objects.create(card=active, role="location")
     CardFactionAssignment.objects.create(card=active, faction="blood")
+    set_card_mana_families(card=active, mana_families=("arcane", "dark"))
     deprecated = Card.objects.create(
         key="deprecated-location",
         label="Deprecated Location",
@@ -144,6 +152,20 @@ def test_catalog_definitions_are_global_and_sources_have_reverse_references() ->
     )
     assert blood["linked_card_counts"]["evil"] == 1
     assert no_faction["linked_card_counts"]["evil"] == 0
+    mana_families = catalog.json()["classification"]["mana_families"]
+    assert [row["label"] for row in mana_families] == [
+        "Colorless",
+        "Arcane",
+        "Dark",
+        "Divine",
+        "Martial",
+        "Occult",
+        "Primal",
+    ]
+    arcane = next(row for row in mana_families if row["key"] == "arcane")
+    assert arcane["linked_card_counts"]["evil"] == 1
+    assert arcane["display_symbol_key"] == "arcane-mana"
+    assert arcane["display_symbol"]["key"] == "arcane-mana"
 
     detail = client.get(f"/admin/tags/{tag.id}")
     assert detail.status_code == 200
@@ -228,6 +250,117 @@ def test_dark_and_metal_are_supported_faction_rule_targets() -> None:
     assert [dark_rule.target_key, metal_rule.target_key] == ["dark", "metal"]
 
 
+def test_symbol_rules_support_all_classification_targets_and_protect_the_source() -> None:
+    symbol = Symbol.objects.create(key="classification-source", label="Classification Source")
+    service = ClassificationRuleService()
+    rules = [
+        service.create_rule(
+            card_pool="player",
+            target_kind=target_kind,
+            target_key=target_key,
+            source_kind="symbol",
+            source_id=symbol.id,
+        )
+        for target_kind, target_key in (
+            ("role", "hero"),
+            ("faction", "order"),
+            ("mana_family", "arcane"),
+        )
+    ]
+
+    snapshot = service.build_snapshot(
+        card_pool="player",
+        include_roles=True,
+        include_factions=True,
+        include_mana_families=True,
+    )
+    assert {row["rule_id"] for row in snapshot["rules"]} == {rule.id for rule in rules}
+    detail = staff_client("classification-symbol-admin").get(f"/admin/symbols/{symbol.id}")
+    assert detail.status_code == 200
+    assert {row["target_kind"] for row in detail.json()["classification_rules"]} == {
+        "role",
+        "faction",
+        "mana_family",
+    }
+    assert staff_client("classification-symbol-delete-admin").delete(
+        f"/admin/symbols/{symbol.id}"
+    ).status_code == 409
+
+
+def test_default_player_mana_symbol_rules_reconcile_idempotently_without_placeholders() -> None:
+    Symbol.objects.exclude(key__in={"arcane-mana", "arcane-affinity"}).delete()
+
+    assert ensure_default_mana_family_classification_rules() == 2
+    assert ensure_default_mana_family_classification_rules() == 0
+    assert set(
+        CardClassificationRule.objects.filter(target_kind="mana_family").values_list(
+            "target_key", "symbol__key"
+        )
+    ) == {
+        ("arcane", "arcane-mana"),
+        ("arcane", "arcane-affinity"),
+    }
+    assert not Symbol.objects.filter(key="primal-mana").exists()
+
+
+def test_creating_a_symbol_only_reconciles_that_symbol_default() -> None:
+    arcane_symbol, _created = Symbol.objects.get_or_create(
+        key="arcane-mana",
+        defaults={"label": "Arcane Mana", "symbol_type": "mana"},
+    )
+    ensure_default_mana_family_classification_rules(symbol_keys={arcane_symbol.key})
+    CardClassificationRule.objects.filter(
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="arcane",
+        source_kind="symbol",
+        symbol=arcane_symbol,
+    ).delete()
+
+    CatalogService().create_symbol(
+        key="unrelated-new-symbol",
+        label="Unrelated New Symbol",
+    )
+
+    assert not CardClassificationRule.objects.filter(
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="arcane",
+        source_kind="symbol",
+        symbol=arcane_symbol,
+    ).exists()
+    assert (
+        ensure_default_mana_family_classification_rules(
+            symbol_keys={arcane_symbol.key}
+        )
+        == 1
+    )
+
+
+def test_card_mana_family_assignment_is_unique_and_updates_the_cached_sort_key() -> None:
+    card = Card.objects.create(key="mana-assignment", label="Mana Assignment")
+
+    assert set_card_mana_families(card=card, mana_families=("dark", "arcane")) == (
+        "arcane",
+        "dark",
+    )
+    card.refresh_from_db()
+    assert card.mana_family_sort_key == 1
+    assert list(
+        CardManaFamilyAssignment.objects.filter(card=card).values_list(
+            "mana_family", flat=True
+        )
+    ) == ["arcane", "dark"]
+
+    set_card_mana_families(card=card, mana_families=())
+    card.refresh_from_db()
+    assert card.mana_family_sort_key == 63
+    assert not CardManaFamilyAssignment.objects.filter(card=card).exists()
+
+    with pytest.raises(ValueError, match="Invalid card mana family"):
+        set_card_mana_families(card=card, mana_families=("colorless",))
+
+
 def test_snapshot_detector_sources_survive_later_catalog_edits_and_deletion() -> None:
     tag = Tag.objects.create(
         key="frozen-hero",
@@ -256,11 +389,12 @@ def test_snapshot_detector_sources_survive_later_catalog_edits_and_deletion() ->
     service.delete_rule(rule_id=rule.id)
     tag.delete()
 
-    frozen_tags, frozen_types = service.detector_sources_from_snapshot(
+    frozen_tags, frozen_types, frozen_symbols = service.detector_sources_from_snapshot(
         snapshot,
         card_pool="player",
     )
     assert frozen_types == []
+    assert frozen_symbols == []
     assert [(row.id, row.key, row.label, row.identifiers_json) for row in frozen_tags] == [
         (original_tag_id, "frozen-hero", "Frozen Hero", ["original hero term"])
     ]

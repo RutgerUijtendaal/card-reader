@@ -46,6 +46,12 @@ class ImportUploadView(APIView):
             "card_role_override": request.data.get("card_role_override", "[]"),
             "card_faction_mode": request.data.get("card_faction_mode", "automatic"),
             "card_faction_override": request.data.get("card_faction_override", "[]"),
+            "card_mana_family_mode": request.data.get(
+                "card_mana_family_mode", "automatic"
+            ),
+            "card_mana_family_override": request.data.get(
+                "card_mana_family_override", "[]"
+            ),
         }
         for required_field in (
             "creation_key",

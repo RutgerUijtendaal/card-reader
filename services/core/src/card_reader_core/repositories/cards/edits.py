@@ -16,6 +16,7 @@ from card_reader_core.models import (
     now_utc,
 )
 from card_reader_core.rules import render_enriched_rule_text
+from card_reader_core.metadata import MANA_FAMILY_BY_KEY
 
 from ..card_groups import card_is_group_anchor
 from ..helpers import infer_mana_value
@@ -27,6 +28,7 @@ from ..metadata import (
     replace_card_version_types,
 )
 from .queries import get_card, get_latest_card_version
+from .classification import set_card_mana_families
 from .identity import change_card_identity
 from .snapshots import (
     FIELD_SOURCE_AUTO,
@@ -116,7 +118,7 @@ def update_latest_card_version(
             )
             field_sources["metadata"]["types"] = FIELD_SOURCE_MANUAL
         if "symbol_ids" in updates:
-            version.mana_family_sort_key = replace_card_version_symbols(
+            replace_card_version_symbols(
                 card_version_id=version.id,
                 symbol_ids=string_list(updates.get("symbol_ids")),
             )
@@ -130,6 +132,18 @@ def update_latest_card_version(
             if not is_card_pool(card_pool):
                 raise ValueError("Invalid card pool.")
             destination_card_pool = card_pool
+            classification_changed = True
+        if "card_mana_families" in updates:
+            raw_mana_families = updates["card_mana_families"]
+            if not isinstance(raw_mana_families, list):
+                raise ValueError("Card mana families must be a list.")
+            requested_mana_families = [str(value) for value in raw_mana_families]
+            if any(value not in MANA_FAMILY_BY_KEY for value in requested_mana_families):
+                raise ValueError("Invalid card mana family.")
+            set_card_mana_families(
+                card=card,
+                mana_families=requested_mana_families,
+            )
             classification_changed = True
         if "card_factions" in updates:
             raw_factions = updates["card_factions"]

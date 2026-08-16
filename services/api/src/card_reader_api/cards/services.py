@@ -11,7 +11,12 @@ from card_reader_core.repositories.cards import (
 )
 from card_reader_core.repositories.import_jobs import ImportJobItemTarget
 from card_reader_core.config.settings import settings
-from card_reader_core.models import CardPool, card_faction_keys, card_role_keys
+from card_reader_core.models import (
+    CardPool,
+    card_faction_keys,
+    card_mana_family_keys,
+    card_role_keys,
+)
 from card_reader_core.services.templates import TemplateService
 from card_reader_core.services.imports import ImportService
 
@@ -61,6 +66,7 @@ class CardActionService:
                     card_pool=cast(CardPool, card.card_pool),
                     card_roles=card_role_keys(card),
                     card_factions=card_faction_keys(card),
+                    card_mana_families=card_mana_family_keys(card),
                 )
             ],
             card_pool=cast(CardPool, card.card_pool),

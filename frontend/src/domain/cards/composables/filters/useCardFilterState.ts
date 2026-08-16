@@ -34,7 +34,7 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   const keywordMatch = ref<'any' | 'all'>('any');
   const tagMatch = ref<'any' | 'all'>('any');
   const typeMatch = ref<'any' | 'all'>('any');
-  const manaSymbolMatch = ref<'any' | 'all'>('any');
+  const manaFamilyMatch = ref<'any' | 'all'>('any');
   const affinitySymbolMatch = ref<'any' | 'all'>('any');
   const devotionSymbolMatch = ref<'any' | 'all'>('any');
   const otherSymbolMatch = ref<'any' | 'all'>('any');
@@ -47,8 +47,8 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   const healthMax = ref('');
   const keywordIds = ref<string[]>([]);
   const tagIds = ref<string[]>([]);
-  const manaTypeSymbolIds = ref<string[]>([]);
-  const manaTypeSymbolExcludeIds = ref<string[]>([]);
+  const manaFamilyIds = ref<string[]>([]);
+  const manaFamilyExcludeIds = ref<string[]>([]);
   const affinitySymbolIds = ref<string[]>([]);
   const affinitySymbolExcludeIds = ref<string[]>([]);
   const devotionSymbolIds = ref<string[]>([]);
@@ -72,7 +72,7 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
       keywordMatch: keywordMatch.value,
       tagMatch: tagMatch.value,
       typeMatch: typeMatch.value,
-      manaSymbolMatch: manaSymbolMatch.value,
+      manaFamilyMatch: manaFamilyMatch.value,
       affinitySymbolMatch: affinitySymbolMatch.value,
       devotionSymbolMatch: devotionSymbolMatch.value,
       otherSymbolMatch: otherSymbolMatch.value,
@@ -85,8 +85,8 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
       healthMax: healthMax.value,
       keywordIds: keywordIds.value,
       tagIds: tagIds.value,
-      manaTypeSymbolIds: manaTypeSymbolIds.value,
-      manaTypeSymbolExcludeIds: manaTypeSymbolExcludeIds.value,
+      manaFamilyIds: manaFamilyIds.value,
+      manaFamilyExcludeIds: manaFamilyExcludeIds.value,
       affinitySymbolIds: affinitySymbolIds.value,
       affinitySymbolExcludeIds: affinitySymbolExcludeIds.value,
       devotionSymbolIds: devotionSymbolIds.value,
@@ -112,7 +112,7 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     keywordMatch.value = normalized.keywordMatch;
     tagMatch.value = normalized.tagMatch;
     typeMatch.value = normalized.typeMatch;
-    manaSymbolMatch.value = normalized.manaSymbolMatch;
+    manaFamilyMatch.value = normalized.manaFamilyMatch;
     affinitySymbolMatch.value = normalized.affinitySymbolMatch;
     devotionSymbolMatch.value = normalized.devotionSymbolMatch;
     otherSymbolMatch.value = normalized.otherSymbolMatch;
@@ -125,8 +125,8 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     healthMax.value = normalized.healthMax;
     keywordIds.value = [...normalized.keywordIds];
     tagIds.value = [...normalized.tagIds];
-    manaTypeSymbolIds.value = [...normalized.manaTypeSymbolIds];
-    manaTypeSymbolExcludeIds.value = [...normalized.manaTypeSymbolExcludeIds];
+    manaFamilyIds.value = [...normalized.manaFamilyIds];
+    manaFamilyExcludeIds.value = [...normalized.manaFamilyExcludeIds];
     affinitySymbolIds.value = [...normalized.affinitySymbolIds];
     affinitySymbolExcludeIds.value = [...normalized.affinitySymbolExcludeIds];
     devotionSymbolIds.value = [...normalized.devotionSymbolIds];
@@ -161,7 +161,7 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     keywordMatch,
     tagMatch,
     typeMatch,
-    manaSymbolMatch,
+    manaFamilyMatch,
     affinitySymbolMatch,
     devotionSymbolMatch,
     otherSymbolMatch,
@@ -174,8 +174,8 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     healthMax,
     keywordIds,
     tagIds,
-    manaTypeSymbolIds,
-    manaTypeSymbolExcludeIds,
+    manaFamilyIds,
+    manaFamilyExcludeIds,
     affinitySymbolIds,
     affinitySymbolExcludeIds,
     devotionSymbolIds,

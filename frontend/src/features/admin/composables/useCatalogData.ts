@@ -25,6 +25,7 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     'suggested-types': '',
     'card-roles': '',
     'card-factions': '',
+    'card-mana-families': '',
     'deck-roles': '',
     'deck-types': '',
     'suggested-deck-types': '',
@@ -38,6 +39,7 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     'suggested-types': SuggestionRecord[];
     'card-roles': ClassificationDefinitionRecord[];
     'card-factions': ClassificationDefinitionRecord[];
+    'card-mana-families': ClassificationDefinitionRecord[];
     'deck-roles': DeckTagRecord[];
     'deck-types': DeckTagRecord[];
     'suggested-deck-types': SuggestionRecord[];
@@ -50,6 +52,7 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     'suggested-types': [],
     'card-roles': [],
     'card-factions': [],
+    'card-mana-families': [],
     'deck-roles': [],
     'deck-types': [],
     'suggested-deck-types': [],
@@ -89,6 +92,7 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     catalog['suggested-types'] = data.suggested.types ?? [];
     catalog['card-roles'] = data.classification?.roles ?? [];
     catalog['card-factions'] = data.classification?.factions ?? [];
+    catalog['card-mana-families'] = data.classification?.mana_families ?? [];
     catalog['deck-roles'] = deckTagData.roles;
     catalog['deck-types'] = deckTagData.types;
     catalog['suggested-deck-types'] = deckTagData.suggestedTypes;

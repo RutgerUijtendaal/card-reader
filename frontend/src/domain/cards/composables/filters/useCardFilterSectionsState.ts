@@ -58,9 +58,9 @@ export const useCardFilterSectionsState = (
     filterState.cardFactionMatch.value = 'any';
   };
   const resetManaGroup = (): void => {
-    filterState.manaTypeSymbolIds.value = [];
-    filterState.manaTypeSymbolExcludeIds.value = [];
-    filterState.manaSymbolMatch.value = 'any';
+    filterState.manaFamilyIds.value = [];
+    filterState.manaFamilyExcludeIds.value = [];
+    filterState.manaFamilyMatch.value = 'any';
     filterState.manaCostMin.value = '';
     filterState.manaCostMax.value = '';
   };
@@ -137,13 +137,13 @@ export const useCardFilterSectionsState = (
     resetCardFactionGroup,
     lifecycleStatus: filterState.lifecycleStatus.value,
     onUpdateLifecycleStatus: createLifecycleUpdater(filterState.lifecycleStatus),
-    selectedManaTypeSymbolIds: filterState.manaTypeSymbolIds.value,
-    onUpdateSelectedManaTypeSymbolIds: createArrayUpdater(filterState.manaTypeSymbolIds),
-    excludedManaTypeSymbolIds: filterState.manaTypeSymbolExcludeIds.value,
-    onUpdateExcludedManaTypeSymbolIds: createArrayUpdater(filterState.manaTypeSymbolExcludeIds),
-    manaSymbolMatch: filterState.manaSymbolMatch.value,
-    onUpdateManaSymbolMatch: createMatchModeUpdater(filterState.manaSymbolMatch),
-    manaTypeOptions: filterCatalog.value.manaSymbols,
+    selectedManaFamilyIds: filterState.manaFamilyIds.value,
+    onUpdateSelectedManaFamilyIds: createArrayUpdater(filterState.manaFamilyIds),
+    excludedManaFamilyIds: filterState.manaFamilyExcludeIds.value,
+    onUpdateExcludedManaFamilyIds: createArrayUpdater(filterState.manaFamilyExcludeIds),
+    manaFamilyMatch: filterState.manaFamilyMatch.value,
+    onUpdateManaFamilyMatch: createMatchModeUpdater(filterState.manaFamilyMatch),
+    manaFamilyOptions: filterCatalog.value.manaFamilies,
     manaCostMin: filterState.manaCostMin.value,
     onUpdateManaCostMin: createStringUpdater(filterState.manaCostMin),
     manaCostMax: filterState.manaCostMax.value,

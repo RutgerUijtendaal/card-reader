@@ -30,6 +30,8 @@ describe('ImportJobsPage', () => {
       cardRoleOverride: ref([]),
       cardFactionMode: ref<'automatic' | 'override'>('override'),
       cardFactionOverride: ref([]),
+      cardManaFamilyMode: ref<'automatic' | 'override'>('automatic'),
+      cardManaFamilyOverride: ref([]),
       creationKey: ref('f1e10412-e8e8-49cb-9717-a24d2eec38c1'),
       contentVersionBase: ref('16.2'),
       contentVersionDescription: ref('Current release.'),
@@ -144,6 +146,7 @@ describe('ImportJobsPage', () => {
       'Card setup',
       'Card roles',
       'Card factions',
+      'Mana Families',
       'Content version',
       'Source images',
     ]);

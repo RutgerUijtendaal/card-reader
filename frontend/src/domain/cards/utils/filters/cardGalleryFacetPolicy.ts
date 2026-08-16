@@ -41,15 +41,15 @@ export const sanitizeGalleryFilterStateForPool = (
     cardFactionExcludeKeys: visibleSections.has('factions')
       ? normalized.cardFactionExcludeKeys
       : defaults.cardFactionExcludeKeys,
-    manaSymbolMatch: visibleSections.has('mana')
-      ? normalized.manaSymbolMatch
-      : defaults.manaSymbolMatch,
-    manaSymbolKeys: visibleSections.has('mana')
-      ? normalized.manaSymbolKeys
-      : defaults.manaSymbolKeys,
-    manaSymbolExcludeKeys: visibleSections.has('mana')
-      ? normalized.manaSymbolExcludeKeys
-      : defaults.manaSymbolExcludeKeys,
+    manaFamilyMatch: visibleSections.has('mana')
+      ? normalized.manaFamilyMatch
+      : defaults.manaFamilyMatch,
+    manaFamilyKeys: visibleSections.has('mana')
+      ? normalized.manaFamilyKeys
+      : defaults.manaFamilyKeys,
+    manaFamilyExcludeKeys: visibleSections.has('mana')
+      ? normalized.manaFamilyExcludeKeys
+      : defaults.manaFamilyExcludeKeys,
     manaCostMin: visibleSections.has('mana')
       ? normalized.manaCostMin
       : defaults.manaCostMin,

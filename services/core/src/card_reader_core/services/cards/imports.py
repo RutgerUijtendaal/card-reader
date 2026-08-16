@@ -13,6 +13,7 @@ from card_reader_core.models import (
 )
 from card_reader_core.repositories.cards import save_parsed_card_result
 from card_reader_core.repositories.metadata import SuggestionCandidate
+from card_reader_core.metadata import ManaFamily
 from card_reader_core.services.notifications import (
     DECK_CARD_VERSION_CHANGE_IMPORT_CREATED,
     NotificationService,
@@ -38,6 +39,7 @@ def save_parsed_card_with_notifications(
     card_pool: CardPool = DEFAULT_CARD_POOL,
     resolved_card_roles: tuple[CardRole, ...] = (),
     resolved_card_factions: tuple[CardFaction, ...] = (),
+    resolved_card_mana_families: tuple[ManaFamily, ...] = (),
     classification_evidence: CardClassificationInferenceEvidence | None = None,
 ) -> CardVersion:
     result = save_parsed_card_result(
@@ -57,6 +59,7 @@ def save_parsed_card_with_notifications(
         card_pool=card_pool,
         resolved_card_roles=resolved_card_roles,
         resolved_card_factions=resolved_card_factions,
+        resolved_card_mana_families=resolved_card_mana_families,
         classification_evidence=classification_evidence,
     )
     version = result.version

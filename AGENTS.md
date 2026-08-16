@@ -105,15 +105,19 @@ Core stack:
 - Django owns the domain schema through migrations in `services/core`.
 - When adding, removing, or changing Django database models or relationships, update `docs/card-database-diagram.svg` when the card-related schema diagram is affected.
 - When changing documented feature behavior, workflows, permissions, API contracts, onboarding, or operations, review the relevant guides under `docs/` and update them when they are no longer accurate. Also review `docs/README.md` when documentation is added, removed, or renamed.
-- The target card classification model has three independent card-level dimensions:
+- The target card classification model has four independent card-level dimensions:
   - `card_pool` is exactly one of `player`, `evil`, or `neutral`; unknown values are invalid.
   - `card_roles` is a set of zero or more code-owned roles: `hero`, `boss`, `location`, `boon`, `event`, and `shop_item`; roles may coexist.
   - `card_factions` is a set of zero or more code-owned factions: `order`, `blood`, `dark`, and `metal`; factions may coexist.
+  - `card_mana_families` is a set of zero or more code-owned families: `arcane`, `dark`, `divine`, `martial`, `occult`, and `primal`; families may coexist across every pool. Colorless is the derived empty state and is never persisted.
   - Normal is the product label for the derived empty-role state and must not be persisted as a role. Keep `standard` only as the existing internal/query sentinel for that derived state.
-  - Pool/role/faction conventions belong in core code, not mutually-exclusive or same-pool database constraints. Cross-pool relationships are allowed.
-  - Pool, roles, and factions belong to the stable `Card` record; template remains version/parser configuration.
-  - Stable human-readable card identity is scoped by pool plus the exact canonical faction set: normalized primary names, aliases, and ordinary untargeted image-hash matching must resolve inside one explicit `(card_pool, card_factions)` namespace. Same-name cards may coexist in different faction namespaces. Roles never participate in identity matching.
-  - Empty factions on an untargeted Evil import mean unknown classification rather than an intentional stable Evil namespace. After ordinary empty-namespace matching, search currently factioned Evil Cards across all historical image checksums and then normalized primary names and aliases. Reuse only one unambiguous Card: either evidence set may resolve alone, both singleton sets must agree, and any multiple or conflicting candidates must refuse the merge. Preserve a matched Card's stored roles and factions and emit the classification-mismatch warning. An unmatched or ambiguous import may create or reuse a transitional no-faction Evil Card, must emit `evil_faction_unresolved` with candidate counts, and must link reviewers to its Card tab. Targeted reparses, known-faction imports, other pools, and imports with reparse matching disabled do not use this fallback.
+  - Pool/role/faction/mana-family conventions belong in core code, not mutually-exclusive or same-pool database constraints. Cross-pool relationships are allowed.
+  - Pool, roles, factions, and mana families belong to the stable `Card` record; template remains version/parser configuration.
+  - Stored Card mana families are authoritative for classification, filtering, sorting, and deck-building decisions. `CardVersion` Symbols remain authoritative for printed mana cost and value, mana distribution, Affinity and Devotion, exact raw-Symbol filters, parser output, and diagnostic evidence. Symbol edits must never silently mutate stored Card families.
+  - Mana-family assignments and the indexed `Card.mana_family_sort_key` form one invariant. Runtime mutations must use the cards classification seam so the complete assignment set and cached sort key update atomically.
+  - Mana families do not participate in Card identity, alias namespaces, or merge namespace validation.
+  - Stable human-readable card identity is scoped by pool plus the exact canonical faction set: normalized primary names, aliases, and ordinary untargeted image-hash matching must resolve inside one explicit `(card_pool, card_factions)` namespace. Same-name cards may coexist in different faction namespaces. Roles and mana families never participate in identity matching.
+  - Empty factions on an untargeted Evil import mean unknown classification rather than an intentional stable Evil namespace. After ordinary empty-namespace matching, search currently factioned Evil Cards across all historical image checksums and then normalized primary names and aliases. Reuse only one unambiguous Card: either evidence set may resolve alone, both singleton sets must agree, and any multiple or conflicting candidates must refuse the merge. Preserve a matched Card's stored roles, factions, and mana families and emit the classification-mismatch warning. An unmatched or ambiguous import may create or reuse a transitional no-faction Evil Card, must emit `evil_faction_unresolved` with candidate counts, and must link reviewers to its Card tab. Targeted reparses, known-faction imports, other pools, and imports with reparse matching disabled do not use this fallback.
   - Faction assignments and the derived faction identity key form one invariant. Runtime faction mutations must go through the cards identity seam so assignments plus card and alias namespace keys update atomically.
   - Neutral remains a separate stable pool. Do not include it implicitly in Player or Evil queries; any future Neutral overlay must be an explicit, authorized multi-pool view state.
 - Ordinary Gallery filter visibility is code-owned frontend presentation policy, not card validity, authorization, or import inference:
@@ -142,11 +146,11 @@ Core stack:
   - shared sort keys and semantics must stay aligned across both layers
   - `default` is the canonical single-pool sort: Player orders by mana family, then Hero before the default role order, then ascending mana value; Evil orders by Order, Blood, Dark, Metal, then no faction, followed by Boss, Location, the default role order, and ascending mana value; Neutral uses the default role order
   - the default role order is Normal, Hero, Boss, Location, Boon, Event, then Shop Item; pool-specific priority roles are moved ahead of that order without duplicating them
-  - multi-valued factions and roles sort by their earliest effective value, then their complete effective membership vector; grouped Gallery results use their anchor Card's values
+  - multi-valued factions, roles, and mana families sort by their earliest effective value, then their complete effective membership vector; grouped Gallery results use their anchor Card's values
   - keep the pool sort as declarative mirrored component lists in backend and frontend code so future priority changes remain localized; query-backed defaults must translate those components to SQL annotations and paginate in the database
   - canonical mana-family order is Arcane, Dark, Divine, Martial, Occult, then Primal; changing it requires a release
   - paired mana and affinity symbols represent the same canonical family for family sorting, filtering, and deck-builder hero presets
-  - query-backed mana-family sorting uses the indexed `CardVersion.mana_family_sort_key`; numeric colorless symbols and unmatched affinities stay in the no-family bucket
+  - query-backed mana-family sorting uses the indexed `Card.mana_family_sort_key`; empty assignments stay in the Colorless/no-family bucket
 - Card lifecycle status controls normal visibility:
   - `active` is the default for play/browsing surfaces such as gallery, grouped gallery, public group detail, catalog linked-card counts/previews, and exports.
   - `deprecated` cards should stay directly retrievable by id and available in explicit management/query flows such as `lifecycle_status=all` or `lifecycle_status=deprecated`.
@@ -162,7 +166,7 @@ Core stack:
   - Frontend code should consume `/decks/rules` for defaults and examples, keeping local fallback defaults only for load/error resilience.
 - Deck list surfaces that only need listing metadata should use summary deck records/endpoints and `DeckListRecord`-compatible shared components; fetch full `DeckRecord` only for detail, editor, export, or playtest flows that need full board entries.
 - The card detail editor separates card-level and version-level edits:
-  - The `Card` tab owns Card Pool, multi-valued Card Roles and Factions, Card Status, and Deck-Building Config; Normal and No faction are derived when their assignment sets are empty.
+  - The `Card` tab owns Card Pool, multi-valued Card Roles, Factions, and Mana Families, Card Status, and Deck-Building Config; Normal, No faction, and Colorless are derived when their assignment sets are empty.
   - `Card Version` tab owns parsed scalar fields, symbols, metadata groups, template selection, reset, and reparse actions.
 - User notifications are durable, core-owned in-app records.
   - `NotificationService` is the only public creation API; API views, frontend code, and feature call sites must not write notification rows directly.

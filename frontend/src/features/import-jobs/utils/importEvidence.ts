@@ -3,6 +3,11 @@ import type { CardRole } from '@/domain/cards/cardRoles';
 import { cardFactionLabel, CARD_FACTION_OPTIONS } from '@/domain/cards/cardFactions';
 import type { CardFaction } from '@/domain/cards/cardFactions';
 import { cardPoolLabel, isCardPool } from '@/domain/cards/cardPools';
+import {
+  MANA_FAMILY_OPTIONS,
+  manaFamilyLabel,
+  type ManaFamily,
+} from '@/domain/cards/manaFamilies';
 import type { ImportJobItem, ImportWarning } from '@/features/import-jobs/types';
 import { isTerminalImportStatus } from '@/features/import-jobs/utils/importJobUtils';
 
@@ -19,6 +24,9 @@ const CARD_ROLE_VALUES: ReadonlySet<string> = new Set(
 );
 const CARD_FACTION_VALUES: ReadonlySet<string> = new Set(
   CARD_FACTION_OPTIONS.map((option) => option.value),
+);
+const MANA_FAMILY_VALUES: ReadonlySet<string> = new Set(
+  MANA_FAMILY_OPTIONS.map((option) => option.value),
 );
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -40,6 +48,13 @@ const asCardFactions = (value: unknown): CardFaction[] =>
     )
     : [];
 
+const asManaFamilies = (value: unknown): ManaFamily[] =>
+  Array.isArray(value)
+    ? value.filter(
+      (item): item is ManaFamily => typeof item === 'string' && MANA_FAMILY_VALUES.has(item),
+    )
+    : [];
+
 const sourceLabels = (value: unknown): string[] =>
   Array.isArray(value)
     ? value.flatMap((item) => {
@@ -58,13 +73,24 @@ export const formatImportFactions = (value: unknown): string => {
   return factions.length > 0 ? factions.map(cardFactionLabel).join(', ') : 'None';
 };
 
+export const formatImportManaFamilies = (value: unknown): string => {
+  if (!Array.isArray(value)) return 'Unavailable';
+  const families = asManaFamilies(value);
+  return families.length > 0 ? families.map(manaFamilyLabel).join(', ') : 'Colorless';
+};
+
+export const formatResolvedImportManaFamilies = (item: ImportJobItem): string =>
+  asRecord(item.classification_inference.mana_families)
+    ? formatImportManaFamilies(item.resolved_card_mana_families)
+    : 'Unavailable';
+
 const formatPool = (value: unknown): string =>
   isCardPool(value) ? cardPoolLabel(value) : 'Unknown';
 
 const formatClassification = (value: unknown): string | null => {
   const classification = asRecord(value);
   if (!classification) return null;
-  return `${formatPool(classification.card_pool)} · ${formatImportRoles(classification.card_roles)} · ${formatImportFactions(classification.card_factions)}`;
+  return `${formatPool(classification.card_pool)} · ${formatImportRoles(classification.card_roles)} · ${formatImportFactions(classification.card_factions)} · ${formatImportManaFamilies(classification.card_mana_families)}`;
 };
 
 export const getImportEvidenceState = (item: ImportJobItem): ImportEvidenceState => {
@@ -81,22 +107,33 @@ export const getInferenceEvidence = (item: ImportJobItem): ImportEvidenceEntry[]
   const evidence = item.classification_inference;
   const roleEvidence = asRecord(evidence.roles) ?? {};
   const factionEvidence = asRecord(evidence.factions) ?? {};
+  const manaEvidence = asRecord(evidence.mana_families) ?? {};
   const roleMode = roleEvidence.mode === 'override'
     ? 'Manual override'
     : roleEvidence.mode === 'automatic' ? 'Automatic' : 'Unavailable';
   const factionMode = factionEvidence.mode === 'override'
     ? 'Manual override'
     : factionEvidence.mode === 'automatic' ? 'Automatic' : 'Unavailable';
+  const manaMode = manaEvidence.mode === 'override'
+    ? 'Manual override'
+    : manaEvidence.mode === 'automatic' ? 'Automatic' : 'Unavailable';
   const entries: ImportEvidenceEntry[] = [
     { label: 'Role resolution', value: roleMode },
     { label: 'Faction resolution', value: factionMode },
+    { label: 'Mana resolution', value: manaMode },
   ];
   const roleMatchedTags = sourceLabels(roleEvidence.matched_tag_sources);
   const roleMatchedTypes = sourceLabels(roleEvidence.matched_type_sources);
+  const roleMatchedSymbols = sourceLabels(roleEvidence.matched_symbol_sources);
   const overrideRoles = asCardRoles(roleEvidence.override_roles);
   const factionMatchedTags = sourceLabels(factionEvidence.matched_tag_sources);
   const factionMatchedTypes = sourceLabels(factionEvidence.matched_type_sources);
+  const factionMatchedSymbols = sourceLabels(factionEvidence.matched_symbol_sources);
   const overrideFactions = asCardFactions(factionEvidence.override_factions);
+  const manaMatchedTags = sourceLabels(manaEvidence.matched_tag_sources);
+  const manaMatchedTypes = sourceLabels(manaEvidence.matched_type_sources);
+  const manaMatchedSymbols = sourceLabels(manaEvidence.matched_symbol_sources);
+  const overrideManaFamilies = asManaFamilies(manaEvidence.override_mana_families);
 
   if (roleEvidence.mode && roleMatchedTags.length > 0) {
     entries.push({ label: 'Role tags', value: roleMatchedTags.join(', ') });
@@ -104,10 +141,18 @@ export const getInferenceEvidence = (item: ImportJobItem): ImportEvidenceEntry[]
   if (roleEvidence.mode && roleMatchedTypes.length > 0) {
     entries.push({ label: 'Role types', value: roleMatchedTypes.join(', ') });
   }
+  if (roleEvidence.mode && roleMatchedSymbols.length > 0) {
+    entries.push({ label: 'Role symbols', value: roleMatchedSymbols.join(', ') });
+  }
   if (roleEvidence.mode === 'override') {
     entries.push({ label: 'Override roles', value: formatImportRoles(overrideRoles) });
   }
-  if (roleMatchedTags.length === 0 && roleMatchedTypes.length === 0 && roleEvidence.mode === 'automatic') {
+  if (
+    roleMatchedTags.length === 0
+    && roleMatchedTypes.length === 0
+    && roleMatchedSymbols.length === 0
+    && roleEvidence.mode === 'automatic'
+  ) {
     entries.push({ label: 'Role signals', value: 'None matched' });
   }
   if (factionEvidence.mode && factionMatchedTags.length > 0) {
@@ -116,15 +161,40 @@ export const getInferenceEvidence = (item: ImportJobItem): ImportEvidenceEntry[]
   if (factionEvidence.mode && factionMatchedTypes.length > 0) {
     entries.push({ label: 'Faction types', value: factionMatchedTypes.join(', ') });
   }
+  if (factionEvidence.mode && factionMatchedSymbols.length > 0) {
+    entries.push({ label: 'Faction symbols', value: factionMatchedSymbols.join(', ') });
+  }
   if (factionEvidence.mode === 'override') {
     entries.push({ label: 'Override factions', value: formatImportFactions(overrideFactions) });
   }
   if (
     factionMatchedTags.length === 0
     && factionMatchedTypes.length === 0
+    && factionMatchedSymbols.length === 0
     && factionEvidence.mode === 'automatic'
   ) {
     entries.push({ label: 'Faction signals', value: 'None matched' });
+  }
+  for (const [label, values] of [
+    ['Mana tags', manaMatchedTags],
+    ['Mana types', manaMatchedTypes],
+    ['Mana symbols', manaMatchedSymbols],
+  ] as const) {
+    if (values.length > 0) entries.push({ label, value: values.join(', ') });
+  }
+  if (manaEvidence.mode === 'override') {
+    entries.push({
+      label: 'Override Mana Families',
+      value: formatImportManaFamilies(overrideManaFamilies),
+    });
+  }
+  if (
+    manaEvidence.mode === 'automatic'
+    && manaMatchedTags.length === 0
+    && manaMatchedTypes.length === 0
+    && manaMatchedSymbols.length === 0
+  ) {
+    entries.push({ label: 'Mana signals', value: 'None matched' });
   }
   return entries;
 };
@@ -157,6 +227,7 @@ export const getWarningEvidence = (warning: ImportWarning): ImportEvidenceEntry[
   }
   const labels: Array<[string, string]> = [
     ['inferred', 'Inferred'],
+    ['stored', 'Stored'],
     ['existing', 'Existing'],
     ['queued', 'Queued'],
     ['live', 'Live'],
