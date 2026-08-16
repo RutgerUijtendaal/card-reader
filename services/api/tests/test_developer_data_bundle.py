@@ -92,6 +92,24 @@ def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
     }
 
 
+def test_version_one_payload_adoption_adds_mana_role_from_latest_type() -> None:
+    adopted = adopt_payload_for_format(
+        {
+            "cards": [
+                {
+                    "key": "legacy-mana",
+                    "is_hero": False,
+                    "latest_version_number": 1,
+                    "versions": [{"version_number": 1, "type_keys": ["mana"]}],
+                }
+            ]
+        },
+        format_version=1,
+    )
+
+    assert adopted["cards"][0]["card_roles"] == ["mana"]  # type: ignore[index]
+
+
 @pytest.mark.parametrize(
     "legacy_card", [{"key": "missing"}, {"key": "wrong-type", "is_hero": "true"}]
 )
@@ -212,19 +230,29 @@ def test_version_two_adoption_backfills_only_player_cards_and_group_references()
                 {
                     "key": "legacy-player",
                     "card_pool": "player",
+                    "card_roles": ["hero"],
                     "card_factions": [],
                     "latest_version_number": 1,
                     "versions": [
-                        {"version_number": 1, "symbol_keys": ["arcane-mana"]}
+                        {
+                            "version_number": 1,
+                            "symbol_keys": ["arcane-mana"],
+                            "type_keys": ["mana"],
+                        }
                     ],
                 },
                 {
                     "key": "legacy-evil",
                     "card_pool": "evil",
+                    "card_roles": ["boss"],
                     "card_factions": ["dark"],
                     "latest_version_number": 1,
                     "versions": [
-                        {"version_number": 1, "symbol_keys": ["dark-affinity"]}
+                        {
+                            "version_number": 1,
+                            "symbol_keys": ["dark-affinity"],
+                            "type_keys": ["mana"],
+                        }
                     ],
                 },
             ],
@@ -255,6 +283,9 @@ def test_version_two_adoption_backfills_only_player_cards_and_group_references()
     assert [
         card["card_mana_families"] for card in adopted["cards"]  # type: ignore[index]
     ] == [["arcane"], []]
+    assert [
+        card["card_roles"] for card in adopted["cards"]  # type: ignore[index]
+    ] == [["hero", "mana"], ["boss", "mana"]]
     group = adopted["card_groups"][0]  # type: ignore[index]
     assert group["anchor_card_ref"]["card_mana_families"] == ["arcane"]
     assert group["members"][0]["card_ref"]["card_mana_families"] == []
@@ -1319,6 +1350,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
                 "location": 1,
                 "boss": 0,
                 "shop_item": 0,
+                "mana": 0,
             },
             "min_cards_by_faction": {"order": 1, "blood": 1, "dark": 0, "metal": 0},
             "min_cards_by_mana_family": {"arcane": 1},
@@ -1415,8 +1447,12 @@ def _clear_domain_data() -> None:
 
 
 def _seed_migration_defaults() -> None:
-    migration = importlib.import_module(
+    classification_migration = importlib.import_module(
         "card_reader_core.migrations."
         "0055_seed_classification_rules_and_full_height_template"
     )
-    migration.seed_classification_rules_and_template(django_apps, None)
+    classification_migration.seed_classification_rules_and_template(django_apps, None)
+    mana_role_migration = importlib.import_module(
+        "card_reader_core.migrations.0058_add_mana_card_role"
+    )
+    mana_role_migration.add_mana_role_defaults_and_backfill(django_apps, None)

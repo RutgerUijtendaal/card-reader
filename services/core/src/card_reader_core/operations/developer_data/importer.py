@@ -71,12 +71,15 @@ MIGRATION_DEFAULT_SOURCE_DEFINITIONS = {
         "boon": ("Boon", ["boon"]),
         "event": ("Event", ["event"]),
         "location": ("Location", ["location"]),
+        "mana": ("Mana", ["mana"]),
     },
 }
 MIGRATION_DEFAULT_CLASSIFICATION_RULES = (
     ("player", "role", "hero", "type", "hero"),
+    ("player", "role", "mana", "type", "mana"),
     ("evil", "role", "boss", "type", "boss"),
     ("evil", "role", "location", "type", "location"),
+    ("evil", "role", "mana", "type", "mana"),
     ("evil", "faction", "order", "tag", "order"),
     ("evil", "faction", "blood", "tag", "blood"),
     ("evil", "faction", "dark", "tag", "dark"),

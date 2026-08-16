@@ -49,6 +49,7 @@ def snapshot(*rules: dict[str, object], card_pool: str = "evil") -> dict[str, ob
 
 def classification_input(
     *,
+    card_pool: str = "evil",
     rules: tuple[dict[str, object], ...] = (),
     role_mode: str = "automatic",
     role_override: tuple[str, ...] = (),
@@ -61,14 +62,14 @@ def classification_input(
     symbols: tuple[tuple[str, str], ...] = (),
 ) -> CardClassificationInput:
     return CardClassificationInput(
-        card_pool="evil",
+        card_pool=card_pool,  # type: ignore[arg-type]
         role_mode=role_mode,  # type: ignore[arg-type]
         override_roles=role_override,  # type: ignore[arg-type]
         faction_mode=faction_mode,  # type: ignore[arg-type]
         override_factions=faction_override,  # type: ignore[arg-type]
         mana_family_mode=mana_family_mode,  # type: ignore[arg-type]
         override_mana_families=mana_family_override,  # type: ignore[arg-type]
-        rule_snapshot=snapshot(*rules),
+        rule_snapshot=snapshot(*rules, card_pool=card_pool),
         matched_tags=tuple(DetectedClassificationSource(id=id_, key=key) for id_, key in tags),
         matched_types=tuple(DetectedClassificationSource(id=id_, key=key) for id_, key in types),
         matched_symbols=tuple(
@@ -130,6 +131,34 @@ def test_automatic_inference_unions_tag_and_type_rules_canonically() -> None:
         "rule-order-tag",
         "rule-order-type",
     }
+
+
+@pytest.mark.parametrize("card_pool", ["player", "evil"])
+def test_mana_type_infers_only_the_mana_role(card_pool: str) -> None:
+    mana_role_rule = rule(
+        f"rule-{card_pool}-mana-role",
+        target_kind="role",
+        target_key="mana",
+        source_kind="type",
+        source_id="type-mana",
+        source_key="mana",
+        card_pool=card_pool,
+    )
+
+    result = classify_import_card(
+        classification_input(
+            card_pool=card_pool,
+            rules=(mana_role_rule,),
+            types=(("type-mana", "mana"),),
+        )
+    )
+
+    assert result.roles == ("mana",)
+    assert result.factions == ()
+    assert result.mana_families == ()
+    assert result.evidence["roles"]["matched_type_sources"] == [
+        {"id": "type-mana", "key": "mana"}
+    ]
 
 
 def test_role_and_faction_overrides_are_independent_and_exact() -> None:

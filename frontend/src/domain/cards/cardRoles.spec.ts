@@ -15,6 +15,7 @@ describe('card role registry', () => {
       { value: 'boon', label: 'Boon' },
       { value: 'event', label: 'Event' },
       { value: 'shop_item', label: 'Shop Item' },
+      { value: 'mana', label: 'Mana' },
     ]);
     expect(CARD_ROLE_FILTER_VALUES).toEqual([
       'standard',
@@ -24,10 +25,11 @@ describe('card role registry', () => {
       'boon',
       'event',
       'shop_item',
+      'mana',
     ]);
     expect(isCardRoleFilter('location')).toBe(true);
     expect(isCardRoleFilter('unknown')).toBe(false);
-    expect(displayCardRoleLabels(['event', 'location'])).toEqual(['Event', 'Location']);
+    expect(displayCardRoleLabels(['event', 'location', 'mana'])).toEqual(['Event', 'Location', 'Mana']);
     expect(displayCardRoleLabels([])).toEqual(['Normal']);
   });
 });

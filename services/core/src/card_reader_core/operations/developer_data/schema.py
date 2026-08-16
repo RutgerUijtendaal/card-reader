@@ -15,6 +15,7 @@ from card_reader_core.models import (
     CardRole,
     CardRoleFilter,
     normalize_card_factions,
+    normalize_card_roles,
 )
 from card_reader_core.metadata import (
     ManaFamily,
@@ -356,6 +357,22 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
             ),
             None,
         )
+        role_values = adopted_card.get("card_roles", [])
+        type_keys = (
+            latest_version.get("type_keys", [])
+            if isinstance(latest_version, dict)
+            else []
+        )
+        if (
+            isinstance(role_values, list)
+            and isinstance(type_keys, list)
+            and adopted_card.get("card_pool") in {"player", "evil"}
+            and any(
+                isinstance(key, str) and key.strip().casefold() == "mana"
+                for key in type_keys
+            )
+        ):
+            adopted_card["card_roles"] = list(normalize_card_roles((*role_values, "mana")))
         symbol_keys = (
             latest_version.get("symbol_keys", [])
             if isinstance(latest_version, dict)
