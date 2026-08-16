@@ -218,6 +218,109 @@ def test_untargeted_import_name_and_image_matching_stays_in_exact_faction_namesp
 
 
 @pytest.mark.django_db
+def test_reimport_reuses_unique_image_after_manual_faction_correction() -> None:
+    template = Template.objects.create(key="corrected-faction-import", label="Corrected Faction")
+
+    def import_card(source_name: str) -> tuple[CardVersion, ImportJobItem]:
+        source_path = build_storage_relative_path("uploads", "faction-correction", source_name)
+        path = settings.storage_root_dir / source_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"corrected-faction-art")
+        job = ImportJob.objects.create(
+            source_path="uploads/faction-correction",
+            template=template,
+            card_pool="evil",
+            total_items=1,
+        )
+        item = ImportJobItem.objects.create(job=job, source_file=source_path)
+        version = save_parsed_card(
+            item=item,
+            template_id=template.key,
+            checksum="corrected-faction-art",
+            normalized_fields={"name": "Corrected Faction Card"},
+            confidence={"overall": 1.0},
+            raw_ocr={},
+            card_pool="evil",
+            resolved_card_factions=(),
+        )
+        item.refresh_from_db()
+        return version, item
+
+    original_version, original_item = import_card("first.webp")
+    change_card_identity(card=original_version.card, card_factions=("order",))
+    repeated_version, repeated_item = import_card("second.webp")
+
+    original_version.card.refresh_from_db()
+    assert original_item.resolved_card_factions_json == []
+    assert card_faction_keys(original_version.card) == ("order",)
+    assert repeated_version.card_id == original_version.card_id
+    assert repeated_item.target_card_id == original_version.card_id
+    assert repeated_item.warning_code == "card_classification_mismatch"
+    assert repeated_item.resolved_card_factions_json == []
+
+
+@pytest.mark.django_db
+def test_reimport_does_not_cross_faction_namespace_when_corrected_image_is_ambiguous() -> None:
+    template = Template.objects.create(key="ambiguous-faction-import", label="Ambiguous Faction")
+    corrected_cards = []
+    for index, faction in enumerate(("order", "blood")):
+        card, _created = create_card_identity(
+            name=f"Corrected Twin {index}",
+            card_pool="evil",
+            card_factions=(faction,),
+        )
+        version = CardVersion.objects.create(
+            card=card,
+            template=template,
+            image_hash="ambiguous-corrected-art",
+            name=card.label,
+        )
+        card.latest_version = version
+        card.save(update_fields=["latest_version"])
+        prior_job = ImportJob.objects.create(
+            source_path=f"uploads/ambiguous-correction-{index}",
+            template=template,
+            card_pool="evil",
+            total_items=1,
+        )
+        ImportJobItem.objects.create(
+            job=prior_job,
+            source_file=f"uploads/ambiguous-correction-{index}.webp",
+            target_card=card,
+            target_card_version=version,
+            status="completed",
+            resolved_card_factions_json=[],
+        )
+        corrected_cards.append(card)
+
+    source_path = build_storage_relative_path("uploads", "ambiguous-correction-new.webp")
+    path = settings.storage_root_dir / source_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"ambiguous-corrected-art")
+    job = ImportJob.objects.create(
+        source_path="uploads/ambiguous-correction-new.webp",
+        template=template,
+        card_pool="evil",
+        total_items=1,
+    )
+    item = ImportJobItem.objects.create(job=job, source_file=source_path)
+
+    version = save_parsed_card(
+        item=item,
+        template_id=template.key,
+        checksum="ambiguous-corrected-art",
+        normalized_fields={"name": "Ambiguous New Card"},
+        confidence={"overall": 1.0},
+        raw_ocr={},
+        card_pool="evil",
+        resolved_card_factions=(),
+    )
+
+    assert version.card_id not in {card.id for card in corrected_cards}
+    assert card_faction_keys(version.card) == ()
+
+
+@pytest.mark.django_db
 def test_merge_preview_rejects_different_exact_faction_namespaces() -> None:
     order_card, _ = create_card_identity(
         name="Merge Twin",

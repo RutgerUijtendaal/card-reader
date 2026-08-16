@@ -167,18 +167,15 @@ def save_parsed_card_result(
             )
             return ParsedCardSaveResult(version=version, created_new_version=False)
 
-        existing_version = None
-        if reparse_existing:
-            existing_version = (
-                CardVersion.objects.filter(
-                    image_hash=checksum,
-                    is_latest=True,
-                    card__card_pool=card_pool,
-                    card__faction_identity_key=card_faction_identity_key(resolved_card_factions),
-                )
-                .order_by("-updated_at")
-                .first()
+        existing_version = (
+            _resolve_existing_import_version(
+                checksum=checksum,
+                card_pool=card_pool,
+                resolved_card_factions=resolved_card_factions,
             )
+            if reparse_existing
+            else None
+        )
         if existing_version is not None:
             if should_create_content_version_snapshot(item, existing_version):
                 version = create_content_version_snapshot_from_existing(
@@ -312,6 +309,53 @@ def save_parsed_card_result(
             is_new_card=created_new_card,
         )
         return ParsedCardSaveResult(version=version, created_new_version=True)
+
+
+def _resolve_existing_import_version(
+    *,
+    checksum: str,
+    card_pool: CardPool,
+    resolved_card_factions: tuple[CardFaction, ...],
+) -> CardVersion | None:
+    """Recover a unique manual faction correction without weakening normal namespaces."""
+    faction_key = card_faction_identity_key(resolved_card_factions)
+    exact_match = (
+        CardVersion.objects.filter(
+            image_hash=checksum,
+            is_latest=True,
+            card__card_pool=card_pool,
+            card__faction_identity_key=faction_key,
+        )
+        .order_by("-updated_at")
+        .first()
+    )
+    if exact_match is not None:
+        return exact_match
+
+    corrected_card_ids = list(
+        ImportJobItem.objects.filter(
+            status=ImportJobStatus.completed,
+            resolved_card_factions_json=list(resolved_card_factions),
+            target_card__card_pool=card_pool,
+            target_card__latest_version__image_hash=checksum,
+        )
+        .exclude(target_card__faction_identity_key=faction_key)
+        .order_by()
+        .values_list("target_card_id", flat=True)
+        .distinct()[:2]
+    )
+    if len(corrected_card_ids) != 1:
+        return None
+
+    return (
+        CardVersion.objects.filter(
+            card_id=corrected_card_ids[0],
+            image_hash=checksum,
+            is_latest=True,
+        )
+        .order_by("-updated_at")
+        .first()
+    )
 
 
 def apply_latest_version_identity(card: Card, version: CardVersion) -> None:
