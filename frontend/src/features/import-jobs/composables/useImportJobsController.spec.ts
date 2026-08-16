@@ -1,5 +1,4 @@
 import { createApp, defineComponent, h } from 'vue';
-import { createPinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fetchOperationsQueuePage } from '@/domain/operations/api';
 import type { OperationsQueueItem, OperationsQueuePage } from '@/domain/operations/types';
@@ -14,8 +13,6 @@ import {
 } from '@/features/import-jobs/api';
 import { useImportJobsController } from '@/features/import-jobs/composables/useImportJobsController';
 import type { ContentVersion, ImportJob, ImportJobDetail } from '@/features/import-jobs/types';
-import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
-import type { CardPool } from '@/domain/cards/cardPools';
 
 vi.mock('@/domain/operations/api', () => ({
   fetchOperationsQueuePage: vi.fn(),
@@ -110,7 +107,7 @@ const currentVersion = {
   description: 'Current release.',
 };
 
-const mountController = (cardPool: CardPool = 'player') => {
+const mountController = () => {
   let controller!: ReturnType<typeof useImportJobsController>;
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -122,13 +119,8 @@ const mountController = (cardPool: CardPool = 'player') => {
       },
     }),
   );
-  const pinia = createPinia();
-  const workspace = useCardPoolWorkspaceStore(pinia);
-  workspace.synchronizeSession(['player', 'evil', 'neutral'], 'test-staff');
-  workspace.selectPool(cardPool);
-  app.use(pinia);
   app.mount(host);
-  return { app, controller, workspace };
+  return { app, controller };
 };
 
 describe('useImportJobsController', () => {
@@ -162,91 +154,13 @@ describe('useImportJobsController', () => {
     });
   });
 
-  test('prefills the explicit import pool from the active workspace', () => {
-    const { app, controller } = mountController('neutral');
-
-    expect(controller.cardPool.value).toBe('neutral');
-    app.unmount();
-  });
-
-  test('follows workspace changes only while the import pool is pristine', () => {
-    const mounted = mountController();
-
-    mounted.workspace.selectPool('evil');
-    expect(mounted.controller.cardPool.value).toBe('evil');
-
-    mounted.controller.setCardPool('player');
-    mounted.workspace.selectPool('neutral');
-    expect(mounted.controller.cardPool.value).toBe('player');
-
-    mounted.app.unmount();
-  });
-
-  test('preserves a sealed import pool while the workspace changes', async () => {
-    const mounted = mountController('evil');
-    await vi.waitFor(() => expect(mounted.controller.formLoaded.value).toBe(true));
-    const createResult = deferred<Awaited<ReturnType<typeof createImportJob>>>();
-    vi.mocked(createImportJob).mockReturnValueOnce(createResult.promise);
-    mounted.controller.pickedFiles.value = [
-      new File(['image'], 'card.png', { type: 'image/png' }),
-    ];
-
-    const createPromise = mounted.controller.createJobFromPicker();
-    expect(mounted.controller.formLocked.value).toBe(true);
-    mounted.workspace.selectPool('neutral');
-    expect(mounted.controller.cardPool.value).toBe('evil');
-
-    createResult.resolve({
-      ...activeJob('sealed-job'),
-      job_id: 'sealed-job',
-      idempotent_replay: false,
-    });
-    await createPromise;
-    expect(mounted.controller.cardPool.value).toBe('neutral');
-
-    mounted.app.unmount();
-  });
-
-  test('re-syncs a pristine pool after a definitive failure unlocks the form', async () => {
+  test('leaves template and card pool unselected after form options load', async () => {
     const mounted = mountController();
     await vi.waitFor(() => expect(mounted.controller.formLoaded.value).toBe(true));
-    const createResult = deferred<Awaited<ReturnType<typeof createImportJob>>>();
-    vi.mocked(createImportJob).mockReturnValueOnce(createResult.promise);
-    mounted.controller.pickedFiles.value = [
-      new File(['image'], 'card.png', { type: 'image/png' }),
-    ];
 
-    const createPromise = mounted.controller.createJobFromPicker();
-    mounted.workspace.selectPool('evil');
-    expect(mounted.controller.cardPool.value).toBe('player');
-    createResult.reject({ response: { status: 400, data: { detail: 'Invalid import.' } } });
-    await createPromise;
-
-    expect(mounted.controller.formLocked.value).toBe(false);
-    expect(mounted.controller.cardPool.value).toBe('evil');
-    mounted.app.unmount();
-  });
-
-  test('re-syncs a pristine pool after an uncertain attempt is abandoned', async () => {
-    const mounted = mountController();
-    await vi.waitFor(() => expect(mounted.controller.formLoaded.value).toBe(true));
-    const createResult = deferred<Awaited<ReturnType<typeof createImportJob>>>();
-    vi.mocked(createImportJob).mockReturnValueOnce(createResult.promise);
-    mounted.controller.pickedFiles.value = [
-      new File(['image'], 'card.png', { type: 'image/png' }),
-    ];
-
-    const createPromise = mounted.controller.createJobFromPicker();
-    mounted.workspace.selectPool('neutral');
-    createResult.reject(new Error('connection lost'));
-    await createPromise;
-    expect(mounted.controller.createState.value.phase).toBe('uncertain');
-    expect(mounted.controller.cardPool.value).toBe('player');
-
-    mounted.controller.abandonPendingAttempt();
-
-    expect(mounted.controller.formLocked.value).toBe(false);
-    expect(mounted.controller.cardPool.value).toBe('neutral');
+    expect(mounted.controller.templates.value).toHaveLength(1);
+    expect(mounted.controller.pickerTemplateId.value).toBeNull();
+    expect(mounted.controller.cardPool.value).toBeNull();
     mounted.app.unmount();
   });
 
@@ -768,7 +682,7 @@ describe('useImportJobsController', () => {
     mounted.app.unmount();
   });
 
-  test('submits the existing import payload and resets the native picker key', async () => {
+  test('requires explicit card setup, submits it, and clears it after success', async () => {
     const mounted = mountController();
     await vi.waitFor(() => expect(mounted.controller.formLoaded.value).toBe(true));
     const file = new File(['image'], 'card.png', { type: 'image/png' });
@@ -776,6 +690,16 @@ describe('useImportJobsController', () => {
     const initialInputKey = mounted.controller.fileInputKey.value;
     const initialCreationKey = mounted.controller.creationKey.value;
 
+    await mounted.controller.createJobFromPicker();
+    expect(mounted.controller.formErrorMessage.value).toBe('Please select a template.');
+    expect(createImportJob).not.toHaveBeenCalled();
+
+    mounted.controller.pickerTemplateId.value = 'mtg-like-v1';
+    await mounted.controller.createJobFromPicker();
+    expect(mounted.controller.formErrorMessage.value).toBe('Please select a card pool.');
+    expect(createImportJob).not.toHaveBeenCalled();
+
+    mounted.controller.setCardPool('player');
     await mounted.controller.createJobFromPicker();
 
     expect(createImportJob).toHaveBeenCalledWith({
@@ -793,6 +717,8 @@ describe('useImportJobsController', () => {
     expect(mounted.controller.pickedFiles.value).toEqual([]);
     expect(mounted.controller.fileInputKey.value).toBe(initialInputKey + 1);
     expect(mounted.controller.creationKey.value).not.toBe(initialCreationKey);
+    expect(mounted.controller.pickerTemplateId.value).toBeNull();
+    expect(mounted.controller.cardPool.value).toBeNull();
     expect(mounted.controller.cardRoleMode.value).toBe('automatic');
     expect(fetchOperationsQueuePage).toHaveBeenCalledTimes(2);
 
@@ -804,6 +730,7 @@ describe('useImportJobsController', () => {
     await vi.waitFor(() => expect(mounted.controller.formLoaded.value).toBe(true));
     const file = new File(['image'], 'card.png', { type: 'image/png' });
     mounted.controller.pickedFiles.value = [file];
+    mounted.controller.pickerTemplateId.value = 'mtg-like-v1';
     mounted.controller.cardPool.value = 'evil';
     mounted.controller.cardRoleMode.value = 'override';
     mounted.controller.cardRoleOverride.value = ['boon'];
@@ -834,6 +761,8 @@ describe('useImportJobsController', () => {
     expect(mounted.controller.cardRoleOverride.value).toEqual([]);
     expect(mounted.controller.cardFactionMode.value).toBe('automatic');
     expect(mounted.controller.cardFactionOverride.value).toEqual([]);
+    expect(mounted.controller.pickerTemplateId.value).toBeNull();
+    expect(mounted.controller.cardPool.value).toBeNull();
     expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(true);
 
     mounted.app.unmount();

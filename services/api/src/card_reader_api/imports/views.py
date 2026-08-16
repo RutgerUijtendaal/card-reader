@@ -39,21 +39,25 @@ class CurrentContentVersionView(APIView):
 
 class ImportUploadView(APIView):
     def post(self, request: Request) -> Response:
-        serializer = ImportUploadSerializer(
-            data={
-                "creation_key": request.data.get("creation_key", ""),
-                "template_id": request.data.get("template_id", ""),
-                "content_version_base": request.data.get("content_version_base", ""),
-                "content_version_description": request.data.get("content_version_description", ""),
-                "options_json": request.data.get("options_json", "{}"),
-                "files": request.FILES.getlist("files"),
-                "card_pool": request.data.get("card_pool", ""),
-                "card_role_mode": request.data.get("card_role_mode", "automatic"),
-                "card_role_override": request.data.get("card_role_override", "[]"),
-                "card_faction_mode": request.data.get("card_faction_mode", "automatic"),
-                "card_faction_override": request.data.get("card_faction_override", "[]"),
-            }
-        )
+        upload_data: dict[str, object] = {
+            "options_json": request.data.get("options_json", "{}"),
+            "files": request.FILES.getlist("files"),
+            "card_role_mode": request.data.get("card_role_mode", "automatic"),
+            "card_role_override": request.data.get("card_role_override", "[]"),
+            "card_faction_mode": request.data.get("card_faction_mode", "automatic"),
+            "card_faction_override": request.data.get("card_faction_override", "[]"),
+        }
+        for required_field in (
+            "creation_key",
+            "template_id",
+            "content_version_base",
+            "content_version_description",
+            "card_pool",
+        ):
+            if required_field in request.data:
+                upload_data[required_field] = request.data[required_field]
+
+        serializer = ImportUploadSerializer(data=upload_data)
         if not serializer.is_valid():
             return serializer_error(serializer)
 

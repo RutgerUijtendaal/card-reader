@@ -24,8 +24,8 @@ describe('ImportJobsPage', () => {
     const unresolvedCreateAttempt = ref(false);
     const createState = ref<ImportCreateState>({ phase: 'idle' });
     mockedUseImportJobsController.mockReturnValue({
-      pickerTemplateId: ref('mtg-like-v1'),
-      cardPool: ref('player'),
+      pickerTemplateId: ref<string | null>(null),
+      cardPool: ref<'player' | 'evil' | 'neutral' | null>(null),
       cardRoleMode: ref<'automatic' | 'override'>('override'),
       cardRoleOverride: ref([]),
       cardFactionMode: ref<'automatic' | 'override'>('override'),
@@ -160,6 +160,18 @@ describe('ImportJobsPage', () => {
     expect(host.querySelectorAll('input[type="file"]')).toHaveLength(2);
     expect(host.textContent).not.toContain('Pick mode');
     expect(host.textContent).toContain('Card pool');
+    const cardSetupSelects = Array.from(form?.querySelectorAll('select') ?? []);
+    expect(cardSetupSelects).toHaveLength(2);
+    expect(cardSetupSelects.map((select) => select.value)).toEqual([
+      '__placeholder__',
+      '__placeholder__',
+    ]);
+    expect(cardSetupSelects.map((select) => select.options[0]?.textContent)).toEqual([
+      'Select a template',
+      'Select a card pool',
+    ]);
+    expect(cardSetupSelects.every((select) => select.required)).toBe(true);
+    expect(form?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
     expect(host.textContent).toContain('Automatic');
     expect(host.textContent).toContain('Location');
     const currentVersion = host.querySelector('[data-testid="current-content-version"]');

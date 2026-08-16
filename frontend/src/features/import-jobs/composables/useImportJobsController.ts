@@ -1,9 +1,8 @@
 import { useEventListener } from '@vueuse/core';
-import { computed, onMounted, ref, shallowRef, watch } from 'vue';
+import { computed, onMounted, ref, shallowRef } from 'vue';
 import type { CardRole } from '@/domain/cards/cardRoles';
 import type { CardFaction } from '@/domain/cards/cardFactions';
 import { isCardPool, type CardPool } from '@/domain/cards/cardPools';
-import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import { fetchTemplates } from '@/domain/templates/api';
 import type { TemplateRecord } from '@/domain/templates/types';
 import {
@@ -44,10 +43,8 @@ const isAmbiguousCreateFailure = (error: unknown): boolean => {
 };
 
 export const useImportJobsController = () => {
-  const workspace = useCardPoolWorkspaceStore();
-  const pickerTemplateId = ref('mtg-like-v1');
-  const cardPool = ref<CardPool>(workspace.activePool);
-  const cardPoolWasEdited = ref(false);
+  const pickerTemplateId = ref<string | null>(null);
+  const cardPool = ref<CardPool | null>(null);
   const cardRoleMode = ref<'automatic' | 'override'>('automatic');
   const cardRoleOverride = ref<CardRole[]>([]);
   const cardFactionMode = ref<'automatic' | 'override'>('automatic');
@@ -108,32 +105,16 @@ export const useImportJobsController = () => {
   const hasUnresolvedCreateAttempt = computed(() => pendingAttempt.value !== null);
 
   const setCardPool = (value: string | number | null): void => {
-    if (formLocked.value || !isCardPool(value)) {
-      return;
-    }
-    cardPool.value = value;
-    cardPoolWasEdited.value = true;
+    if (formLocked.value) return;
+    cardPool.value = isCardPool(value) ? value : null;
   };
-
-  watch(
-    [() => workspace.activePool, formLocked, hasUnresolvedCreateAttempt],
-    ([nextPool, locked, hasUnresolvedAttempt]) => {
-      if (cardPoolWasEdited.value || locked || hasUnresolvedAttempt) {
-        return;
-      }
-      cardPool.value = nextPool;
-    },
-    { flush: 'sync' },
-  );
 
   const loadTemplates = async (): Promise<void> => {
     templates.value = await fetchTemplates();
-    if (templates.value.length === 0) {
-      pickerTemplateId.value = '';
-      return;
-    }
-    const stillExists = templates.value.some((item) => item.key === pickerTemplateId.value);
-    if (!stillExists) pickerTemplateId.value = templates.value[0].key;
+    const selectedTemplateStillExists = templates.value.some(
+      (item) => item.key === pickerTemplateId.value,
+    );
+    if (!selectedTemplateStillExists) pickerTemplateId.value = null;
   };
 
   const loadCurrentContentVersion = async (): Promise<void> => {
@@ -196,8 +177,8 @@ export const useImportJobsController = () => {
     cardRoleOverride.value = [];
     cardFactionMode.value = 'automatic';
     cardFactionOverride.value = [];
-    cardPoolWasEdited.value = false;
-    cardPool.value = workspace.activePool;
+    pickerTemplateId.value = null;
+    cardPool.value = null;
     creationKey.value = newCreationKey();
   };
 
@@ -211,6 +192,16 @@ export const useImportJobsController = () => {
 
   const createJobFromPicker = async (): Promise<void> => {
     formErrorMessage.value = '';
+    const templateId = pickerTemplateId.value;
+    if (!templateId) {
+      formErrorMessage.value = 'Please select a template.';
+      return;
+    }
+    const selectedCardPool = cardPool.value;
+    if (!selectedCardPool) {
+      formErrorMessage.value = 'Please select a card pool.';
+      return;
+    }
     if (pickedFiles.value.length === 0) {
       formErrorMessage.value = 'Please select at least one file.';
       return;
@@ -226,11 +217,11 @@ export const useImportJobsController = () => {
 
     const attempt = pendingAttempt.value ?? {
       creationKey: creationKey.value,
-      templateId: pickerTemplateId.value,
+      templateId,
       contentVersionBase: contentVersionBase.value.trim(),
       contentVersionDescription: contentVersionDescription.value.trim(),
       files: [...pickedFiles.value],
-      cardPool: cardPool.value,
+      cardPool: selectedCardPool,
       cardRoleMode: cardRoleMode.value,
       cardRoleOverride: cardRoleMode.value === 'override' ? [...cardRoleOverride.value] : [],
       cardFactionMode: cardFactionMode.value,

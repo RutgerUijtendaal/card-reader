@@ -1,18 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import hashlib
 import json
 from pathlib import Path
-import time
-from collections.abc import Callable, Iterator
-from typing import TypeVar
 
-from django.db import IntegrityError, OperationalError, connection, transaction
+from django.db import IntegrityError, transaction
 from django.db.models import F, Max, Prefetch, Q, QuerySet
 from PIL import Image
 
+from card_reader_core.database import run_with_sqlite_write_retry
 from card_reader_core.models import (
     TTS_CARD_SHEET_CAPACITY,
     TTS_CARD_SHEET_LAYOUT_VERSION,
@@ -30,10 +29,8 @@ _RENDER_DEBOUNCE = timedelta(seconds=2)
 _RENDER_MAX_DEBOUNCE = timedelta(seconds=30)
 TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT = timedelta(minutes=10)
 _RENDERER_FINGERPRINT_VERSION = 2
-_SQLITE_WRITE_RETRY_ATTEMPTS = 6
 _SLOT_RESERVATION_ATTEMPTS = 16
 _CLAIM_RESERVATION_ATTEMPTS = 16
-_RetryResult = TypeVar("_RetryResult")
 
 
 class TtsCardSheetAllocationError(RuntimeError):
@@ -127,19 +124,7 @@ def resolve_tts_card_image_path(image: CardVersionImage) -> Path | None:
 
 
 def sync_card_sources(sources: list[TtsCardImageSource]) -> set[str]:
-    return _retry_sqlite_write(lambda: _sync_card_sources_once(sources))
-
-
-def _retry_sqlite_write(operation: Callable[[], _RetryResult]) -> _RetryResult:
-    for attempt in range(_SQLITE_WRITE_RETRY_ATTEMPTS):
-        try:
-            return operation()
-        except OperationalError as exc:
-            is_locked = connection.vendor == "sqlite" and "locked" in str(exc).lower()
-            if not is_locked or attempt == _SQLITE_WRITE_RETRY_ATTEMPTS - 1:
-                raise
-            time.sleep(0.05 * (2**attempt))
-    raise TtsCardSheetAllocationError("TTS card-sheet write retries were exhausted.")
+    return run_with_sqlite_write_retry(lambda: _sync_card_sources_once(sources))
 
 
 @transaction.atomic
@@ -308,7 +293,7 @@ def ensure_sheet_render_requested(sheet_ids: list[str]) -> None:
 
 
 def upgrade_sheet_layouts() -> set[str]:
-    return _retry_sqlite_write(_upgrade_sheet_layouts_once)
+    return run_with_sqlite_write_retry(_upgrade_sheet_layouts_once)
 
 
 @transaction.atomic
@@ -331,7 +316,7 @@ def _upgrade_sheet_layouts_once() -> set[str]:
 
 
 def claim_next_renderable_sheet() -> TtsCardSheet | None:
-    return _retry_sqlite_write(_claim_next_renderable_sheet_once)
+    return run_with_sqlite_write_retry(_claim_next_renderable_sheet_once)
 
 
 def _claim_next_renderable_sheet_once() -> TtsCardSheet | None:
@@ -363,7 +348,7 @@ def claim_sheet_for_render(
     *,
     respect_not_before: bool = False,
 ) -> TtsCardSheet | None:
-    return _retry_sqlite_write(
+    return run_with_sqlite_write_retry(
         lambda: _claim_sheet_for_render_once(
             sheet_id,
             respect_not_before=respect_not_before,
@@ -420,7 +405,7 @@ def get_sheet_with_slots(sheet_id: str) -> TtsCardSheet | None:
 
 
 def refresh_card_source_visibility(card_ids: list[str] | None = None) -> set[str]:
-    return _retry_sqlite_write(lambda: _refresh_card_source_visibility_once(card_ids))
+    return run_with_sqlite_write_retry(lambda: _refresh_card_source_visibility_once(card_ids))
 
 
 @transaction.atomic
@@ -459,7 +444,7 @@ def sheet_has_unretired_incompatible_slots(sheet_id: str) -> bool:
 
 
 def retire_incompatible_sheet_slots(sheet_id: str) -> None:
-    _retry_sqlite_write(lambda: _retire_incompatible_sheet_slots_once(sheet_id))
+    run_with_sqlite_write_retry(lambda: _retire_incompatible_sheet_slots_once(sheet_id))
 
 
 @transaction.atomic

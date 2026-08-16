@@ -76,12 +76,12 @@ def import_detail_payload(job: ImportJob, items: list[ImportJobItem]) -> dict[st
 
 class ImportUploadSerializer(serializers.Serializer[dict[str, object]]):
     creation_key = serializers.UUIDField()
-    template_id = serializers.CharField()
+    template_id = serializers.CharField(required=True, allow_blank=False)
     content_version_base = serializers.CharField()
     content_version_description = serializers.CharField()
     options_json = serializers.CharField(required=False, default="{}")
     files = serializers.ListField(child=serializers.FileField(), allow_empty=False)
-    card_pool = serializers.ChoiceField(choices=CARD_POOLS)
+    card_pool = serializers.ChoiceField(choices=CARD_POOLS, required=True, allow_blank=False)
     card_role_mode = serializers.ChoiceField(
         choices=("automatic", "override"),
         required=False,

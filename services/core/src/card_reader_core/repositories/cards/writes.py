@@ -4,6 +4,7 @@ from pathlib import Path
 
 from django.db import transaction
 
+from card_reader_core.database import retry_sqlite_write
 from card_reader_core.models import (
     Card,
     CardClassificationInferenceEvidence,
@@ -97,6 +98,7 @@ def save_parsed_card(
     ).version
 
 
+@retry_sqlite_write
 def save_parsed_card_result(
     *,
     item: ImportJobItem,

@@ -123,6 +123,32 @@ def test_create_import_upload_rejects_unknown_template() -> None:
     assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
 
 
+@pytest.mark.parametrize("omitted_field", ["template_id", "card_pool"])
+def test_create_import_upload_requires_explicit_card_setup(omitted_field: str) -> None:
+    existing_job_count = ImportJob.objects.count()
+    payload: dict[str, object] = {
+        "creation_key": str(uuid4()),
+        "card_pool": "player",
+        "template_id": "mtg-like-v1",
+        "content_version_base": "14.1",
+        "content_version_description": "Required card setup.",
+        "options_json": "{}",
+        "files": SimpleUploadedFile(
+            "card.png", b"fake-image-content", content_type="image/png"
+        ),
+    }
+    payload.pop(omitted_field)
+
+    response = _staff_client(f"import-missing-{omitted_field}-user").post(
+        "/imports/upload",
+        data=payload,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "This field is required."
+    assert ImportJob.objects.count() == existing_job_count
+
+
 def test_create_import_upload_rejects_unsupported_files() -> None:
     response = _staff_client("import-unsupported-files-user").post(
         "/imports/upload",

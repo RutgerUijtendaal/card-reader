@@ -64,6 +64,8 @@
                   <AppSelect
                     v-model="pickerTemplateId"
                     :options="templateOptions"
+                    placeholder="Select a template"
+                    placeholder-disabled
                     :disabled="formLocked"
                     required
                   />
@@ -73,6 +75,8 @@
                   <AppSelect
                     :model-value="cardPool"
                     :options="cardPoolOptions"
+                    placeholder="Select a card pool"
+                    placeholder-disabled
                     :disabled="formLocked"
                     required
                     @update:model-value="setCardPool"
@@ -332,6 +336,8 @@
                 :disabled="
                   pickedFiles.length === 0 ||
                     templates.length === 0 ||
+                    pickerTemplateId === null ||
+                    cardPool === null ||
                     !hasValidVersionInput ||
                     creatingJob || createState.phase === 'reconciling'
                 "
