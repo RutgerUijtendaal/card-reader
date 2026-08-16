@@ -12,7 +12,10 @@ from card_reader_core.models import (
     CardPool,
     Symbol,
 )
-from card_reader_core.services.templates import MAX_MANA_BADGE_OCR_SCALE
+from card_reader_core.services.templates import (
+    MAX_MANA_BADGE_OCR_ATTEMPTS,
+    MAX_MANA_BADGE_OCR_SCALE,
+)
 from PIL import Image
 
 from ..ocr_runner import OcrRunner
@@ -39,6 +42,7 @@ class ManaBadgeOcrResult:
     confidence: float
     lines: list[dict[str, Any]]
     scale: int
+    bounds: tuple[int, int, int, int]
 
 
 class NameManaCostParser:
@@ -138,13 +142,20 @@ class NameManaCostParser:
                 if has_variable_x:
                     mana_symbol_keys.append("x")
 
+        primary_ocr_contains_confirmed_badge_x = bool(
+            mana_badge_result is not None
+            and mana_badge_result.mana_cost == "X"
+            and self._primary_ocr_contains_badge_token(
+                filtered_lines,
+                token="X",
+                bounds=mana_badge_result.bounds,
+            )
+        )
         name = (
             self._extract_name(
                 full_text,
                 has_mana=has_mana,
-                confirmed_variable_x=bool(
-                    mana_badge_result is not None and mana_badge_result.mana_cost == "X"
-                ),
+                confirmed_variable_x=primary_ocr_contains_confirmed_badge_x,
             )
             or image_stem
         )
@@ -156,9 +167,13 @@ class NameManaCostParser:
                 part for part in (full_text, mana_badge_result.text) if part
             )
             result_lines = [*filtered_lines, *mana_badge_result.lines]
-            result_confidence = self._combined_confidence(
-                ocr_text.confidence,
-                mana_badge_result.confidence,
+
+        field_confidences = {"name": ocr_text.confidence}
+        if has_mana:
+            field_confidences["mana_cost"] = (
+                mana_badge_result.confidence
+                if mana_badge_result is not None
+                else ocr_text.confidence
             )
 
         logger.info(
@@ -212,6 +227,7 @@ class NameManaCostParser:
             lines=result_lines,
             detected_symbols=detected_symbols,
             normalized_fields=normalized_fields,
+            field_confidences=field_confidences,
             debug={
                 "card_pool": card_pool,
                 "mana_source": mana_source,
@@ -333,6 +349,7 @@ class NameManaCostParser:
                         scale=scale,
                     ),
                     scale=scale,
+                    bounds=(left, top, left + badge.width, top + badge.height),
                 ),
                 attempted_texts,
             )
@@ -378,14 +395,37 @@ class NameManaCostParser:
     def _resolve_mana_badge_scales(self, raw: Any) -> tuple[int, ...]:
         if not isinstance(raw, list):
             return self._DEFAULT_MANA_BADGE_OCR_SCALES
-        scales = tuple(
-            value
-            for value in raw
-            if isinstance(value, int)
-            and not isinstance(value, bool)
-            and 0 < value <= MAX_MANA_BADGE_OCR_SCALE
-        )
-        return scales or self._DEFAULT_MANA_BADGE_OCR_SCALES
+        scales: list[int] = []
+        for value in raw:
+            if (
+                not isinstance(value, int)
+                or isinstance(value, bool)
+                or not 0 < value <= MAX_MANA_BADGE_OCR_SCALE
+                or value in scales
+            ):
+                continue
+            scales.append(value)
+            if len(scales) == MAX_MANA_BADGE_OCR_ATTEMPTS:
+                break
+        return tuple(scales) or self._DEFAULT_MANA_BADGE_OCR_SCALES
+
+    def _primary_ocr_contains_badge_token(
+        self,
+        lines: list[dict[str, Any]],
+        *,
+        token: str,
+        bounds: tuple[int, int, int, int],
+    ) -> bool:
+        left, top, right, bottom = bounds
+        for line in lines:
+            if str(line.get("text", "")).strip().upper() != token.upper():
+                continue
+            x = line.get("x")
+            y = line.get("y")
+            if isinstance(x, (int, float)) and isinstance(y, (int, float)):
+                if left <= float(x) <= right and top <= float(y) <= bottom:
+                    return True
+        return False
 
     def _normalize_badge_lines(
         self,
@@ -421,10 +461,6 @@ class NameManaCostParser:
 
     def _safe_lines(self, raw: Any) -> list[dict[str, Any]]:
         return raw if isinstance(raw, list) else []
-
-    def _combined_confidence(self, primary: float, badge: float) -> float:
-        values = [value for value in (primary, badge) if value > 0.0]
-        return float(sum(values) / len(values)) if values else 0.0
 
     def _mana_symbol_keys(self, rows: list[DetectedSymbol]) -> list[str]:
         ordered = sorted(rows, key=lambda row: row.bbox.x)

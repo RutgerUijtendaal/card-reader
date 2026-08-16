@@ -15,6 +15,7 @@ class RegionParseResult:
     lines: list[dict[str, Any]] = field(default_factory=list)
     detected_symbols: list[DetectedSymbol] = field(default_factory=list)
     normalized_fields: dict[str, str] = field(default_factory=dict)
+    field_confidences: dict[str, float] = field(default_factory=dict)
     extracted_keyword_ids: list[str] = field(default_factory=list)
     extracted_tag_ids: list[str] = field(default_factory=list)
     extracted_type_ids: list[str] = field(default_factory=list)

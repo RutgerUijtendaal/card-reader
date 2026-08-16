@@ -8,6 +8,7 @@ ATTACK = "attack"
 HEALTH = "health"
 AFFINITY = "affinity"
 MAX_MANA_BADGE_OCR_SCALE = 4
+MAX_MANA_BADGE_OCR_ATTEMPTS = 4
 
 TEMPLATE_PARSER_TYPES = (
     NAME,
@@ -25,6 +26,7 @@ __all__ = [
     "AFFINITY",
     "ATTACK",
     "HEALTH",
+    "MAX_MANA_BADGE_OCR_ATTEMPTS",
     "MAX_MANA_BADGE_OCR_SCALE",
     "NAME",
     "NAME_MANA_COST",

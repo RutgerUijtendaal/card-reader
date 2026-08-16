@@ -56,12 +56,14 @@ def _parser_result(
     text: str = "",
     confidence: float = 0.0,
     normalized_fields: dict[str, str] | None = None,
+    field_confidences: dict[str, float] | None = None,
 ) -> RegionParseResult:
     return RegionParseResult(
         region_name=region_name,
         text=text,
         confidence=confidence,
         normalized_fields=normalized_fields or {},
+        field_confidences=field_confidences or {},
     )
 
 
@@ -210,6 +212,22 @@ def test_card_parser_reports_zero_mana_confidence_when_pool_cost_is_missing(tmp_
     assert parser._name_mana_cost_parser.calls[0]["card_pool"] == "neutral"
     assert parsed.confidence["name"] == 0.91
     assert parsed.confidence["mana_cost"] == 0.0
+
+
+def test_card_parser_uses_field_specific_name_and_mana_confidences() -> None:
+    parser = CardParser.__new__(CardParser)
+    result = _parser_result(
+        "top_bar",
+        confidence=0.4,
+        normalized_fields={"name": "Counter Rune", "mana_cost": "X"},
+        field_confidences={"name": 0.4, "mana_cost": 0.8},
+    )
+
+    confidence = parser._confidence_breakdown({"name_mana_cost": result})
+
+    assert confidence["name"] == 0.4
+    assert confidence["mana_cost"] == 0.8
+    assert confidence["overall"] == 0.4
 
 
 def test_card_parser_uses_second_rules_text_region_as_fallback(tmp_path: Path) -> None:

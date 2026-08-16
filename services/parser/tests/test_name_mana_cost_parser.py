@@ -36,10 +36,14 @@ class StubOcrRunner:
         text: str | list[str],
         *,
         lines: list[str] | None = None,
+        line_rows: list[dict[str, Any]] | None = None,
         confidences: list[float] | None = None,
     ) -> None:
         self._texts = text if isinstance(text, list) else [text]
-        self._lines = lines or [self._texts[0]]
+        self._lines = line_rows or [
+            {"text": line, "confidence": (confidences or [0.9])[0]}
+            for line in (lines or [self._texts[0]])
+        ]
         self._confidences = confidences or [0.9]
         self.calls: list[tuple[int, int]] = []
 
@@ -49,11 +53,15 @@ class StubOcrRunner:
         call_index = len(self.calls) - 1
         text = self._texts[min(call_index, len(self._texts) - 1)]
         confidence = self._confidences[min(call_index, len(self._confidences) - 1)]
-        lines = self._lines if len(self.calls) == 1 else [text]
+        lines = (
+            self._lines
+            if len(self.calls) == 1
+            else [{"text": text, "confidence": confidence}]
+        )
         return {
             "text": text,
             "confidence": confidence,
-            "lines": [{"text": line, "confidence": confidence} for line in lines],
+            "lines": lines,
         }
 
 
@@ -231,7 +239,8 @@ def test_evil_name_mana_cost_parser_reads_isolated_badge_with_scaled_fallback(
         badge_text,
     ]
     assert result.lines[-1]["ocr_source"] == "mana_badge"
-    assert result.confidence == pytest.approx(0.6)
+    assert result.confidence == pytest.approx(0.4)
+    assert result.field_confidences == {"name": 0.4, "mana_cost": 0.8}
 
 
 def test_evil_name_mana_cost_parser_does_not_treat_trailing_title_x_as_mana() -> None:
@@ -253,6 +262,10 @@ def test_evil_name_mana_cost_parser_does_not_treat_trailing_title_x_as_mana() ->
 def test_evil_name_mana_cost_parser_removes_spatially_confirmed_x_from_name() -> None:
     result, _ocr_runner = _parse_with_runner(
         text=["Counter Rune X", "X"],
+        line_rows=[
+            {"text": "Counter Rune", "confidence": 0.9, "x": 70, "y": 20},
+            {"text": "X", "confidence": 0.9, "x": 190, "y": 20},
+        ],
         detections=[],
         card_pool=EVIL_CARD_POOL,
         expected_detector_calls=0,
@@ -263,6 +276,22 @@ def test_evil_name_mana_cost_parser_removes_spatially_confirmed_x_from_name() ->
     assert result.normalized_fields["mana_cost"] == "X"
     assert result.normalized_fields["mana_total"] == "0"
     assert result.normalized_fields["mana_symbols"] == "x"
+
+
+def test_evil_name_mana_cost_parser_preserves_title_x_with_separate_x_badge() -> None:
+    result, _ocr_runner = _parse_with_runner(
+        text=["Project X", "X"],
+        line_rows=[
+            {"text": "Project X", "confidence": 0.9, "x": 70, "y": 20},
+        ],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
+    )
+
+    assert result.normalized_fields["name"] == "Project X"
+    assert result.normalized_fields["mana_cost"] == "X"
 
 
 def test_evil_name_mana_cost_parser_rejects_unsafe_badge_scale() -> None:
@@ -282,6 +311,25 @@ def test_evil_name_mana_cost_parser_rejects_unsafe_badge_scale() -> None:
 
     assert result.normalized_fields["mana_cost"] == "1"
     assert ocr_runner.calls == [(200, 40), (56, 80)]
+
+
+def test_evil_name_mana_cost_parser_deduplicates_badge_scales() -> None:
+    region_spec = {
+        "mana_badge_ocr": {
+            "cut_region": MANA_BADGE_OCR_CONFIG["mana_badge_ocr"]["cut_region"],
+            "scales": [3, 3, 2, 2],
+        }
+    }
+    result, ocr_runner = _parse_with_runner(
+        text=["Amulet of Order", "", "1"],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=region_spec,
+    )
+
+    assert result.normalized_fields["mana_cost"] == "1"
+    assert ocr_runner.calls == [(200, 40), (84, 120), (56, 80)]
 
 
 def test_neutral_name_mana_cost_parser_leaves_cost_fields_empty() -> None:
@@ -304,6 +352,7 @@ def _parse(
     text: str | list[str],
     detections: list[DetectedSymbol],
     lines: list[str] | None = None,
+    line_rows: list[dict[str, Any]] | None = None,
     card_pool: CardPool = PLAYER_CARD_POOL,
     expected_detector_calls: int = 1,
     region_spec: dict[str, Any] | None = None,
@@ -313,6 +362,7 @@ def _parse(
         text=text,
         detections=detections,
         lines=lines,
+        line_rows=line_rows,
         card_pool=card_pool,
         expected_detector_calls=expected_detector_calls,
         region_spec=region_spec,
@@ -326,13 +376,19 @@ def _parse_with_runner(
     text: str | list[str],
     detections: list[DetectedSymbol],
     lines: list[str] | None = None,
+    line_rows: list[dict[str, Any]] | None = None,
     card_pool: CardPool = PLAYER_CARD_POOL,
     expected_detector_calls: int = 1,
     region_spec: dict[str, Any] | None = None,
     confidences: list[float] | None = None,
 ) -> tuple[Any, StubOcrRunner]:
     detector = StubSymbolDetector(detections)
-    ocr_runner = StubOcrRunner(text, lines=lines, confidences=confidences)
+    ocr_runner = StubOcrRunner(
+        text,
+        lines=lines,
+        line_rows=line_rows,
+        confidences=confidences,
+    )
     parser = NameManaCostParser(ocr_runner, detector)
     result = parser.parse(
         region_name="top_bar",

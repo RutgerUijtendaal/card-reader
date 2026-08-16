@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import Any
 
 from card_reader_core.models import Template
@@ -15,6 +16,7 @@ from card_reader_core.repositories.templates import (
     update_template,
 )
 from .parser_types import (
+    MAX_MANA_BADGE_OCR_ATTEMPTS,
     MAX_MANA_BADGE_OCR_SCALE,
     NAME_PRODUCING_TEMPLATE_PARSER_TYPES,
     NAME_MANA_COST,
@@ -190,14 +192,20 @@ class TemplateService:
             raise ValueError(f"{field} is supported only for name_mana_cost regions")
         if not isinstance(config, dict):
             raise ValueError(f"{field} must be an object")
-        if not isinstance(config.get("cut_region"), dict):
+        cut_region = config.get("cut_region")
+        if not isinstance(cut_region, dict):
             raise ValueError(f"{field}.cut_region must be an object")
+        self._validate_mana_badge_cut_region(cut_region, field=f"{field}.cut_region")
 
         scales = config.get("scales")
         if scales is None:
             return
         if not isinstance(scales, list) or not scales:
             raise ValueError(f"{field}.scales must be a non-empty array")
+        if len(scales) > MAX_MANA_BADGE_OCR_ATTEMPTS:
+            raise ValueError(
+                f"{field}.scales may contain at most {MAX_MANA_BADGE_OCR_ATTEMPTS} values"
+            )
         if any(
             not isinstance(scale, int)
             or isinstance(scale, bool)
@@ -207,3 +215,33 @@ class TemplateService:
             raise ValueError(
                 f"{field}.scales values must be integers from 1 to {MAX_MANA_BADGE_OCR_SCALE}"
             )
+
+    def _validate_mana_badge_cut_region(
+        self,
+        bounds: dict[str, object],
+        *,
+        field: str,
+    ) -> None:
+        unit = str(bounds.get("unit", "relative")).strip().lower()
+        if unit not in {"relative", "absolute"}:
+            raise ValueError(f"{field}.unit must be relative or absolute")
+
+        values: dict[str, float] = {}
+        for key in ("x", "y", "w", "h"):
+            raw = bounds.get(key)
+            if (
+                not isinstance(raw, (int, float))
+                or isinstance(raw, bool)
+                or not math.isfinite(raw)
+            ):
+                raise ValueError(f"{field}.{key} must be a finite number")
+            values[key] = float(raw)
+
+        if values["x"] < 0 or values["y"] < 0:
+            raise ValueError(f"{field}.x and {field}.y must be non-negative")
+        if values["w"] <= 0 or values["h"] <= 0:
+            raise ValueError(f"{field}.w and {field}.h must be greater than zero")
+        if unit == "relative" and (
+            values["x"] + values["w"] > 1 or values["y"] + values["h"] > 1
+        ):
+            raise ValueError(f"{field} must fit within the relative parent region")
