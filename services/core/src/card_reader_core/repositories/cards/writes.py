@@ -229,6 +229,7 @@ def save_parsed_card_result(
             _resolve_corrected_import_card(
                 checksum=checksum,
                 card_pool=card_pool,
+                resolved_card_roles=resolved_card_roles,
                 resolved_card_factions=resolved_card_factions,
             )
             if reparse_existing
@@ -348,6 +349,7 @@ def _resolve_corrected_import_card(
     *,
     checksum: str,
     card_pool: CardPool,
+    resolved_card_roles: tuple[CardRole, ...],
     resolved_card_factions: tuple[CardFaction, ...],
 ) -> Card | None:
     """Recover one same-pool manual faction correction from its completed import."""
@@ -357,8 +359,12 @@ def _resolve_corrected_import_card(
             status=ImportJobStatus.completed,
             job__card_pool=card_pool,
             target_card_pool_snapshot__isnull=True,
+            resolved_card_roles_json=list(resolved_card_roles),
             resolved_card_factions_json=list(resolved_card_factions),
             classification_inference_json__live_classification__card_pool=card_pool,
+            classification_inference_json__live_classification__card_roles=list(
+                resolved_card_roles
+            ),
             classification_inference_json__live_classification__card_factions=list(
                 resolved_card_factions
             ),

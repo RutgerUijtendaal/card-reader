@@ -449,6 +449,57 @@ def test_reimport_does_not_treat_targeted_classification_mismatch_as_correction(
 
 
 @pytest.mark.django_db
+def test_reimport_does_not_treat_role_mismatch_as_faction_correction() -> None:
+    template = Template.objects.create(key="role-mismatch-import", label="Role Mismatch")
+    source_path = build_storage_relative_path("uploads", "role-mismatch", "source.webp")
+    path = settings.storage_root_dir / source_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"role-mismatch-art")
+
+    def import_card(*, name: str, roles: tuple[CardRole, ...]) -> tuple[CardVersion, ImportJobItem]:
+        job = ImportJob.objects.create(
+            source_path="uploads/role-mismatch",
+            template=template,
+            card_pool="evil",
+            total_items=1,
+        )
+        item = ImportJobItem.objects.create(job=job, source_file=source_path)
+        version = save_parsed_card(
+            item=item,
+            template_id=template.key,
+            checksum="role-mismatch-art",
+            normalized_fields={"name": name},
+            confidence={"overall": 1.0},
+            raw_ocr={},
+            card_pool="evil",
+            resolved_card_roles=roles,
+            resolved_card_factions=(),
+        )
+        item.refresh_from_db()
+        return version, item
+
+    original_version, _original_item = import_card(
+        name="Role Mismatch Card",
+        roles=("boss",),
+    )
+    mismatch_version, mismatch_item = import_card(
+        name="Role Mismatch Card",
+        roles=(),
+    )
+    assert mismatch_version.card_id == original_version.card_id
+    assert mismatch_item.warning_code == "card_classification_mismatch"
+
+    change_card_identity(card=original_version.card, card_factions=("order",))
+    independent_version, _independent_item = import_card(
+        name="Independent Role Mismatch Card",
+        roles=(),
+    )
+
+    assert independent_version.card_id != original_version.card_id
+    assert card_faction_keys(independent_version.card) == ()
+
+
+@pytest.mark.django_db
 def test_reimport_does_not_cross_faction_namespace_when_corrected_image_is_ambiguous() -> None:
     template = Template.objects.create(key="ambiguous-faction-import", label="Ambiguous Faction")
     corrected_cards = []
@@ -478,7 +529,15 @@ def test_reimport_does_not_cross_faction_namespace_when_corrected_image_is_ambig
             target_card=card,
             target_card_version=version,
             status="completed",
+            resolved_card_roles_json=[],
             resolved_card_factions_json=[],
+            classification_inference_json={
+                "live_classification": {
+                    "card_pool": "evil",
+                    "card_roles": [],
+                    "card_factions": [],
+                }
+            },
         )
         corrected_cards.append(card)
 
