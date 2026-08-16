@@ -57,7 +57,7 @@ def add_mtg_like_mana_badge_ocr(
 
 
 class Migration(migrations.Migration):
-    dependencies = [("card_reader_core", "0057_card_classification_review_item")]
+    dependencies = [("card_reader_core", "0058_add_mana_card_role")]
 
     operations = [
         migrations.RunPython(

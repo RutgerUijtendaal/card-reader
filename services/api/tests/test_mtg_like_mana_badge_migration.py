@@ -5,8 +5,8 @@ from django.db.migrations.executor import MigrationExecutor
 import pytest
 
 
-BASE_MIGRATION = ("card_reader_core", "0057_card_classification_review_item")
-TARGET_MIGRATION = ("card_reader_core", "0058_add_mtg_like_mana_badge_ocr")
+BASE_MIGRATION = ("card_reader_core", "0058_add_mana_card_role")
+TARGET_MIGRATION = ("card_reader_core", "0059_add_mtg_like_mana_badge_ocr")
 
 
 def _migrate_to(target: tuple[str, str]):
