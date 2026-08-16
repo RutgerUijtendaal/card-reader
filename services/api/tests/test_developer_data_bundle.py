@@ -356,7 +356,7 @@ def test_import_accepts_only_unmodified_migration_defaults(
 
         assert result.counts["cards"] == 4
         assert Template.objects.filter(key="full-height", label="Full height").exists()
-        assert CardClassificationRule.objects.count() == 14
+        assert CardClassificationRule.objects.count() == 16
         transaction.set_rollback(True)
 
 

@@ -78,7 +78,11 @@ def test_mana_role_migration_reuses_type_seeds_rules_and_backfills_latest_types(
         identifiers_json=["existing mana"],
     )
     other_type = Type.objects.create(key="other-mana-migration", label="Other")
-    template = Template.objects.get(key="full-height")
+    template = Template.objects.create(
+        key="mana-role-migration-template",
+        label="Mana role migration template",
+        definition_json={},
+    )
 
     player, player_version = _create_card_version(
         old_apps,
