@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+
 from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 import pytest
@@ -85,6 +88,12 @@ def test_final_state_migration_backfills_master_data_and_reverses_hero_roles() -
 
     assert NewImportJob.objects.get(id=job.id).creation_key
     assert NewImportJob.objects.get(id=job.id).card_pool == "player"
+    snapshot = NewImportJob.objects.get(id=job.id).classification_rule_snapshot_json
+    snapshot_body = {"schema_version": 1, "card_pool": "player", "rules": []}
+    expected_digest = hashlib.sha256(
+        json.dumps(snapshot_body, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    assert snapshot == {**snapshot_body, "digest": expected_digest}
     assert NewImportJobItem.objects.get(id=item.id).warnings_json == [
         {"code": "legacy_warning", "message": "Legacy warning message."}
     ]

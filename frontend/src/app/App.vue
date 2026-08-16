@@ -146,7 +146,7 @@ const hoverModeOverrides = {
   notifications: hoverModePreferences.getOverrideHoverMode('notifications'),
 } satisfies Record<HoverModeSurface, ReturnType<typeof hoverModePreferences.getOverrideHoverMode>>;
 const activeHoverModeSurface = computed(() => resolveHoverModeSurfacePath(route.path));
-const routeViewKey = computed(() => resolveRouteViewKey(route.path));
+const routeViewKey = computed(() => resolveRouteViewKey(route.path, workspace.generation));
 const hoverModeHotkeyActions = computed(() => {
   if (!globalHotkeysEnabled.value) {
     return null;

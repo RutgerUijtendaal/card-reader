@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Any
 from uuid import uuid4
 
@@ -24,6 +26,16 @@ CARD_FACTION_CHOICES = [
     ("metal", "Metal"),
 ]
 EMPTY_FACTION_IDENTITY_KEY = "[]"
+
+
+def empty_player_classification_snapshot() -> dict[str, object]:
+    body: dict[str, object] = {
+        "schema_version": 1,
+        "card_pool": "player",
+        "rules": [],
+    }
+    encoded = json.dumps(body, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return {**body, "digest": hashlib.sha256(encoded).hexdigest()}
 
 
 def populate_master_data(apps: Any, _schema_editor: Any) -> None:
@@ -63,9 +75,11 @@ def populate_master_data(apps: Any, _schema_editor: Any) -> None:
                 f"as another card's alias: '{alias.key}'. Resolve the collision before retrying."
             )
 
+    legacy_classification_snapshot = empty_player_classification_snapshot()
     for job in ImportJob.objects.iterator():
         job.creation_key = str(uuid4())
-        job.save(update_fields=["creation_key"])
+        job.classification_rule_snapshot_json = legacy_classification_snapshot
+        job.save(update_fields=["creation_key", "classification_rule_snapshot_json"])
 
     for item in ImportJobItem.objects.iterator():
         if item.warning_code or item.warning_message:
@@ -116,7 +130,14 @@ def restore_master_hero_flags(apps: Any, _schema_editor: Any) -> None:
         or ImportJob.objects.exclude(card_faction_override_json=[]).exists()
     ):
         unsupported.append("import classification configuration")
-    if ImportJob.objects.exclude(classification_rule_snapshot_json={}).exists():
+    representable_snapshots: tuple[dict[str, object], ...] = (
+        {},
+        empty_player_classification_snapshot(),
+    )
+    if any(
+        job.classification_rule_snapshot_json not in representable_snapshots
+        for job in ImportJob.objects.only("classification_rule_snapshot_json").iterator()
+    ):
         unsupported.append("classification rule snapshots")
     if (
         ImportJobItem.objects.exclude(classification_inference_json={}).exists()
