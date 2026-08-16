@@ -366,7 +366,13 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
     with pytest.raises(RuntimeError, match="card mana-family assignments"):
         _migrate_to(BASE_MIGRATION)
     custom_assignment.delete()
-    Assignment.objects.create(card_id=evil.id, mana_family="arcane")
+    matching_non_player_assignment = Assignment.objects.create(
+        card_id=evil.id,
+        mana_family="arcane",
+    )
+    with pytest.raises(RuntimeError, match="non-Player card mana-family assignments"):
+        _migrate_to(BASE_MIGRATION)
+    matching_non_player_assignment.delete()
 
     with pytest.raises(RuntimeError, match="classification rule snapshots"):
         _migrate_to(BASE_MIGRATION)

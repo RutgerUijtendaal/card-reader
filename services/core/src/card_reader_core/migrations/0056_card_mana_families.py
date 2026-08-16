@@ -378,13 +378,17 @@ def guard_mana_family_downgrade(apps: Any, _schema_editor: Any) -> None:
 
     unsupported: list[str] = []
 
+    if CardAssignment.objects.exclude(card__card_pool="player").exists():
+        unsupported.append("non-Player card mana-family assignments")
+
     assigned_by_card: dict[str, set[str]] = {}
-    for card_id, mana_family in CardAssignment.objects.values_list(
-        "card_id", "mana_family"
-    ).iterator():
+    for card_id, mana_family in CardAssignment.objects.filter(
+        card__card_pool="player"
+    ).values_list("card_id", "mana_family").iterator():
         assigned_by_card.setdefault(str(card_id), set()).add(str(mana_family))
     symbol_families_by_card: dict[str, set[str]] = {}
     latest_symbol_links = VersionSymbol.objects.filter(
+        card_version__card__card_pool="player",
         card_version__card__latest_version_id=models.F("card_version_id"),
         symbol__key__in=tuple(FAMILY_BY_SYMBOL),
     ).values_list("card_version__card_id", "symbol__key")
