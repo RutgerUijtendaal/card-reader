@@ -340,6 +340,7 @@ def test_maintenance_reparse_rolls_back_every_group_when_later_creation_fails(
             card_pool="player",
             card_roles=(),
             card_factions=(),
+            card_mana_families=(),
         ),
         LatestCardVersionReparseSource(
             card_id="game-master-card",
@@ -349,6 +350,7 @@ def test_maintenance_reparse_rolls_back_every_group_when_later_creation_fails(
             card_pool="evil",
             card_roles=(),
             card_factions=(),
+            card_mana_families=(),
         ),
     ]
     creation_count = 0
