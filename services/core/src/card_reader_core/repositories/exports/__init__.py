@@ -53,7 +53,7 @@ def export_cards_csv(
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
     template_id: str | None = None,
-    card_pool: CardPool = DEFAULT_CARD_POOL,
+    card_pool: CardPool | None = DEFAULT_CARD_POOL,
     card_roles: list[CardRoleFilter] | None = None,
     card_role_exclude: list[CardRoleFilter] | None = None,
     card_role_match: str = "any",

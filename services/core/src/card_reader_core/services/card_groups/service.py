@@ -12,6 +12,7 @@ from card_reader_core.repositories.card_groups import (
     delete_card_group,
     get_card_group,
     get_card_group_for_pool,
+    get_card_groups,
     get_cards,
     list_card_groups,
     list_card_groups_for_card,
@@ -37,6 +38,9 @@ class CardGroupService:
 
     def get_group_for_pool(self, group_id: str, *, card_pool: CardPool) -> CardGroup | None:
         return get_card_group_for_pool(group_id, card_pool=card_pool)
+
+    def get_groups(self, group_ids: list[str]) -> list[CardGroup]:
+        return get_card_groups(group_ids)
 
     def get_groups_for_card(self, card_id: str) -> list[CardGroup]:
         return list_card_groups_for_card(card_id)

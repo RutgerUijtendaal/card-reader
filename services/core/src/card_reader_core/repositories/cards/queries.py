@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Collection
 from typing import Any, cast
 
-from django.db.models import Count, F, Prefetch, Q, QuerySet
+from django.db.models import Count, F, Prefetch, Q, QuerySet, Subquery
 
 from card_reader_core.metadata import normalize_mana_family_keys
 from card_reader_core.models import (
@@ -13,6 +13,8 @@ from card_reader_core.models import (
     Card,
     CardFaction,
     CardFactionAssignment,
+    CardGroup,
+    CardGroupMember,
     CardPool,
     CardRoleAssignment,
     CardRoleFilter,
@@ -26,6 +28,7 @@ from card_reader_core.models import (
     CardVersionType,
     Type,
     active_card_lifecycle_q,
+    card_lifecycle_filter_q,
     card_role_keys,
     card_faction_keys,
     card_mana_family_keys,
@@ -34,7 +37,12 @@ from card_reader_core.models import (
 from card_reader_core.search.cards import apply_card_search
 
 from .images import resolve_image_file_path, select_usable_card_image
-from .sorting import apply_default_card_sort, apply_type_card_sort
+from .sorting import (
+    apply_default_card_group_sort,
+    apply_default_card_sort,
+    apply_type_card_sort,
+    card_default_sort_key,
+)
 from .types import (
     CARD_SORT_DEFAULT,
     CARD_SORT_MANA_ASC,
@@ -46,11 +54,14 @@ from .types import (
     DEFAULT_CARD_PAGE_SIZE,
     DEFAULT_CARD_LIFECYCLE_FILTER,
     CardListCandidate,
+    CardFilterParams,
     CardLifecycleFilter,
     CardListRow,
     CardSort,
     LatestCardVersionReparseSource,
+    GroupedCardListReference,
     PaginatedCardList,
+    PaginatedGroupedCardList,
 )
 
 def list_cards(
@@ -84,7 +95,7 @@ def list_cards(
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
     template_id: str | None = None,
-    card_pool: CardPool = DEFAULT_CARD_POOL,
+    card_pool: CardPool | None = DEFAULT_CARD_POOL,
     card_roles: list[CardRoleFilter] | None = None,
     card_role_exclude: list[CardRoleFilter] | None = None,
     card_role_match: str = "any",
@@ -212,7 +223,7 @@ def list_matching_cards(
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
     template_id: str | None = None,
-    card_pool: CardPool = DEFAULT_CARD_POOL,
+    card_pool: CardPool | None = DEFAULT_CARD_POOL,
     card_roles: list[CardRoleFilter] | None = None,
     card_role_exclude: list[CardRoleFilter] | None = None,
     card_role_match: str = "any",
@@ -304,7 +315,7 @@ def list_matching_card_candidates(
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
     template_id: str | None = None,
-    card_pool: CardPool = DEFAULT_CARD_POOL,
+    card_pool: CardPool | None = DEFAULT_CARD_POOL,
     card_roles: list[CardRoleFilter] | None = None,
     card_role_exclude: list[CardRoleFilter] | None = None,
     card_role_match: str = "any",
@@ -365,6 +376,145 @@ def list_matching_card_candidates(
     return _hydrate_card_list_candidates(
         version_ids,
         include_types=sort == CARD_SORT_TYPES_ASC,
+    )
+
+
+def list_default_grouped_card_references(
+    filters: CardFilterParams,
+    *,
+    page: int,
+    page_size: int,
+) -> PaginatedGroupedCardList:
+    card_pool = filters["card_pool"]
+    if card_pool is None:
+        raise ValueError("Grouped default sorting requires one explicit card pool.")
+
+    matching_versions = _build_filtered_versions_from_params(filters)
+    matching_card_ids = matching_versions.order_by().values("card_id")
+    participating_groups = CardGroup.objects.filter(
+        anchor_card__card_pool=card_pool,
+        anchor_card__latest_version__isnull=False,
+        members__card_id__in=Subquery(matching_card_ids),
+    ).distinct()
+    participating_group_ids = participating_groups.order_by().values("id")
+    participant_card_ids = (
+        CardGroupMember.objects.filter(
+            group_id__in=Subquery(participating_group_ids),
+            card__card_pool=card_pool,
+        )
+        .filter(
+            card_lifecycle_filter_q(
+                filters["lifecycle_status"],
+                field_path="card__lifecycle_status",
+            )
+        )
+        .values("card_id")
+    )
+    standalone_versions = matching_versions.exclude(
+        card_id__in=Subquery(participant_card_ids)
+    )
+
+    normalized_page = max(page, 1)
+    normalized_page_size = max(1, min(page_size, 100))
+    offset = (normalized_page - 1) * normalized_page_size
+    candidate_limit = offset + normalized_page_size
+    total_count = standalone_versions.count() + participating_groups.count()
+
+    ordered_standalone = apply_default_card_sort(
+        standalone_versions,
+        card_pool=card_pool,
+    )
+    standalone_candidates = list(
+        ordered_standalone.select_related("card")
+        .prefetch_related(
+            "card__role_assignments",
+            "card__faction_assignments",
+        )[:candidate_limit]
+    )
+    ordered_groups = apply_default_card_group_sort(
+        participating_groups,
+        card_pool=card_pool,
+    )
+    group_candidates = list(
+        ordered_groups.select_related(
+            "anchor_card",
+            "anchor_card__latest_version",
+        )
+        .prefetch_related(
+            "anchor_card__role_assignments",
+            "anchor_card__faction_assignments",
+        )[:candidate_limit]
+    )
+
+    sortable_references: list[
+        tuple[tuple[object, ...], GroupedCardListReference]
+    ] = []
+    for version in standalone_candidates:
+        item_id = version.card.id
+        sortable_references.append(
+            (
+                (
+                    *card_default_sort_key(
+                        card_pool=card_pool,
+                        card_id=version.card.id,
+                        label=version.card.label,
+                        name=version.name,
+                        mana_family_sort_key=version.card.mana_family_sort_key,
+                        mana_value=version.mana_value,
+                        card_roles=card_role_keys(version.card),
+                        card_factions=card_faction_keys(version.card),
+                    ),
+                    item_id,
+                ),
+                GroupedCardListReference(
+                    result_type="card",
+                    item_id=item_id,
+                    card_version_id=version.id,
+                    group_id=None,
+                ),
+            )
+        )
+    for group in group_candidates:
+        anchor_version = group.anchor_card.latest_version
+        if anchor_version is None:
+            continue
+        item_id = group.id
+        sortable_references.append(
+            (
+                (
+                    *card_default_sort_key(
+                        card_pool=card_pool,
+                        card_id=group.anchor_card.id,
+                        label=group.anchor_card.label,
+                        name=anchor_version.name,
+                        mana_family_sort_key=group.anchor_card.mana_family_sort_key,
+                        mana_value=anchor_version.mana_value,
+                        card_roles=card_role_keys(group.anchor_card),
+                        card_factions=card_faction_keys(group.anchor_card),
+                    ),
+                    item_id,
+                ),
+                GroupedCardListReference(
+                    result_type="card_group",
+                    item_id=item_id,
+                    card_version_id=None,
+                    group_id=group.id,
+                ),
+            )
+        )
+
+    sortable_references.sort(key=lambda row: row[0])
+    page_references = [
+        reference
+        for _sort_key, reference in sortable_references[
+            offset : offset + normalized_page_size
+        ]
+    ]
+    return PaginatedGroupedCardList(
+        count=total_count,
+        page=normalized_page,
+        page_size=normalized_page_size,
+        results=page_references,
     )
 
 
@@ -487,7 +637,7 @@ def list_filtered_latest_card_version_reparse_sources(
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
     template_id: str | None = None,
-    card_pool: CardPool = DEFAULT_CARD_POOL,
+    card_pool: CardPool | None = DEFAULT_CARD_POOL,
     card_roles: list[CardRoleFilter] | None = None,
     card_role_exclude: list[CardRoleFilter] | None = None,
     card_role_match: str = "any",
@@ -817,6 +967,54 @@ def exclude_by_mana_families(
     return queryset.exclude(card_id__in=card_ids)
 
 
+def _build_filtered_versions_from_params(
+    filters: CardFilterParams,
+) -> QuerySet[CardVersion]:
+    return _build_filtered_versions_queryset(
+        query=filters["query"],
+        card_ids=filters["card_ids"],
+        max_confidence=filters["max_confidence"],
+        keyword_ids=filters["keyword_ids"],
+        keyword_match=filters["keyword_match"],
+        tag_ids=filters["tag_ids"],
+        tag_match=filters["tag_match"],
+        mana_symbol_ids=filters["mana_symbol_ids"],
+        mana_symbol_exclude_ids=filters["mana_symbol_exclude_ids"],
+        mana_symbol_match=filters["mana_symbol_match"],
+        mana_family_keys=filters["mana_family_keys"],
+        mana_family_exclude_keys=filters["mana_family_exclude_keys"],
+        mana_family_match=filters["mana_family_match"],
+        affinity_symbol_ids=filters["affinity_symbol_ids"],
+        affinity_symbol_exclude_ids=filters["affinity_symbol_exclude_ids"],
+        affinity_symbol_match=filters["affinity_symbol_match"],
+        devotion_symbol_ids=filters["devotion_symbol_ids"],
+        devotion_symbol_exclude_ids=filters["devotion_symbol_exclude_ids"],
+        devotion_symbol_match=filters["devotion_symbol_match"],
+        other_symbol_ids=filters["other_symbol_ids"],
+        other_symbol_exclude_ids=filters["other_symbol_exclude_ids"],
+        other_symbol_match=filters["other_symbol_match"],
+        symbol_ids=filters["symbol_ids"],
+        type_ids=filters["type_ids"],
+        type_exclude_ids=filters["type_exclude_ids"],
+        type_match=filters["type_match"],
+        mana_cost_min=filters["mana_cost_min"],
+        mana_cost_max=filters["mana_cost_max"],
+        template_id=filters["template_id"],
+        card_pool=filters["card_pool"],
+        card_roles=filters["card_roles"],
+        card_role_exclude=filters["card_role_exclude"],
+        card_role_match=filters["card_role_match"],
+        card_factions=filters["card_factions"],
+        card_faction_exclude=filters["card_faction_exclude"],
+        card_faction_match=filters["card_faction_match"],
+        attack_min=filters["attack_min"],
+        attack_max=filters["attack_max"],
+        health_min=filters["health_min"],
+        health_max=filters["health_max"],
+        lifecycle_status=filters["lifecycle_status"],
+    )
+
+
 def _build_filtered_versions_queryset(
     *,
     query: str | None,
@@ -848,7 +1046,7 @@ def _build_filtered_versions_queryset(
     mana_cost_min: int | None,
     mana_cost_max: int | None,
     template_id: str | None,
-    card_pool: CardPool,
+    card_pool: CardPool | None,
     card_roles: list[CardRoleFilter] | None,
     card_role_exclude: list[CardRoleFilter] | None,
     card_role_match: str,
@@ -862,7 +1060,7 @@ def _build_filtered_versions_queryset(
     lifecycle_status: CardLifecycleFilter,
 ) -> QuerySet[CardVersion]:
     versions = _latest_card_versions_queryset(
-        card_pools=(card_pool,),
+        card_pools=CARD_POOLS if card_pool is None else (card_pool,),
         query=query,
         lifecycle_status=lifecycle_status,
     )
@@ -988,7 +1186,7 @@ def _ordered_card_version_ids(
     queryset: QuerySet[CardVersion],
     sort: CardSort,
     *,
-    card_pool: CardPool,
+    card_pool: CardPool | None,
 ) -> list[str]:
     return list(
         _apply_sql_card_sort(queryset, sort, card_pool=card_pool).values_list("id", flat=True)
