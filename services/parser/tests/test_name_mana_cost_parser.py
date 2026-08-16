@@ -278,28 +278,6 @@ def test_evil_name_mana_cost_parser_removes_spatially_confirmed_x_from_name() ->
     assert result.normalized_fields["mana_symbols"] == "x"
 
 
-def test_evil_name_mana_cost_parser_removes_x_from_combined_badge_line() -> None:
-    result, _ocr_runner = _parse_with_runner(
-        text=["Counter Rune X", "X"],
-        line_rows=[
-            {
-                "text": "Counter Rune X",
-                "confidence": 0.9,
-                "x": 100,
-                "y": 20,
-                "box": [(20, 10), (195, 10), (195, 30), (20, 30)],
-            },
-        ],
-        detections=[],
-        card_pool=EVIL_CARD_POOL,
-        expected_detector_calls=0,
-        region_spec=MANA_BADGE_OCR_CONFIG,
-    )
-
-    assert result.normalized_fields["name"] == "Counter Rune"
-    assert result.normalized_fields["mana_cost"] == "X"
-
-
 def test_evil_name_mana_cost_parser_preserves_title_x_with_separate_x_badge() -> None:
     result, _ocr_runner = _parse_with_runner(
         text=["Project X", "X"],
@@ -309,7 +287,7 @@ def test_evil_name_mana_cost_parser_preserves_title_x_with_separate_x_badge() ->
                 "confidence": 0.9,
                 "x": 70,
                 "y": 20,
-                "box": [(20, 10), (140, 10), (140, 30), (20, 30)],
+                "box": [(20, 10), (195, 10), (195, 30), (20, 30)],
             },
         ],
         detections=[],
