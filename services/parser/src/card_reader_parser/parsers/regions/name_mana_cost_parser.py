@@ -52,12 +52,11 @@ class NameManaCostParser:
         full_text = ocr_text.text
 
         candidate_symbols = self._select_mana_candidate_symbols(symbols)
-        detected_symbols_all = self._symbol_detector.detect(
+        detected_symbols = self._symbol_detector.detect(
             image=image,
             symbols=candidate_symbols,
             expected_symbol_types=self._EXPECTED_SYMBOL_TYPES,
         )
-        detected_symbols = detected_symbols_all
         mana_symbol_keys = self._mana_symbol_keys(detected_symbols)
         variable_x_in_symbols = any(self._is_variable_symbol_key(key) for key in mana_symbol_keys)
         variable_x_in_ocr = self._has_variable_x_in_text(full_text)
@@ -74,19 +73,18 @@ class NameManaCostParser:
         ) or image_stem
 
         logger.info(
-            "Name/mana parse summary. text=%r symbol_mana_total=%s symbols_all=%s symbols_right=%s symbol_keys=%s name=%r mana_cost=%r mana_total=%s",
+            "Name/mana parse summary. text=%r symbol_mana_total=%s symbols=%s symbol_keys=%s name=%r mana_cost=%r mana_total=%s",
             full_text,
             mana_total,
-            len(detected_symbols_all),
             len(detected_symbols),
             mana_symbol_keys,
             name,
             mana_cost,
             mana_total,
         )
-        if detected_symbols_all:
+        if detected_symbols:
             logger.info(
-                "Name/mana parse symbols_all_details=%s",
+                "Name/mana parse symbol_details=%s",
                 [
                     {
                         "key": row.key,
@@ -96,11 +94,11 @@ class NameManaCostParser:
                         "w": row.bbox.w,
                         "h": row.bbox.h,
                     }
-                    for row in detected_symbols_all[:12]
+                    for row in detected_symbols[:12]
                 ],
             )
         else:
-            logger.info("Name/mana parse symbols_all_details=[]")
+            logger.info("Name/mana parse symbol_details=[]")
         logger.info(
             "Name/mana parser finished. region=%s conf=%.3f name=%r mana_cost=%r mana_symbols=%s",
             region_name,
@@ -137,19 +135,12 @@ class NameManaCostParser:
     def _select_mana_candidate_symbols(self, symbols: list[Symbol]) -> list[Symbol]:
         enabled_template = [row for row in symbols if row.enabled and row.detector_type == "template"]
         mana_typed = [row for row in enabled_template if row.symbol_type.strip().lower() == "mana"]
-        if mana_typed:
-            logger.info(
-                "Name/mana parser symbol candidates: using mana-typed symbols. total=%s mana=%s",
-                len(enabled_template),
-                len(mana_typed),
-            )
-            return mana_typed
-
-        logger.warning(
-            "Name/mana parser symbol candidates: no mana-typed symbols found; falling back to all template symbols. total=%s",
+        logger.info(
+            "Name/mana parser symbol candidates selected. total=%s mana=%s",
             len(enabled_template),
+            len(mana_typed),
         )
-        return enabled_template
+        return mana_typed
 
     def _extract_name(self, text: str, *, has_mana: bool) -> str:
         compact = normalize_name_text(text)
@@ -199,11 +190,4 @@ class NameManaCostParser:
         if mana_total <= 0:
             return "X"
         return f"X+{mana_total}"
-
-    def _build_mana_layout_text(self, any_color: int, symbol_keys: list[str]) -> str:
-        tokens: list[str] = []
-        if any_color > 0:
-            tokens.append(str(any_color))
-        tokens.extend([f"{{{key}}}" for key in symbol_keys])
-        return " ".join(tokens).strip()
 
