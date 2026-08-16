@@ -14,6 +14,10 @@ export type TemplateRegionDefinition = {
   cut_region: RegionBounds;
   parser_type: TemplateParserType;
   ocr_config: JsonObject;
+  mana_badge_ocr?: {
+    cut_region: RegionBounds;
+    scales?: number[];
+  };
 };
 
 export type TemplateDefinition = JsonObject & {
