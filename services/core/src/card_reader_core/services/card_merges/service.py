@@ -6,6 +6,7 @@ from card_reader_core.models import (
     CARD_POOLS,
     Card,
     CardAlias,
+    CardClassificationReviewItem,
     CardMergeRedirect,
     CardRoleAssignment,
     CardVersion,
@@ -75,6 +76,10 @@ def merge_cards(*, target_card_id: str, source_card_ids: list[str]) -> CardMerge
     merge_deck_references(target.id, source_ids)
     merge_card_group_references(target.id, source_ids)
     merge_card_versions(target.id, source_ids)
+    CardClassificationReviewItem.objects.filter(card_id__in=source_ids).update(
+        card=target,
+        updated_at=now_utc(),
+    )
     TtsCardSheetService().sync_merge(target_card_id=target.id, source_card_ids=source_ids)
     CardAlias.objects.filter(card_id__in=source_ids).update(
         card=target,

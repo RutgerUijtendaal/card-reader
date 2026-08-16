@@ -3750,6 +3750,35 @@ def test_staff_can_manage_card_groups() -> None:
 def test_staff_can_preview_and_apply_card_merge() -> None:
     target_card, target_version = _create_editable_card_version(name="Renamed Card")
     source_card, source_version = _create_editable_card_version(name="Old Card Name")
+    review_job = ImportJob.objects.create(
+        source_path="uploads/merge-classification-review.png",
+        template=Template.objects.get(key="mtg-like-v1"),
+        card_pool="player",
+        total_items=1,
+    )
+    review_import_item = ImportJobItem.objects.create(
+        job=review_job,
+        source_file="uploads/merge-classification-review.png",
+    )
+    classification_review = CardClassificationReviewItem.objects.create(
+        import_item=review_import_item,
+        card=source_card,
+        card_version=source_version,
+        card_pool="player",
+        existing_classification_json={
+            "card_pool": "player",
+            "card_roles": [],
+            "card_factions": [],
+            "card_mana_families": [],
+        },
+        inferred_classification_json={
+            "card_pool": "player",
+            "card_roles": ["event"],
+            "card_factions": [],
+            "card_mana_families": [],
+        },
+        inference_evidence_json={},
+    )
     owner = _create_user("merge-deck-owner", "password", is_staff=True)
     deck = Deck.objects.create(owner=owner, name="Merge Deck", hero_card=source_card)
     DeckEntry.objects.create(deck=deck, card=target_card, quantity=1)
@@ -3799,6 +3828,18 @@ def test_staff_can_preview_and_apply_card_merge() -> None:
         target_version.id,
     ]
     assert get_latest_card_version(target_card.id).id == target_version.id
+    classification_review.refresh_from_db()
+    assert classification_review.card_id == target_card.id
+    assert classification_review.card_version_id == source_version.id
+    review_response = client.get("/review/classification-items?status=open")
+    assert review_response.status_code == 200
+    review_payload = next(
+        row
+        for row in review_response.json()["results"]
+        if row["id"] == classification_review.id
+    )
+    assert review_payload["card"]["id"] == target_card.id
+    assert review_payload["version"]["id"] == source_version.id
     assert DeckEntry.objects.get(deck=deck, card=target_card).quantity == 3
     deck.refresh_from_db()
     assert deck.hero_card_id == target_card.id

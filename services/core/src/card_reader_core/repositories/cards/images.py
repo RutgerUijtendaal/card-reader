@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 
 from card_reader_core.models import PLAYER_CARD_POOL_SCOPE, CardVersion, CardVersionImage, active_card_lifecycle_q, now_utc
@@ -21,6 +22,18 @@ def resolve_image_file_path(image: CardVersionImage) -> Path | None:
         return source_path
 
     return None
+
+
+def select_usable_card_image(
+    images: Iterable[CardVersionImage],
+) -> CardVersionImage | None:
+    first_image: CardVersionImage | None = None
+    for image in images:
+        if first_image is None:
+            first_image = image
+        if resolve_image_file_path(image) is not None:
+            return image
+    return first_image
 
 
 def list_latest_active_card_image_sources(

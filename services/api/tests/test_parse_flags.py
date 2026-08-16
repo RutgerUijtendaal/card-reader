@@ -4,7 +4,9 @@ import json
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 
 from card_reader_core.models import (
     EVIL_CARD_POOL,
@@ -18,6 +20,7 @@ from card_reader_core.models import (
     ParseResult,
     Template,
 )
+from card_reader_core.repositories.cards import change_card_identity
 
 
 def test_authenticated_user_can_create_parse_flag_with_multiple_items() -> None:
@@ -214,6 +217,14 @@ def test_classification_review_list_and_terminal_updates_are_auditable() -> None
     assert payload["inferred_classification"]["card_roles"] == ["event"]
     assert payload["card"]["card_pool"] == "player"
 
+    change_card_identity(card=card, card_pool=EVIL_CARD_POOL)
+    live_response = client.get("/review/classification-items?status=open")
+    live_payload = next(
+        row for row in live_response.json()["results"] if row["id"] == review_item.id
+    )
+    assert live_payload["existing_classification"]["card_pool"] == "player"
+    assert live_payload["card"]["card_pool"] == "evil"
+
     resolved_response = client.patch(
         f"/review/classification-items/{review_item.id}",
         data={"status": "resolved", "review_note": "Updated in the Card editor."},
@@ -238,6 +249,27 @@ def test_classification_review_list_and_terminal_updates_are_auditable() -> None
     assert replay_response.json()["review_note"] == "Updated in the Card editor."
     assert conflicting_response.status_code == 400
     assert "already been completed" in conflicting_response.json()["detail"]
+
+
+def test_classification_review_page_image_loading_has_bounded_query_count() -> None:
+    CardClassificationReviewItem.objects.all().delete()
+    reviewer = _create_user("classification-query-reviewer", "password", is_staff=True)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(reviewer)
+    first_card, first_version = _create_card_version(name="First Query Review")
+    _create_classification_review(card=first_card, version=first_version)
+
+    with CaptureQueriesContext(connection) as first_queries:
+        first_response = client.get("/review/classification-items?status=open")
+
+    second_card, second_version = _create_card_version(name="Second Query Review")
+    _create_classification_review(card=second_card, version=second_version)
+    with CaptureQueriesContext(connection) as second_queries:
+        second_response = client.get("/review/classification-items?status=open")
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert len(second_queries) == len(first_queries)
 
 
 def test_review_summary_combines_parse_flags_and_classification_reviews() -> None:

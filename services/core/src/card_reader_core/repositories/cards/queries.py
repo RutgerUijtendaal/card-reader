@@ -33,7 +33,7 @@ from card_reader_core.models import (
 )
 from card_reader_core.search.cards import apply_card_search
 
-from .images import resolve_image_file_path
+from .images import resolve_image_file_path, select_usable_card_image
 from .sorting import apply_default_card_sort, apply_type_card_sort
 from .types import (
     CARD_SORT_DEFAULT,
@@ -425,13 +425,7 @@ def get_card_image(card_version_id: str) -> CardVersionImage | None:
     images = CardVersionImage.objects.filter(card_version_id=card_version_id).order_by(
         "-created_at"
     )
-    first_image: CardVersionImage | None = None
-    for image in images:
-        if first_image is None:
-            first_image = image
-        if resolve_image_file_path(image) is not None:
-            return image
-    return first_image
+    return select_usable_card_image(images)
 
 
 def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseSource]:

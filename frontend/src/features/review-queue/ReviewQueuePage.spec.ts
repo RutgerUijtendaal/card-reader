@@ -237,6 +237,26 @@ describe('ReviewQueuePage', () => {
     mounted.unmount();
   });
 
+  test('shows an explicit error instead of an empty or stale classification queue', async () => {
+    apiGet.mockRejectedValueOnce(new Error('Review service unavailable'));
+    const mounted = await mountPage();
+
+    expect(mounted.container.textContent).toContain(
+      'Classification reviews could not be loaded',
+    );
+    expect(mounted.container.textContent).not.toContain('No classification reviews');
+    expect(mounted.container.textContent).not.toContain('Changed Card');
+
+    const retryButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Try again',
+    );
+    retryButton?.click();
+    await flushPromises();
+
+    expect(mounted.container.textContent).toContain('Changed Card');
+    mounted.unmount();
+  });
+
   test('preserves parse-flag comparison and editor focus behavior', async () => {
     const mounted = await mountPage('/review?view=flags&status=open');
     const itemSections = Array.from(mounted.container.querySelectorAll('.border-t.pt-3'));

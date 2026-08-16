@@ -3,7 +3,11 @@ from __future__ import annotations
 from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
-from .images import list_latest_active_card_image_sources, resolve_image_file_path
+from .images import (
+    list_latest_active_card_image_sources,
+    resolve_image_file_path,
+    select_usable_card_image,
+)
 from .classification import set_card_mana_families
 from .identity import (
     change_card_identity,
@@ -143,6 +147,7 @@ __all__ = [
     "list_latest_active_card_image_sources",
     "promote_card_version",
     "resolve_image_file_path",
+    "select_usable_card_image",
     "resolve_card_by_name_key",
     "save_parsed_card",
     "save_parsed_card_result",

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from django.db.models import QuerySet
+from django.db.models import Prefetch, QuerySet
 
 from card_reader_core.models import (
     CLASSIFICATION_REVIEW_OPEN,
     CardClassificationReviewItem,
     CardPoolScope,
+    CardVersionImage,
 )
 
 from .types import (
@@ -27,7 +28,10 @@ def _review_items() -> QuerySet[CardClassificationReviewItem]:
         "card__role_assignments",
         "card__faction_assignments",
         "card__mana_family_assignments",
-        "card_version__images",
+        Prefetch(
+            "card_version__images",
+            queryset=CardVersionImage.objects.order_by("-created_at"),
+        ),
     )
 
 

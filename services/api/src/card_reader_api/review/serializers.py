@@ -13,7 +13,7 @@ from card_reader_core.models import (
     card_mana_family_keys,
     card_role_keys,
 )
-from card_reader_core.repositories.cards import get_card_image
+from card_reader_core.repositories.cards import get_card_image, select_usable_card_image
 
 
 class ParseFlagItemsQuerySerializer(serializers.Serializer[dict[str, object]]):
@@ -45,7 +45,7 @@ def classification_review_item_payload(
     version = item.card_version
     image_url: str | None = None
     if card is not None and version is not None:
-        image = get_card_image(version.id)
+        image = select_usable_card_image(version.images.all())
         image_url = card_image_asset_url(
             image,
             fallback_url=f"/cards/{card.id}/versions/{version.id}/image",
@@ -80,7 +80,7 @@ def classification_review_item_payload(
             "id": card.id if card is not None else None,
             "label": card.label if card is not None else "Card unavailable",
             "name": version.name if version is not None else "Card unavailable",
-            "card_pool": item.card_pool,
+            "card_pool": current_classification.get("card_pool", item.card_pool),
             "card_roles": current_classification.get("card_roles", []),
             "card_factions": current_classification.get("card_factions", []),
             "card_mana_families": current_classification.get("card_mana_families", []),

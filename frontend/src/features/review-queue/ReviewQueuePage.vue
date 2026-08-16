@@ -99,6 +99,28 @@
           </ul>
 
           <div
+            v-else-if="classificationLoadError"
+            class="theme-empty-state flex min-h-72 flex-col items-center justify-center gap-3 py-10 text-center text-sm"
+            role="alert"
+          >
+            <div class="space-y-1">
+              <h3 class="theme-section-title text-sm font-semibold">
+                Classification reviews could not be loaded
+              </h3>
+              <p class="theme-section-muted mx-auto max-w-md leading-6">
+                {{ classificationLoadError }}
+              </p>
+            </div>
+            <button
+              class="btn-secondary"
+              type="button"
+              @click="loadClassificationPage(1, 'replace')"
+            >
+              Try again
+            </button>
+          </div>
+
+          <div
             v-else-if="classificationItems.length === 0"
             class="theme-section-muted flex min-h-72 items-center justify-center py-10 text-center text-sm"
           >
@@ -521,6 +543,7 @@ const reviewStatus = ref<FlagStatus>(normalizeStatus(queryString(route.query.sta
 const classificationItems = ref<ClassificationReviewItem[]>([]);
 const classificationPage = ref<ClassificationReviewPage | null>(null);
 const loadingClassification = ref(false);
+const classificationLoadError = ref<string | null>(null);
 let classificationRequestGeneration = 0;
 const updatingClassificationId = ref<string | null>(null);
 const flagReports = ref<ParseFlagReviewReport[]>([]);
@@ -595,6 +618,11 @@ const loadClassificationPage = async (page: number, mode: 'replace' | 'append'):
   const requestGeneration = ++classificationRequestGeneration;
   const status = reviewStatus.value;
   loadingClassification.value = true;
+  classificationLoadError.value = null;
+  if (mode === 'replace') {
+    classificationItems.value = [];
+    classificationPage.value = null;
+  }
   try {
     const response = await fetchClassificationReviewPage(status, page, 25);
     if (requestGeneration !== classificationRequestGeneration || status !== reviewStatus.value)
@@ -603,6 +631,15 @@ const loadClassificationPage = async (page: number, mode: 'replace' | 'append'):
     classificationItems.value =
       mode === 'append' ? [...classificationItems.value, ...response.results] : response.results;
     if (status === 'open') void loadReviewSummary();
+  } catch (error) {
+    if (requestGeneration !== classificationRequestGeneration || status !== reviewStatus.value)
+      return;
+    classificationItems.value = [];
+    classificationPage.value = null;
+    classificationLoadError.value = extractErrorMessage(
+      error,
+      'Check your connection and try again.',
+    );
   } finally {
     if (requestGeneration === classificationRequestGeneration) loadingClassification.value = false;
   }
