@@ -35,6 +35,7 @@ from card_reader_core.models import (
 )  # noqa: E402
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE  # noqa: E402
 from card_reader_core.repositories.cards import (  # noqa: E402
+    change_card_identity,
     get_latest_card_version,
     save_parsed_card,
     set_card_mana_families,
@@ -767,6 +768,55 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
     ) == ["arcane"]
     assert card.latest_version is not None
     assert not card.latest_version.card_version_symbols.exists()
+
+
+def test_processor_rejects_a_queued_reparse_after_the_target_pool_changes() -> None:
+    card, target_version = _create_editable_card_version(name="Queued Pool Drift")
+    source_file = build_storage_relative_path("uploads", "queued-pool-drift.png")
+    source_path = resolve_storage_path(source_file)
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_bytes(b"queued-pool-drift")
+    job = ImportJob.objects.create(
+        source_path=source_file,
+        template=target_version.template,
+        options_json={"reparse_existing": True},
+        card_pool="player",
+        classification_rule_snapshot_json=ClassificationRuleService().build_snapshot(
+            card_pool="player",
+            include_roles=True,
+            include_factions=True,
+            include_mana_families=True,
+        ),
+        total_items=1,
+    )
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=source_file,
+        target_card=card,
+        target_card_version=target_version,
+        target_card_pool_snapshot="player",
+    )
+    change_card_identity(card=card, card_pool="evil", card_factions=())
+
+    class UnexpectedParser:
+        called = False
+
+        def parse(self, *_args: object, **_kwargs: object) -> SimpleNamespace:
+            self.called = True
+            pytest.fail("pool drift must be rejected before OCR starts")
+
+    parser = UnexpectedParser()
+    ImportProcessorService(parser).process_job(job.id)
+
+    job.refresh_from_db()
+    item.refresh_from_db()
+    assert parser.called is False
+    assert job.status == "failed"
+    assert item.status == "failed"
+    assert item.error_message == (
+        "The target Card pool changed while this reparse was queued; "
+        "queue a new reparse for its current pool."
+    )
 
 
 def test_card_gallery_routes_are_public() -> None:

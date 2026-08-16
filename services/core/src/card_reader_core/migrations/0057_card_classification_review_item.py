@@ -6,6 +6,16 @@ import django.db.models.deletion
 import card_reader_core.models.base
 
 
+def guard_classification_review_downgrade(apps, _schema_editor) -> None:  # type: ignore[no-untyped-def]
+    ReviewItem = apps.get_model("card_reader_core", "CardClassificationReviewItem")
+    if ReviewItem.objects.exists():
+        raise RuntimeError(
+            "Card classification review migration 0057 cannot be reversed while durable "
+            "classification review items exist. Preserve or remove those records explicitly "
+            "before rolling back."
+        )
+
+
 class Migration(migrations.Migration):
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -99,5 +109,9 @@ class Migration(migrations.Migration):
                     ),
                 ],
             },
+        ),
+        migrations.RunPython(
+            migrations.RunPython.noop,
+            guard_classification_review_downgrade,
         ),
     ]

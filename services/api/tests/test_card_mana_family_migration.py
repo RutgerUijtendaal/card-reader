@@ -303,6 +303,31 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
         },
     )
 
+    custom_assignment = Assignment.objects.create(card_id=evil.id, mana_family="dark")
+    with pytest.raises(RuntimeError, match="card mana-family assignments"):
+        _migrate_to(BASE_MIGRATION)
+    custom_assignment.delete()
+
+    with pytest.raises(RuntimeError, match="classification rule snapshots"):
+        _migrate_to(BASE_MIGRATION)
+
+    reversible_body: dict[str, object] = {
+        "schema_version": 3,
+        "card_pool": "evil",
+        "rules": [rollback_role_rule],
+    }
+    rollback_job.classification_rule_snapshot_json = {
+        **reversible_body,
+        "digest": hashlib.sha256(
+            json.dumps(
+                reversible_body,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest(),
+    }
+    rollback_job.save(update_fields=["classification_rule_snapshot_json"])
+
     downgraded_apps = _migrate_to(BASE_MIGRATION)
     DowngradedRule = downgraded_apps.get_model(
         "card_reader_core", "CardClassificationRule"

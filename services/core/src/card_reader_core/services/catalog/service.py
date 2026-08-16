@@ -508,6 +508,10 @@ class CatalogService:
                 old_key=previous_key,
                 new_key=updated_symbol.key,
             )
+        if updated_symbol.key != previous_key:
+            ensure_default_mana_family_classification_rules(
+                symbol_keys={updated_symbol.key}
+            )
 
         return updated_symbol
 

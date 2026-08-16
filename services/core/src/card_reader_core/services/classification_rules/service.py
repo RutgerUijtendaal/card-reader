@@ -55,6 +55,10 @@ class ClassificationRuleDuplicateError(ClassificationRuleError):
     pass
 
 
+class ClassificationRuleUpdateConflictError(ClassificationRuleError):
+    pass
+
+
 class ClassificationRuleSourceNotFoundError(ClassificationRuleError):
     pass
 
@@ -167,7 +171,6 @@ class ClassificationRuleService:
                 "This pool, target, and source rule already exists."
             ) from exc
 
-    @transaction.atomic
     def update_rule(
         self,
         *,
@@ -208,11 +211,16 @@ class ClassificationRuleService:
         if enabled is not None:
             updates["enabled"] = enabled
         try:
-            return update_classification_rule(rule, updates=updates)
+            updated_rule = update_classification_rule(rule, updates=updates)
         except IntegrityError as exc:
             raise ClassificationRuleDuplicateError(
                 "This pool, target, and source rule already exists."
             ) from exc
+        if updated_rule is None:
+            raise ClassificationRuleUpdateConflictError(
+                "This classification rule changed while it was being edited. Reload and retry."
+            )
+        return updated_rule
 
     @transaction.atomic
     def delete_rule(self, *, rule_id: str) -> None:

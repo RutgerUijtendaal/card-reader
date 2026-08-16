@@ -37,18 +37,17 @@ def test_import_save_retries_the_complete_transaction_after_sqlite_lock(
         source_file=source_file,
         status=ImportJobStatus.running,
     )
-    original_create_version = card_writes.create_parsed_card_version
+    original_finalize_item = card_writes.finalize_import_item
     attempts = 0
 
-    def create_version_then_contend(**kwargs: object) -> CardVersion:
+    def finalize_item_then_contend(*args: object, **kwargs: object) -> None:
         nonlocal attempts
         attempts += 1
-        version = original_create_version(**kwargs)
+        original_finalize_item(*args, **kwargs)  # type: ignore[arg-type]
         if attempts == 1:
             raise OperationalError("database is locked")
-        return version
 
-    monkeypatch.setattr(card_writes, "create_parsed_card_version", create_version_then_contend)
+    monkeypatch.setattr(card_writes, "finalize_import_item", finalize_item_then_contend)
     monkeypatch.setattr(retry_module.time, "sleep", lambda _delay: None)
 
     version = save_parsed_card(

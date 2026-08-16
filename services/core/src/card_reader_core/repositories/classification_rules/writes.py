@@ -30,12 +30,19 @@ def update_classification_rule(
     rule: CardClassificationRule,
     *,
     updates: dict[str, object],
-) -> CardClassificationRule:
-    for field_name, value in updates.items():
-        setattr(rule, field_name, value)
-    rule.updated_at = now_utc()
-    rule.save(update_fields=[*updates, "updated_at"])
-    return rule
+) -> CardClassificationRule | None:
+    updated_at = now_utc()
+    updated_count = CardClassificationRule.objects.filter(
+        id=rule.id,
+        updated_at=rule.updated_at,
+    ).update(**updates, updated_at=updated_at)
+    if updated_count == 0:
+        return None
+    return (
+        CardClassificationRule.objects.select_related("tag", "type", "symbol")
+        .filter(id=rule.id)
+        .first()
+    )
 
 
 def delete_classification_rule(rule: CardClassificationRule) -> None:

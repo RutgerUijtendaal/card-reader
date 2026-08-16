@@ -4,6 +4,7 @@ import logging
 from typing import Callable, TypeVar, cast
 
 from card_reader_core.models import (
+    Card,
     CardFaction,
     CardPool,
     CardRole,
@@ -143,6 +144,7 @@ class ImportProcessorService:
         options: JobOptions,
         resources: ParserResources,
     ) -> ItemProcessingResult:
+        self._validate_target_card_pool(item, expected_pool=cast(CardPool, job.card_pool))
         template_id = job.template.key
         snapshot = cast(dict[str, object], job.classification_rule_snapshot_json)
         frozen_tags, frozen_types, frozen_symbols = (
@@ -261,6 +263,34 @@ class ImportProcessorService:
             tag_count=tag_count,
             type_count=type_count,
         )
+
+    @staticmethod
+    def _validate_target_card_pool(
+        item: ImportJobItem,
+        *,
+        expected_pool: CardPool,
+    ) -> None:
+        target_card_id = (
+            ImportJobItem.objects.filter(id=item.id)
+            .values_list("target_card_id", flat=True)
+            .first()
+        )
+        if target_card_id is None:
+            if item.target_card_pool_snapshot is not None:
+                raise ValueError("The target Card no longer exists; queue a new reparse.")
+            return
+        live_pool = (
+            Card.objects.filter(id=target_card_id)
+            .values_list("card_pool", flat=True)
+            .first()
+        )
+        if live_pool is None:
+            raise ValueError("The target Card no longer exists; queue a new reparse.")
+        if live_pool != expected_pool:
+            raise ValueError(
+                "The target Card pool changed while this reparse was queued; "
+                "queue a new reparse for its current pool."
+            )
 
     def _log_item_processed(
         self,

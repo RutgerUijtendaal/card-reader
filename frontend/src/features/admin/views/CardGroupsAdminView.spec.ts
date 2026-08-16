@@ -150,6 +150,9 @@ describe('CardGroupsAdminView', () => {
     await nextTick();
 
     expect(mounted.container.textContent).toContain('Order');
+    expect(mounted.container.querySelector('[data-card-pool="evil"]')?.textContent?.trim()).toBe(
+      'Evil',
+    );
 
     const poolSelect = mounted.container.querySelector<HTMLSelectElement>('select');
     if (!(poolSelect instanceof HTMLSelectElement)) {
@@ -178,6 +181,9 @@ describe('CardGroupsAdminView', () => {
     await nextTick();
 
     expect(mounted.container.textContent).toContain('Position 2');
+    expect(mounted.container.querySelector('[data-card-pool="player"]')?.textContent?.trim()).toBe(
+      'Player',
+    );
     expect(mounted.container.querySelector('button[aria-label="Added Card 1"]')).not.toBeNull();
     expect(apiGet).toHaveBeenCalledWith('/cards', {
       params: expect.objectContaining({

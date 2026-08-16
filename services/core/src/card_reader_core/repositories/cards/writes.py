@@ -152,6 +152,18 @@ def save_parsed_card_result(
     resolved_card_mana_families: tuple[ManaFamily, ...] = (),
     classification_evidence: CardClassificationInferenceEvidence | None = None,
 ) -> ParsedCardSaveResult:
+    # A failed atomic attempt can leave relation assignments cached on the Python
+    # instance even though the database transaction rolled them back. Every retry
+    # must therefore start from the authoritative persisted item state.
+    item = (
+        ImportJobItem.objects.select_related(
+            "job__content_version",
+            "job__template",
+            "target_card",
+            "target_card_version__card",
+        )
+        .get(id=item.id)
+    )
     resolved_evidence: CardClassificationInferenceEvidence = classification_evidence or {
         "roles": {
             "mode": "automatic",

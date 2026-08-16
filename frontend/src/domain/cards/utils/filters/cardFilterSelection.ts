@@ -19,6 +19,19 @@ export type CardFilterCatalog = {
   legacyManaFamilyBySymbolKey: Record<string, string>;
 };
 
+export const cardFilterStateRequiresCatalog = (state: CardFilterState): boolean => [
+  state.keywordKeys,
+  state.tagKeys,
+  state.typeKeys,
+  state.typeExcludeKeys,
+  state.affinitySymbolKeys,
+  state.affinitySymbolExcludeKeys,
+  state.devotionSymbolKeys,
+  state.devotionSymbolExcludeKeys,
+  state.otherSymbolKeys,
+  state.otherSymbolExcludeKeys,
+].some((keys) => keys.length > 0);
+
 export const createCardFilterCatalog = (filters: CardFiltersResponse): CardFilterCatalog => {
   const legacyManaFamilyBySymbolKey: Record<string, string> = {};
   const manaFamilies = (filters.mana_families ?? []).map((family): SymbolFilterOption => {
