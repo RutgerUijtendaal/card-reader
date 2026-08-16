@@ -23,7 +23,7 @@ const activeJob: ImportJob = {
   card_mana_family_mode: 'automatic',
   card_mana_family_override: [],
   classification_rule_snapshot: {
-    schema_version: 1,
+    schema_version: 3,
     card_pool: 'player',
     rules: [],
     digest: 'abc123',
@@ -152,7 +152,7 @@ describe('ImportActivityPanel', () => {
     mounted.app.unmount();
   });
 
-  test('shows historical warnings and a neutral classification review handoff', async () => {
+  test('shows import warnings and a neutral classification review handoff', async () => {
     const detail: ImportJobDetail = {
       ...activeJob,
       id: 'finished-job',
@@ -169,14 +169,6 @@ describe('ImportActivityPanel', () => {
           warning_message: 'Matched a deprecated card.',
           warnings: [
             { code: 'matched_deprecated_card', message: 'Matched a deprecated card.' },
-            {
-              code: 'card_classification_mismatch',
-              message: 'Inferred roles differ from the existing card.',
-              details: {
-                inferred: { card_pool: 'evil', card_roles: ['event'] },
-                existing: { card_pool: 'player', card_roles: [] },
-              },
-            },
             {
               code: 'card_classification_changed_while_queued',
               message: 'Classification changed while queued.',
@@ -230,15 +222,12 @@ describe('ImportActivityPanel', () => {
     const mounted = await mountPanel({ selectedJobDetail: detail });
 
     expect(mounted.host.textContent).toContain('Matched a deprecated card.');
-    expect(mounted.host.textContent).toContain('Inferred roles differ from the existing card.');
     expect(mounted.host.textContent).toContain('Classification changed while queued.');
     expect(mounted.host.textContent).toContain('No Evil faction was inferred.');
     expect(mounted.host.textContent).toContain('Ambiguous name or alias');
     expect(mounted.host.textContent).toContain('Name candidates:');
     expect(mounted.host.textContent).toContain('Role types');
-    expect(mounted.host.textContent).toContain('Inferred');
     expect(mounted.host.textContent).toContain('Evil');
-    expect(mounted.host.textContent).toContain('Existing');
     expect(mounted.host.textContent).toContain('Queued');
     expect(mounted.host.textContent).toContain('Live');
     expect(mounted.host.textContent).toContain('Normal');
@@ -247,7 +236,7 @@ describe('ImportActivityPanel', () => {
     expect(
       mounted.host.querySelector('a[href="/cards/card-id/edit?tab=card"]')?.textContent,
     ).toContain('Review card classification');
-    expect(mounted.host.querySelectorAll('a[href="/cards/card-id/edit?tab=card"]')).toHaveLength(2);
+    expect(mounted.host.querySelectorAll('a[href="/cards/card-id/edit?tab=card"]')).toHaveLength(1);
     const reviewLink = Array.from(mounted.host.querySelectorAll('a')).find((link) =>
       link.textContent?.includes('Sent to Review · open'),
     );

@@ -33,7 +33,12 @@ from card_reader_api.cards.serializers import (
 )
 from card_reader_api.common.auth_access import card_pool_scope_for_user, is_authenticated
 from card_reader_api.common.permissions import AuthenticatedAllowed
-from card_reader_api.common.responses import paginated_payload, serializer_error
+from card_reader_api.common.responses import (
+    RESTRICTED_CARD_POOL_DETAIL,
+    forbidden,
+    paginated_payload,
+    serializer_error,
+)
 from card_reader_api.cards.services import CardActionService, CardReparseError
 from card_reader_core.repositories.cards import (
     get_card_in_scope,
@@ -71,7 +76,7 @@ class CardListView(APIView):
             return serializer_error(serializer)
         filters = serializer.validated_list_filters()
         if not card_pool_scope.allows_card_pool(filters["card_pool"]):
-            return Response({"detail": "Restricted card pools require staff access."}, status=status.HTTP_403_FORBIDDEN)
+            return forbidden(RESTRICTED_CARD_POOL_DETAIL)
         show_groups = filters["show_groups"]
         if show_groups:
             return Response(grouped_gallery_payload(filters))
@@ -139,10 +144,7 @@ class CardFiltersView(APIView):
             return serializer_error(scope_serializer)
         requested_pool = scope_serializer.requested_card_pool()
         if requested_pool is not None and not card_pool_scope.allows_card_pool(requested_pool):
-            return Response(
-                {"detail": "Restricted card pools require staff access."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+            return forbidden(RESTRICTED_CARD_POOL_DETAIL)
         metadata_scope = (
             CardPoolScope(frozenset({requested_pool}))
             if requested_pool is not None

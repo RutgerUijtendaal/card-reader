@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, cast
 from rest_framework import serializers
 
 from card_reader_api.cards.public_urls import card_image_asset_url
+from card_reader_api.common.serializer_values import ValidatedStringValuesMixin
 from card_reader_core.metadata import MANA_FAMILIES
 from card_reader_core.models import (
     CARD_POOLS,
@@ -274,7 +275,10 @@ def _first_symbol_asset_url(raw: object) -> str | None:
     return None
 
 
-class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
+class CardFiltersQuerySerializer(
+    ValidatedStringValuesMixin,
+    serializers.Serializer[dict[str, object]],
+):
     q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     query = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     card_ids = serializers.ListField(
@@ -470,10 +474,6 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     def _query_or_none(self) -> str | None:
         return self._string_or_none("q") or self._string_or_none("query")
 
-    def _string_or_none(self, key: str) -> str | None:
-        value = self.validated_data.get(key)
-        return value if isinstance(value, str) else None
-
     def _float_or_none(self, key: str) -> float | None:
         value = self.validated_data.get(key)
         return value if isinstance(value, float) else None
@@ -497,14 +497,6 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     def _lifecycle_status_value(self, key: str) -> CardLifecycleFilter:
         value = self.validated_data.get(key)
         return normalize_card_lifecycle_filter(value)
-
-    def _string_list_or_none(self, key: str) -> list[str] | None:
-        value = self.validated_data.get(key)
-        if not isinstance(value, list):
-            return None
-        out = [item for item in value if isinstance(item, str)]
-        return out or None
-
 
 class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
     name = serializers.CharField(required=False, allow_blank=False)

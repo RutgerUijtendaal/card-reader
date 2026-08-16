@@ -179,7 +179,7 @@ Core stack:
   - Classification review is resolved or dismissed explicitly after staff inspection. Card edits do not silently close review items.
   - Card merges retarget open and historical classification review items to the surviving Card while preserving their captured snapshots and reviewed version.
   - Classification review authorization follows the live Card pool; use the immutable pool snapshot only when the Card no longer exists.
-  - New classification mismatches belong in Review rather than import warnings. Keep historical `card_classification_mismatch` warnings readable without backfilling them into the queue.
+  - Classification mismatches belong in Review rather than import warnings. Do not reintroduce a parallel `card_classification_mismatch` warning path.
 
 ## Auth Rules
 - Auth is enabled by default.
@@ -198,15 +198,16 @@ Core stack:
 - The Vue app uses Django session auth with CSRF protection.
 - `/auth/me` and `/auth/login` return a CSRF token for unsafe browser requests.
 
-## Seed Files
-- Default seed JSON files live in `services/api/src/card_reader_api/seeds`:
+## Seed And Fixture Files
+- Catalog seed fixtures used by integration tests live in
+  `services/integration/tests/fixtures/catalog`:
   - `seed-keywords.json`
   - `seed-symbols.json`
   - `seed-tags.json`
   - `seed-templates.json`
   - `seed-types.json`
-  - `seed-users.example.json`
-- Local development users live in:
+- The example and local development users live in:
+  - `services/api/src/card_reader_api/seeds/seed-users.example.json`
   - `services/api/src/card_reader_api/seeds/seed-users.local.json`
 - `seed-users.local.json` is gitignored.
 

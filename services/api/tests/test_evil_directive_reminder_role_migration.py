@@ -7,8 +7,11 @@ from django.db.migrations.executor import MigrationExecutor
 import pytest
 
 
-BASE_MIGRATION = ("card_reader_core", "0059_add_mtg_like_mana_badge_ocr")
-ROLE_MIGRATION = ("card_reader_core", "0060_add_evil_directive_reminder_roles")
+BASE_MIGRATION = ("card_reader_core", "0054_card_classification_final_state")
+ROLE_MIGRATION = (
+    "card_reader_core",
+    "0055_seed_classification_rules_and_full_height_template",
+)
 
 
 def _migrate_to(target: tuple[str, str]) -> Any:
@@ -177,7 +180,7 @@ def test_role_migration_creates_and_reuses_types_then_backfills_latest_evil_type
 
 
 @pytest.mark.django_db(transaction=True)
-def test_role_migration_refuses_to_orphan_custom_assignments_and_rules() -> None:
+def test_seed_reverse_preserves_custom_role_assignments_and_rules() -> None:
     _migrate_to(BASE_MIGRATION)
     apps = _migrate_to(ROLE_MIGRATION)
     Card = apps.get_model("card_reader_core", "Card")
@@ -199,10 +202,9 @@ def test_role_migration_refuses_to_orphan_custom_assignments_and_rules() -> None
         enabled=True,
     )
 
-    with pytest.raises(RuntimeError, match="custom assignments or classification rules"):
-        _migrate_to(BASE_MIGRATION)
-
-    CardClassificationRule.objects.filter(id=custom_rule.id).delete()
-    CardRoleAssignment.objects.filter(id=custom_assignment.id).delete()
-    _migrate_to(BASE_MIGRATION)
+    reversed_apps = _migrate_to(BASE_MIGRATION)
+    ReversedRule = reversed_apps.get_model("card_reader_core", "CardClassificationRule")
+    ReversedRole = reversed_apps.get_model("card_reader_core", "CardRoleAssignment")
+    assert ReversedRule.objects.filter(id=custom_rule.id).exists()
+    assert ReversedRole.objects.filter(id=custom_assignment.id).exists()
     _restore_leaf()

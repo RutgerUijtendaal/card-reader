@@ -142,9 +142,7 @@
               </dl>
               <RouterLink
                 v-if="
-                  (warning.code === 'card_classification_mismatch' ||
-                    warning.code === 'evil_faction_unresolved') &&
-                    item.card_tab_url
+                  warning.code === 'evil_faction_unresolved' && item.card_tab_url
                 "
                 class="mt-1 inline-flex font-semibold underline"
                 :to="item.card_tab_url"
@@ -239,12 +237,12 @@
                       ? 'Automatic factions'
                       : job.card_faction_override.length > 0
                         ? `Faction override: ${job.card_faction_override.join(', ')}`
-                        : 'Faction override: None'
+                        : 'Faction override: No faction'
                   }}
                 </p>
                 <p class="theme-section-muted font-mono text-[0.68rem]">
-                  {{ job.classification_rule_snapshot?.rules?.length ?? 0 }} snapshotted rules ·
-                  {{ job.classification_rule_snapshot?.digest?.slice(0, 12) || 'legacy' }}
+                  {{ job.classification_rule_snapshot.rules.length }} snapshotted rules ·
+                  {{ job.classification_rule_snapshot.digest.slice(0, 12) }}
                 </p>
               </div>
               <span class="theme-section-muted shrink-0 text-xs">

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 from pathlib import Path
@@ -16,7 +15,7 @@ from card_reader_core.repositories.tts_card_sheets import (
     mark_render_failed,
     mark_render_succeeded,
 )
-from card_reader_core.storage import resolve_storage_path
+from card_reader_core.storage import calculate_checksum, resolve_storage_path
 
 _BACKGROUND = (0, 0, 0)
 logger = logging.getLogger(__name__)
@@ -127,7 +126,7 @@ def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
             if validation_image.size != layout.image_size:
                 raise TtsCardSheetRenderError("Rendered TTS sheet has unexpected dimensions.")
             validation_image.verify()
-        rendered_checksum = _sha256_file(temporary_path)
+        rendered_checksum = calculate_checksum(temporary_path)
         target = tts_card_sheet_path(str(sheet.id), rendered_checksum)
         os.replace(temporary_path, target)
         temporary_path = None
@@ -164,14 +163,6 @@ def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
     finally:
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _remove_superseded_sheet_revisions(*, sheet_id: str, current_path: Path) -> None:

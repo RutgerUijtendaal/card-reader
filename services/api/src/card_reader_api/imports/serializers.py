@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 import json
 
 from django.core.files.uploadedfile import UploadedFile
@@ -9,6 +10,30 @@ from card_reader_core.models import ContentVersion, ImportJob, ImportJobItem
 from card_reader_core.models import CARD_FACTIONS, CARD_POOLS, CARD_ROLES
 from card_reader_core.metadata import MANA_FAMILIES
 from card_reader_core.repositories.content_versions import parse_base_version
+
+
+def _validate_json_choice_array(
+    value: str,
+    *,
+    field_name: str,
+    item_label: str,
+    unsupported_label: str,
+    choices: Sequence[str],
+) -> list[str]:
+    try:
+        payload = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise serializers.ValidationError(f"{field_name} must be valid JSON") from exc
+    if not isinstance(payload, list):
+        raise serializers.ValidationError(f"{field_name} must decode to an array")
+    if len(payload) != len(set(map(str, payload))):
+        raise serializers.ValidationError(f"{field_name} {item_label} must be unique")
+    invalid = sorted({str(item) for item in payload if item not in choices})
+    if invalid:
+        raise serializers.ValidationError(
+            f"Unsupported {unsupported_label}: {', '.join(invalid)}"
+        )
+    return [choice for choice in choices if choice in payload]
 
 
 def content_version_payload(version: ContentVersion | None) -> dict[str, object] | None:
@@ -149,55 +174,32 @@ class ImportUploadSerializer(serializers.Serializer[dict[str, object]]):
         return payload
 
     def validate_card_role_override(self, value: str) -> list[str]:
-        try:
-            payload = json.loads(value)
-        except json.JSONDecodeError as exc:
-            raise serializers.ValidationError("card_role_override must be valid JSON") from exc
-        if not isinstance(payload, list):
-            raise serializers.ValidationError("card_role_override must decode to an array")
-        if len(payload) != len(set(map(str, payload))):
-            raise serializers.ValidationError("card_role_override roles must be unique")
-        invalid = sorted({str(role) for role in payload if role not in CARD_ROLES})
-        if invalid:
-            raise serializers.ValidationError(f"Unsupported card roles: {', '.join(invalid)}")
-        return [role for role in CARD_ROLES if role in payload]
+        return _validate_json_choice_array(
+            value,
+            field_name="card_role_override",
+            item_label="roles",
+            unsupported_label="card roles",
+            choices=CARD_ROLES,
+        )
 
     def validate_card_faction_override(self, value: str) -> list[str]:
-        try:
-            payload = json.loads(value)
-        except json.JSONDecodeError as exc:
-            raise serializers.ValidationError("card_faction_override must be valid JSON") from exc
-        if not isinstance(payload, list):
-            raise serializers.ValidationError("card_faction_override must decode to an array")
-        if len(payload) != len(set(map(str, payload))):
-            raise serializers.ValidationError("card_faction_override factions must be unique")
-        invalid = sorted({str(faction) for faction in payload if faction not in CARD_FACTIONS})
-        if invalid:
-            raise serializers.ValidationError(f"Unsupported card factions: {', '.join(invalid)}")
-        return [faction for faction in CARD_FACTIONS if faction in payload]
+        return _validate_json_choice_array(
+            value,
+            field_name="card_faction_override",
+            item_label="factions",
+            unsupported_label="card factions",
+            choices=CARD_FACTIONS,
+        )
 
     def validate_card_mana_family_override(self, value: str) -> list[str]:
-        try:
-            payload = json.loads(value)
-        except json.JSONDecodeError as exc:
-            raise serializers.ValidationError(
-                "card_mana_family_override must be valid JSON"
-            ) from exc
-        if not isinstance(payload, list):
-            raise serializers.ValidationError(
-                "card_mana_family_override must decode to an array"
-            )
-        if len(payload) != len(set(map(str, payload))):
-            raise serializers.ValidationError(
-                "card_mana_family_override families must be unique"
-            )
         family_keys = tuple(family.key for family in MANA_FAMILIES)
-        invalid = sorted({str(family) for family in payload if family not in family_keys})
-        if invalid:
-            raise serializers.ValidationError(
-                f"Unsupported mana families: {', '.join(invalid)}"
-            )
-        return [family for family in family_keys if family in payload]
+        return _validate_json_choice_array(
+            value,
+            field_name="card_mana_family_override",
+            item_label="families",
+            unsupported_label="mana families",
+            choices=family_keys,
+        )
 
     def validate(self, attrs: dict[str, object]) -> dict[str, object]:
         if attrs.get("card_role_mode") == "automatic" and attrs.get("card_role_override"):

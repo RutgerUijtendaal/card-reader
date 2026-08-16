@@ -7,8 +7,11 @@ from django.db.migrations.executor import MigrationExecutor
 import pytest
 
 
-BASE_MIGRATION = ("card_reader_core", "0057_card_classification_review_item")
-MANA_ROLE_MIGRATION = ("card_reader_core", "0058_add_mana_card_role")
+BASE_MIGRATION = ("card_reader_core", "0054_card_classification_final_state")
+MANA_ROLE_MIGRATION = (
+    "card_reader_core",
+    "0055_seed_classification_rules_and_full_height_template",
+)
 
 
 def _migrate_to(target: tuple[str, str]) -> Any:
@@ -168,7 +171,7 @@ def test_mana_role_migration_reuses_type_seeds_rules_and_backfills_latest_types(
 
 
 @pytest.mark.django_db(transaction=True)
-def test_mana_role_migration_refuses_to_orphan_custom_mana_classification() -> None:
+def test_seed_reverse_preserves_custom_mana_classification() -> None:
     _migrate_to(BASE_MIGRATION)
     apps = _migrate_to(MANA_ROLE_MIGRATION)
     Card = apps.get_model("card_reader_core", "Card")
@@ -197,10 +200,9 @@ def test_mana_role_migration_refuses_to_orphan_custom_mana_classification() -> N
         enabled=True,
     )
 
-    with pytest.raises(RuntimeError, match="custom Mana assignments or classification rules"):
-        _migrate_to(BASE_MIGRATION)
-
-    CardClassificationRule.objects.filter(id=custom_rule.id).delete()
-    CardRoleAssignment.objects.filter(id=custom_assignment.id).delete()
-    _migrate_to(BASE_MIGRATION)
+    reversed_apps = _migrate_to(BASE_MIGRATION)
+    ReversedRule = reversed_apps.get_model("card_reader_core", "CardClassificationRule")
+    ReversedRole = reversed_apps.get_model("card_reader_core", "CardRoleAssignment")
+    assert ReversedRule.objects.filter(id=custom_rule.id).exists()
+    assert ReversedRole.objects.filter(id=custom_assignment.id).exists()
     _restore_leaf()

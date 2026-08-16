@@ -267,23 +267,24 @@
   <path class="line" d="M715 238 L850 238"/>
   <text class="label" x="742" y="224">has items</text>
   <path class="line" d="M1000 281 C1035 300, 1060 315, 1095 318"/>
-  <text class="label" x="1008" y="304">classification review</text>
   <path class="line" d="M715 205 C875 150, 1080 150, 1245 205"/>
   <text class="label" x="930" y="154">ImportJob.template</text>
   <path class="line" d="M607 281 C650 350, 760 425, 820 575"/>
   <text class="label" x="642" y="360">job release context</text>
   <path class="line" d="M962 281 C925 360, 880 450, 860 575"/>
   <text class="label" x="902" y="365">target_card</text>
-  <path class="line" d="M1015 281 C1090 345, 1195 390, 1235 455"/>
-  <text class="label" x="1090" y="350">target_card_version</text>
+  <path class="line" d="M1015 281 C1055 350, 1085 420, 1175 455"/>
+  <text class="label" x="1018" y="365">target_card_version</text>
   <path class="line" d="M268 281 C420 360, 860 410, 1125 515"/>
   <text class="label" x="610" y="378">content release marker</text>
-  <path class="line" d="M1245 255 C1210 320, 1210 390, 1245 455"/>
-  <text class="label" x="1125" y="360">CardVersion.template</text>
+  <path class="line" d="M1245 255 C1430 285, 1430 400, 1325 455"/>
+  <text class="label" x="1350" y="430">CardVersion.template</text>
   <path class="thin" d="M1245 348 L1245 455"/>
-  <text class="label" x="1255" y="392">reviewed version</text>
+  <text class="label" x="1255" y="440">reviewed version</text>
   <path class="thin" d="M1120 348 C1030 410, 960 500, 900 575"/>
   <text class="label" x="965" y="455">reviewed Card</text>
+  <path class="thin" d="M1395 318 C1470 310, 1540 292, 1600 281"/>
+  <text class="label" x="1450" y="300">reviewed_by</text>
   <path class="soft" d="M610 281 C700 345, 900 510, 1125 690"/>
   <text class="label" x="810" y="442">immutable rule snapshot</text>
   <path class="thin" d="M1725 238 L1765 238"/>
@@ -357,7 +358,6 @@
   <path class="thin" d="M1375 700 C1550 700, 1600 790, 1665 808"/>
   <path class="thin" d="M1375 730 C1540 810, 1585 1015, 1665 1078"/>
   <path class="thin" d="M1375 742 C1500 820, 1570 900, 1665 898"/>
-  <text class="label" x="1435" y="758">Tag, Type, or Symbol source</text>
 
   <path class="thin" d="M1850 1155 C1965 1115, 1975 835, 1850 808"/>
   <path class="thin" d="M1850 1175 C1955 1150, 1970 1090, 1850 1078"/>

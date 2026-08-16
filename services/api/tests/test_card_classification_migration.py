@@ -89,7 +89,7 @@ def test_final_state_migration_backfills_master_data_and_reverses_hero_roles() -
     assert NewImportJob.objects.get(id=job.id).creation_key
     assert NewImportJob.objects.get(id=job.id).card_pool == "player"
     snapshot = NewImportJob.objects.get(id=job.id).classification_rule_snapshot_json
-    snapshot_body = {"schema_version": 1, "card_pool": "player", "rules": []}
+    snapshot_body = {"schema_version": 3, "card_pool": "player", "rules": []}
     expected_digest = hashlib.sha256(
         json.dumps(snapshot_body, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
@@ -136,7 +136,7 @@ def test_final_state_reverse_rejects_classification_rule_data() -> None:
     job = ImportJob.objects.create(
         source_path="imports/classification-rule-reverse",
         template_id=template.id,
-        classification_rule_snapshot_json={"schema_version": 1, "digest": "preserved"},
+        classification_rule_snapshot_json={"schema_version": 3, "digest": "preserved"},
     )
 
     with pytest.raises(RuntimeError, match="classification rule snapshots"):

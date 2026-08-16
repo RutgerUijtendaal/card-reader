@@ -18,6 +18,9 @@ CARD_ROLE_CHOICES = [
     ("boon", "Boon"),
     ("event", "Event"),
     ("shop_item", "Shop Item"),
+    ("directive", "Directive"),
+    ("reminder", "Reminder"),
+    ("mana", "Mana"),
 ]
 CARD_FACTION_CHOICES = [
     ("order", "Order"),
@@ -30,7 +33,7 @@ EMPTY_FACTION_IDENTITY_KEY = "[]"
 
 def empty_player_classification_snapshot() -> dict[str, object]:
     body: dict[str, object] = {
-        "schema_version": 1,
+        "schema_version": 3,
         "card_pool": "player",
         "rules": [],
     }
@@ -75,10 +78,10 @@ def populate_master_data(apps: Any, _schema_editor: Any) -> None:
                 f"as another card's alias: '{alias.key}'. Resolve the collision before retrying."
             )
 
-    legacy_classification_snapshot = empty_player_classification_snapshot()
+    initial_classification_snapshot = empty_player_classification_snapshot()
     for job in ImportJob.objects.iterator():
         job.creation_key = str(uuid4())
-        job.classification_rule_snapshot_json = legacy_classification_snapshot
+        job.classification_rule_snapshot_json = initial_classification_snapshot
         job.save(update_fields=["creation_key", "classification_rule_snapshot_json"])
 
     for item in ImportJobItem.objects.iterator():

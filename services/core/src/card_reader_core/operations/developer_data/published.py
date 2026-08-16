@@ -5,8 +5,9 @@ import re
 import shutil
 
 from card_reader_core.config.settings import settings
+from card_reader_core.storage import calculate_checksum
 
-from .archive import DeveloperDataError, canonical_json_bytes, sha256_file, validate_archive
+from .archive import DeveloperDataError, canonical_json_bytes, validate_archive
 from .schema import PublishedBundle
 
 _SAFE_VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
@@ -31,7 +32,7 @@ class PublishedBundleStore:
             bundle_version=version,
             format_version=manifest.format_version,
             filename=filename,
-            sha256=sha256_file(archive_path),
+            sha256=calculate_checksum(archive_path),
             size_bytes=archive_path.stat().st_size,
             created_at=manifest.created_at,
         )
@@ -83,7 +84,10 @@ class PublishedBundleStore:
             raise DeveloperDataError(f"Published metadata for {version} is invalid.") from exc
         if artifact.filename != filename or artifact.bundle_version != version:
             raise DeveloperDataError(f"Published metadata for {version} does not match its filename.")
-        if archive_path.stat().st_size != artifact.size_bytes or sha256_file(archive_path) != artifact.sha256:
+        if (
+            archive_path.stat().st_size != artifact.size_bytes
+            or calculate_checksum(archive_path) != artifact.sha256
+        ):
             raise DeveloperDataError(f"Published developer-data bundle {version} failed integrity validation.")
         return artifact
 
@@ -108,7 +112,10 @@ class PublishedBundleStore:
         artifact: PublishedBundle,
     ) -> PublishedBundle:
         if target.exists():
-            if target.stat().st_size != artifact.size_bytes or sha256_file(target) != artifact.sha256:
+            if (
+                target.stat().st_size != artifact.size_bytes
+                or calculate_checksum(target) != artifact.sha256
+            ):
                 raise DeveloperDataError(
                     f"Incomplete developer-data publication for {artifact.bundle_version} conflicts with the new archive."
                 )

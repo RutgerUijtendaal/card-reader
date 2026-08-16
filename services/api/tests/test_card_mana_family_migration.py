@@ -66,16 +66,16 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
             "unmatched-affinity",
         )
     }
-    legacy_snapshot_body: dict[str, object] = {
-        "schema_version": 1,
+    pre_mana_snapshot_body: dict[str, object] = {
+        "schema_version": 3,
         "card_pool": "player",
         "rules": [],
     }
-    legacy_snapshot = {
-        **legacy_snapshot_body,
+    pre_mana_snapshot = {
+        **pre_mana_snapshot_body,
         "digest": hashlib.sha256(
             json.dumps(
-                legacy_snapshot_body,
+                pre_mana_snapshot_body,
                 sort_keys=True,
                 separators=(",", ":"),
             ).encode("utf-8")
@@ -86,14 +86,14 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
         template_id=template.id,
         card_pool="player",
         status="queued",
-        classification_rule_snapshot_json=legacy_snapshot,
+        classification_rule_snapshot_json=pre_mana_snapshot,
     )
     completed_job = ImportJob.objects.create(
         source_path="imports/pre-mana-completed",
         template_id=template.id,
         card_pool="player",
         status="completed",
-        classification_rule_snapshot_json=legacy_snapshot,
+        classification_rule_snapshot_json=pre_mana_snapshot,
     )
 
     def create_card(
@@ -244,7 +244,7 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
     ).hexdigest()
     assert (
         MigratedJob.objects.get(id=completed_job.id).classification_rule_snapshot_json
-        == legacy_snapshot
+        == pre_mana_snapshot
     )
     assert MigratedItem.objects.get(
         id=queued_target_item.id
@@ -326,7 +326,7 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
     downgraded_queued_snapshot = DowngradedJob.objects.get(
         id=queued_job.id
     ).classification_rule_snapshot_json
-    assert downgraded_queued_snapshot["schema_version"] == 1
+    assert downgraded_queued_snapshot["schema_version"] == 3
     assert downgraded_queued_snapshot["rules"] == []
     downgraded_queued_body = {
         key: downgraded_queued_snapshot[key]
@@ -342,7 +342,7 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
     downgraded_new_snapshot = DowngradedJob.objects.get(
         id=rollback_job.id
     ).classification_rule_snapshot_json
-    assert downgraded_new_snapshot["schema_version"] == 1
+    assert downgraded_new_snapshot["schema_version"] == 3
     assert downgraded_new_snapshot["rules"] == [rollback_role_rule]
     downgraded_new_body = {
         key: downgraded_new_snapshot[key]

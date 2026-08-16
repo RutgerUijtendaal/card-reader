@@ -20,8 +20,8 @@ from card_reader_core.operations.developer_data import (
     DeveloperDataError,
     DeveloperDataLock,
     import_developer_data,
-    sha256_file,
 )
+from card_reader_core.storage import calculate_checksum
 from card_reader_core.services.tts_card_sheets import TtsCardSheetService
 
 
@@ -127,7 +127,7 @@ def _download_bundle(*, lock: DeveloperDataLock, code: str, stdout: Any) -> Path
     cache_root.mkdir(parents=True, exist_ok=True)
     target = cache_root / filename
     temporary = target.with_suffix(target.suffix + ".part")
-    if target.is_file() and sha256_file(target) == lock.sha256:
+    if target.is_file() and calculate_checksum(target) == lock.sha256:
         stdout.write(f"Using verified cached developer-data bundle {lock.bundle_version}.")
         return target
     exchange_url = urljoin(lock.api_base_url.rstrip("/") + "/", "developer-data/grants/exchange")
@@ -206,7 +206,7 @@ def _verified_cached_bundle(lock: DeveloperDataLock) -> Path | None:
     target = REPO_ROOT / ".tmp" / "dev-data" / (
         f"card-reader-dev-data-{lock.bundle_version}.tar.gz"
     )
-    if target.is_file() and sha256_file(target) == lock.sha256:
+    if target.is_file() and calculate_checksum(target) == lock.sha256:
         return target
     return None
 

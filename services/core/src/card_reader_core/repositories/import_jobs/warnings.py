@@ -5,12 +5,10 @@ from typing import Any, TypedDict
 from card_reader_core.models import ImportJobItem
 
 MATCHED_DEPRECATED_CARD_WARNING = "matched_deprecated_card"
-CARD_CLASSIFICATION_MISMATCH_WARNING = "card_classification_mismatch"
 EVIL_FACTION_UNRESOLVED_WARNING = "evil_faction_unresolved"
 CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING = "card_classification_changed_while_queued"
 _WARNING_ORDER = (
     MATCHED_DEPRECATED_CARD_WARNING,
-    CARD_CLASSIFICATION_MISMATCH_WARNING,
     EVIL_FACTION_UNRESOLVED_WARNING,
     CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING,
 )

@@ -18,7 +18,6 @@ from .status import (
 from card_reader_core.imports import SUPPORTED_IMAGE_SUFFIXES, ImportJobItemTarget
 from .warnings import (
     CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING,
-    CARD_CLASSIFICATION_MISMATCH_WARNING,
     EVIL_FACTION_UNRESOLVED_WARNING,
     MATCHED_DEPRECATED_CARD_WARNING,
     ImportWarning,
@@ -32,7 +31,6 @@ __all__ = [
     "ImportJobItemTarget",
     "ImportWarning",
     "CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING",
-    "CARD_CLASSIFICATION_MISMATCH_WARNING",
     "EVIL_FACTION_UNRESOLVED_WARNING",
     "MATCHED_DEPRECATED_CARD_WARNING",
     "bump_job_processed",

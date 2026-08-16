@@ -45,8 +45,9 @@ from card_reader_core.services.classification_rules import (
 )
 from card_reader_core.services.templates import apply_bundled_template_compatibility
 from card_reader_core.metadata import MANA_FAMILY_BY_KEY
+from card_reader_core.storage import calculate_checksum
 
-from .archive import DeveloperDataError, extracted_archive, load_extracted_bundle, sha256_file
+from .archive import DeveloperDataError, extracted_archive, load_extracted_bundle
 from .schema import (
     CardReferenceRecord,
     CardReferenceIdentity,
@@ -169,7 +170,7 @@ def import_developer_data(
     expected_archive_sha256: str | None = None,
 ) -> DeveloperDataImportResult:
     if expected_archive_sha256 is not None:
-        actual_archive_sha256 = sha256_file(archive_path)
+        actual_archive_sha256 = calculate_checksum(archive_path)
         if actual_archive_sha256 != expected_archive_sha256:
             raise DeveloperDataError(
                 "Developer-data archive checksum does not match the lock file."
@@ -371,7 +372,7 @@ def _copy_assets(
             if (
                 not target.is_file()
                 or target.stat().st_size != entry.size_bytes
-                or sha256_file(target) != entry.sha256
+                or calculate_checksum(target) != entry.sha256
             ):
                 raise DeveloperDataError(
                     f"Conflicting local asset already exists: {relative_storage_path}"

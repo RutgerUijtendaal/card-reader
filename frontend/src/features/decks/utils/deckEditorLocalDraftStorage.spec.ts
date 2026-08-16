@@ -159,6 +159,29 @@ describe('deckEditorLocalDraftStorage', () => {
     });
   });
 
+  test('rejects cached card snapshots with noncanonical classification values', () => {
+    const form = { ...createEmptyDeckForm(), hero_card_id: 'hero-1' };
+    const draft = buildStoredDeckEditorDraft(
+      'user-1',
+      'draft-1',
+      form,
+      { 'hero-1': buildCard('hero-1', true) },
+    );
+    const invalidCard = draft.cards['hero-1'] as unknown as Record<string, unknown>;
+    invalidCard.card_roles = ['hero', 'legacy-role'];
+    invalidCard.card_factions = ['order', 'legacy-faction'];
+    invalidCard.card_mana_families = ['arcane', 'legacy-family'];
+    localStorage.setItem(
+      'card-reader.deck-editor.new-draft.user-1',
+      JSON.stringify(draft),
+    );
+
+    expect(createDeckEditorLocalDraftStorage().read('user-1')).toEqual({
+      status: 'loaded',
+      slot: { kind: 'empty' },
+    });
+  });
+
   test('conditionally clears malformed and owner-mismatched data', async () => {
     const storage = createDeckEditorLocalDraftStorage();
     localStorage.setItem('card-reader.deck-editor.new-draft.user-1', '{broken');

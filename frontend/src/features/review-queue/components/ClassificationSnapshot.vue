@@ -37,10 +37,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { cardFactionLabel } from '@/domain/cards/cardFactions';
-import { manaFamilyLabel } from '@/domain/cards/manaFamilies';
+import { displayCardFactionLabels } from '@/domain/cards/cardFactions';
+import { displayManaFamilyLabels } from '@/domain/cards/manaFamilies';
 import { cardPoolLabel } from '@/domain/cards/cardPools';
-import { cardRoleLabel } from '@/domain/cards/cardRoles';
+import { displayCardRoleLabels } from '@/domain/cards/cardRoles';
 import type { CardClassificationSnapshot } from '@/features/review-queue/types';
 
 const props = withDefaults(
@@ -53,18 +53,12 @@ const props = withDefaults(
 );
 
 const roleLabels = computed(() =>
-  props.classification.card_roles.length > 0
-    ? props.classification.card_roles.map(cardRoleLabel).join(', ')
-    : 'Normal',
+  displayCardRoleLabels(props.classification.card_roles).join(', '),
 );
 const factionLabels = computed(() =>
-  props.classification.card_factions.length > 0
-    ? props.classification.card_factions.map(cardFactionLabel).join(', ')
-    : 'None',
+  displayCardFactionLabels(props.classification.card_factions).join(', '),
 );
 const manaLabels = computed(() =>
-  props.classification.card_mana_families.length > 0
-    ? props.classification.card_mana_families.map(manaFamilyLabel).join(', ')
-    : 'Colorless',
+  displayManaFamilyLabels(props.classification.card_mana_families).join(', '),
 );
 </script>
