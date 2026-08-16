@@ -172,6 +172,8 @@ describe('ImportJobsPage', () => {
       'Select a template',
       'Select a card pool',
     ]);
+    expect(cardSetupSelects[0]?.textContent).toContain('Default card');
+    expect(cardSetupSelects[0]?.textContent).not.toContain('mtg-like-v1');
     expect(cardSetupSelects.every((select) => select.required)).toBe(true);
     expect(form?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
     expect(host.textContent).toContain('Automatic');

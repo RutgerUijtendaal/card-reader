@@ -406,6 +406,7 @@
           <ImportActivityPanel
             :active-jobs="activeJobs"
             :recent-jobs="recentJobs"
+            :template-label-by-key="templateLabelByKey"
             :active-loaded="activeJobsLoaded"
             :history-loaded="historyLoaded"
             :refreshing="isRefreshing"
@@ -497,7 +498,10 @@ const {
 const auth = useAuthStore();
 
 const templateOptions = computed(() =>
-  templates.value.map((item) => ({ value: item.key, label: `${item.label} (${item.key})` })),
+  templates.value.map((item) => ({ value: item.key, label: item.label })),
+);
+const templateLabelByKey = computed<Record<string, string>>(() =>
+  Object.fromEntries(templates.value.map((item) => [item.key, item.label])),
 );
 const cardPoolOptions = CARD_POOL_OPTIONS;
 const cardRoleOptions = CARD_ROLE_OPTIONS;

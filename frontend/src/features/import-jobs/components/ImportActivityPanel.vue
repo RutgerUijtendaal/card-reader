@@ -212,7 +212,8 @@
                   {{ job.status }}
                 </span>
                 <p class="theme-section-title text-sm font-semibold leading-5">
-                  {{ job.template_id }} · {{ job.content_version?.version_number ?? 'Unversioned' }}
+                  {{ templateLabel(job.template_id) }} ·
+                  {{ job.content_version?.version_number ?? 'Unversioned' }}
                 </p>
                 <p class="theme-section-muted text-xs">
                   {{ cardPoolLabel(job.card_pool) }} ·
@@ -407,9 +408,10 @@ import {
   getOperationsItemProgressPercent,
 } from '@/features/import-jobs/utils/importJobUtils';
 
-defineProps<{
+const props = defineProps<{
   activeJobs: ImportJob[];
   recentJobs: OperationsQueueItem[];
+  templateLabelByKey: Readonly<Record<string, string>>;
   activeLoaded: boolean;
   historyLoaded: boolean;
   refreshing: boolean;
@@ -422,6 +424,9 @@ defineProps<{
   selectedJobDetail: ImportJobDetail | null;
   detailLoading: boolean;
 }>();
+
+const templateLabel = (templateKey: string): string =>
+  props.templateLabelByKey[templateKey]?.trim() || templateKey;
 
 const emit = defineEmits<{
   refresh: [];

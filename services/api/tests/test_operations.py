@@ -86,6 +86,10 @@ def test_operations_overview_reports_workers_and_normalized_queues() -> None:
 
     queues = {queue["key"]: queue for queue in payload["queues"]}
     assert queues["imports"]["status_counts"]["queued"] >= 1
+    import_item = next(item for item in queues["imports"]["items"] if item["id"] == "import-1")
+    assert {entry["label"]: entry["value"] for entry in import_item["metadata"]}["Template"] == (
+        "MTG Like V1"
+    )
     assert queues["tts-card-sheets"]["status_counts"]["queued"] >= 1
     assert queues["developer-data-builds"]["status_counts"]["failed"] >= 1
 

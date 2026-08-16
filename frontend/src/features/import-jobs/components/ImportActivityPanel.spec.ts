@@ -72,6 +72,7 @@ const mountPanel = async (
   const app = createApp(ImportActivityPanel, {
     activeJobs: options.activeJobs ?? [activeJob],
     recentJobs: options.recentJobs ?? [recentJob],
+    templateLabelByKey: { 'mtg-like-v1': 'Default card' },
     activeLoaded: options.activeLoaded ?? true,
     historyLoaded: options.historyLoaded ?? true,
     refreshing: false,
@@ -105,7 +106,8 @@ describe('ImportActivityPanel', () => {
         .querySelector('[data-testid="import-activity-panel"]')
         ?.classList.contains('theme-card-frame'),
     ).toBe(false);
-    expect(mounted.host.textContent).toContain('mtg-like-v1 · Unversioned');
+    expect(mounted.host.textContent).toContain('Default card · Unversioned');
+    expect(mounted.host.textContent).not.toContain('mtg-like-v1');
     expect(mounted.host.textContent).toContain('Default card · 16.2.0');
     expect(mounted.host.textContent).not.toContain('uploads/finished-job');
     expect(
@@ -142,7 +144,7 @@ describe('ImportActivityPanel', () => {
   test('shows active controls while recent history is still loading', async () => {
     const mounted = await mountPanel({ historyLoaded: false });
 
-    expect(mounted.host.textContent).toContain('mtg-like-v1 · Unversioned');
+    expect(mounted.host.textContent).toContain('Default card · Unversioned');
     expect(mounted.host.textContent).toContain('Interrupt');
     expect(mounted.host.querySelector('[aria-label="Loading active imports"]')).toBeNull();
     expect(
