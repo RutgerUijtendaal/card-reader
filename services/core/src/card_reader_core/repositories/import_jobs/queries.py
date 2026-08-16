@@ -31,7 +31,13 @@ def fetch_job_by_creation_key(creation_key: str) -> ImportJob | None:
 def fetch_items_for_job(job_id: str) -> list[ImportJobItem]:
     return list(
         ImportJobItem.objects.filter(job_id=job_id)
-        .select_related("job__content_version", "job__template", "target_card", "target_card_version")
+        .select_related(
+            "job__content_version",
+            "job__template",
+            "target_card",
+            "target_card_version",
+            "classification_review_item",
+        )
         .order_by("created_at")
     )
 

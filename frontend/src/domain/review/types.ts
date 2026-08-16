@@ -2,6 +2,8 @@ import type { MetadataGroupName, ScalarFieldName } from '@/domain/cards/types';
 
 export type ReviewSummaryResponse = {
   open_parse_flag_item_count: number;
+  open_classification_review_count: number;
+  open_review_count: number;
 };
 
 export type ParseFlagPropertyKey = ScalarFieldName | MetadataGroupName | 'overall' | 'other';

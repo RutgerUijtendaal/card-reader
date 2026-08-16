@@ -54,12 +54,12 @@ describe('card API', () => {
     };
     vi.mocked(api.get).mockResolvedValue({ data: page });
 
-    await expect(
-      fetchCardPage('/review/confidence-cards', new URLSearchParams({ page: '1' })),
-    ).resolves.toEqual(page);
+    await expect(fetchCardPage('/cards', new URLSearchParams({ page: '1' }))).resolves.toEqual(
+      page,
+    );
     await expect(fetchCards({ q: 'hero', page_size: 25 })).resolves.toEqual(page);
 
-    expect(api.get).toHaveBeenNthCalledWith(1, '/review/confidence-cards?page=1');
+    expect(api.get).toHaveBeenNthCalledWith(1, '/cards?page=1');
     expect(api.get).toHaveBeenNthCalledWith(2, '/cards', {
       params: { q: 'hero', page_size: 25 },
     });

@@ -7,6 +7,7 @@ from card_reader_core.config.settings import settings
 from card_reader_core.models import (
     CardAlias,
     CardClassificationInferenceEvidence,
+    CardClassificationReviewItem,
     CardFaction,
     CardPool,
     CardRole,
@@ -68,6 +69,13 @@ def _import_card(
     )
     item.refresh_from_db()
     return version, item
+
+
+def _assert_classification_review(item: ImportJobItem) -> CardClassificationReviewItem:
+    assert item.warning_code is None
+    review_item = CardClassificationReviewItem.objects.get(import_item=item)
+    assert review_item.status == "open"
+    return review_item
 
 
 @pytest.mark.django_db
@@ -285,7 +293,7 @@ def test_reimport_reuses_unique_image_after_manual_faction_correction() -> None:
     assert card_role_keys(original_version.card) == ("boss",)
     assert repeated_version.card_id == original_version.card_id
     assert repeated_item.target_card_id == original_version.card_id
-    assert repeated_item.warning_code == "card_classification_mismatch"
+    _assert_classification_review(repeated_item)
     assert repeated_item.resolved_card_factions_json == []
 
 
@@ -309,7 +317,7 @@ def test_unknown_evil_faction_reuses_unique_name_after_artwork_changes() -> None
 
     assert repeated_version.card_id == original_version.card_id
     assert repeated_version.version_number == 2
-    assert repeated_item.warning_code == "card_classification_mismatch"
+    _assert_classification_review(repeated_item)
     assert card_faction_keys(repeated_version.card) == ("blood",)
 
 
@@ -351,7 +359,7 @@ def test_empty_evil_override_uses_unknown_faction_matching() -> None:
     )
 
     assert version.card_id == card.id
-    assert item.warning_code == "card_classification_mismatch"
+    _assert_classification_review(item)
     assert item.classification_inference_json["factions"]["mode"] == "override"
 
 
@@ -373,7 +381,7 @@ def test_unknown_evil_faction_reuses_unique_alias_after_artwork_changes() -> Non
     )
 
     assert version.card_id == card.id
-    assert item.warning_code == "card_classification_mismatch"
+    _assert_classification_review(item)
     assert card_faction_keys(version.card) == ("dark",)
 
 
@@ -411,7 +419,7 @@ def test_unknown_evil_faction_matches_historical_image_version() -> None:
     assert repeated_version.id not in {original_version.id, newer_version.id}
     assert repeated_version.version_number == 3
     assert repeated_version.previous_version_id == newer_version.id
-    assert repeated_item.warning_code == "card_classification_mismatch"
+    _assert_classification_review(repeated_item)
     assert card_faction_keys(repeated_version.card) == ("dark",)
 
 
@@ -611,7 +619,7 @@ def test_targeted_reparse_with_unknown_evil_faction_remains_targeted() -> None:
         resolved_card_factions=(),
     )
     reparse_item.refresh_from_db()
-    assert reparse_item.warning_code == "card_classification_mismatch"
+    _assert_classification_review(reparse_item)
     assert all(
         warning["code"] != "evil_faction_unresolved"
         for warning in reparse_item.warnings_json

@@ -2,17 +2,25 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 
 from card_reader_core.models import (
     EVIL_CARD_POOL,
+    PLAYER_CARD_POOL_SCOPE,
     Card,
+    CardClassificationReviewItem,
     CardVersion,
     CardVersionParseFlag,
+    ImportJob,
+    ImportJobItem,
     ParseResult,
     Template,
 )
+from card_reader_core.repositories.cards import change_card_identity
 
 
 def test_authenticated_user_can_create_parse_flag_with_multiple_items() -> None:
@@ -124,9 +132,8 @@ def test_review_lists_are_global_across_every_authorized_card_pool() -> None:
         name="Evil Review Flag",
         card_pool=EVIL_CARD_POOL,
     )
-    CardVersion.objects.filter(id__in=[player_version.id, evil_version.id]).update(
-        confidence=0.7
-    )
+    _create_classification_review(card=player_card, version=player_version)
+    _create_classification_review(card=evil_card, version=evil_version)
     payload = {"items": [{"property_key": "name", "expected_value": "Correct name"}]}
     assert (
         client.post(
@@ -146,7 +153,7 @@ def test_review_lists_are_global_across_every_authorized_card_pool() -> None:
     )
 
     flags_response = client.get("/review/parse-flags")
-    confidence_response = client.get("/review/confidence-cards")
+    classification_response = client.get("/review/classification-items")
 
     assert flags_response.status_code == 200
     assert {
@@ -156,14 +163,156 @@ def test_review_lists_are_global_across_every_authorized_card_pool() -> None:
         ("Player Review Flag", "player"),
         ("Evil Review Flag", "evil"),
     }
-    assert confidence_response.status_code == 200
+    assert classification_response.status_code == 200
     assert {
-        (row["name"], row["card_pool"])
-        for row in confidence_response.json()["results"]
+        (row["card"]["name"], row["card"]["card_pool"])
+        for row in classification_response.json()["results"]
     }.issuperset({
         ("Player Review Flag", "player"),
         ("Evil Review Flag", "evil"),
     })
+
+
+def test_classification_review_update_respects_authorized_card_pool_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    CardClassificationReviewItem.objects.all().delete()
+    reviewer = _create_user("pool-scoped-reviewer", "password", is_staff=True)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(reviewer)
+    card, version = _create_card_version(name="Restricted Classification Review")
+    review_item = _create_classification_review(card=card, version=version)
+    change_card_identity(card=card, card_pool=EVIL_CARD_POOL)
+    monkeypatch.setattr(
+        "card_reader_api.review.views.card_pool_scope_for_user",
+        lambda _user: PLAYER_CARD_POOL_SCOPE,
+    )
+
+    list_response = client.get("/review/classification-items?status=open")
+    summary_response = client.get("/review/summary")
+    response = client.patch(
+        f"/review/classification-items/{review_item.id}",
+        data={"status": "dismissed"},
+        content_type="application/json",
+    )
+
+    assert list_response.status_code == 200
+    assert list_response.json()["results"] == []
+    assert summary_response.json()["open_classification_review_count"] == 0
+    assert response.status_code == 404
+    review_item.refresh_from_db()
+    assert review_item.status == "open"
+
+
+def test_classification_review_scope_falls_back_to_snapshot_for_deleted_card(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    CardClassificationReviewItem.objects.all().delete()
+    reviewer = _create_user("deleted-review-scope", "password", is_staff=True)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(reviewer)
+    card, version = _create_card_version(name="Deleted Classification Review")
+    review_item = _create_classification_review(card=card, version=version)
+    card.delete()
+    monkeypatch.setattr(
+        "card_reader_api.review.views.card_pool_scope_for_user",
+        lambda _user: PLAYER_CARD_POOL_SCOPE,
+    )
+
+    response = client.get("/review/classification-items?status=open")
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()["results"]] == [review_item.id]
+    assert response.json()["results"][0]["card"]["id"] is None
+
+
+def test_classification_review_list_and_terminal_updates_are_auditable() -> None:
+    reviewer = _create_user("classification-reviewer", "password", is_staff=True)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(reviewer)
+    card, version = _create_card_version(name="Classification Review Card")
+    review_item = _create_classification_review(card=card, version=version)
+
+    list_response = client.get("/review/classification-items?status=open")
+
+    assert list_response.status_code == 200
+    payload = next(
+        row for row in list_response.json()["results"] if row["id"] == review_item.id
+    )
+    assert payload["existing_classification"]["card_roles"] == []
+    assert payload["inferred_classification"]["card_roles"] == ["event"]
+    assert payload["card"]["card_pool"] == "player"
+
+    change_card_identity(card=card, card_pool=EVIL_CARD_POOL)
+    live_response = client.get("/review/classification-items?status=open")
+    live_payload = next(
+        row for row in live_response.json()["results"] if row["id"] == review_item.id
+    )
+    assert live_payload["existing_classification"]["card_pool"] == "player"
+    assert live_payload["card"]["card_pool"] == "evil"
+
+    resolved_response = client.patch(
+        f"/review/classification-items/{review_item.id}",
+        data={"status": "resolved", "review_note": "Updated in the Card editor."},
+        content_type="application/json",
+    )
+    replay_response = client.patch(
+        f"/review/classification-items/{review_item.id}",
+        data={"status": "resolved"},
+        content_type="application/json",
+    )
+    conflicting_response = client.patch(
+        f"/review/classification-items/{review_item.id}",
+        data={"status": "dismissed"},
+        content_type="application/json",
+    )
+
+    assert resolved_response.status_code == 200
+    assert resolved_response.json()["status"] == "resolved"
+    assert resolved_response.json()["reviewed_by"]["username"] == reviewer.username
+    assert resolved_response.json()["review_note"] == "Updated in the Card editor."
+    assert replay_response.status_code == 200
+    assert replay_response.json()["review_note"] == "Updated in the Card editor."
+    assert conflicting_response.status_code == 400
+    assert "already been completed" in conflicting_response.json()["detail"]
+
+
+def test_classification_review_page_image_loading_has_bounded_query_count() -> None:
+    CardClassificationReviewItem.objects.all().delete()
+    reviewer = _create_user("classification-query-reviewer", "password", is_staff=True)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(reviewer)
+    first_card, first_version = _create_card_version(name="First Query Review")
+    _create_classification_review(card=first_card, version=first_version)
+
+    with CaptureQueriesContext(connection) as first_queries:
+        first_response = client.get("/review/classification-items?status=open")
+
+    second_card, second_version = _create_card_version(name="Second Query Review")
+    _create_classification_review(card=second_card, version=second_version)
+    with CaptureQueriesContext(connection) as second_queries:
+        second_response = client.get("/review/classification-items?status=open")
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert len(second_queries) <= len(first_queries)
+
+
+def test_review_summary_combines_parse_flags_and_classification_reviews() -> None:
+    reviewer = _create_user("combined-reviewer", "password", is_staff=True)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(reviewer)
+    card, version = _create_card_version(name="Combined Review Card")
+    _create_classification_review(card=card, version=version)
+
+    response = client.get("/review/summary")
+
+    assert response.status_code == 200
+    assert response.json()["open_classification_review_count"] >= 1
+    assert response.json()["open_review_count"] == (
+        response.json()["open_classification_review_count"]
+        + response.json()["open_parse_flag_item_count"]
+    )
 
 
 def test_regular_user_cannot_read_global_review_lists() -> None:
@@ -172,7 +321,7 @@ def test_regular_user_cannot_read_global_review_lists() -> None:
     client.force_login(reviewer)
 
     assert client.get("/review/parse-flags").status_code == 403
-    assert client.get("/review/confidence-cards").status_code == 403
+    assert client.get("/review/classification-items").status_code == 403
 
 
 def test_authenticated_user_can_create_overall_and_property_flag_items() -> None:
@@ -347,6 +496,50 @@ def _create_user(
 
 def _clear_parse_flags() -> None:
     CardVersionParseFlag.objects.all().delete()
+
+
+def _create_classification_review(
+    *,
+    card: Card,
+    version: CardVersion,
+) -> CardClassificationReviewItem:
+    job = ImportJob.objects.create(
+        source_path=f"uploads/{card.id}",
+        template=version.template,
+        card_pool=card.card_pool,
+        total_items=1,
+    )
+    import_item = ImportJobItem.objects.create(
+        job=job,
+        source_file=f"uploads/{card.id}.webp",
+        target_card=card,
+        target_card_version=version,
+        status="completed",
+    )
+    return CardClassificationReviewItem.objects.create(
+        import_item=import_item,
+        card=card,
+        card_version=version,
+        card_pool=card.card_pool,
+        existing_classification_json={
+            "card_pool": card.card_pool,
+            "card_roles": [],
+            "card_factions": [],
+            "card_mana_families": [],
+        },
+        inferred_classification_json={
+            "card_pool": card.card_pool,
+            "card_roles": ["event"],
+            "card_factions": [],
+            "card_mana_families": [],
+        },
+        inference_evidence_json={
+            "roles": {
+                "mode": "automatic",
+                "matched_tag_sources": [{"id": "tag-event", "key": "event"}],
+            }
+        },
+    )
 
 
 def _create_card_version(*, name: str, card_pool: str = "player") -> tuple[Card, CardVersion]:

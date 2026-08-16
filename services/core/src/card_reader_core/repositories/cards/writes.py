@@ -29,6 +29,9 @@ from card_reader_core.models import (
     now_utc,
 )
 from card_reader_core.metadata import ManaFamily
+from card_reader_core.repositories.classification_reviews import (
+    create_classification_review_item,
+)
 from card_reader_core.repositories.import_jobs import (
     CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING,
     CARD_CLASSIFICATION_MISMATCH_WARNING,
@@ -936,27 +939,26 @@ def finalize_import_item(
     ):
         remove_import_warning(item, CARD_CLASSIFICATION_MISMATCH_WARNING)
     else:
-        mismatch_details: dict[str, object] = {
-            "stored": evidence_payload["live_classification"],
-            "live": evidence_payload["live_classification"],
-            "inferred": {
-                "card_pool": card_pool,
-                "card_roles": list(resolved_card_roles),
-                "card_factions": list(resolved_card_factions),
-                "card_mana_families": list(resolved_card_mana_families),
-            },
+        existing_classification: dict[str, object] = {
+            "card_pool": card.card_pool,
+            "card_roles": list(live_roles),
+            "card_factions": list(live_factions),
+            "card_mana_families": list(live_mana_families),
         }
-        if "queued_target_classification" in evidence_payload:
-            mismatch_details["queued"] = evidence_payload[
-                "queued_target_classification"
-            ]
-        upsert_import_warning(
-            item,
-            {
-                "code": CARD_CLASSIFICATION_MISMATCH_WARNING,
-                "message": "Inferred classification differs from the existing card; the existing classification was preserved.",
-                "details": mismatch_details,
-            },
+        inferred_classification: dict[str, object] = {
+            "card_pool": card_pool,
+            "card_roles": list(resolved_card_roles),
+            "card_factions": list(resolved_card_factions),
+            "card_mana_families": list(resolved_card_mana_families),
+        }
+        remove_import_warning(item, CARD_CLASSIFICATION_MISMATCH_WARNING)
+        create_classification_review_item(
+            import_item=item,
+            card=card,
+            card_version=version,
+            existing_classification=existing_classification,
+            inferred_classification=inferred_classification,
+            inference_evidence=evidence_payload,
         )
 
     item.resolved_card_roles_json = list(resolved_card_roles)

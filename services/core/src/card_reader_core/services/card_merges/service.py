@@ -19,6 +19,9 @@ from card_reader_core.repositories.cards import (
     ensure_card_alias,
     lock_card_identity_pools,
 )
+from card_reader_core.repositories.classification_reviews import (
+    retarget_classification_review_items,
+)
 from card_reader_core.services.tts_card_sheets import TtsCardSheetService
 
 from .aliases import build_alias_previews
@@ -75,6 +78,10 @@ def merge_cards(*, target_card_id: str, source_card_ids: list[str]) -> CardMerge
     merge_deck_references(target.id, source_ids)
     merge_card_group_references(target.id, source_ids)
     merge_card_versions(target.id, source_ids)
+    retarget_classification_review_items(
+        source_card_ids=source_ids,
+        target_card=target,
+    )
     TtsCardSheetService().sync_merge(target_card_id=target.id, source_card_ids=source_ids)
     CardAlias.objects.filter(card_id__in=source_ids).update(
         card=target,

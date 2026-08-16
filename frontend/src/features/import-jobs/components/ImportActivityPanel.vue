@@ -63,8 +63,8 @@
               Import details
             </h4>
             <p class="theme-section-muted mt-1 text-xs">
-              {{ cardPoolLabel(selectedJobDetail.card_pool) }} ·
-              roles {{ selectedJobDetail.card_role_mode }} · factions
+              {{ cardPoolLabel(selectedJobDetail.card_pool) }} · roles
+              {{ selectedJobDetail.card_role_mode }} · factions
               {{ selectedJobDetail.card_faction_mode }}
               · Mana {{ selectedJobDetail.card_mana_family_mode }}
             </p>
@@ -141,24 +141,30 @@
                 </div>
               </dl>
               <RouterLink
-                v-if="(
-                  warning.code === 'card_classification_mismatch'
-                  || warning.code === 'evil_faction_unresolved'
-                ) && item.card_tab_url"
+                v-if="
+                  (warning.code === 'card_classification_mismatch' ||
+                    warning.code === 'evil_faction_unresolved') &&
+                    item.card_tab_url
+                "
                 class="mt-1 inline-flex font-semibold underline"
                 :to="item.card_tab_url"
               >
                 Review card classification
               </RouterLink>
             </div>
+            <RouterLink
+              v-if="item.classification_review"
+              class="theme-section-muted inline-flex text-xs font-semibold underline"
+              :to="item.classification_review.url"
+            >
+              Sent to Review · {{ item.classification_review.status }}
+            </RouterLink>
           </article>
         </div>
       </template>
     </section>
 
-    <div
-      class="theme-divider mt-5 border-t"
-    >
+    <div class="theme-divider mt-5 border-t">
       <section
         class="pt-5"
         aria-labelledby="active-imports-heading"
@@ -425,5 +431,4 @@ const emit = defineEmits<{
   view: [jobId: string];
   'close-detail': [];
 }>();
-
 </script>

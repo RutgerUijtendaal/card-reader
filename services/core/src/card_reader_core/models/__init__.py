@@ -12,6 +12,7 @@ _REGISTERED_MODEL_MODULES = (
     import_module(".card_group", __name__),
     import_module(".content_version", __name__),
     import_module(".card_version", __name__),
+    import_module(".classification_review", __name__),
     import_module(".parse_flag", __name__),
     import_module(".deck", __name__),
     import_module(".deck_tag", __name__),
@@ -104,6 +105,13 @@ if TYPE_CHECKING:
     from .card_group import CardGroup, CardGroupMember
     from .content_version import ContentVersion
     from .card_version import CardVersion, CardVersionImage, ParseResult
+    from .classification_review import (
+        CLASSIFICATION_REVIEW_DISMISSED,
+        CLASSIFICATION_REVIEW_OPEN,
+        CLASSIFICATION_REVIEW_RESOLVED,
+        CLASSIFICATION_REVIEW_STATUSES,
+        CardClassificationReviewItem,
+    )
     from .parse_flag import (
         PARSE_FLAG_ITEM_DISMISSED,
         PARSE_FLAG_ITEM_OPEN,
@@ -291,6 +299,11 @@ _EXPORTS = {
     "CardVersion": ".card_version",
     "CardVersionImage": ".card_version",
     "ParseResult": ".card_version",
+    "CLASSIFICATION_REVIEW_DISMISSED": ".classification_review",
+    "CLASSIFICATION_REVIEW_OPEN": ".classification_review",
+    "CLASSIFICATION_REVIEW_RESOLVED": ".classification_review",
+    "CLASSIFICATION_REVIEW_STATUSES": ".classification_review",
+    "CardClassificationReviewItem": ".classification_review",
     "PARSE_FLAG_ITEM_DISMISSED": ".parse_flag",
     "PARSE_FLAG_ITEM_OPEN": ".parse_flag",
     "PARSE_FLAG_ITEM_RESOLVED": ".parse_flag",
@@ -452,6 +465,11 @@ __all__ = [
     "CardVersion",
     "CardVersionImage",
     "ParseResult",
+    "CLASSIFICATION_REVIEW_DISMISSED",
+    "CLASSIFICATION_REVIEW_OPEN",
+    "CLASSIFICATION_REVIEW_RESOLVED",
+    "CLASSIFICATION_REVIEW_STATUSES",
+    "CardClassificationReviewItem",
     "PARSE_FLAG_ITEM_DISMISSED",
     "PARSE_FLAG_ITEM_OPEN",
     "PARSE_FLAG_ITEM_RESOLVED",

@@ -3,7 +3,13 @@ import type { CardFaction } from '@/domain/cards/cardFactions';
 import type { CardPool } from '@/domain/cards/cardPools';
 import type { ManaFamily } from '@/domain/cards/manaFamilies';
 
-export type ImportJobStatus = 'queued' | 'running' | 'canceling' | 'cancelled' | 'completed' | 'failed';
+export type ImportJobStatus =
+  | 'queued'
+  | 'running'
+  | 'canceling'
+  | 'cancelled'
+  | 'completed'
+  | 'failed';
 
 export type ContentVersion = {
   id: string;
@@ -62,6 +68,11 @@ export type ImportJobItem = {
   target_card_factions_snapshot: CardFaction[];
   target_card_mana_families_snapshot: ManaFamily[];
   card_tab_url: string | null;
+  classification_review?: {
+    id: string;
+    status: 'open' | 'resolved' | 'dismissed';
+    url: string;
+  } | null;
 };
 
 export type ImportJobDetail = ImportJob & {
