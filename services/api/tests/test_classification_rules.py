@@ -19,6 +19,7 @@ from card_reader_core.services.classification_rules import (
     ClassificationRuleService,
     ensure_default_mana_family_classification_rules,
 )
+from card_reader_core.services.catalog import CatalogService
 
 
 def staff_client(username: str = "classification-admin") -> Client:
@@ -302,6 +303,40 @@ def test_default_player_mana_symbol_rules_reconcile_idempotently_without_placeho
     assert not Symbol.objects.filter(key="primal-mana").exists()
 
 
+def test_creating_a_symbol_only_reconciles_that_symbol_default() -> None:
+    arcane_symbol, _created = Symbol.objects.get_or_create(
+        key="arcane-mana",
+        defaults={"label": "Arcane Mana", "symbol_type": "mana"},
+    )
+    ensure_default_mana_family_classification_rules(symbol_keys={arcane_symbol.key})
+    CardClassificationRule.objects.filter(
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="arcane",
+        source_kind="symbol",
+        symbol=arcane_symbol,
+    ).delete()
+
+    CatalogService().create_symbol(
+        key="unrelated-new-symbol",
+        label="Unrelated New Symbol",
+    )
+
+    assert not CardClassificationRule.objects.filter(
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="arcane",
+        source_kind="symbol",
+        symbol=arcane_symbol,
+    ).exists()
+    assert (
+        ensure_default_mana_family_classification_rules(
+            symbol_keys={arcane_symbol.key}
+        )
+        == 1
+    )
+
+
 def test_card_mana_family_assignment_is_unique_and_updates_the_cached_sort_key() -> None:
     card = Card.objects.create(key="mana-assignment", label="Mana Assignment")
 
@@ -310,7 +345,7 @@ def test_card_mana_family_assignment_is_unique_and_updates_the_cached_sort_key()
         "dark",
     )
     card.refresh_from_db()
-    assert card.mana_family_sort_key == 6
+    assert card.mana_family_sort_key == 1
     assert list(
         CardManaFamilyAssignment.objects.filter(card=card).values_list(
             "mana_family", flat=True

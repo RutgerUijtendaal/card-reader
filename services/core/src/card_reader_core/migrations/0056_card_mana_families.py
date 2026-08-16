@@ -24,7 +24,21 @@ FAMILY_BY_SYMBOL = {
     for family_key, _label, mana_key, affinity_keys in FAMILIES
     for symbol_key in (mana_key, *affinity_keys)
 }
-MULTI_RANKS = {
+FAMILY_COMBINATIONS = sorted(
+    (
+        combination
+        for size in range(1, len(FAMILIES) + 1)
+        for combination in combinations(range(len(FAMILIES)), size)
+    ),
+    key=lambda combination: (
+        combination[0],
+        sum(1 << rank for rank in combination),
+    ),
+)
+FAMILY_RANKS = {
+    combination: index for index, combination in enumerate(FAMILY_COMBINATIONS)
+}
+LEGACY_MULTI_RANKS = {
     combination: len(FAMILIES) + index
     for index, combination in enumerate(
         sorted(
@@ -34,7 +48,7 @@ MULTI_RANKS = {
         )
     )
 }
-NO_FAMILY_SORT_KEY = len(FAMILIES) + len(MULTI_RANKS)
+NO_FAMILY_SORT_KEY = len(FAMILY_COMBINATIONS)
 RULE_NAMESPACE = UUID("b26ccbd1-7014-46fc-874d-416f358be4c0")
 
 
@@ -72,12 +86,7 @@ def backfill_player_mana_families(apps, _schema_editor) -> None:  # type: ignore
             )
             assignments = []
         ranks = tuple(family_rank[family] for family in families)
-        if len(ranks) == 1:
-            card.mana_family_sort_key = ranks[0]
-        elif len(ranks) > 1:
-            card.mana_family_sort_key = MULTI_RANKS[ranks]
-        else:
-            card.mana_family_sort_key = NO_FAMILY_SORT_KEY
+        card.mana_family_sort_key = FAMILY_RANKS.get(ranks, NO_FAMILY_SORT_KEY)
         updates.append(card)
         if len(updates) >= 500:
             Card.objects.bulk_update(updates, ["mana_family_sort_key"], batch_size=500)
@@ -114,6 +123,8 @@ def seed_available_symbol_rules(apps, _schema_editor) -> None:  # type: ignore[n
 
 def backfill_queued_player_rule_snapshots(apps, _schema_editor) -> None:  # type: ignore[no-untyped-def]
     ImportJob = apps.get_model("card_reader_core", "ImportJob")
+    ImportJobItem = apps.get_model("card_reader_core", "ImportJobItem")
+    VersionSymbol = apps.get_model("card_reader_core", "CardVersionSymbol")
     Symbol = apps.get_model("card_reader_core", "Symbol")
     symbols = {row.key: row for row in Symbol.objects.filter(key__in=tuple(FAMILY_BY_SYMBOL))}
     for job in ImportJob.objects.filter(
@@ -171,6 +182,77 @@ def backfill_queued_player_rule_snapshots(apps, _schema_editor) -> None:  # type
             "digest": hashlib.sha256(encoded).hexdigest(),
         }
         job.save(update_fields=["classification_rule_snapshot_json"])
+
+    target_rows = list(
+        ImportJobItem.objects.filter(
+            job__card_pool="player",
+            job__status__in=("queued", "running", "canceling"),
+            target_card_version_id__isnull=False,
+        ).values_list("id", "target_card_version_id")
+    )
+    version_ids = {str(version_id) for _item_id, version_id in target_rows}
+    families_by_version: dict[str, set[str]] = {}
+    links = VersionSymbol.objects.filter(
+        card_version_id__in=version_ids,
+        symbol__key__in=tuple(FAMILY_BY_SYMBOL),
+    ).values_list("card_version_id", "symbol__key")
+    for version_id, symbol_key in links.iterator():
+        families_by_version.setdefault(str(version_id), set()).add(
+            FAMILY_BY_SYMBOL[str(symbol_key)]
+        )
+    family_order = tuple(family[0] for family in FAMILIES)
+    item_updates = []
+    for item_id, version_id in target_rows:
+        item = ImportJobItem(id=item_id)
+        selected = families_by_version.get(str(version_id), set())
+        item.target_card_mana_families_snapshot_json = [
+            family for family in family_order if family in selected
+        ]
+        item_updates.append(item)
+    if item_updates:
+        ImportJobItem.objects.bulk_update(
+            item_updates,
+            ["target_card_mana_families_snapshot_json"],
+            batch_size=500,
+        )
+
+
+def restore_version_mana_family_sort_keys(apps, _schema_editor) -> None:  # type: ignore[no-untyped-def]
+    CardVersion = apps.get_model("card_reader_core", "CardVersion")
+    VersionSymbol = apps.get_model("card_reader_core", "CardVersionSymbol")
+    family_rank = {family[0]: rank for rank, family in enumerate(FAMILIES)}
+    ranks_by_version: dict[str, set[int]] = {}
+    links = VersionSymbol.objects.filter(symbol__key__in=tuple(FAMILY_BY_SYMBOL)).values_list(
+        "card_version_id",
+        "symbol__key",
+    )
+    for version_id, symbol_key in links.iterator():
+        family = FAMILY_BY_SYMBOL[str(symbol_key)]
+        ranks_by_version.setdefault(str(version_id), set()).add(family_rank[family])
+
+    updates = []
+    for version in CardVersion.objects.all().iterator():
+        ranks = tuple(sorted(ranks_by_version.get(str(version.id), set())))
+        if len(ranks) == 1:
+            version.mana_family_sort_key = ranks[0]
+        elif len(ranks) > 1:
+            version.mana_family_sort_key = LEGACY_MULTI_RANKS[ranks]
+        else:
+            version.mana_family_sort_key = NO_FAMILY_SORT_KEY
+        updates.append(version)
+        if len(updates) >= 500:
+            CardVersion.objects.bulk_update(
+                updates,
+                ["mana_family_sort_key"],
+                batch_size=500,
+            )
+            updates = []
+    if updates:
+        CardVersion.objects.bulk_update(
+            updates,
+            ["mana_family_sort_key"],
+            batch_size=500,
+        )
 
 
 def remove_symbol_rules_for_downgrade(apps, _schema_editor) -> None:  # type: ignore[no-untyped-def]
@@ -345,7 +427,10 @@ class Migration(migrations.Migration):
             backfill_queued_player_rule_snapshots,
             migrations.RunPython.noop,
         ),
-        migrations.RunPython(backfill_player_mana_families, migrations.RunPython.noop),
+        migrations.RunPython(
+            backfill_player_mana_families,
+            restore_version_mana_family_sort_keys,
+        ),
         migrations.RunPython(seed_available_symbol_rules, remove_symbol_rules_for_downgrade),
         migrations.RemoveIndex(
             model_name="cardversion",

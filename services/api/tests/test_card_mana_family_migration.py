@@ -35,6 +35,7 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
     Symbol = old_apps.get_model("card_reader_core", "Symbol")
     Template = old_apps.get_model("card_reader_core", "Template")
     ImportJob = old_apps.get_model("card_reader_core", "ImportJob")
+    ImportJobItem = old_apps.get_model("card_reader_core", "ImportJobItem")
 
     CardClassificationRule.objects.all().delete()
     CardVersionSymbol.objects.all().delete()
@@ -162,6 +163,12 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
         pool="evil",
         latest_symbols=("arcane-mana",),
     )
+    queued_target_item = ImportJobItem.objects.create(
+        job_id=queued_job.id,
+        source_file="imports/pre-mana-queued/targeted.png",
+        target_card_id=multicolor.id,
+        target_card_version_id=multicolor.latest_version_id,
+    )
 
     apps = _migrate_to(MANA_MIGRATION)
     MigratedCard = apps.get_model("card_reader_core", "Card")
@@ -169,19 +176,20 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
     Rule = apps.get_model("card_reader_core", "CardClassificationRule")
     MigratedVersion = apps.get_model("card_reader_core", "CardVersion")
     MigratedJob = apps.get_model("card_reader_core", "ImportJob")
+    MigratedItem = apps.get_model("card_reader_core", "ImportJobItem")
 
     assert set(
         Assignment.objects.filter(card_id=multicolor.id).values_list(
             "mana_family", flat=True
         )
     ) == {"arcane", "dark"}
-    assert MigratedCard.objects.get(id=multicolor.id).mana_family_sort_key == 6
+    assert MigratedCard.objects.get(id=multicolor.id).mana_family_sort_key == 1
     assert list(
         Assignment.objects.filter(card_id=deprecated.id).values_list(
             "mana_family", flat=True
         )
     ) == ["primal"]
-    assert MigratedCard.objects.get(id=deprecated.id).mana_family_sort_key == 5
+    assert MigratedCard.objects.get(id=deprecated.id).mana_family_sort_key == 62
     for card in (colorless, missing_latest, evil):
         assert not Assignment.objects.filter(card_id=card.id).exists()
         assert MigratedCard.objects.get(id=card.id).mana_family_sort_key == 63
@@ -238,11 +246,28 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
         MigratedJob.objects.get(id=completed_job.id).classification_rule_snapshot_json
         == legacy_snapshot
     )
+    assert MigratedItem.objects.get(
+        id=queued_target_item.id
+    ).target_card_mana_families_snapshot_json == ["arcane", "dark"]
 
     downgraded_apps = _migrate_to(BASE_MIGRATION)
     DowngradedRule = downgraded_apps.get_model(
         "card_reader_core", "CardClassificationRule"
     )
     assert not DowngradedRule.objects.filter(source_kind="symbol").exists()
+    DowngradedVersion = downgraded_apps.get_model("card_reader_core", "CardVersion")
+    assert (
+        DowngradedVersion.objects.get(id=multicolor.latest_version_id).mana_family_sort_key
+        == 6
+    )
+    assert (
+        DowngradedVersion.objects.get(id=deprecated.latest_version_id).mana_family_sort_key
+        == 5
+    )
+    assert (
+        DowngradedVersion.objects.get(id=colorless.latest_version_id).mana_family_sort_key
+        == 63
+    )
+    assert DowngradedVersion.objects.get(id=evil.latest_version_id).mana_family_sort_key == 0
 
     _restore_leaf()

@@ -635,6 +635,21 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
         source_kind="symbol",
         source_id=symbol.id,
     )
+    inactive_symbol = Symbol.objects.create(
+        key="frozen-inactive-mana-source",
+        label="Inactive Mana Source",
+        symbol_type="mana",
+        detector_type="template",
+        detection_config_json={"threshold": 0.7},
+        enabled=False,
+    )
+    classification_rules.create_rule(
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="dark",
+        source_kind="symbol",
+        source_id=inactive_symbol.id,
+    )
     image = settings.storage_root_dir / "uploads" / "frozen-parser-job" / "0001.png"
     image.parent.mkdir(parents=True, exist_ok=True)
     image.write_bytes(b"frozen-parser-image")
@@ -672,6 +687,8 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
         ]
     )
     classification_rules.delete_rule(rule_id=symbol_rule.id)
+    inactive_symbol.enabled = True
+    inactive_symbol.save(update_fields=["enabled", "updated_at"])
 
     class SnapshotInspectingParser:
         def parse(
@@ -689,6 +706,10 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
             assert frozen_tag.identifiers_json == ["original hero term"]
             symbols = resources["symbols"]
             assert isinstance(symbols, list)
+            assert all(
+                not isinstance(row, Symbol) or row.id != inactive_symbol.id
+                for row in symbols
+            )
             frozen_symbol = next(
                 row for row in symbols if isinstance(row, Symbol) and row.id == symbol.id
             )
@@ -2559,13 +2580,17 @@ def test_cards_list_supports_indexed_mana_family_sorting_and_pagination() -> Non
     assert second_response.status_code == 200
     assert [row["id"] for row in first_response.json()["results"]] == [
         cards_and_versions[0][0].id,
-        cards_and_versions[1][0].id,
+        cards_and_versions[2][0].id,
     ]
     assert [row["id"] for row in second_response.json()["results"]] == [
-        cards_and_versions[2][0].id,
+        cards_and_versions[1][0].id,
         cards_and_versions[3][0].id,
     ]
     assert [row["mana_family_sort_key"] for row in first_response.json()["results"]] == [0, 1]
+    assert [row["mana_family_sort_key"] for row in second_response.json()["results"]] == [
+        32,
+        63,
+    ]
     from card_reader_core.repositories.cards.queries import _apply_sql_card_sort
 
     paginated_query = _apply_sql_card_sort(

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Collection
+
 from card_reader_core.metadata import MANA_FAMILIES
 from card_reader_core.models import (
     CARD_CLASSIFICATION_SOURCE_SYMBOL,
@@ -12,12 +14,24 @@ from card_reader_core.repositories.metadata import list_symbols
 from .service import ClassificationRuleDuplicateError, ClassificationRuleService
 
 
-def ensure_default_mana_family_classification_rules() -> int:
+def ensure_default_mana_family_classification_rules(
+    *,
+    symbol_keys: Collection[str] | None = None,
+) -> int:
     """Create missing Player Symbol rules without overriding administrator choices."""
-    symbol_keys = {
+    canonical_symbol_keys = {
         symbol_key for family in MANA_FAMILIES for symbol_key in family.symbol_keys
     }
-    symbols_by_key = {symbol.key: symbol for symbol in list_symbols(keys=symbol_keys)}
+    selected_symbol_keys = (
+        canonical_symbol_keys
+        if symbol_keys is None
+        else canonical_symbol_keys.intersection(symbol_keys)
+    )
+    if not selected_symbol_keys:
+        return 0
+    symbols_by_key = {
+        symbol.key: symbol for symbol in list_symbols(keys=selected_symbol_keys)
+    }
     existing = {
         (rule.target_key, rule.symbol.id)
         for rule in list_classification_rules(card_pool=PLAYER_CARD_POOL)
@@ -29,6 +43,8 @@ def ensure_default_mana_family_classification_rules() -> int:
     service = ClassificationRuleService()
     for family in MANA_FAMILIES:
         for symbol_key in family.symbol_keys:
+            if symbol_key not in selected_symbol_keys:
+                continue
             symbol = symbols_by_key.get(symbol_key)
             if symbol is None or (family.key, symbol.id) in existing:
                 continue

@@ -153,9 +153,14 @@ class ImportProcessorService:
         )
         detection_tags = _merge_metadata_sources(resources.known_tags, frozen_tags)
         detection_types = _merge_metadata_sources(resources.known_types, frozen_types)
-        detection_symbols = _merge_metadata_sources(
+        snapshot_symbols = _merge_metadata_sources(
             resources.detectable_symbols, frozen_symbols
         )
+        detection_symbols = [
+            symbol
+            for symbol in snapshot_symbols
+            if symbol.enabled and symbol.detector_type == "template"
+        ]
         parsed = self._parser.parse(
             resolve_storage_path(item.source_file),
             template_id,

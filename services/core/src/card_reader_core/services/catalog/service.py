@@ -466,7 +466,7 @@ class CatalogService:
             text_token=(text_token or "").strip(),
             enabled=enabled if enabled is not None else True,
         )
-        ensure_default_mana_family_classification_rules()
+        ensure_default_mana_family_classification_rules(symbol_keys={symbol.key})
         return symbol
 
     def update_symbol(

@@ -380,9 +380,7 @@ class ClassificationRuleService:
                 )
             elif source_kind == CARD_CLASSIFICATION_SOURCE_SYMBOL and isinstance(
                 symbol_definition, dict
-            ) and symbol_definition["enabled"] is True and symbol_definition[
-                "detector_type"
-            ] == "template":
+            ):
                 symbols[source_id] = Symbol(
                     id=source_id,
                     key=source_key,

@@ -59,17 +59,21 @@ MANA_FAMILY_BY_SYMBOL_KEY = {
     for symbol_key in family.symbol_keys
 }
 
-_SINGLE_FAMILY_RANKS = {(family.rank,): family.rank for family in MANA_FAMILIES}
-_MULTI_FAMILY_COMBINATIONS = sorted(
-    combination
-    for size in range(2, len(MANA_FAMILIES) + 1)
-    for combination in combinations(range(len(MANA_FAMILIES)), size)
+_FAMILY_COMBINATIONS = sorted(
+    (
+        combination
+        for size in range(1, len(MANA_FAMILIES) + 1)
+        for combination in combinations(range(len(MANA_FAMILIES)), size)
+    ),
+    key=lambda combination: (
+        combination[0],
+        sum(1 << rank for rank in combination),
+    ),
 )
-_MULTI_FAMILY_RANKS = {
-    combination: len(MANA_FAMILIES) + index
-    for index, combination in enumerate(_MULTI_FAMILY_COMBINATIONS)
+_FAMILY_COMBINATION_RANKS = {
+    combination: index for index, combination in enumerate(_FAMILY_COMBINATIONS)
 }
-NO_MANA_FAMILY_SORT_KEY = len(MANA_FAMILIES) + len(_MULTI_FAMILY_COMBINATIONS)
+NO_MANA_FAMILY_SORT_KEY = len(_FAMILY_COMBINATIONS)
 
 
 def normalize_mana_family_keys(values: list[str] | tuple[str, ...]) -> tuple[ManaFamily, ...]:
@@ -98,11 +102,7 @@ def mana_family_symbol_keys(family_keys: list[str] | tuple[str, ...]) -> tuple[s
 
 def mana_family_sort_key_for_family_keys(family_keys: list[str] | tuple[str, ...]) -> int:
     ranks = tuple(MANA_FAMILY_BY_KEY[key].rank for key in normalize_mana_family_keys(family_keys))
-    if len(ranks) == 1:
-        return _SINGLE_FAMILY_RANKS[ranks]
-    if len(ranks) > 1:
-        return _MULTI_FAMILY_RANKS[ranks]
-    return NO_MANA_FAMILY_SORT_KEY
+    return _FAMILY_COMBINATION_RANKS.get(ranks, NO_MANA_FAMILY_SORT_KEY)
 
 
 def mana_family_sort_key(symbol_keys: list[str] | tuple[str, ...]) -> int:

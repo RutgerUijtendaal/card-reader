@@ -33,7 +33,7 @@ def test_stored_family_normalization_is_canonical_and_empty_is_colorless() -> No
         "primal",
     )
     assert mana_family_sort_key_for_family_keys(()) == NO_MANA_FAMILY_SORT_KEY
-    assert mana_family_sort_key_for_family_keys(("arcane", "dark")) == 6
+    assert mana_family_sort_key_for_family_keys(("arcane", "dark")) == 1
 
 
 def test_mana_and_affinity_aliases_resolve_to_one_family() -> None:
@@ -47,21 +47,22 @@ def test_legacy_primal_affinity_alias_is_accepted_without_becoming_canonical() -
     primal = MANA_FAMILIES[-1]
 
     assert mana_family_keys_for_symbol_keys(["primla-affinity"]) == ("primal",)
-    assert mana_family_sort_key(["primla-affinity"]) == primal.rank
+    assert mana_family_sort_key(["primla-affinity"]) == mana_family_sort_key_for_family_keys(
+        (primal.key,)
+    )
     assert primal.affinity_symbol_key == "primal-affinity"
 
 
-def test_sort_keys_put_singles_before_lexicographic_multitypes_and_no_family_last() -> None:
-    single_keys = [mana_family_sort_key([family.mana_symbol_key]) for family in MANA_FAMILIES]
-    multi_keys = [
-        mana_family_sort_key(["arcane-mana", "dark-affinity"]),
-        mana_family_sort_key(["arcane-affinity", "dark-mana", "divine-mana"]),
-        mana_family_sort_key(["arcane-mana", "divine-affinity"]),
-        mana_family_sort_key(["dark-mana", "divine-affinity"]),
-    ]
+def test_sort_keys_use_earliest_family_then_complete_membership_and_no_family_last() -> None:
+    arcane = mana_family_sort_key(["arcane-mana"])
+    arcane_dark = mana_family_sort_key(["arcane-mana", "dark-affinity"])
+    arcane_divine = mana_family_sort_key(["arcane-affinity", "divine-mana"])
+    dark = mana_family_sort_key(["dark-mana"])
+    dark_divine = mana_family_sort_key(["dark-mana", "divine-affinity"])
+    divine = mana_family_sort_key(["divine-mana"])
 
-    assert single_keys == list(range(6))
-    assert multi_keys == sorted(multi_keys)
-    assert max(single_keys) < min(multi_keys)
-    assert max(multi_keys) < NO_MANA_FAMILY_SORT_KEY
+    assert arcane < arcane_dark < arcane_divine < dark < dark_divine < divine
+    assert max(arcane, arcane_dark, arcane_divine, dark, dark_divine, divine) < (
+        NO_MANA_FAMILY_SORT_KEY
+    )
     assert mana_family_sort_key(["colorless-mana-3", "sola-affinity"]) == NO_MANA_FAMILY_SORT_KEY
