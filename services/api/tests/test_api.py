@@ -665,6 +665,7 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
             include_mana_families=True,
         ),
     )
+    frozen_symbol_id = symbol.id
 
     tag.label = "Edited Hero Source"
     tag.identifiers_json = ["edited hero term"]
@@ -687,6 +688,7 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
         ]
     )
     classification_rules.delete_rule(rule_id=symbol_rule.id)
+    symbol.delete()
     inactive_symbol.enabled = True
     inactive_symbol.save(update_fields=["enabled", "updated_at"])
 
@@ -711,7 +713,9 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
                 for row in symbols
             )
             frozen_symbol = next(
-                row for row in symbols if isinstance(row, Symbol) and row.id == symbol.id
+                row
+                for row in symbols
+                if isinstance(row, Symbol) and row.id == frozen_symbol_id
             )
             assert frozen_symbol.label == "Original Mana Source"
             assert frozen_symbol.detection_config_json == {"threshold": 0.81}
@@ -734,7 +738,7 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
                 keyword_ids=[],
                 tag_ids=[tag.id],
                 type_ids=[],
-                symbol_ids=[symbol.id],
+                symbol_ids=[frozen_symbol_id],
                 tag_suggestions=[],
                 type_suggestions=[],
             )
@@ -746,6 +750,8 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
     assert list(
         card.mana_family_assignments.values_list("mana_family", flat=True)
     ) == ["arcane"]
+    assert card.latest_version is not None
+    assert not card.latest_version.card_version_symbols.exists()
 
 
 def test_card_gallery_routes_are_public() -> None:

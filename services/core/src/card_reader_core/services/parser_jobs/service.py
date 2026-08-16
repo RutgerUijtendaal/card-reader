@@ -221,7 +221,11 @@ class ImportProcessorService:
             keyword_ids=parsed.keyword_ids,
             tag_ids=[tag_id for tag_id in parsed.tag_ids if tag_id in live_tag_ids],
             type_ids=[type_id for type_id in parsed.type_ids if type_id in live_type_ids],
-            symbol_ids=parsed.symbol_ids,
+            symbol_ids=[
+                symbol_id
+                for symbol_id in parsed.symbol_ids
+                if symbol_id in resources.known_symbol_ids
+            ],
             tag_suggestions=[
                 SuggestionCandidate(
                     display_value=row.display_value,

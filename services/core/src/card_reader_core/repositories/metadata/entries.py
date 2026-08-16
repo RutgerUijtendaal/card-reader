@@ -44,6 +44,10 @@ def list_symbols(*, keys: set[str] | None = None) -> list[Symbol]:
     return _list(Symbol, keys=keys)
 
 
+def list_symbol_ids() -> set[str]:
+    return set(Symbol.objects.values_list("id", flat=True))
+
+
 def list_detectable_symbols() -> list[Symbol]:
     return list(Symbol.objects.filter(enabled=True, detector_type="template").order_by("label"))
 

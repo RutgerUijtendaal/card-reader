@@ -6,6 +6,7 @@ from card_reader_core.models import ImportJob
 from card_reader_core.repositories.metadata import (
     list_detectable_symbols,
     list_keywords,
+    list_symbol_ids,
     list_tags,
     list_types,
 )
@@ -33,6 +34,7 @@ class ParserJobContextLoader:
             known_keywords=list_keywords(keys=options.keyword_keys),
             known_tags=list_tags(),
             known_types=list_types(),
+            known_symbol_ids=list_symbol_ids(),
             detectable_symbols=list_detectable_symbols(),
         )
 
