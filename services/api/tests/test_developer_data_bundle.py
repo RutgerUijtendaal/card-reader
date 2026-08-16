@@ -50,7 +50,6 @@ from card_reader_core.operations.developer_data import (
     PublishedBundleStore,
     export_developer_data,
     import_developer_data,
-    sha256_file,
     validate_archive,
 )
 from card_reader_core.operations.developer_data.importer import (
@@ -60,6 +59,7 @@ from card_reader_core.operations.developer_data.importer import (
 from card_reader_core.operations.developer_data.exporter import _build_payload
 from card_reader_core.operations.developer_data.schema import CardRecord, adopt_payload_for_format
 from card_reader_core.repositories.cards import set_card_mana_families
+from card_reader_core.storage import calculate_checksum
 from card_reader_core.services.classification_rules import (
     ClassificationRuleService,
     ensure_default_mana_family_classification_rules,
@@ -572,7 +572,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         result = import_developer_data(
             archive_path=archive_path,
             expected_bundle_version="synthetic-v1",
-            expected_archive_sha256=sha256_file(archive_path),
+            expected_archive_sha256=calculate_checksum(archive_path),
         )
 
         assert result.counts["cards"] == 4
@@ -1549,13 +1549,3 @@ def _seed_migration_defaults() -> None:
         "0055_seed_classification_rules_and_full_height_template"
     )
     classification_migration.seed_classification_rules_and_template(django_apps, None)
-    mana_role_migration = importlib.import_module(
-        "card_reader_core.migrations.0058_add_mana_card_role"
-    )
-    mana_role_migration.add_mana_role_defaults_and_backfill(django_apps, None)
-    directive_reminder_migration = importlib.import_module(
-        "card_reader_core.migrations.0060_add_evil_directive_reminder_roles"
-    )
-    directive_reminder_migration.add_evil_directive_reminder_defaults_and_backfill(
-        django_apps, None
-    )

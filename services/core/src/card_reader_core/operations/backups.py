@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -19,6 +18,7 @@ from urllib.request import urlopen
 from uuid import uuid4
 
 from card_reader_core.config.settings import REPO_ROOT
+from card_reader_core.storage import calculate_checksum
 
 ARCHIVE_VERSION = 1
 DEFAULT_HEALTHCHECK_URL = "http://127.0.0.1:8000/health"
@@ -292,7 +292,7 @@ def _build_manifest(
         files.append(
             {
                 "path": path.relative_to(content_root).as_posix(),
-                "sha256": _sha256(path),
+                "sha256": calculate_checksum(path),
                 "size_bytes": path.stat().st_size,
             }
         )
@@ -348,7 +348,7 @@ def _validate_extracted_backup(extraction_root: Path) -> ValidatedBackup:
         file_path = content_root / path_value
         if not file_path.exists():
             raise BackupError(f"Backup file is missing: {path_value}")
-        if _sha256(file_path) != checksum:
+        if calculate_checksum(file_path) != checksum:
             raise BackupError(f"Checksum mismatch for backup file: {path_value}")
 
     extracted_paths = {path.relative_to(content_root).as_posix() for path in content_root.rglob("*") if path.is_file()}
@@ -425,7 +425,7 @@ def _discard_inconsistent_tts_sheet_atlases(*, database_path: Path, atlas_dir: P
 
     for atlas_path in atlas_dir.glob("*.webp"):
         expected_checksum = expected_files.get(atlas_path.name, "")
-        if not expected_checksum or _sha256(atlas_path) != expected_checksum:
+        if not expected_checksum or calculate_checksum(atlas_path) != expected_checksum:
             atlas_path.unlink()
 
 
@@ -457,14 +457,6 @@ def _wait_for_healthcheck(url: str, *, attempts: int, delay_seconds: float) -> N
             last_error = error
         time.sleep(delay_seconds)
     raise BackupError(f"Healthcheck did not recover: {url}") from last_error
-
-
-def _sha256(file_path: Path) -> str:
-    hasher = hashlib.sha256()
-    with file_path.open("rb") as handle:
-        while chunk := handle.read(1024 * 1024):
-            hasher.update(chunk)
-    return hasher.hexdigest()
 
 
 def _make_work_dir(parent_dir: Path, prefix: str) -> Path:

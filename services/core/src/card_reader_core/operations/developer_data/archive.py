@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import tarfile
 import tempfile
+
+from card_reader_core.storage import calculate_checksum
 
 from .schema import (
     SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS,
@@ -17,14 +18,6 @@ from .schema import (
 
 class DeveloperDataError(RuntimeError):
     pass
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def canonical_json_bytes(value: object) -> bytes:
@@ -83,7 +76,7 @@ def load_extracted_bundle(extraction_root: Path) -> tuple[DeveloperDataManifest,
         target = extraction_root / Path(normalized)
         if not target.is_file():
             raise DeveloperDataError(f"Developer-data file is missing: {normalized}")
-        if target.stat().st_size != entry.size_bytes or sha256_file(target) != entry.sha256:
+        if target.stat().st_size != entry.size_bytes or calculate_checksum(target) != entry.sha256:
             raise DeveloperDataError(f"Developer-data file checksum mismatch: {normalized}")
 
     actual_paths = {

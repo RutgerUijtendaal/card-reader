@@ -1,3 +1,4 @@
+import { onKeyStroke } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import type {
   LocationQuery,
@@ -15,6 +16,7 @@ import type { GalleryPageState } from '@/domain/cards/utils/gallery/galleryState
 import { DEFAULT_CARD_PAGE_SIZE } from '@/domain/cards/utils/gallery/pageSize';
 import type { GalleryItem } from '@/domain/cards/types';
 import { isCardPool, type CardPool } from '@/domain/cards/cardPools';
+import { isEditableKeyboardTarget } from '@/shared/utils/keyboard';
 
 type GalleryNavigationCard = {
   id: string;
@@ -299,6 +301,23 @@ export const useGalleryCardNavigation = (
     }
     navigateToCard(nextCard.value);
   };
+
+  onKeyStroke(['ArrowLeft', 'ArrowRight'], (event) => {
+    if (!hasGalleryContext.value || isEditableKeyboardTarget(event)) {
+      return;
+    }
+
+    if (event.key === 'ArrowLeft' && previousCard.value) {
+      event.preventDefault();
+      goToPreviousCard();
+      return;
+    }
+
+    if (event.key === 'ArrowRight' && (nextCard.value || hasMoreResults.value)) {
+      event.preventDefault();
+      void goToNextCard();
+    }
+  });
 
   return {
     hasGalleryContext,

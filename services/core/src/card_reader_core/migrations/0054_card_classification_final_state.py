@@ -18,6 +18,9 @@ CARD_ROLE_CHOICES = [
     ("boon", "Boon"),
     ("event", "Event"),
     ("shop_item", "Shop Item"),
+    ("directive", "Directive"),
+    ("reminder", "Reminder"),
+    ("mana", "Mana"),
 ]
 CARD_FACTION_CHOICES = [
     ("order", "Order"),

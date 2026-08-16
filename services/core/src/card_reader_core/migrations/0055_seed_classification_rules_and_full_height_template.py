@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 from uuid import UUID, uuid5
 
@@ -23,13 +24,20 @@ SOURCE_DEFINITIONS = {
         ("boon", "Boon", ["boon"]),
         ("event", "Event", ["event"]),
         ("location", "Location", ["location"]),
+        ("mana", "Mana", ["mana"]),
+        ("directive", "Directive", ["directive"]),
+        ("reminder", "Reminder", ["reminder"]),
     ),
 }
 
 CLASSIFICATION_RULES = (
     ("player", "role", "hero", "type", "hero"),
+    ("player", "role", "mana", "type", "mana"),
     ("evil", "role", "boss", "type", "boss"),
     ("evil", "role", "location", "type", "location"),
+    ("evil", "role", "mana", "type", "mana"),
+    ("evil", "role", "directive", "type", "directive"),
+    ("evil", "role", "reminder", "type", "reminder"),
     ("evil", "faction", "order", "tag", "order"),
     ("evil", "faction", "blood", "tag", "blood"),
     ("evil", "faction", "dark", "tag", "dark"),
@@ -37,6 +45,30 @@ CLASSIFICATION_RULES = (
     ("neutral", "role", "boon", "type", "boon"),
     ("neutral", "role", "event", "type", "event"),
 )
+
+ROLE_BACKFILL_POOLS = {
+    "mana": ("player", "evil"),
+    "directive": ("evil",),
+    "reminder": ("evil",),
+}
+
+MTG_LIKE_V1_NAME_REGION_CUT = {
+    "unit": "relative",
+    "x": 0.04,
+    "y": 0.02,
+    "w": 0.92,
+    "h": 0.07,
+}
+MTG_LIKE_V1_MANA_BADGE_OCR = {
+    "cut_region": {
+        "unit": "relative",
+        "x": 0.86,
+        "y": 0.0,
+        "w": 0.14,
+        "h": 1.0,
+    },
+    "scales": [3, 2],
+}
 
 FULL_HEIGHT_TEMPLATE_DEFINITION: dict[str, Any] = {
     "id": "full-height",
@@ -102,6 +134,10 @@ def _classification_rule_id(rule: tuple[str, str, str, str, str]) -> str:
     return _migration_default_id("classification-rule", ":".join(rule))
 
 
+def _role_assignment_id(card_id: str, role: str) -> str:
+    return _migration_default_id("card-role-assignment", f"{card_id}:{role}")
+
+
 def _source_models(apps: Apps) -> dict[str, Any]:
     return {
         "tag": apps.get_model("card_reader_core", "Tag"),
@@ -159,6 +195,66 @@ def seed_classification_rules_and_template(
             },
         )
 
+    Card = apps.get_model("card_reader_core", "Card")
+    CardRoleAssignment = apps.get_model("card_reader_core", "CardRoleAssignment")
+    for role, pools in ROLE_BACKFILL_POOLS.items():
+        source = sources[("type", role)]
+        card_ids = list(
+            Card.objects.filter(
+                card_pool__in=pools,
+                latest_version__card_version_types__type_id=source.id,
+            )
+            .order_by("id")
+            .values_list("id", flat=True)
+        )
+        existing_card_ids = set(
+            CardRoleAssignment.objects.filter(
+                card_id__in=card_ids,
+                role=role,
+            ).values_list("card_id", flat=True)
+        )
+        CardRoleAssignment.objects.bulk_create(
+            [
+                CardRoleAssignment(
+                    id=_role_assignment_id(str(card_id), role),
+                    card_id=card_id,
+                    role=role,
+                )
+                for card_id in card_ids
+                if card_id not in existing_card_ids
+            ],
+            batch_size=1000,
+        )
+
+
+def add_mtg_like_mana_badge_ocr(
+    apps: Apps,
+    _schema_editor: BaseDatabaseSchemaEditor,
+) -> None:
+    Template = apps.get_model("card_reader_core", "Template")
+    template = Template.objects.filter(key="mtg-like-v1").first()
+    if template is None or not isinstance(template.definition_json, dict):
+        return
+
+    definition: dict[str, Any] = deepcopy(template.definition_json)
+    regions = definition.get("regions")
+    if not isinstance(regions, list):
+        return
+
+    for region in regions:
+        if not isinstance(region, dict):
+            continue
+        if region.get("parser_type") != "name_mana_cost":
+            continue
+        if region.get("cut_region") != MTG_LIKE_V1_NAME_REGION_CUT:
+            continue
+        if "mana_badge_ocr" in region:
+            return
+        region["mana_badge_ocr"] = deepcopy(MTG_LIKE_V1_MANA_BADGE_OCR)
+        template.definition_json = definition
+        template.save(update_fields=["definition_json", "updated_at"])
+        return
+
 
 def remove_seeded_classification_rules(
     apps: Apps,
@@ -182,6 +278,16 @@ def remove_seeded_classification_rules(
             **source_fields,
         ).delete()
 
+    CardRoleAssignment = apps.get_model("card_reader_core", "CardRoleAssignment")
+    migration_assignment_ids = [
+        assignment_id
+        for assignment_id, card_id, role in CardRoleAssignment.objects.filter(
+            role__in=tuple(ROLE_BACKFILL_POOLS),
+        ).values_list("id", "card_id", "role")
+        if assignment_id == _role_assignment_id(str(card_id), role)
+    ]
+    CardRoleAssignment.objects.filter(id__in=migration_assignment_ids).delete()
+
 
 class Migration(migrations.Migration):
     dependencies = [("card_reader_core", "0054_card_classification_final_state")]
@@ -190,5 +296,6 @@ class Migration(migrations.Migration):
         migrations.RunPython(
             seed_classification_rules_and_template,
             remove_seeded_classification_rules,
-        )
+        ),
+        migrations.RunPython(add_mtg_like_mana_badge_ocr, migrations.RunPython.noop),
     ]

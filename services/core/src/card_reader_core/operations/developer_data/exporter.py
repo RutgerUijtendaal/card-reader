@@ -37,9 +37,13 @@ from card_reader_core.models import (
     card_role_keys,
 )
 from card_reader_core.metadata import MANA_FAMILIES
-from card_reader_core.storage import relativize_image_storage_path, relativize_storage_path
+from card_reader_core.storage import (
+    calculate_checksum,
+    relativize_image_storage_path,
+    relativize_storage_path,
+)
 
-from .archive import DeveloperDataError, canonical_json_bytes, sha256_file
+from .archive import DeveloperDataError, canonical_json_bytes
 from .schema import (
     DEVELOPER_DATA_FORMAT_VERSION,
     BundleFileRecord,
@@ -629,7 +633,7 @@ def _build_file_manifest(staging_root: Path) -> list[BundleFileRecord]:
     return [
         BundleFileRecord(
             path=path.relative_to(staging_root).as_posix(),
-            sha256=sha256_file(path),
+            sha256=calculate_checksum(path),
             size_bytes=path.stat().st_size,
         )
         for path in sorted(staging_root.rglob("*"))

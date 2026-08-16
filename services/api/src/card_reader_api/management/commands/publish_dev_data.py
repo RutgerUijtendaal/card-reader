@@ -10,9 +10,9 @@ from card_reader_core.operations.developer_data import (
     DeveloperDataError,
     DeveloperDataLock,
     PublishedBundleStore,
-    sha256_file,
     validate_archive,
 )
+from card_reader_core.storage import calculate_checksum
 
 from card_reader_api.developer_data.validation import validate_temporary_import
 
@@ -34,7 +34,7 @@ class Command(BaseCommand):
         archive_path = Path(str(options["archive"])).resolve()
         try:
             manifest, _payload = validate_archive(archive_path)
-            archive_sha256 = sha256_file(archive_path)
+            archive_sha256 = calculate_checksum(archive_path)
             validate_temporary_import(
                 archive_path=archive_path,
                 bundle_version=manifest.bundle_version,

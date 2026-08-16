@@ -23,7 +23,11 @@ from card_reader_core.services.imports import (
     ImportCreationRejected,
     ImportService,
 )
-from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
+from card_reader_core.storage import (
+    build_storage_relative_path,
+    calculate_checksum,
+    resolve_storage_path,
+)
 
 logger = logging.getLogger(__name__)
 IMPORT_ADMISSION_LOCK_TIMEOUT_SECONDS = 60
@@ -80,7 +84,7 @@ class StagedImportUpload:
                     continue
                 target_file = target_dir / f"{index:04d}-{original_name}"
                 if target_file.is_file():
-                    if _sha256_path(target_file) != expected_checksum:
+                    if calculate_checksum(target_file) != expected_checksum:
                         raise ImportCreationKeyConflict(
                             "Stored upload content conflicts with this creation key."
                         )
@@ -124,7 +128,7 @@ class StagedImportUpload:
             if Path(original_name).suffix.lower() not in SUPPORTED_IMAGE_SUFFIXES:
                 continue
             target_file = target_dir / f"{index:04d}-{original_name}"
-            if target_file.is_file() and _sha256_path(target_file) == expected_checksum:
+            if target_file.is_file() and calculate_checksum(target_file) == expected_checksum:
                 cleanup_files.append(target_file)
         staged.owned_files = tuple(cleanup_files)
         return staged
@@ -458,7 +462,7 @@ def _publish_upload_atomically(
         try:
             os.link(staged_file, target_file)
         except FileExistsError:
-            if _sha256_path(target_file) != expected_checksum:
+            if calculate_checksum(target_file) != expected_checksum:
                 raise ImportCreationKeyConflict(
                     "Stored upload content conflicts with this creation key."
                 ) from None
@@ -535,11 +539,3 @@ def _upload_fingerprint(
     payload["card_mana_family_override"] = list(card_mana_family_override)
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest(), uploads
-
-
-def _sha256_path(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()

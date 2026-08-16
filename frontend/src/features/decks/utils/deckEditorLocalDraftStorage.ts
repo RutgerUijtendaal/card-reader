@@ -1,4 +1,8 @@
 import type { DeckCardSummary, DeckUpsertRequest } from '@/domain/decks/types';
+import { isCardFaction } from '@/domain/cards/cardFactions';
+import { isCardPool } from '@/domain/cards/cardPools';
+import { isCardRole } from '@/domain/cards/cardRoles';
+import { isManaFamily } from '@/domain/cards/manaFamilies';
 import type {
   DeckForm,
   DeckFormEntry,
@@ -184,15 +188,25 @@ const normalizeCardSnapshot = (value: unknown): DeckCardSummary | null => {
   let cardPool: DeckCardSummary['card_pool'];
   let cardRoles: DeckCardSummary['card_roles'];
   if (
-    (value.card_pool === 'player' || value.card_pool === 'evil' || value.card_pool === 'neutral')
+    isCardPool(value.card_pool)
     && isStringArray(value.card_roles)
+    && value.card_roles.every(isCardRole)
   ) {
     cardPool = value.card_pool;
-    cardRoles = [...value.card_roles] as DeckCardSummary['card_roles'];
+    cardRoles = [...value.card_roles];
   } else if (typeof value.is_hero === 'boolean') {
     cardPool = 'player';
     cardRoles = value.is_hero ? ['hero'] : [];
   } else {
+    return null;
+  }
+  if (
+    (value.card_factions !== undefined
+      && (!isStringArray(value.card_factions) || !value.card_factions.every(isCardFaction)))
+    || (value.card_mana_families !== undefined
+      && (!isStringArray(value.card_mana_families)
+        || !value.card_mana_families.every(isManaFamily)))
+  ) {
     return null;
   }
   if (!(value.result_type === 'card'

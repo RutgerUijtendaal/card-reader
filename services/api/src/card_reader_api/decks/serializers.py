@@ -9,6 +9,7 @@ from rest_framework import serializers
 
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload, symbol_option
+from card_reader_api.common.serializer_values import ValidatedStringValuesMixin
 from card_reader_core.metadata import NO_MANA_FAMILY_SORT_KEY
 from card_reader_core.models import (
     PLAYER_CARD_POOL,
@@ -536,7 +537,10 @@ class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
         return value
 
 
-class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
+class DeckListQuerySerializer(
+    ValidatedStringValuesMixin,
+    serializers.Serializer[dict[str, object]],
+):
     q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     view = serializers.ChoiceField(choices=['summary'], required=False, allow_null=True)
     page = serializers.IntegerField(required=False, allow_null=True, min_value=1)
@@ -611,14 +615,3 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
             created_at if isinstance(created_at, datetime) else None,
             deck_id if isinstance(deck_id, str) else None,
         )
-
-    def _string_or_none(self, key: str) -> str | None:
-        value = self.validated_data.get(key)
-        return value if isinstance(value, str) else None
-
-    def _string_list_or_none(self, key: str) -> list[str] | None:
-        value = self.validated_data.get(key)
-        if not isinstance(value, list):
-            return None
-        out = [item for item in value if isinstance(item, str)]
-        return out or None

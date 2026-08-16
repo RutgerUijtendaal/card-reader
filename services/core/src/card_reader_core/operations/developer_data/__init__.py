@@ -1,4 +1,4 @@
-from .archive import DeveloperDataError, sha256_file, validate_archive
+from .archive import DeveloperDataError, validate_archive
 from .exporter import export_developer_data
 from .importer import DeveloperDataImportResult, import_developer_data
 from .published import InvalidDeveloperDataVersion, PublishedBundleStore
@@ -22,6 +22,5 @@ __all__ = [
     "PublishedBundleStore",
     "export_developer_data",
     "import_developer_data",
-    "sha256_file",
     "validate_archive",
 ]

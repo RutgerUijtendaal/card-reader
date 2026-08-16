@@ -16,8 +16,12 @@ SEED_MIGRATION = (
 
 EXPECTED_RULES = {
     ("player", "role", "hero", "type", "hero", True),
+    ("player", "role", "mana", "type", "mana", True),
     ("evil", "role", "boss", "type", "boss", True),
     ("evil", "role", "location", "type", "location", True),
+    ("evil", "role", "mana", "type", "mana", True),
+    ("evil", "role", "directive", "type", "directive", True),
+    ("evil", "role", "reminder", "type", "reminder", True),
     ("evil", "faction", "order", "tag", "order", True),
     ("evil", "faction", "blood", "tag", "blood", True),
     ("evil", "faction", "dark", "tag", "dark", True),
@@ -66,7 +70,18 @@ def test_seed_migration_reuses_sources_and_creates_missing_defaults() -> None:
 
     CardClassificationRule.objects.all().delete()
     Tag.objects.filter(key__in={"order", "blood", "dark", "metal"}).delete()
-    Type.objects.filter(key__in={"hero", "boss", "boon", "event", "location"}).delete()
+    Type.objects.filter(
+        key__in={
+            "hero",
+            "boss",
+            "boon",
+            "event",
+            "location",
+            "mana",
+            "directive",
+            "reminder",
+        }
+    ).delete()
     Template.objects.filter(key="full-height").delete()
     existing_order = Tag.objects.create(
         key="order",
@@ -98,7 +113,16 @@ def test_seed_migration_reuses_sources_and_creates_missing_defaults() -> None:
     }
     seeded_type_keys = set(
         SeededType.objects.filter(
-            key__in={"hero", "boss", "boon", "event", "location"}
+            key__in={
+                "hero",
+                "boss",
+                "boon",
+                "event",
+                "location",
+                "mana",
+                "directive",
+                "reminder",
+            }
         ).values_list("key", flat=True)
     )
     assert seeded_type_keys == {
@@ -107,6 +131,9 @@ def test_seed_migration_reuses_sources_and_creates_missing_defaults() -> None:
         "boon",
         "event",
         "location",
+        "mana",
+        "directive",
+        "reminder",
     }
     assert _rule_identities(SeededRule) == EXPECTED_RULES
 
@@ -193,7 +220,18 @@ def test_seed_migration_preserves_existing_rule_and_template_customizations() ->
 
     CardClassificationRule.objects.all().delete()
     Tag.objects.filter(key__in={"order", "blood", "dark", "metal"}).delete()
-    Type.objects.filter(key__in={"hero", "boss", "boon", "event", "location"}).delete()
+    Type.objects.filter(
+        key__in={
+            "hero",
+            "boss",
+            "boon",
+            "event",
+            "location",
+            "mana",
+            "directive",
+            "reminder",
+        }
+    ).delete()
     Template.objects.filter(key="full-height").delete()
     hero_type = Type.objects.create(
         key="hero",
