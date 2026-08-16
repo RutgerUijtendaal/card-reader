@@ -122,7 +122,7 @@ describe('useCardPublicDetailState version navigation', () => {
     const loadPromise = state?.loadCard();
     await Promise.resolve();
     workspaceState.generation += 1;
-    resolveCard?.({ data: { id: 'restricted-card' } });
+    resolveCard?.({ data: { id: 'stale-card' } });
     await loadPromise;
 
     expect(state?.card.value).toBeNull();

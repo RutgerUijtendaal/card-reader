@@ -1756,7 +1756,7 @@ def test_deck_create_is_idempotent_per_owner_and_creation_key() -> None:
     assert DeckCreation.objects.filter(owner=owner, client_creation_id=creation_key).count() == 1
 
 
-def test_deck_create_replay_rejects_newly_restricted_cards_without_returning_card_data() -> None:
+def test_deck_create_replay_rejects_newly_non_player_cards_without_returning_card_data() -> None:
     username = "deck-idempotency-reclassified-user"
     password = "password"
     _create_user(username, password)
@@ -3218,9 +3218,9 @@ def test_deck_writes_treat_evil_card_ids_as_missing_player_cards() -> None:
             HTTP_X_CSRFTOKEN=csrf_token,
         )
 
-    restricted_hero_response = create_response(hero_card_id=evil_hero.id, entries=[])
+    non_player_hero_response = create_response(hero_card_id=evil_hero.id, entries=[])
     missing_hero_response = create_response(hero_card_id="missing-hero", entries=[])
-    restricted_entry_response = create_response(
+    non_player_entry_response = create_response(
         hero_card_id=player_hero.id,
         entries=[{"card_id": evil_card.id, "quantity": 1}],
     )
@@ -3228,12 +3228,12 @@ def test_deck_writes_treat_evil_card_ids_as_missing_player_cards() -> None:
         hero_card_id=player_hero.id,
         entries=[{"card_id": "missing-card", "quantity": 1}],
     )
-    restricted_sideboard_response = create_response(
+    non_player_sideboard_response = create_response(
         hero_card_id=player_hero.id,
         entries=[],
         sideboards=[
             {
-                "name": "Restricted",
+                "name": "Non-Player",
                 "entries": [{"card_id": evil_card.id, "quantity": 1}],
             }
         ],
@@ -3249,16 +3249,16 @@ def test_deck_writes_treat_evil_card_ids_as_missing_player_cards() -> None:
         ],
     )
 
-    assert restricted_hero_response.status_code == 400
-    assert restricted_hero_response.json() == missing_hero_response.json() == {
+    assert non_player_hero_response.status_code == 400
+    assert non_player_hero_response.json() == missing_hero_response.json() == {
         "detail": "Hero card not found."
     }
-    assert restricted_entry_response.status_code == 400
-    assert restricted_entry_response.json() == missing_entry_response.json() == {
+    assert non_player_entry_response.status_code == 400
+    assert non_player_entry_response.json() == missing_entry_response.json() == {
         "detail": "One or more selected mainboard cards do not exist."
     }
-    assert restricted_sideboard_response.status_code == 400
-    assert restricted_sideboard_response.json() == missing_sideboard_response.json() == {
+    assert non_player_sideboard_response.status_code == 400
+    assert non_player_sideboard_response.json() == missing_sideboard_response.json() == {
         "detail": "One or more selected sideboard cards do not exist."
     }
 
@@ -3372,7 +3372,7 @@ def test_reclassified_evil_card_is_visible_in_owner_and_staff_deck_payloads() ->
             "entries": [{"card_id": reclassified.id, "quantity": 1}],
             "sideboards": [
                 {
-                    "name": "Moved restricted card",
+                    "name": "Moved non-Player card",
                     "entries": [{"card_id": reclassified.id, "quantity": 1}],
                 }
             ],
@@ -3403,39 +3403,39 @@ def test_reclassified_evil_card_is_visible_in_owner_and_staff_deck_payloads() ->
 
 
 def test_partial_deck_edits_preserve_unchanged_non_player_references() -> None:
-    owner = _create_user("restricted-partial-edit-owner", "password")
-    hero = _create_card(name="Restricted Partial Hero", hero=True)
-    restricted = _create_card(name="Restricted Partial Card", hero=False)
+    owner = _create_user("non-player-partial-edit-owner", "password")
+    hero = _create_card(name="Non-Player Partial Hero", hero=True)
+    non_player = _create_card(name="Non-Player Partial Card", hero=False)
     visible = _create_card(name="Visible Partial Card", hero=False)
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.id),
-        name="Restricted Partial Deck",
+        name="Non-Player Partial Deck",
         description=None,
         visibility="private",
         hero_card_id=hero.id,
         entries=[
-            DeckEntryInput(card_id=restricted.id, quantity=1),
+            DeckEntryInput(card_id=non_player.id, quantity=1),
             DeckEntryInput(card_id=visible.id, quantity=1),
         ],
         sideboards=[
             DeckSideboardInput(
-                name="Restricted Tech",
+                name="Non-Player Tech",
                 entries=[
-                    DeckEntryInput(card_id=restricted.id, quantity=2),
+                    DeckEntryInput(card_id=non_player.id, quantity=2),
                     DeckEntryInput(card_id=visible.id, quantity=1),
                 ],
             )
         ],
     )
-    restricted.card_pool = "evil"
-    restricted.save(update_fields=["card_pool", "updated_at"])
+    non_player.card_pool = "evil"
+    non_player.save(update_fields=["card_pool", "updated_at"])
     client = Client(HTTP_HOST="localhost")
     client.force_login(owner)
     payload = client.get(f"/my/decks/{deck.id}").json()
-    restricted_id = restricted.id
+    non_player_id = non_player.id
     assert next(
         entry["card"] for entry in payload["mainboard"]["entries"]
-        if entry["card"]["id"] == restricted_id
+        if entry["card"]["id"] == non_player_id
     )["card_pool"] == "evil"
     sideboard_id = payload["sideboards"][0]["id"]
 
@@ -3443,15 +3443,15 @@ def test_partial_deck_edits_preserve_unchanged_non_player_references() -> None:
         f"/my/decks/{deck.id}",
         data={
             "entries": [
-                {"card_id": restricted_id, "quantity": 1},
+                {"card_id": non_player_id, "quantity": 1},
                 {"card_id": visible.id, "quantity": 2},
             ],
             "sideboards": [
                 {
                     "id": sideboard_id,
-                    "name": "Renamed Restricted Tech",
+                    "name": "Renamed Non-Player Tech",
                     "entries": [
-                        {"card_id": restricted_id, "quantity": 2},
+                        {"card_id": non_player_id, "quantity": 2},
                         {"card_id": visible.id, "quantity": 3},
                     ],
                 }
@@ -3464,11 +3464,11 @@ def test_partial_deck_edits_preserve_unchanged_non_player_references() -> None:
     deck.refresh_from_db()
     assert {
         entry.card_id: entry.quantity for entry in deck.entries.all()
-    } == {restricted.id: 1, visible.id: 2}
+    } == {non_player.id: 1, visible.id: 2}
     assert {
         entry.card_id: entry.quantity for entry in deck.sideboards.get().entries.all()
-    } == {restricted.id: 2, visible.id: 3}
-    assert deck.sideboards.get().name == "Renamed Restricted Tech"
+    } == {non_player.id: 2, visible.id: 3}
+    assert deck.sideboards.get().name == "Renamed Non-Player Tech"
     current_sideboard_id = deck.sideboards.get().id
     assert current_sideboard_id == sideboard_id
 
@@ -3478,9 +3478,9 @@ def test_partial_deck_edits_preserve_unchanged_non_player_references() -> None:
             "sideboards": [
                 {
                     "id": "stale-sideboard-id",
-                    "name": "Renamed Restricted Tech",
+                    "name": "Renamed Non-Player Tech",
                     "entries": [
-                        {"card_id": restricted_id, "quantity": 2},
+                        {"card_id": non_player_id, "quantity": 2},
                         {"card_id": visible.id, "quantity": 4},
                     ],
                 }
@@ -3498,12 +3498,12 @@ def test_partial_deck_edits_preserve_unchanged_non_player_references() -> None:
                 {
                     "id": current_sideboard_id,
                     "name": "First copy",
-                    "entries": [{"card_id": restricted_id, "quantity": 2}],
+                    "entries": [{"card_id": non_player_id, "quantity": 2}],
                 },
                 {
                     "id": current_sideboard_id,
                     "name": "Second copy",
-                    "entries": [{"card_id": restricted_id, "quantity": 2}],
+                    "entries": [{"card_id": non_player_id, "quantity": 2}],
                 },
             ],
         },
@@ -3522,13 +3522,13 @@ def test_partial_deck_edits_preserve_unchanged_non_player_references() -> None:
                 "sideboards": [
                     {
                         **source_fields[0],
-                        "name": "Renamed Restricted Tech",
-                        "entries": [{"card_id": restricted_id, "quantity": 2}],
+                        "name": "Renamed Non-Player Tech",
+                        "entries": [{"card_id": non_player_id, "quantity": 2}],
                     },
                     {
                         **source_fields[1],
-                        "name": "Renamed Restricted Tech",
-                        "entries": [{"card_id": restricted_id, "quantity": 2}],
+                        "name": "Renamed Non-Player Tech",
+                        "entries": [{"card_id": non_player_id, "quantity": 2}],
                     },
                 ],
             },
@@ -3570,7 +3570,7 @@ def test_partial_deck_edits_preserve_unchanged_non_player_references() -> None:
 
     tampered = client.patch(
         f"/my/decks/{deck.id}",
-        data={"entries": [{"card_id": restricted_id, "quantity": 2}]},
+        data={"entries": [{"card_id": non_player_id, "quantity": 2}]},
         content_type="application/json",
     )
     assert tampered.status_code == 400
@@ -3579,7 +3579,7 @@ def test_partial_deck_edits_preserve_unchanged_non_player_references() -> None:
 def test_idless_duplicate_name_sideboards_round_trip_by_exact_or_position() -> None:
     owner = _create_user("duplicate-sideboard-name-owner", "password")
     hero = _create_card(name="Duplicate Sideboard Hero", hero=True)
-    restricted = _create_card(name="Duplicate Sideboard Restricted", hero=False)
+    non_player = _create_card(name="Duplicate Sideboard Non-Player", hero=False)
     first_visible = _create_card(name="Duplicate Sideboard First Visible", hero=False)
     second_visible = _create_card(name="Duplicate Sideboard Second Visible", hero=False)
     deck = DeckService().create_owner_deck(
@@ -3593,21 +3593,21 @@ def test_idless_duplicate_name_sideboards_round_trip_by_exact_or_position() -> N
             DeckSideboardInput(
                 name="Shared Name",
                 entries=[
-                    DeckEntryInput(card_id=restricted.id, quantity=1),
+                    DeckEntryInput(card_id=non_player.id, quantity=1),
                     DeckEntryInput(card_id=first_visible.id, quantity=1),
                 ],
             ),
             DeckSideboardInput(
                 name="Shared Name",
                 entries=[
-                    DeckEntryInput(card_id=restricted.id, quantity=2),
+                    DeckEntryInput(card_id=non_player.id, quantity=2),
                     DeckEntryInput(card_id=second_visible.id, quantity=1),
                 ],
             ),
         ],
     )
-    restricted.card_pool = "evil"
-    restricted.save(update_fields=["card_pool", "updated_at"])
+    non_player.card_pool = "evil"
+    non_player.save(update_fields=["card_pool", "updated_at"])
     client = Client(HTTP_HOST="localhost")
     client.force_login(owner)
     payload = client.get(f"/my/decks/{deck.id}").json()
@@ -3645,8 +3645,8 @@ def test_idless_duplicate_name_sideboards_round_trip_by_exact_or_position() -> N
         for sideboard in deck.sideboards.all()
     }
     assert persisted_entry_sets == {
-        frozenset({(restricted.id, 1), (first_visible.id, 2)}),
-        frozenset({(restricted.id, 2), (second_visible.id, 2)}),
+        frozenset({(non_player.id, 1), (first_visible.id, 2)}),
+        frozenset({(non_player.id, 2), (second_visible.id, 2)}),
     }
 
 

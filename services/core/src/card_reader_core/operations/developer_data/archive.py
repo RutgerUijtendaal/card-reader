@@ -122,10 +122,10 @@ def _validate_public_payload_scope(payload: DeveloperDataPayload) -> None:
             + ", ".join(sorted(cross_pool_groups))
         )
 
-    restricted_card_keys = sorted(card.key for card in payload.cards if card.card_pool != "player")
-    if restricted_card_keys:
+    non_player_card_keys = sorted(card.key for card in payload.cards if card.card_pool != "player")
+    if non_player_card_keys:
         raise DeveloperDataError(
-            "Developer-data archive contains non-Player cards: " + ", ".join(restricted_card_keys)
+            "Developer-data archive contains non-Player cards: " + ", ".join(non_player_card_keys)
         )
 
 

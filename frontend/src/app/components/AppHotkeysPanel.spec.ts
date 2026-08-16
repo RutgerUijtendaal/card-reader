@@ -105,7 +105,7 @@ describe('AppHotkeysPanel', () => {
     mounted.unmount();
   });
 
-  test('hides the Player-only New Deck shortcut in restricted workspaces', async () => {
+  test('hides the Player-only New Deck shortcut in non-Player workspaces', async () => {
     workspaceState.activePool = 'evil';
     const mounted = await mountPanel('/cards');
 

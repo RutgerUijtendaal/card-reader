@@ -163,12 +163,12 @@ def test_main_deck_tts_export_omits_sideboard_entries() -> None:
     assert sideboard_card.id not in {card["card_id"] for card in payload["cards"]}
 
 
-def test_deck_tts_export_restricts_only_the_requested_board() -> None:
+def test_deck_tts_export_enforces_player_pool_only_on_the_requested_board() -> None:
     TtsCardSheet.objects.all().delete()
     owner = _create_user("tts-export-board-scope-owner", "password")
     hero = _create_card(name="TTS Board Scope Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
-    restricted_sideboard_card = _create_card(name="TTS Restricted Sideboard Card", hero=False)
+    non_player_sideboard_card = _create_card(name="TTS Non-Player Sideboard Card", hero=False)
     player_sideboard_card = _create_card(name="TTS Player Sideboard Card", hero=False)
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.id),
@@ -179,8 +179,8 @@ def test_deck_tts_export_restricts_only_the_requested_board() -> None:
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[
             DeckSideboardInput(
-                name="Restricted",
-                entries=[DeckEntryInput(card_id=restricted_sideboard_card.id, quantity=1)],
+                name="Non-Player",
+                entries=[DeckEntryInput(card_id=non_player_sideboard_card.id, quantity=1)],
             ),
             DeckSideboardInput(
                 name="Player",
@@ -188,8 +188,8 @@ def test_deck_tts_export_restricts_only_the_requested_board() -> None:
             ),
         ],
     )
-    restricted_sideboard_card.card_pool = "evil"
-    restricted_sideboard_card.save(update_fields=["card_pool"])
+    non_player_sideboard_card.card_pool = "evil"
+    non_player_sideboard_card.save(update_fields=["card_pool"])
     sideboards = {sideboard.name: sideboard for sideboard in deck.sideboards.all()}
     _prepare_tts_export(
         "board-scope",
@@ -201,13 +201,13 @@ def test_deck_tts_export_restricts_only_the_requested_board() -> None:
     player_sideboard_response = client.get(
         f"/decks/{deck.id}/exports/tts?sideboard_id={sideboards['Player'].id}"
     )
-    restricted_sideboard_response = client.get(
-        f"/decks/{deck.id}/exports/tts?sideboard_id={sideboards['Restricted'].id}"
+    non_player_sideboard_response = client.get(
+        f"/decks/{deck.id}/exports/tts?sideboard_id={sideboards['Non-Player'].id}"
     )
 
     assert mainboard_response.status_code == 200
     assert player_sideboard_response.status_code == 200
-    assert restricted_sideboard_response.status_code == 404
+    assert non_player_sideboard_response.status_code == 404
 
 
 def test_deck_tts_export_rechecks_player_pool_rule_in_authoritative_snapshot(monkeypatch) -> None:
@@ -224,10 +224,10 @@ def test_deck_tts_export_rechecks_player_pool_rule_in_authoritative_snapshot(mon
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[],
     )
-    restricted_card = mainboard_cards[0]
+    reclassified_card = mainboard_cards[0]
 
     def reclassify_after_visibility_check(*_args, **_kwargs) -> bool:
-        Card.objects.filter(id=restricted_card.id).update(card_pool="evil")
+        Card.objects.filter(id=reclassified_card.id).update(card_pool="evil")
         return False
 
     monkeypatch.setattr(
@@ -239,8 +239,8 @@ def test_deck_tts_export_rechecks_player_pool_rule_in_authoritative_snapshot(mon
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Deck not found"}
-    assert restricted_card.latest_version is not None
-    assert restricted_card.latest_version.name not in response.content.decode("utf-8")
+    assert reclassified_card.latest_version is not None
+    assert reclassified_card.latest_version.name not in response.content.decode("utf-8")
 
 
 def test_tts_export_can_target_one_sideboard() -> None:
@@ -574,7 +574,7 @@ def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_ima
     ]
 
 
-def test_restricted_gallery_tts_export_uses_stable_pool_sheet_urls() -> None:
+def test_non_player_gallery_tts_export_uses_stable_pool_sheet_urls() -> None:
     TtsCardSheet.objects.all().delete()
     staff = _create_user("tts-evil-gallery-staff", "password", is_staff=True)
     client = Client(HTTP_HOST="cards.example")

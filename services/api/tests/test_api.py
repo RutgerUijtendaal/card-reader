@@ -1511,10 +1511,24 @@ def test_non_player_card_images_are_public_across_all_routes(
         f"/cards/{card.id}/versions/{version.id}/image",
         f"/card-images/{image.stored_path}",
     ]
+    ordinary = Client(HTTP_HOST="localhost")
+    ordinary.force_login(
+        _create_user(
+            f"public-{card_pool}-image-user",
+            "password",
+            is_staff=False,
+        )
+    )
+    inactive_user = _create_user(f"public-{card_pool}-image-inactive", "password", is_staff=True)
+    inactive = Client(HTTP_HOST="localhost")
+    inactive.force_login(inactive_user)
+    inactive_user.is_active = False
+    inactive_user.save(update_fields=["is_active"])
+    staff = _staff_client(f"public-{card_pool}-image-staff")
 
-    responses = [anonymous.get(path) for path in paths]
+    responses = [client.get(path) for client in (anonymous, ordinary, inactive, staff) for path in paths]
     try:
-        assert [response.status_code for response in responses] == [200, 200, 200]
+        assert [response.status_code for response in responses] == [200] * 12
     finally:
         for response in responses:
             response.close()
@@ -1529,19 +1543,39 @@ def test_non_player_card_collections_and_objects_are_public(
     card.card_pool = card_pool
     card.save(update_fields=["card_pool"])
     anonymous = Client(HTTP_HOST="localhost")
+    ordinary = Client(HTTP_HOST="localhost")
+    ordinary.force_login(
+        _create_user(
+            f"public-{card_pool}-collection-user",
+            "password",
+            is_staff=False,
+        )
+    )
+    inactive_user = _create_user(
+        f"public-{card_pool}-collection-inactive",
+        "password",
+        is_staff=True,
+    )
+    inactive = Client(HTTP_HOST="localhost")
+    inactive.force_login(inactive_user)
+    inactive_user.is_active = False
+    inactive_user.save(update_fields=["is_active"])
     staff = _staff_client(f"public-{card_pool}-collection-staff")
 
-    anonymous_list = anonymous.get("/cards", {"card_pool": card_pool})
-    assert anonymous_list.status_code == 200
-    assert [row["id"] for row in anonymous_list.json()["results"]] == [card.id]
-    assert anonymous.get(f"/cards/{card.id}").status_code == 200
-    assert anonymous.get(f"/cards/{card.id}/generations").status_code == 200
+    payloads = []
+    for client in (anonymous, ordinary, inactive, staff):
+        list_response = client.get("/cards", {"card_pool": card_pool})
+        detail_response = client.get(f"/cards/{card.id}")
+        generations_response = client.get(f"/cards/{card.id}/generations")
+        assert list_response.status_code == 200
+        assert detail_response.status_code == 200
+        assert generations_response.status_code == 200
+        assert [row["id"] for row in list_response.json()["results"]] == [card.id]
+        payloads.append(
+            (list_response.json(), detail_response.json(), generations_response.json())
+        )
 
-    staff_list = staff.get("/cards", {"card_pool": card_pool})
-    assert staff_list.status_code == 200
-    assert [row["id"] for row in staff_list.json()["results"]] == [card.id]
-    assert staff.get(f"/cards/{card.id}").status_code == 200
-    assert staff.get(f"/cards/{card.id}/generations").status_code == 200
+    assert payloads[1:] == [payloads[0]] * 3
 
 
 def test_inactive_staff_session_retains_public_non_player_card_access() -> None:
@@ -3454,10 +3488,28 @@ def test_cross_pool_group_relationships_expose_all_members_to_every_viewer() -> 
         members=[player_card, evil_card],
     )
 
-    anonymous_group_response = Client(HTTP_HOST="localhost").get(f"/card-groups/{group.id}")
-    anonymous_card_response = Client(HTTP_HOST="localhost").get(f"/cards/{player_card.id}")
+    anonymous = Client(HTTP_HOST="localhost")
+    ordinary = Client(HTTP_HOST="localhost")
+    ordinary.force_login(
+        _create_user("cross-pool-group-user", "password", is_staff=False)
+    )
+    inactive_user = _create_user("cross-pool-group-inactive", "password", is_staff=True)
+    inactive = Client(HTTP_HOST="localhost")
+    inactive.force_login(inactive_user)
+    inactive_user.is_active = False
+    inactive_user.save(update_fields=["is_active"])
     staff_client = _staff_client("cross-pool-group-staff")
-    staff_group_response = staff_client.get(f"/card-groups/{group.id}")
+    group_responses = [
+        client.get(f"/card-groups/{group.id}")
+        for client in (anonymous, ordinary, inactive, staff_client)
+    ]
+    card_responses = [
+        client.get(f"/cards/{player_card.id}")
+        for client in (anonymous, ordinary, inactive, staff_client)
+    ]
+    anonymous_group_response = group_responses[0]
+    anonymous_card_response = card_responses[0]
+    staff_group_response = group_responses[-1]
     staff_evil_card_response = staff_client.get(f"/cards/{evil_card.id}")
 
     assert anonymous_group_response.status_code == 200
@@ -3485,6 +3537,12 @@ def test_cross_pool_group_relationships_expose_all_members_to_every_viewer() -> 
         evil_card.id,
     ]
     assert staff_evil_card_response.json()["card_groups"][0]["position"] == 2
+    assert [response.json() for response in group_responses[1:]] == [
+        anonymous_group_response.json()
+    ] * 3
+    assert [response.json() for response in card_responses[1:]] == [
+        anonymous_card_response.json()
+    ] * 3
 
 
 def test_card_detail_includes_viewer_visible_deck_references() -> None:

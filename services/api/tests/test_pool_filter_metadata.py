@@ -215,10 +215,18 @@ def test_filter_metadata_api_validates_and_serves_every_explicit_pool() -> None:
     omitted_payload = anonymous.get("/cards/filters").json()
     assert keyword.key in {row["key"] for row in omitted_payload["keywords"]}
 
+    user_model = get_user_model()
+    ordinary_user = user_model.objects.create_user(
+        username="exact-filter-pool-user",
+        password="password",
+    )
+    ordinary = Client(HTTP_HOST="localhost")
+    ordinary.force_login(ordinary_user)
     staff = _staff_client("exact-filter-pool-staff")
     assert staff.get("/cards/filters", {"card_pool": "player"}).status_code == 200
     assert staff.get("/cards/filters", {"card_pool": "neutral"}).status_code == 200
     exact_payload = staff.get("/cards/filters", {"card_pool": "evil"}).json()
+    assert ordinary.get("/cards/filters", {"card_pool": "evil"}).json() == exact_payload
     assert {row["key"] for row in exact_payload["keywords"]} == {keyword.key}
     assert {row["key"] for row in exact_payload["tags"]} == {tag.key}
     assert {row["key"] for row in exact_payload["types"]} == {card_type.key}
