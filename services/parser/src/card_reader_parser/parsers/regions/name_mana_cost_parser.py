@@ -418,13 +418,31 @@ class NameManaCostParser:
     ) -> bool:
         left, top, right, bottom = bounds
         for line in lines:
-            if str(line.get("text", "")).strip().upper() != token.upper():
+            line_text = " ".join(str(line.get("text", "")).split())
+            if not line_text.upper().endswith(f" {token.upper()}") and (
+                line_text.upper() != token.upper()
+            ):
                 continue
             x = line.get("x")
             y = line.get("y")
             if isinstance(x, (int, float)) and isinstance(y, (int, float)):
                 if left <= float(x) <= right and top <= float(y) <= bottom:
                     return True
+            box = line.get("box")
+            if isinstance(box, list):
+                points = [
+                    (float(point[0]), float(point[1]))
+                    for point in box
+                    if isinstance(point, (list, tuple))
+                    and len(point) >= 2
+                    and isinstance(point[0], (int, float))
+                    and isinstance(point[1], (int, float))
+                ]
+                if points:
+                    right_edge = max(point[0] for point in points)
+                    center_y = sum(point[1] for point in points) / len(points)
+                    if left <= right_edge <= right and top <= center_y <= bottom:
+                        return True
         return False
 
     def _normalize_badge_lines(
