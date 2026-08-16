@@ -178,6 +178,7 @@ Core stack:
   - Create one immutable evidence snapshot per mismatching import item; do not coalesce separate imports for the same Card.
   - Classification review is resolved or dismissed explicitly after staff inspection. Card edits do not silently close review items.
   - Card merges retarget open and historical classification review items to the surviving Card while preserving their captured snapshots and reviewed version.
+  - Classification review authorization follows the live Card pool; use the immutable pool snapshot only when the Card no longer exists.
   - New classification mismatches belong in Review rather than import warnings. Keep historical `card_classification_mismatch` warnings readable without backfilling them into the queue.
 
 ## Auth Rules

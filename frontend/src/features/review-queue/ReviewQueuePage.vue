@@ -669,17 +669,13 @@ const updateClassificationItem = async (
   updatingClassificationId.value = itemId;
   try {
     const response = await updateClassificationReviewItem(itemId, status);
-    classificationItems.value = classificationItems.value.map((item) =>
-      item.id === itemId ? response : item,
-    );
     if (previous?.status === 'open') decrementOpenClassificationReviewCount();
     if (reviewStatus.value === 'open') {
-      classificationItems.value = classificationItems.value.filter((item) => item.id !== itemId);
-      if (classificationPage.value)
-        classificationPage.value = {
-          ...classificationPage.value,
-          count: Math.max(0, classificationPage.value.count - 1),
-        };
+      await loadClassificationPage(1, 'replace');
+    } else {
+      classificationItems.value = classificationItems.value.map((item) =>
+        item.id === itemId ? response : item,
+      );
     }
     toast.success(
       status === 'resolved' ? 'Classification review resolved.' : 'Existing classification kept.',

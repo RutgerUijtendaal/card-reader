@@ -10,6 +10,7 @@ from .types import (
 )
 from .writes import (
     create_classification_review_item,
+    retarget_classification_review_items,
     update_classification_review_item_status,
 )
 
@@ -21,5 +22,6 @@ __all__ = [
     "count_open_classification_review_items",
     "create_classification_review_item",
     "list_classification_review_items",
+    "retarget_classification_review_items",
     "update_classification_review_item_status",
 ]

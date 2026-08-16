@@ -14,6 +14,7 @@ from card_reader_core.models import (
 )
 
 from .types import ClassificationReviewStatus
+from .queries import classification_review_card_pool_scope_q
 
 
 def create_classification_review_item(
@@ -60,7 +61,8 @@ def update_classification_review_item_status(
                 "card_version__content_version",
                 "reviewed_by",
             )
-            .filter(id=item_id, card_pool__in=card_pool_scope.allowed_pools)
+            .filter(id=item_id)
+            .filter(classification_review_card_pool_scope_q(card_pool_scope))
             .first()
         )
         if item is None:
@@ -84,3 +86,14 @@ def update_classification_review_item_status(
             ]
         )
     return item
+
+
+def retarget_classification_review_items(
+    *,
+    source_card_ids: list[str],
+    target_card: Card,
+) -> None:
+    CardClassificationReviewItem.objects.filter(card_id__in=source_card_ids).update(
+        card=target_card,
+        updated_at=now_utc(),
+    )

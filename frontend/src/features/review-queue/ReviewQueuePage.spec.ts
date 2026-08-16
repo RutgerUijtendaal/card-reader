@@ -222,6 +222,9 @@ describe('ReviewQueuePage', () => {
   });
 
   test('keeps the existing classification through an explicit terminal action', async () => {
+    apiGet
+      .mockResolvedValueOnce({ data: page([classificationItem]) })
+      .mockResolvedValueOnce({ data: page([]) });
     const mounted = await mountPage();
     const keepButton = Array.from(mounted.container.querySelectorAll('button')).find(
       (button) => button.textContent?.trim() === 'Keep Existing',
@@ -233,6 +236,7 @@ describe('ReviewQueuePage', () => {
       status: 'dismissed',
     });
     expect(decrementOpenClassificationReviewCount).toHaveBeenCalledOnce();
+    expect(apiGet).toHaveBeenCalledTimes(2);
     expect(mounted.container.textContent).not.toContain('Changed Card');
     mounted.unmount();
   });

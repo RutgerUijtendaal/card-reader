@@ -176,28 +176,54 @@ def test_review_lists_are_global_across_every_authorized_card_pool() -> None:
 def test_classification_review_update_respects_authorized_card_pool_scope(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    CardClassificationReviewItem.objects.all().delete()
     reviewer = _create_user("pool-scoped-reviewer", "password", is_staff=True)
     client = Client(HTTP_HOST="localhost")
     client.force_login(reviewer)
-    card, version = _create_card_version(
-        name="Restricted Classification Review",
-        card_pool=EVIL_CARD_POOL,
-    )
+    card, version = _create_card_version(name="Restricted Classification Review")
     review_item = _create_classification_review(card=card, version=version)
+    change_card_identity(card=card, card_pool=EVIL_CARD_POOL)
     monkeypatch.setattr(
         "card_reader_api.review.views.card_pool_scope_for_user",
         lambda _user: PLAYER_CARD_POOL_SCOPE,
     )
 
+    list_response = client.get("/review/classification-items?status=open")
+    summary_response = client.get("/review/summary")
     response = client.patch(
         f"/review/classification-items/{review_item.id}",
         data={"status": "dismissed"},
         content_type="application/json",
     )
 
+    assert list_response.status_code == 200
+    assert list_response.json()["results"] == []
+    assert summary_response.json()["open_classification_review_count"] == 0
     assert response.status_code == 404
     review_item.refresh_from_db()
     assert review_item.status == "open"
+
+
+def test_classification_review_scope_falls_back_to_snapshot_for_deleted_card(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    CardClassificationReviewItem.objects.all().delete()
+    reviewer = _create_user("deleted-review-scope", "password", is_staff=True)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(reviewer)
+    card, version = _create_card_version(name="Deleted Classification Review")
+    review_item = _create_classification_review(card=card, version=version)
+    card.delete()
+    monkeypatch.setattr(
+        "card_reader_api.review.views.card_pool_scope_for_user",
+        lambda _user: PLAYER_CARD_POOL_SCOPE,
+    )
+
+    response = client.get("/review/classification-items?status=open")
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()["results"]] == [review_item.id]
+    assert response.json()["results"][0]["card"]["id"] is None
 
 
 def test_classification_review_list_and_terminal_updates_are_auditable() -> None:
