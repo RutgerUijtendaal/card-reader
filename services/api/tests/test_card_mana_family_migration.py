@@ -250,6 +250,59 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
         id=queued_target_item.id
     ).target_card_mana_families_snapshot_json == ["arcane", "dark"]
 
+    rollback_role_rule = {
+        "rule_id": "rollback-role-rule",
+        "card_pool": "evil",
+        "source_kind": "tag",
+        "source_id": "rollback-tag",
+        "source_key": "rollback-tag",
+        "source_label": "Rollback Tag",
+        "source_identifiers": ["rollback"],
+        "target_kind": "role",
+        "target_key": "boss",
+    }
+    rollback_mana_rule = {
+        "rule_id": "rollback-mana-rule",
+        "card_pool": "evil",
+        "source_kind": "symbol",
+        "source_id": "rollback-symbol",
+        "source_key": "arcane-mana",
+        "source_label": "Arcane Mana",
+        "source_identifiers": [],
+        "source_symbol": {
+            "symbol_type": "mana",
+            "detector_type": "template",
+            "detection_config": {},
+            "text_enrichment": {},
+            "reference_assets": [],
+            "text_token": "{A}",
+            "enabled": True,
+        },
+        "target_kind": "mana_family",
+        "target_key": "arcane",
+    }
+    rollback_body: dict[str, object] = {
+        "schema_version": 3,
+        "card_pool": "evil",
+        "rules": [rollback_role_rule, rollback_mana_rule],
+    }
+    rollback_job = MigratedJob.objects.create(
+        source_path="imports/post-mana-queued",
+        template_id=template.id,
+        card_pool="evil",
+        status="running",
+        classification_rule_snapshot_json={
+            **rollback_body,
+            "digest": hashlib.sha256(
+                json.dumps(
+                    rollback_body,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest(),
+        },
+    )
+
     downgraded_apps = _migrate_to(BASE_MIGRATION)
     DowngradedRule = downgraded_apps.get_model(
         "card_reader_core", "CardClassificationRule"
@@ -269,5 +322,38 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
         == 63
     )
     assert DowngradedVersion.objects.get(id=evil.latest_version_id).mana_family_sort_key == 0
+    DowngradedJob = downgraded_apps.get_model("card_reader_core", "ImportJob")
+    downgraded_queued_snapshot = DowngradedJob.objects.get(
+        id=queued_job.id
+    ).classification_rule_snapshot_json
+    assert downgraded_queued_snapshot["schema_version"] == 1
+    assert downgraded_queued_snapshot["rules"] == []
+    downgraded_queued_body = {
+        key: downgraded_queued_snapshot[key]
+        for key in ("schema_version", "card_pool", "rules")
+    }
+    assert downgraded_queued_snapshot["digest"] == hashlib.sha256(
+        json.dumps(
+            downgraded_queued_body,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    downgraded_new_snapshot = DowngradedJob.objects.get(
+        id=rollback_job.id
+    ).classification_rule_snapshot_json
+    assert downgraded_new_snapshot["schema_version"] == 1
+    assert downgraded_new_snapshot["rules"] == [rollback_role_rule]
+    downgraded_new_body = {
+        key: downgraded_new_snapshot[key]
+        for key in ("schema_version", "card_pool", "rules")
+    }
+    assert downgraded_new_snapshot["digest"] == hashlib.sha256(
+        json.dumps(
+            downgraded_new_body,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
 
     _restore_leaf()

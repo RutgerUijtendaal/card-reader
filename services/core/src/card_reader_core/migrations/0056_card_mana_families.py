@@ -217,6 +217,49 @@ def backfill_queued_player_rule_snapshots(apps, _schema_editor) -> None:  # type
         )
 
 
+def downgrade_active_rule_snapshots(apps, _schema_editor) -> None:  # type: ignore[no-untyped-def]
+    ImportJob = apps.get_model("card_reader_core", "ImportJob")
+    representable_rule_fields = (
+        "rule_id",
+        "card_pool",
+        "source_kind",
+        "source_id",
+        "source_key",
+        "source_label",
+        "source_identifiers",
+        "target_kind",
+        "target_key",
+    )
+    for job in ImportJob.objects.filter(
+        status__in=("queued", "running", "canceling"),
+    ).iterator():
+        snapshot = job.classification_rule_snapshot_json
+        if (
+            not isinstance(snapshot, dict)
+            or snapshot.get("schema_version") == 1
+            or not isinstance(snapshot.get("rules"), list)
+        ):
+            continue
+        rules = [
+            {field: rule[field] for field in representable_rule_fields if field in rule}
+            for rule in snapshot["rules"]
+            if isinstance(rule, dict)
+            and rule.get("source_kind") in {"tag", "type"}
+            and rule.get("target_kind") in {"role", "faction"}
+        ]
+        body: dict[str, object] = {
+            "schema_version": 1,
+            "card_pool": job.card_pool,
+            "rules": rules,
+        }
+        encoded = json.dumps(body, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        job.classification_rule_snapshot_json = {
+            **body,
+            "digest": hashlib.sha256(encoded).hexdigest(),
+        }
+        job.save(update_fields=["classification_rule_snapshot_json"])
+
+
 def restore_version_mana_family_sort_keys(apps, _schema_editor) -> None:  # type: ignore[no-untyped-def]
     CardVersion = apps.get_model("card_reader_core", "CardVersion")
     VersionSymbol = apps.get_model("card_reader_core", "CardVersionSymbol")
@@ -425,7 +468,7 @@ class Migration(migrations.Migration):
         ),
         migrations.RunPython(
             backfill_queued_player_rule_snapshots,
-            migrations.RunPython.noop,
+            downgrade_active_rule_snapshots,
         ),
         migrations.RunPython(
             backfill_player_mana_families,

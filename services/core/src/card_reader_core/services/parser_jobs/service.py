@@ -282,6 +282,11 @@ def _merge_metadata_sources(
     frozen_sources: list[_MetadataSource],
 ) -> list[_MetadataSource]:
     frozen_by_id = {source.id: source for source in frozen_sources}
-    merged = [source for source in live_sources if source.id not in frozen_by_id]
+    frozen_keys = {source.key for source in frozen_sources}
+    merged = [
+        source
+        for source in live_sources
+        if source.id not in frozen_by_id and source.key not in frozen_keys
+    ]
     merged.extend(frozen_sources)
     return sorted(merged, key=lambda source: (source.key, source.id))

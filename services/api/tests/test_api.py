@@ -689,6 +689,14 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
     )
     classification_rules.delete_rule(rule_id=symbol_rule.id)
     symbol.delete()
+    replacement_symbol = Symbol.objects.create(
+        key="frozen-mana-source",
+        label="Replacement Mana Source",
+        symbol_type="mana",
+        detector_type="template",
+        detection_config_json={"threshold": 0.1},
+        enabled=True,
+    )
     inactive_symbol.enabled = True
     inactive_symbol.save(update_fields=["enabled", "updated_at"])
 
@@ -708,8 +716,14 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
             assert frozen_tag.identifiers_json == ["original hero term"]
             symbols = resources["symbols"]
             assert isinstance(symbols, list)
+            assert [
+                row.id
+                for row in symbols
+                if isinstance(row, Symbol) and row.key == "frozen-mana-source"
+            ] == [frozen_symbol_id]
             assert all(
-                not isinstance(row, Symbol) or row.id != inactive_symbol.id
+                not isinstance(row, Symbol)
+                or row.id not in {inactive_symbol.id, replacement_symbol.id}
                 for row in symbols
             )
             frozen_symbol = next(
