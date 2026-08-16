@@ -36,13 +36,13 @@ from card_reader_core.repositories.cards import (
     CARD_SORT_UPDATED_DESC,
     CARD_SORT_VALUES,
     CardFilterParams,
+    CardSort,
 )
 from card_reader_core.rules import render_enriched_rule_text
 from card_reader_core.services.decks import normalize_deck_building_config
 
 if TYPE_CHECKING:
     from card_reader_core.models import CardGroup, Deck
-    from card_reader_core.repositories.cards import CardSort
     from card_reader_core.services.cards import CardEditState, CardMetadata
 
 MANA_FAMILY_KEYS = tuple(family.key for family in MANA_FAMILIES)

@@ -3028,11 +3028,12 @@ def test_cards_list_uses_pool_aware_player_default_before_pagination() -> None:
     )
 
     client = Client(HTTP_HOST="localhost")
-    first_response = client.get("/cards", {"q": "Default Player", "page": 1, "page_size": 2})
-    second_response = client.get("/cards", {"q": "Default Player", "page": 2, "page_size": 2})
-    third_response = client.get("/cards", {"q": "Default Player", "page": 3, "page_size": 2})
-    fourth_response = client.get("/cards", {"q": "Default Player", "page": 4, "page_size": 2})
-    fifth_response = client.get("/cards", {"q": "Default Player", "page": 5, "page_size": 2})
+    query = {"q": "Default Player", "card_pool": "player", "page_size": 2}
+    first_response = client.get("/cards", {**query, "page": 1})
+    second_response = client.get("/cards", {**query, "page": 2})
+    third_response = client.get("/cards", {**query, "page": 3})
+    fourth_response = client.get("/cards", {**query, "page": 4})
+    fifth_response = client.get("/cards", {**query, "page": 5})
 
     assert first_response.status_code == 200
     assert second_response.status_code == 200

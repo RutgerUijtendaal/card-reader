@@ -1799,8 +1799,8 @@ def test_deck_create_replay_returns_confirmed_deck_after_card_pool_change() -> N
     assert lookup_response.json()["id"] == create_response.json()["id"]
     assert replay_response.json()["status"]["is_valid"] is False
     assert lookup_response.json()["status"]["is_valid"] is False
-    assert replay_response.json()["entries"][0]["card"]["id"] == reclassified.id
-    assert lookup_response.json()["entries"][0]["card"]["id"] == reclassified.id
+    assert replay_response.json()["mainboard"]["entries"][0]["card"]["id"] == reclassified.id
+    assert lookup_response.json()["mainboard"]["entries"][0]["card"]["id"] == reclassified.id
 
 
 def test_deck_creation_key_is_owner_scoped_and_lookup_is_private() -> None:
@@ -3171,7 +3171,7 @@ def test_evil_and_neutral_cards_are_public_for_lists_and_details() -> None:
         assert response.status_code == 200
         assert [row["id"] for row in response.json()["results"]] == [card.id]
         assert anonymous.get(f"/cards/{card.id}").status_code == 200
-        assert card.id not in public_ids
+        assert card.id in public_ids
         summary = deck_hero_summary_payload(card)
         assert summary["key"] == card.key
         assert summary["card_pool"] == card.card_pool
