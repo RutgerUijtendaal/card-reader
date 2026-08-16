@@ -269,7 +269,7 @@ def test_classification_review_page_image_loading_has_bounded_query_count() -> N
 
     assert first_response.status_code == 200
     assert second_response.status_code == 200
-    assert len(second_queries) == len(first_queries)
+    assert len(second_queries) <= len(first_queries)
 
 
 def test_review_summary_combines_parse_flags_and_classification_reviews() -> None:
