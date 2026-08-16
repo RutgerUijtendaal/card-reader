@@ -49,6 +49,7 @@ const { editorState, publicState, routerPushMock, workspaceState } = vi.hoisted(
       isQueuingReparse: refValue(false),
       promotingVersionId: refValue<string | null>(null),
       saveMessage: refValue(''),
+      saveError: refValue(''),
       deckBuildingConfigExample: refValue('{}'),
       form,
       selectedVersion: refValue<unknown | null>(null),

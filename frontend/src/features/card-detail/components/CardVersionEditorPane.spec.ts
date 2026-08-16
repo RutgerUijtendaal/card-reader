@@ -105,9 +105,11 @@ const emptyOptions = (): [] => [];
 const mountPane = async ({
   deprecatedStatusDisabled = false,
   formOverrides = {},
+  saveError = '',
 }: {
   deprecatedStatusDisabled?: boolean;
   formOverrides?: Partial<EditorForm>;
+  saveError?: string;
 } = {}) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -134,6 +136,7 @@ const mountPane = async ({
             isSaving: false,
             isQueuingReparse: false,
             saveMessage: '',
+            saveError,
             deckBuildingConfigExample: JSON.stringify(
               {
                 overrides: {
@@ -343,6 +346,18 @@ describe('CardVersionEditorPane tabs', () => {
     expect(mounted.saveCard).toHaveBeenCalledTimes(1);
     expect(mounted.saveVersion).toHaveBeenCalledTimes(1);
 
+    mounted.unmount();
+  });
+
+  test('shows save failures as an accessible error on the active editor tab', async () => {
+    const message = 'Card name conflicts with another identity. Merge the duplicate cards.';
+    const mounted = await mountPane({ saveError: message });
+
+    expect(mounted.container.querySelector('[role="alert"]')?.textContent).toContain(message);
+
+    await clickButton(mounted.container, 'Card');
+
+    expect(mounted.container.querySelector('[role="alert"]')?.textContent).toContain(message);
     mounted.unmount();
   });
 });

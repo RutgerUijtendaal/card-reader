@@ -1,10 +1,26 @@
 import { describe, expect, test } from 'vitest';
 import type { CardGroupSummary } from '@/domain/cards/types';
 import {
+  cardSaveErrorMessage,
   reconcileCardGroupsAfterPoolChange,
   synchronizeCardClassification,
   type CardClassificationFields,
 } from './useCardDetailState';
+
+describe('cardSaveErrorMessage', () => {
+  test('surfaces API identity conflicts with merge guidance', () => {
+    expect(cardSaveErrorMessage({
+      response: { data: { detail: "Card name conflicts with card 'card-2' in the evil pool." } },
+    })).toBe(
+      "Card name conflicts with card 'card-2' in the evil pool. "
+      + "Merge the duplicate cards before changing this card's name, pool, or factions.",
+    );
+  });
+
+  test('uses a stable fallback when the API has no detail', () => {
+    expect(cardSaveErrorMessage(new Error('Network Error'))).toBe('Card changes could not be saved.');
+  });
+});
 
 const buildGroup = (
   id: string,

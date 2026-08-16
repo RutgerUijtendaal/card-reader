@@ -514,7 +514,14 @@
       class="theme-divider flex shrink-0 flex-wrap items-center justify-end gap-3 border-t pt-4"
     >
       <p
-        v-if="saveMessage"
+        v-if="saveError"
+        class="theme-error-text mr-auto text-sm"
+        role="alert"
+      >
+        {{ saveError }}
+      </p>
+      <p
+        v-else-if="saveMessage"
         class="theme-success-text mr-auto text-sm"
       >
         {{ saveMessage }}
@@ -547,13 +554,20 @@
         />
       </label>
       <p
-        v-else-if="saveMessage"
+        v-if="saveError"
+        class="theme-error-text mr-auto text-sm"
+        role="alert"
+      >
+        {{ saveError }}
+      </p>
+      <p
+        v-else-if="!version.editable && saveMessage"
         class="theme-success-text mr-auto text-sm"
       >
         {{ saveMessage }}
       </p>
       <p
-        v-if="version.editable && saveMessage"
+        v-if="version.editable && saveMessage && !saveError"
         class="theme-success-text text-sm"
       >
         {{ saveMessage }}
@@ -624,6 +638,7 @@ const props = defineProps<{
   isSaving: boolean;
   isQueuingReparse: boolean;
   saveMessage: string;
+  saveError: string;
   deckBuildingConfigExample: string;
   fieldSource: (fieldName: ScalarFieldName) => 'auto' | 'manual';
   metadataSource: (groupName: MetadataGroupName) => 'auto' | 'manual';

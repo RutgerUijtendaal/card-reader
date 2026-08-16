@@ -102,6 +102,7 @@
             :is-saving="isSaving"
             :is-queuing-reparse="isQueuingReparse"
             :save-message="saveMessage"
+            :save-error="saveError"
             :deck-building-config-example="deckBuildingConfigExample"
             :field-source="fieldSource"
             :metadata-source="metadataSource"
@@ -193,6 +194,7 @@ const {
   isQueuingReparse,
   promotingVersionId,
   saveMessage,
+  saveError,
   deckBuildingConfigExample,
   form,
   selectedVersion,
