@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from itertools import combinations
 from typing import Any
 from uuid import UUID, uuid5
@@ -108,6 +110,67 @@ def seed_available_symbol_rules(apps, _schema_editor) -> None:  # type: ignore[n
                 symbol_id=symbol.id,
                 defaults={"id": str(uuid5(RULE_NAMESPACE, identity)), "enabled": True},
             )
+
+
+def backfill_queued_player_rule_snapshots(apps, _schema_editor) -> None:  # type: ignore[no-untyped-def]
+    ImportJob = apps.get_model("card_reader_core", "ImportJob")
+    Symbol = apps.get_model("card_reader_core", "Symbol")
+    symbols = {row.key: row for row in Symbol.objects.filter(key__in=tuple(FAMILY_BY_SYMBOL))}
+    for job in ImportJob.objects.filter(
+        card_pool="player",
+        status__in=("queued", "running", "canceling"),
+    ).iterator():
+        snapshot = job.classification_rule_snapshot_json
+        if not isinstance(snapshot, dict) or not isinstance(snapshot.get("rules"), list):
+            continue
+        rules = [dict(rule) for rule in snapshot["rules"] if isinstance(rule, dict)]
+        existing_sources = {
+            (rule.get("target_kind"), rule.get("target_key"), rule.get("source_id"))
+            for rule in rules
+        }
+        for family_key, _label, mana_key, affinity_keys in FAMILIES:
+            for symbol_key in (mana_key, *affinity_keys):
+                symbol = symbols.get(symbol_key)
+                if symbol is None:
+                    continue
+                identity = ("mana_family", family_key, symbol.id)
+                if identity in existing_sources:
+                    continue
+                rule_identity = f"player:mana_family:{family_key}:symbol:{symbol_key}"
+                rules.append(
+                    {
+                        "rule_id": str(uuid5(RULE_NAMESPACE, rule_identity)),
+                        "card_pool": "player",
+                        "source_kind": "symbol",
+                        "source_id": symbol.id,
+                        "source_key": symbol.key,
+                        "source_label": symbol.label,
+                        "source_identifiers": [],
+                        "source_symbol": {
+                            "symbol_type": symbol.symbol_type,
+                            "detector_type": symbol.detector_type,
+                            "detection_config": symbol.detection_config_json,
+                            "text_enrichment": symbol.text_enrichment_json,
+                            "reference_assets": symbol.reference_assets_json,
+                            "text_token": symbol.text_token,
+                            "enabled": symbol.enabled,
+                        },
+                        "target_kind": "mana_family",
+                        "target_key": family_key,
+                    }
+                )
+                existing_sources.add(identity)
+        body: dict[str, object] = {
+            "schema_version": 3,
+            "card_pool": "player",
+            "rules": rules,
+        }
+        encoded = json.dumps(body, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        job.classification_rule_snapshot_json = {
+            **body,
+            "digest": hashlib.sha256(encoded).hexdigest(),
+        }
+        job.save(update_fields=["classification_rule_snapshot_json"])
 
 
 def remove_symbol_rules_for_downgrade(apps, _schema_editor) -> None:  # type: ignore[no-untyped-def]
@@ -277,6 +340,10 @@ class Migration(migrations.Migration):
             model_name="importjobitem",
             name="target_card_mana_families_snapshot_json",
             field=models.JSONField(default=list),
+        ),
+        migrations.RunPython(
+            backfill_queued_player_rule_snapshots,
+            migrations.RunPython.noop,
         ),
         migrations.RunPython(backfill_player_mana_families, migrations.RunPython.noop),
         migrations.RunPython(seed_available_symbol_rules, remove_symbol_rules_for_downgrade),

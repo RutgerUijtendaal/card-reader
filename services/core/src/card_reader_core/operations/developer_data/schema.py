@@ -361,14 +361,62 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
             if isinstance(latest_version, dict)
             else []
         )
-        adopted_card["card_mana_families"] = list(
-            mana_family_keys_for_symbol_keys(
-                tuple(str(key) for key in symbol_keys if isinstance(key, str))
+        adopted_card["card_mana_families"] = (
+            list(
+                mana_family_keys_for_symbol_keys(
+                    tuple(str(key) for key in symbol_keys if isinstance(key, str))
+                )
             )
+            if adopted_card.get("card_pool") == "player"
+            else []
         )
         adopted_cards.append(adopted_card)
     adopted["cards"] = adopted_cards
     if format_version != 1:
+        families_by_reference = {
+            (
+                card.get("key"),
+                card.get("card_pool"),
+                tuple(normalize_card_factions(card.get("card_factions", []))),
+            ): list(card.get("card_mana_families", []))
+            for card in adopted_cards
+            if isinstance(card, dict)
+            and isinstance(card.get("card_factions", []), list)
+        }
+
+        def adopt_reference(reference: object) -> object:
+            if not isinstance(reference, dict):
+                return reference
+            identity = (
+                reference.get("key"),
+                reference.get("card_pool"),
+                tuple(normalize_card_factions(reference.get("card_factions", []))),
+            )
+            return {
+                **reference,
+                "card_mana_families": families_by_reference.get(identity, []),
+            }
+
+        groups = adopted.get("card_groups")
+        if isinstance(groups, list):
+            adopted["card_groups"] = [
+                {
+                    **group,
+                    "anchor_card_ref": adopt_reference(group.get("anchor_card_ref")),
+                    "members": [
+                        {
+                            **member,
+                            "card_ref": adopt_reference(member.get("card_ref")),
+                        }
+                        if isinstance(member, dict)
+                        else member
+                        for member in group.get("members", [])
+                    ],
+                }
+                if isinstance(group, dict)
+                else group
+                for group in groups
+            ]
         return adopted
     cards_by_key = {
         card["key"]: {

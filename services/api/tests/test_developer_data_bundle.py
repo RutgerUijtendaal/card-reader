@@ -205,6 +205,61 @@ def test_legacy_payload_adoption_namespaces_card_group_references() -> None:
     ]
 
 
+def test_version_two_adoption_backfills_only_player_cards_and_group_references() -> None:
+    adopted = adopt_payload_for_format(
+        {
+            "cards": [
+                {
+                    "key": "legacy-player",
+                    "card_pool": "player",
+                    "card_factions": [],
+                    "latest_version_number": 1,
+                    "versions": [
+                        {"version_number": 1, "symbol_keys": ["arcane-mana"]}
+                    ],
+                },
+                {
+                    "key": "legacy-evil",
+                    "card_pool": "evil",
+                    "card_factions": ["dark"],
+                    "latest_version_number": 1,
+                    "versions": [
+                        {"version_number": 1, "symbol_keys": ["dark-affinity"]}
+                    ],
+                },
+            ],
+            "card_groups": [
+                {
+                    "key": "legacy-v2-group",
+                    "anchor_card_ref": {
+                        "key": "legacy-player",
+                        "card_pool": "player",
+                        "card_factions": [],
+                    },
+                    "members": [
+                        {
+                            "position": 1,
+                            "card_ref": {
+                                "key": "legacy-evil",
+                                "card_pool": "evil",
+                                "card_factions": ["dark"],
+                            },
+                        }
+                    ],
+                }
+            ],
+        },
+        format_version=2,
+    )
+
+    assert [
+        card["card_mana_families"] for card in adopted["cards"]  # type: ignore[index]
+    ] == [["arcane"], []]
+    group = adopted["card_groups"][0]  # type: ignore[index]
+    assert group["anchor_card_ref"]["card_mana_families"] == ["arcane"]
+    assert group["members"][0]["card_ref"]["card_mana_families"] == []
+
+
 def test_developer_data_coverage_rejects_missing_required_classification_rule(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

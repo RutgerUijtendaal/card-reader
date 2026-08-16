@@ -10,6 +10,7 @@ from card_reader_core.models import (
     ImportJob,
     ImportJobItem,
     ImportJobStatus,
+    Symbol,
     Tag,
     Type,
 )
@@ -42,7 +43,7 @@ from .resources import ParserJobContextLoader
 from .types import CardParserProtocol, ItemProcessingResult, JobOptions, ParserResources
 
 logger = logging.getLogger(__name__)
-_MetadataSource = TypeVar("_MetadataSource", Tag, Type)
+_MetadataSource = TypeVar("_MetadataSource", Tag, Type, Symbol)
 
 
 class ImportProcessorService:
@@ -144,17 +145,22 @@ class ImportProcessorService:
     ) -> ItemProcessingResult:
         template_id = job.template.key
         snapshot = cast(dict[str, object], job.classification_rule_snapshot_json)
-        frozen_tags, frozen_types = ClassificationRuleService().detector_sources_from_snapshot(
-            snapshot,
-            card_pool=cast(CardPool, job.card_pool),
+        frozen_tags, frozen_types, frozen_symbols = (
+            ClassificationRuleService().detector_sources_from_snapshot(
+                snapshot,
+                card_pool=cast(CardPool, job.card_pool),
+            )
         )
         detection_tags = _merge_metadata_sources(resources.known_tags, frozen_tags)
         detection_types = _merge_metadata_sources(resources.known_types, frozen_types)
+        detection_symbols = _merge_metadata_sources(
+            resources.detectable_symbols, frozen_symbols
+        )
         parsed = self._parser.parse(
             resolve_storage_path(item.source_file),
             template_id,
             card_pool=cast(CardPool, job.card_pool),
-            symbols=resources.detectable_symbols,
+            symbols=detection_symbols,
             known_keywords=resources.known_keywords,
             known_tags=detection_tags,
             known_types=detection_types,
@@ -163,7 +169,7 @@ class ImportProcessorService:
         type_keys_by_id = {type_row.id: type_row.key for type_row in detection_types}
         live_tag_ids = {tag.id for tag in resources.known_tags}
         live_type_ids = {type_row.id for type_row in resources.known_types}
-        symbol_keys_by_id = {symbol.id: symbol.key for symbol in resources.detectable_symbols}
+        symbol_keys_by_id = {symbol.id: symbol.key for symbol in detection_symbols}
         matched_tags = tuple(
             DetectedClassificationSource(id=tag_id, key=tag_keys_by_id[tag_id])
             for tag_id in parsed.tag_ids

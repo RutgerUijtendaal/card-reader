@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 import pytest
@@ -31,6 +34,7 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
     CardVersionSymbol = old_apps.get_model("card_reader_core", "CardVersionSymbol")
     Symbol = old_apps.get_model("card_reader_core", "Symbol")
     Template = old_apps.get_model("card_reader_core", "Template")
+    ImportJob = old_apps.get_model("card_reader_core", "ImportJob")
 
     CardClassificationRule.objects.all().delete()
     CardVersionSymbol.objects.all().delete()
@@ -41,7 +45,17 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
 
     template = Template.objects.create(key="mana-migration", label="Mana Migration")
     symbols = {
-        key: Symbol.objects.create(key=key, label=key.replace("-", " ").title())
+        key: Symbol.objects.create(
+            key=key,
+            label=key.replace("-", " ").title(),
+            symbol_type="mana",
+            detector_type="template",
+            detection_config_json={"threshold": 0.75},
+            text_enrichment_json={"aliases": [key]},
+            reference_assets_json=[f"symbols/{key}.webp"],
+            text_token=f"{{{key}}}",
+            enabled=True,
+        )
         for key in (
             "arcane-mana",
             "dark-affinity",
@@ -51,6 +65,35 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
             "unmatched-affinity",
         )
     }
+    legacy_snapshot_body: dict[str, object] = {
+        "schema_version": 1,
+        "card_pool": "player",
+        "rules": [],
+    }
+    legacy_snapshot = {
+        **legacy_snapshot_body,
+        "digest": hashlib.sha256(
+            json.dumps(
+                legacy_snapshot_body,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest(),
+    }
+    queued_job = ImportJob.objects.create(
+        source_path="imports/pre-mana-queued",
+        template_id=template.id,
+        card_pool="player",
+        status="queued",
+        classification_rule_snapshot_json=legacy_snapshot,
+    )
+    completed_job = ImportJob.objects.create(
+        source_path="imports/pre-mana-completed",
+        template_id=template.id,
+        card_pool="player",
+        status="completed",
+        classification_rule_snapshot_json=legacy_snapshot,
+    )
 
     def create_card(
         key: str,
@@ -125,6 +168,7 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
     Assignment = apps.get_model("card_reader_core", "CardManaFamilyAssignment")
     Rule = apps.get_model("card_reader_core", "CardClassificationRule")
     MigratedVersion = apps.get_model("card_reader_core", "CardVersion")
+    MigratedJob = apps.get_model("card_reader_core", "ImportJob")
 
     assert set(
         Assignment.objects.filter(card_id=multicolor.id).values_list(
@@ -155,6 +199,45 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
     assert "mana_family_sort_key" not in {
         field.name for field in MigratedVersion._meta.get_fields()
     }
+    queued_snapshot = MigratedJob.objects.get(
+        id=queued_job.id
+    ).classification_rule_snapshot_json
+    assert queued_snapshot["schema_version"] == 3
+    assert {
+        (rule["target_key"], rule["source_key"])
+        for rule in queued_snapshot["rules"]
+        if rule["target_kind"] == "mana_family"
+    } == {
+        ("arcane", "arcane-mana"),
+        ("dark", "dark-affinity"),
+        ("primal", "primal-affinity"),
+        ("primal", "primla-affinity"),
+    }
+    arcane_rule = next(
+        rule
+        for rule in queued_snapshot["rules"]
+        if rule.get("source_key") == "arcane-mana"
+    )
+    assert arcane_rule["source_symbol"] == {
+        "symbol_type": "mana",
+        "detector_type": "template",
+        "detection_config": {"threshold": 0.75},
+        "text_enrichment": {"aliases": ["arcane-mana"]},
+        "reference_assets": ["symbols/arcane-mana.webp"],
+        "text_token": "{arcane-mana}",
+        "enabled": True,
+    }
+    queued_body = {
+        key: queued_snapshot[key]
+        for key in ("schema_version", "card_pool", "rules")
+    }
+    assert queued_snapshot["digest"] == hashlib.sha256(
+        json.dumps(queued_body, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    assert (
+        MigratedJob.objects.get(id=completed_job.id).classification_rule_snapshot_json
+        == legacy_snapshot
+    )
 
     downgraded_apps = _migrate_to(BASE_MIGRATION)
     DowngradedRule = downgraded_apps.get_model(

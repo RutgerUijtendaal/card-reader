@@ -354,11 +354,12 @@ def test_snapshot_detector_sources_survive_later_catalog_edits_and_deletion() ->
     service.delete_rule(rule_id=rule.id)
     tag.delete()
 
-    frozen_tags, frozen_types = service.detector_sources_from_snapshot(
+    frozen_tags, frozen_types, frozen_symbols = service.detector_sources_from_snapshot(
         snapshot,
         card_pool="player",
     )
     assert frozen_types == []
+    assert frozen_symbols == []
     assert [(row.id, row.key, row.label, row.identifiers_json) for row in frozen_tags] == [
         (original_tag_id, "frozen-hero", "Frozen Hero", ["original hero term"])
     ]

@@ -41,8 +41,8 @@ from card_reader_core.repositories.classification_rules import (
 from card_reader_core.repositories.metadata import get_symbol, get_tag, get_type, list_symbols
 
 
-CLASSIFICATION_RULE_SNAPSHOT_SCHEMA_VERSION = 2
-SUPPORTED_CLASSIFICATION_RULE_SNAPSHOT_SCHEMA_VERSIONS = (1, 2)
+CLASSIFICATION_RULE_SNAPSHOT_SCHEMA_VERSION = 3
+SUPPORTED_CLASSIFICATION_RULE_SNAPSHOT_SCHEMA_VERSIONS = (1, 2, 3)
 
 
 class ClassificationRuleError(ValueError):
@@ -326,6 +326,11 @@ class ClassificationRuleService:
                 )
             if not isinstance(rule.get("rule_id"), str) or not rule["rule_id"]:
                 raise ClassificationRuleError("Snapshot rule rule_id is required.")
+            if (
+                value["schema_version"] >= 3
+                and rule.get("source_kind") == CARD_CLASSIFICATION_SOURCE_SYMBOL
+            ):
+                _validate_snapshot_symbol(rule.get("source_symbol"))
         return cast(dict[str, object], value)
 
     def detector_sources_from_snapshot(
@@ -333,12 +338,13 @@ class ClassificationRuleService:
         value: object,
         *,
         card_pool: CardPool,
-    ) -> tuple[list[Tag], list[Type]]:
+    ) -> tuple[list[Tag], list[Type], list[Symbol]]:
         snapshot = self.validate_snapshot(value, card_pool=card_pool)
         rules = cast(list[dict[str, object]], snapshot["rules"])
         tags: dict[str, Tag] = {}
         types: dict[str, Type] = {}
-        source_definitions: dict[tuple[str, str], tuple[str, str, tuple[str, ...]]] = {}
+        symbols: dict[str, Symbol] = {}
+        source_definitions: dict[tuple[str, str], object] = {}
         for rule in rules:
             source_kind = cast(str, rule["source_kind"])
             source_id = cast(str, rule["source_id"])
@@ -346,7 +352,13 @@ class ClassificationRuleService:
             source_label = cast(str, rule["source_label"])
             source_identifiers = tuple(cast(list[str], rule["source_identifiers"]))
             identity = (source_kind, source_id)
-            definition = (source_key, source_label, source_identifiers)
+            symbol_definition = rule.get("source_symbol")
+            definition = (
+                source_key,
+                source_label,
+                source_identifiers,
+                symbol_definition,
+            )
             previous = source_definitions.setdefault(identity, definition)
             if previous != definition:
                 raise ClassificationRuleError(
@@ -366,9 +378,33 @@ class ClassificationRuleService:
                     label=source_label,
                     identifiers_json=list(source_identifiers),
                 )
+            elif source_kind == CARD_CLASSIFICATION_SOURCE_SYMBOL and isinstance(
+                symbol_definition, dict
+            ) and symbol_definition["enabled"] is True and symbol_definition[
+                "detector_type"
+            ] == "template":
+                symbols[source_id] = Symbol(
+                    id=source_id,
+                    key=source_key,
+                    label=source_label,
+                    symbol_type=cast(str, symbol_definition["symbol_type"]),
+                    detector_type=cast(str, symbol_definition["detector_type"]),
+                    detection_config_json=cast(
+                        dict[str, object], symbol_definition["detection_config"]
+                    ),
+                    text_enrichment_json=cast(
+                        dict[str, object], symbol_definition["text_enrichment"]
+                    ),
+                    reference_assets_json=cast(
+                        list[str], symbol_definition["reference_assets"]
+                    ),
+                    text_token=cast(str, symbol_definition["text_token"]),
+                    enabled=cast(bool, symbol_definition["enabled"]),
+                )
         return (
             sorted(tags.values(), key=lambda source: (source.key, source.id)),
             sorted(types.values(), key=lambda source: (source.key, source.id)),
+            sorted(symbols.values(), key=lambda source: (source.key, source.id)),
         )
 
     def definition_catalog(
@@ -537,7 +573,7 @@ class ClassificationRuleService:
         source = _rule_source(rule)
         if source is None:
             raise ClassificationRuleError(f"Rule {rule.id} has an invalid source reference.")
-        return {
+        snapshot_rule = {
             "rule_id": payload["id"],
             "card_pool": payload["card_pool"],
             "source_kind": payload["source_kind"],
@@ -548,6 +584,41 @@ class ClassificationRuleService:
             "target_kind": payload["target_kind"],
             "target_key": payload["target_key"],
         }
+        if isinstance(source, Symbol):
+            snapshot_rule["source_symbol"] = {
+                "symbol_type": source.symbol_type,
+                "detector_type": source.detector_type,
+                "detection_config": source.detection_config_json,
+                "text_enrichment": source.text_enrichment_json,
+                "reference_assets": source.reference_assets_json,
+                "text_token": source.text_token,
+                "enabled": source.enabled,
+            }
+        return snapshot_rule
+
+
+def _validate_snapshot_symbol(value: object) -> None:
+    if not isinstance(value, dict):
+        raise ClassificationRuleError("Snapshot Symbol detector definition is required.")
+    for field in ("symbol_type", "detector_type", "text_token"):
+        if not isinstance(value.get(field), str):
+            raise ClassificationRuleError(
+                f"Snapshot Symbol detector {field} must be a string."
+            )
+    for field in ("detection_config", "text_enrichment"):
+        if not isinstance(value.get(field), dict):
+            raise ClassificationRuleError(
+                f"Snapshot Symbol detector {field} must be an object."
+            )
+    reference_assets = value.get("reference_assets")
+    if not isinstance(reference_assets, list) or not all(
+        isinstance(asset, str) for asset in reference_assets
+    ):
+        raise ClassificationRuleError(
+            "Snapshot Symbol detector reference_assets must be an array of strings."
+        )
+    if not isinstance(value.get("enabled"), bool):
+        raise ClassificationRuleError("Snapshot Symbol detector enabled must be a Boolean.")
 
 
 def _snapshot_digest(value: dict[str, object]) -> str:

@@ -617,6 +617,24 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
         source_kind="tag",
         source_id=tag.id,
     )
+    symbol = Symbol.objects.create(
+        key="frozen-mana-source",
+        label="Original Mana Source",
+        symbol_type="mana",
+        detector_type="template",
+        detection_config_json={"threshold": 0.81},
+        text_enrichment_json={"aliases": ["original"]},
+        reference_assets_json=["symbols/original.webp"],
+        text_token="{F}",
+        enabled=True,
+    )
+    symbol_rule = classification_rules.create_rule(
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="arcane",
+        source_kind="symbol",
+        source_id=symbol.id,
+    )
     image = settings.storage_root_dir / "uploads" / "frozen-parser-job" / "0001.png"
     image.parent.mkdir(parents=True, exist_ok=True)
     image.write_bytes(b"frozen-parser-image")
@@ -629,12 +647,31 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
             card_pool="player",
             include_roles=True,
             include_factions=True,
+            include_mana_families=True,
         ),
     )
 
     tag.label = "Edited Hero Source"
     tag.identifiers_json = ["edited hero term"]
     tag.save(update_fields=["label", "identifiers_json", "updated_at"])
+    symbol.label = "Edited Mana Source"
+    symbol.detection_config_json = {"threshold": 0.2}
+    symbol.text_enrichment_json = {"aliases": ["edited"]}
+    symbol.reference_assets_json = ["symbols/edited.webp"]
+    symbol.text_token = "{EDITED}"
+    symbol.enabled = False
+    symbol.save(
+        update_fields=[
+            "label",
+            "detection_config_json",
+            "text_enrichment_json",
+            "reference_assets_json",
+            "text_token",
+            "enabled",
+            "updated_at",
+        ]
+    )
+    classification_rules.delete_rule(rule_id=symbol_rule.id)
 
     class SnapshotInspectingParser:
         def parse(
@@ -650,6 +687,17 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
             )
             assert frozen_tag.label == "Original Hero Source"
             assert frozen_tag.identifiers_json == ["original hero term"]
+            symbols = resources["symbols"]
+            assert isinstance(symbols, list)
+            frozen_symbol = next(
+                row for row in symbols if isinstance(row, Symbol) and row.id == symbol.id
+            )
+            assert frozen_symbol.label == "Original Mana Source"
+            assert frozen_symbol.detection_config_json == {"threshold": 0.81}
+            assert frozen_symbol.text_enrichment_json == {"aliases": ["original"]}
+            assert frozen_symbol.reference_assets_json == ["symbols/original.webp"]
+            assert frozen_symbol.text_token == "{F}"
+            assert frozen_symbol.enabled is True
             return SimpleNamespace(
                 checksum="frozen-parser-checksum",
                 normalized_fields={
@@ -665,7 +713,7 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
                 keyword_ids=[],
                 tag_ids=[tag.id],
                 type_ids=[],
-                symbol_ids=[],
+                symbol_ids=[symbol.id],
                 tag_suggestions=[],
                 type_suggestions=[],
             )
@@ -674,6 +722,9 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
 
     card = Card.objects.get(key="frozen-snapshot-card")
     assert CardRoleAssignment.objects.filter(card=card, role="hero").exists()
+    assert list(
+        card.mana_family_assignments.values_list("mana_family", flat=True)
+    ) == ["arcane"]
 
 
 def test_card_gallery_routes_are_public() -> None:

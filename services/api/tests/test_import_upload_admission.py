@@ -41,6 +41,8 @@ def _validated_data(*, creation_key: str | None = None) -> dict[str, object]:
         "card_role_override": [],
         "card_faction_mode": "automatic",
         "card_faction_override": [],
+        "card_mana_family_mode": "automatic",
+        "card_mana_family_override": [],
     }
 
 
@@ -254,6 +256,60 @@ def test_matching_replay_returns_before_staging(
 
     assert result.idempotent_replay is True
     assert result.job.id == "existing"
+
+
+def test_legacy_fingerprint_replays_when_mana_fields_have_compatibility_defaults() -> None:
+    data = _validated_data()
+    legacy_fingerprint, _uploads = _upload_fingerprint(
+        template_id=str(data["template_id"]),
+        content_version_base=str(data["content_version_base"]),
+        content_version_description=str(data["content_version_description"]),
+        options={},
+        card_pool="player",
+        card_role_mode="automatic",
+        card_role_override=[],
+        card_faction_mode="automatic",
+        card_faction_override=[],
+        files=data["files"],  # type: ignore[arg-type]
+        include_mana_families=False,
+    )
+    service = _FakeImportService()
+    service.existing = SimpleNamespace(
+        id="legacy-existing",
+        creation_fingerprint=legacy_fingerprint,
+    )
+
+    result = ImportUploadAdmission(service=service).admit(data)  # type: ignore[arg-type]
+
+    assert result.idempotent_replay is True
+    assert result.job.id == "legacy-existing"
+
+
+def test_legacy_fingerprint_does_not_match_an_explicit_mana_override() -> None:
+    data = _validated_data()
+    data["card_mana_family_mode"] = "override"
+    data["card_mana_family_override"] = ["arcane"]
+    legacy_fingerprint, _uploads = _upload_fingerprint(
+        template_id=str(data["template_id"]),
+        content_version_base=str(data["content_version_base"]),
+        content_version_description=str(data["content_version_description"]),
+        options={},
+        card_pool="player",
+        card_role_mode="automatic",
+        card_role_override=[],
+        card_faction_mode="automatic",
+        card_faction_override=[],
+        files=data["files"],  # type: ignore[arg-type]
+        include_mana_families=False,
+    )
+    service = _FakeImportService()
+    service.existing = SimpleNamespace(
+        id="legacy-existing",
+        creation_fingerprint=legacy_fingerprint,
+    )
+
+    with pytest.raises(ImportAdmissionConflict, match="different import payload"):
+        ImportUploadAdmission(service=service).admit(data)  # type: ignore[arg-type]
 
 
 def test_creation_key_conflict_discards_a_preserved_losing_fingerprint() -> None:
