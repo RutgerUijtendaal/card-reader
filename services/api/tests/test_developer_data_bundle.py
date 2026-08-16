@@ -296,6 +296,34 @@ def test_version_two_adoption_backfills_player_families_and_latest_type_roles() 
     assert group["members"][0]["card_ref"]["card_mana_families"] == []
 
 
+def test_version_three_adoption_adds_latest_type_roles_without_rewriting_families() -> None:
+    adopted = adopt_payload_for_format(
+        {
+            "cards": [
+                {
+                    "key": "retained-version-three-evil",
+                    "card_pool": "evil",
+                    "card_roles": ["boss"],
+                    "card_mana_families": ["dark"],
+                    "latest_version_number": 2,
+                    "versions": [
+                        {"version_number": 1, "type_keys": ["mana"]},
+                        {
+                            "version_number": 2,
+                            "type_keys": ["directive", "reminder"],
+                        },
+                    ],
+                }
+            ]
+        },
+        format_version=3,
+    )
+
+    card = adopted["cards"][0]  # type: ignore[index]
+    assert card["card_roles"] == ["boss", "directive", "reminder"]
+    assert card["card_mana_families"] == ["dark"]
+
+
 def test_developer_data_coverage_rejects_missing_required_classification_rule(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -33,7 +33,9 @@ Version 1 adoption assigns every card to the Player pool and converts `is_hero=t
 before strict current-schema validation. Older formats derive missing Player mana-family assignments
 from each Card's latest-version Symbols and add the Mana role to Player or Evil cards whose latest
 version has the Mana Type. Version 2 Evil Cards also gain Directive and Reminder from matching Types
-on the authoritative latest version; Version 1 remains Player-only and gains neither. After all Symbols are present, import idempotently reconciles
+on the authoritative latest version; Version 1 remains Player-only and gains neither. Retained Version 3
+archives receive the same Type-backed roles idempotently without rewriting their stored mana-family
+classifications. After all Symbols are present, import idempotently reconciles
 the default Player mana and affinity Symbol rules without creating placeholder Symbols.
 Import reconstructs the
 pool-plus-faction natural identity namespace rather than trusting a serialized internal key. This

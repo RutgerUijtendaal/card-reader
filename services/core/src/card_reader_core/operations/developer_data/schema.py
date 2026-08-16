@@ -25,7 +25,7 @@ from card_reader_core.metadata import (
 
 DEVELOPER_DATA_FORMAT_VERSION = 3
 SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, DEVELOPER_DATA_FORMAT_VERSION)
-LEGACY_ROLE_TYPE_POOLS: tuple[tuple[CardRole, frozenset[CardPool]], ...] = (
+TYPE_INFERRED_ROLE_POOLS: tuple[tuple[CardRole, frozenset[CardPool]], ...] = (
     ("directive", frozenset({"evil"})),
     ("reminder", frozenset({"evil"})),
     ("mana", frozenset({"player", "evil"})),
@@ -328,16 +328,68 @@ class DeveloperDataLock(StrictModel):
     api_base_url: str
 
 
+def _latest_version_record(card: dict[str, Any]) -> dict[str, Any] | None:
+    latest_number = card.get("latest_version_number")
+    versions = card.get("versions", [])
+    if not isinstance(versions, list):
+        return None
+    return next(
+        (
+            version
+            for version in versions
+            if isinstance(version, dict)
+            and version.get("version_number") == latest_number
+        ),
+        None,
+    )
+
+
+def _adopt_type_inferred_roles(card: dict[str, Any]) -> dict[str, Any]:
+    adopted_card = dict(card)
+    latest_version = _latest_version_record(adopted_card)
+    role_values = adopted_card.get("card_roles", [])
+    type_keys = (
+        latest_version.get("type_keys", [])
+        if isinstance(latest_version, dict)
+        else []
+    )
+    if not isinstance(role_values, list) or not isinstance(type_keys, list):
+        return adopted_card
+    normalized_type_keys = {
+        key.strip().casefold() for key in type_keys if isinstance(key, str)
+    }
+    card_pool = adopted_card.get("card_pool")
+    inferred_roles = tuple(
+        role
+        for role, pools in TYPE_INFERRED_ROLE_POOLS
+        if card_pool in pools and role in normalized_type_keys
+    )
+    if inferred_roles:
+        adopted_card["card_roles"] = list(
+            normalize_card_roles((*role_values, *inferred_roles))
+        )
+    return adopted_card
+
+
 def adopt_payload_for_format(value: object, *, format_version: int) -> object:
-    """Adopt older bundle payloads into the current strict schema."""
-    if format_version not in {1, 2} or not isinstance(value, dict):
+    """Adopt supported bundle payloads into the current strict schema."""
+    if (
+        format_version not in SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS
+        or not isinstance(value, dict)
+    ):
         return value
     adopted = dict(value)
-    if format_version == 1:
-        adopted["classification_rules"] = []
     cards = adopted.get("cards")
     if not isinstance(cards, list):
         return adopted
+    if format_version == DEVELOPER_DATA_FORMAT_VERSION:
+        adopted["cards"] = [
+            _adopt_type_inferred_roles(card) if isinstance(card, dict) else card
+            for card in cards
+        ]
+        return adopted
+    if format_version == 1:
+        adopted["classification_rules"] = []
     adopted_cards: list[object] = []
     for card in cards:
         if not isinstance(card, dict):
@@ -351,37 +403,8 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
             adopted_card["card_pool"] = "player"
             adopted_card["card_roles"] = ["hero"] if was_hero is True else []
             adopted_card["card_factions"] = []
-        latest_number = adopted_card.get("latest_version_number")
-        versions = adopted_card.get("versions", [])
-        latest_version = next(
-            (
-                version
-                for version in versions
-                if isinstance(version, dict)
-                and version.get("version_number") == latest_number
-            ),
-            None,
-        )
-        role_values = adopted_card.get("card_roles", [])
-        type_keys = (
-            latest_version.get("type_keys", [])
-            if isinstance(latest_version, dict)
-            else []
-        )
-        if isinstance(role_values, list) and isinstance(type_keys, list):
-            normalized_type_keys = {
-                key.strip().casefold() for key in type_keys if isinstance(key, str)
-            }
-            card_pool = adopted_card.get("card_pool")
-            inferred_roles = tuple(
-                role
-                for role, pools in LEGACY_ROLE_TYPE_POOLS
-                if card_pool in pools and role in normalized_type_keys
-            )
-            if inferred_roles:
-                adopted_card["card_roles"] = list(
-                    normalize_card_roles((*role_values, *inferred_roles))
-                )
+        adopted_card = _adopt_type_inferred_roles(adopted_card)
+        latest_version = _latest_version_record(adopted_card)
         symbol_keys = (
             latest_version.get("symbol_keys", [])
             if isinstance(latest_version, dict)
