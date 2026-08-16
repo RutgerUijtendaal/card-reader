@@ -314,9 +314,48 @@ def _is_reversible_seed_rule(rule: Any) -> bool:
     )
 
 
-def _snapshot_has_custom_mana_data(snapshot: object) -> bool:
+def _expected_mana_snapshot_rules(symbols_by_key: dict[str, Any]) -> list[dict[str, object]]:
+    rules: list[dict[str, object]] = []
+    for family_key, _label, mana_key, affinity_keys in FAMILIES:
+        for symbol_key in (mana_key, *affinity_keys):
+            symbol = symbols_by_key.get(symbol_key)
+            if symbol is None:
+                continue
+            identity = f"player:mana_family:{family_key}:symbol:{symbol_key}"
+            rules.append(
+                {
+                    "rule_id": str(uuid5(RULE_NAMESPACE, identity)),
+                    "card_pool": "player",
+                    "source_kind": "symbol",
+                    "source_id": str(symbol.id),
+                    "source_key": symbol.key,
+                    "source_label": symbol.label,
+                    "source_identifiers": [],
+                    "source_symbol": {
+                        "symbol_type": symbol.symbol_type,
+                        "detector_type": symbol.detector_type,
+                        "detection_config": symbol.detection_config_json,
+                        "text_enrichment": symbol.text_enrichment_json,
+                        "reference_assets": symbol.reference_assets_json,
+                        "text_token": symbol.text_token,
+                        "enabled": symbol.enabled,
+                    },
+                    "target_kind": "mana_family",
+                    "target_key": family_key,
+                }
+            )
+    return rules
+
+
+def _snapshot_has_custom_mana_data(
+    snapshot: object,
+    *,
+    card_pool: str,
+    expected_player_rules: list[dict[str, object]],
+) -> bool:
     if not isinstance(snapshot, dict) or not isinstance(snapshot.get("rules"), list):
         return False
+    mana_rules: list[dict[str, object]] = []
     for rule in snapshot["rules"]:
         if not isinstance(rule, dict):
             continue
@@ -324,15 +363,9 @@ def _snapshot_has_custom_mana_data(snapshot: object) -> bool:
         target_kind = rule.get("target_kind")
         if source_kind != "symbol" and target_kind != "mana_family":
             continue
-        source_key = rule.get("source_key")
-        if not (
-            rule.get("card_pool") == "player"
-            and source_kind == "symbol"
-            and target_kind == "mana_family"
-            and rule.get("target_key") == FAMILY_BY_SYMBOL.get(source_key)
-        ):
-            return True
-    return False
+        mana_rules.append(rule)
+    expected_rules = expected_player_rules if card_pool == "player" else []
+    return mana_rules != expected_rules
 
 
 def guard_mana_family_downgrade(apps: Any, _schema_editor: Any) -> None:
@@ -394,18 +427,27 @@ def guard_mana_family_downgrade(apps: Any, _schema_editor: Any) -> None:
         or ImportJob.objects.exclude(card_mana_family_override_json=[]).exists()
     ):
         unsupported.append("import mana-family configuration")
+    symbols_by_key = {
+        row.key: row for row in Symbol.objects.filter(key__in=tuple(FAMILY_BY_SYMBOL))
+    }
+    expected_player_snapshot_rules = _expected_mana_snapshot_rules(symbols_by_key)
+    active_snapshots = ImportJob.objects.filter(
+        status__in=("queued", "running", "canceling")
+    ).values_list("card_pool", "classification_rule_snapshot_json")
     if any(
-        _snapshot_has_custom_mana_data(snapshot)
-        for snapshot in ImportJob.objects.values_list(
-            "classification_rule_snapshot_json", flat=True
-        ).iterator()
+        _snapshot_has_custom_mana_data(
+            snapshot,
+            card_pool=str(card_pool),
+            expected_player_rules=expected_player_snapshot_rules,
+        )
+        for card_pool, snapshot in active_snapshots.iterator()
     ):
         unsupported.append("classification rule snapshots")
     if ImportJobItem.objects.exclude(resolved_card_mana_families_json=[]).exists():
         unsupported.append("resolved import mana-family evidence")
 
-    target_rows = ImportJobItem.objects.exclude(
-        target_card_mana_families_snapshot_json=[]
+    target_rows = ImportJobItem.objects.filter(
+        target_card_pool_snapshot__isnull=False
     ).values_list(
         "target_card_version_id",
         "target_card_mana_families_snapshot_json",

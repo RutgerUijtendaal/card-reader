@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from card_reader_core.models import ImportJob, ImportJobItem, ImportJobStatus
+from typing import NamedTuple, cast
+
+from card_reader_core.models import CardPool, ImportJob, ImportJobItem, ImportJobStatus
+
+
+class ImportItemTargetState(NamedTuple):
+    was_targeted: bool
+    live_card_pool: CardPool | None
 
 
 def list_import_jobs(*, active_only: bool = False) -> list[ImportJob]:
@@ -39,6 +46,21 @@ def fetch_items_for_job(job_id: str) -> list[ImportJobItem]:
             "classification_review_item",
         )
         .order_by("created_at")
+    )
+
+
+def fetch_import_item_target_state(item_id: str) -> ImportItemTargetState | None:
+    row = (
+        ImportJobItem.objects.filter(id=item_id)
+        .values_list("target_card_pool_snapshot", "target_card__card_pool")
+        .first()
+    )
+    if row is None:
+        return None
+    target_pool_snapshot, live_card_pool = row
+    return ImportItemTargetState(
+        was_targeted=target_pool_snapshot is not None,
+        live_card_pool=cast(CardPool | None, live_card_pool),
     )
 
 

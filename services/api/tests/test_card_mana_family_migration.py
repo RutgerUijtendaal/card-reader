@@ -252,6 +252,33 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
         id=queued_target_item.id
     ).target_card_mana_families_snapshot_json == ["arcane", "dark"]
 
+    edited_snapshot = json.loads(json.dumps(queued_snapshot))
+    edited_arcane_rule = next(
+        rule
+        for rule in edited_snapshot["rules"]
+        if rule.get("source_key") == "arcane-mana"
+    )
+    edited_arcane_rule["source_symbol"]["text_token"] = "{EDITED}"
+    queued_job_row = MigratedJob.objects.get(id=queued_job.id)
+    queued_job_row.classification_rule_snapshot_json = edited_snapshot
+    queued_job_row.save(update_fields=["classification_rule_snapshot_json"])
+    with pytest.raises(RuntimeError, match="classification rule snapshots"):
+        _migrate_to(BASE_MIGRATION)
+    queued_job_row.classification_rule_snapshot_json = queued_snapshot
+    queued_job_row.save(update_fields=["classification_rule_snapshot_json"])
+
+    colorless_target_item = MigratedItem.objects.create(
+        job_id=queued_job.id,
+        source_file="imports/pre-mana-queued/colorless-target.png",
+        target_card_id=multicolor.id,
+        target_card_version_id=multicolor.latest_version_id,
+        target_card_pool_snapshot="player",
+        target_card_mana_families_snapshot_json=[],
+    )
+    with pytest.raises(RuntimeError, match="target Card mana-family snapshots"):
+        _migrate_to(BASE_MIGRATION)
+    colorless_target_item.delete()
+
     rollback_role_rule = {
         "rule_id": "rollback-role-rule",
         "card_pool": "evil",

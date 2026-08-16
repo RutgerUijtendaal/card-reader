@@ -32,7 +32,7 @@ def test_review_migration_refuses_to_drop_durable_classification_evidence() -> N
     ReviewItem = apps.get_model("card_reader_core", "CardClassificationReviewItem")
     Template = apps.get_model("card_reader_core", "Template")
 
-    template = Template.objects.get(key="mtg-like-v1")
+    template = Template.objects.create(key="review-migration", label="Review Migration")
     card = Card.objects.create(
         key="review-rollback-card",
         label="Review Rollback Card",

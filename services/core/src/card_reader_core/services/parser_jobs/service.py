@@ -4,7 +4,6 @@ import logging
 from typing import Callable, TypeVar, cast
 
 from card_reader_core.models import (
-    Card,
     CardFaction,
     CardPool,
     CardRole,
@@ -18,6 +17,7 @@ from card_reader_core.models import (
 from card_reader_core.metadata import ManaFamily
 from card_reader_core.repositories.import_jobs import (
     bump_job_processed,
+    fetch_import_item_target_state,
     fetch_job,
     fetch_items_for_job,
     mark_job_cancelled,
@@ -270,23 +270,14 @@ class ImportProcessorService:
         *,
         expected_pool: CardPool,
     ) -> None:
-        target_card_id = (
-            ImportJobItem.objects.filter(id=item.id)
-            .values_list("target_card_id", flat=True)
-            .first()
-        )
-        if target_card_id is None:
-            if item.target_card_pool_snapshot is not None:
-                raise ValueError("The target Card no longer exists; queue a new reparse.")
+        target_state = fetch_import_item_target_state(item.id)
+        if target_state is None:
+            raise ValueError("The import item no longer exists.")
+        if not target_state.was_targeted:
             return
-        live_pool = (
-            Card.objects.filter(id=target_card_id)
-            .values_list("card_pool", flat=True)
-            .first()
-        )
-        if live_pool is None:
+        if target_state.live_card_pool is None:
             raise ValueError("The target Card no longer exists; queue a new reparse.")
-        if live_pool != expected_pool:
+        if target_state.live_card_pool != expected_pool:
             raise ValueError(
                 "The target Card pool changed while this reparse was queued; "
                 "queue a new reparse for its current pool."

@@ -164,6 +164,10 @@ def save_parsed_card_result(
         )
         .get(id=item.id)
     )
+    if item.target_card_pool_snapshot is not None and (
+        item.target_card is None or item.target_card_version is None
+    ):
+        raise ValueError("The target Card no longer exists; queue a new reparse.")
     resolved_evidence: CardClassificationInferenceEvidence = classification_evidence or {
         "roles": {
             "mode": "automatic",
