@@ -8,8 +8,9 @@ import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import type { CardFiltersResponse } from '@/domain/cards/types';
 import { clearGalleryNavigationState } from '@/domain/cards/utils/gallery/galleryNavigation';
 
-const { apiGet } = vi.hoisted(() => ({
+const { apiGet, authState } = vi.hoisted(() => ({
   apiGet: vi.fn(),
+  authState: { canAccessStaffRoutes: false },
 }));
 
 vi.mock('@/shared/api/client', () => ({
@@ -21,7 +22,7 @@ vi.mock('@/shared/api/client', () => ({
 }));
 
 vi.mock('@/domain/session/store', () => ({
-  useAuthStore: () => ({ canAccessStaffRoutes: false }),
+  useAuthStore: () => authState,
 }));
 
 const filters: CardFiltersResponse = {
@@ -143,6 +144,7 @@ const mountGallery = async (
 describe('CardGalleryPage pool-aware filters', () => {
   afterEach(() => {
     vi.clearAllMocks();
+    authState.canAccessStaffRoutes = false;
     clearGalleryNavigationState();
     document.body.innerHTML = '';
   });
@@ -373,6 +375,43 @@ describe('CardGalleryPage pool-aware filters', () => {
     expect(params.getAll('mana_family_keys')).toEqual(['arcane']);
     expect(params.getAll('mana_family_exclude_keys')).toEqual(['dark']);
     expect(params.get('mana_family_match')).toBe('all');
+
+    mounted.unmount();
+  });
+
+  test('keeps exports ready for catalog-independent fallback results', async () => {
+    authState.canAccessStaffRoutes = true;
+    const mounted = await mountGallery(
+      '/cards?mana_family_match=all&mana_family_keys=arcane&mana_family_exclude_keys=dark',
+      'player',
+      undefined,
+      () => Promise.reject(new Error('facet failure')),
+    );
+
+    const exportButtons = Array.from(mounted.container.querySelectorAll('button')).filter(
+      (button) => button.textContent?.includes('Export'),
+    );
+    expect(exportButtons).toHaveLength(2);
+    expect(exportButtons.every((button) => !button.disabled)).toBe(true);
+
+    mounted.unmount();
+  });
+
+  test('keeps exports disabled when failed hydration leaves catalog-backed filters pending', async () => {
+    authState.canAccessStaffRoutes = true;
+    const mounted = await mountGallery(
+      '/cards?tag_keys=unresolved-tag',
+      'player',
+      undefined,
+      () => Promise.reject(new Error('facet failure')),
+      false,
+    );
+
+    const exportButtons = Array.from(mounted.container.querySelectorAll('button')).filter(
+      (button) => button.textContent?.includes('Export'),
+    );
+    expect(exportButtons).toHaveLength(2);
+    expect(exportButtons.every((button) => button.disabled)).toBe(true);
 
     mounted.unmount();
   });
