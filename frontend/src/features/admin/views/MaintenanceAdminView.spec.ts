@@ -97,4 +97,86 @@ describe('MaintenanceAdminView', () => {
 
     mounted.unmount();
   });
+
+  test('keeps empty filtered reparses inactive and sends selected filters globally', async () => {
+    apiGet.mockImplementation((url: string) => {
+      if (url === '/cards/filters') {
+        return Promise.resolve({
+          data: {
+            keywords: [],
+            tags: [],
+            symbols: [],
+            types: [],
+          },
+        });
+      }
+      if (url.startsWith('/cards?')) {
+        return Promise.resolve({
+          data: {
+            count: 3,
+            page: 1,
+            page_size: 1,
+            results: [],
+          },
+        });
+      }
+      throw new Error(`Unexpected GET ${url}`);
+    });
+    apiPost.mockResolvedValue({
+      data: {
+        message: 'Queued 3 latest card images.',
+        removed_paths: [],
+      },
+    });
+
+    const mounted = await mountView();
+    const buttons = Array.from(mounted.container.querySelectorAll('button'));
+    const previewButton = buttons.find((button) => button.textContent?.includes('Preview Count'));
+    const queueButton = buttons.find((button) => button.textContent?.includes('Queue Selection'));
+    const showFiltersButton = buttons.find((button) => button.textContent?.includes('Show Filters'));
+    if (
+      !(previewButton instanceof HTMLButtonElement)
+      || !(queueButton instanceof HTMLButtonElement)
+      || !(showFiltersButton instanceof HTMLButtonElement)
+    ) {
+      throw new Error('expected filtered reparse controls');
+    }
+
+    expect(previewButton.disabled).toBe(true);
+    expect(queueButton.disabled).toBe(true);
+    expect(mounted.container.textContent).toContain('No filters selected');
+
+    showFiltersButton.click();
+    await nextTick();
+    const searchInput = mounted.container.querySelector('input[placeholder^="Name"]');
+    if (!(searchInput instanceof HTMLInputElement)) {
+      throw new Error('expected filtered reparse search input');
+    }
+    searchInput.value = 'Shared metadata';
+    searchInput.dispatchEvent(new Event('input'));
+    await nextTick();
+
+    expect(previewButton.disabled).toBe(false);
+    expect(queueButton.disabled).toBe(false);
+    expect(mounted.container.textContent).toContain('1 filter selected');
+
+    previewButton.click();
+    await flushPromises();
+    const previewCall = apiGet.mock.calls.find(
+      ([url]) => typeof url === 'string' && url.startsWith('/cards?'),
+    );
+    expect(previewCall).toBeDefined();
+    const previewUrl = new URL(previewCall?.[0] as string, 'http://localhost');
+    expect(previewUrl.searchParams.get('q')).toBe('Shared metadata');
+    expect(previewUrl.searchParams.has('card_pool')).toBe(false);
+
+    queueButton.click();
+    await flushPromises();
+    expect(apiPost).toHaveBeenCalledWith(
+      '/admin/maintenance/queue-filtered-latest-reparse',
+      { q: 'Shared metadata' },
+    );
+
+    mounted.unmount();
+  });
 });

@@ -88,4 +88,14 @@ describe('cardFilterRequest', () => {
       mana_cost_max: '7',
     });
   });
+
+  test('omits the card pool for explicitly global requests', () => {
+    const params = buildCardFilterApiSearchParams(selection, { includeCardPool: false });
+    const payload = buildCardFilterApiPayload(selection, { includeCardPool: false });
+
+    expect(params.has('card_pool')).toBe(false);
+    expect(payload).not.toHaveProperty('card_pool');
+    expect(params.getAll('keyword_ids')).toEqual(['kw-1']);
+    expect(payload.keyword_ids).toEqual(['kw-1']);
+  });
 });

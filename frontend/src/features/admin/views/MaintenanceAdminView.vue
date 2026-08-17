@@ -178,6 +178,8 @@ import {
 } from '@/domain/cards/utils/filters/cardFilterRequest';
 import { useCardFilterController } from '@/domain/cards/composables/filters/useCardFilterController';
 
+const GLOBAL_FILTER_REQUEST = { includeCardPool: false } as const;
+
 const runningBackfillSuggestions = ref(false);
 const runningQueueReparse = ref(false);
 const runningConvertCardImages = ref(false);
@@ -202,13 +204,17 @@ const filterQuery = computed({
 });
 
 const hasActiveReparseFilters = computed(
-  () => buildCardFilterApiSearchParams(selectionState.value).toString().length > 0,
+  () =>
+    buildCardFilterApiSearchParams(
+      selectionState.value,
+      GLOBAL_FILTER_REQUEST,
+    ).toString().length > 0,
 );
 const reparseFilterSignature = computed(() =>
-  buildCardFilterApiSearchParams(selectionState.value).toString(),
+  buildCardFilterApiSearchParams(selectionState.value, GLOBAL_FILTER_REQUEST).toString(),
 );
 const activeFilterCount = computed(() => {
-  const payload = buildCardFilterApiPayload(selectionState.value);
+  const payload = buildCardFilterApiPayload(selectionState.value, GLOBAL_FILTER_REQUEST);
   return Object.keys(payload).filter((key) => !key.endsWith('_match')).length;
 });
 const activeFilterSummary = computed(() => {
@@ -235,7 +241,7 @@ const previewFilteredReparseCount = async (): Promise<void> => {
   if (runningPreviewCount.value || !hasActiveReparseFilters.value) return;
   runningPreviewCount.value = true;
   try {
-    const params = buildCardFilterApiSearchParams(selectionState.value);
+    const params = buildCardFilterApiSearchParams(selectionState.value, GLOBAL_FILTER_REQUEST);
     params.set('page', '1');
     params.set('page_size', '1');
     const response = await fetchCards<never>(params);
@@ -257,7 +263,9 @@ const queueFilteredReparse = async (): Promise<void> => {
   if (runningQueueFilteredReparse.value || !hasActiveReparseFilters.value) return;
   runningQueueFilteredReparse.value = true;
   try {
-    const response = await requestFilteredLatestReparse(buildCardFilterApiPayload(selectionState.value));
+    const response = await requestFilteredLatestReparse(
+      buildCardFilterApiPayload(selectionState.value, GLOBAL_FILTER_REQUEST),
+    );
     toast.success(response.message);
   } catch (error) {
     console.error('Queue filtered latest reparse failed', error);

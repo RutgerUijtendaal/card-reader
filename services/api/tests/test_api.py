@@ -1,3 +1,4 @@
+import csv
 import hashlib
 import json
 from collections.abc import Iterator
@@ -2207,6 +2208,39 @@ def test_card_list_and_csv_without_card_pool_cover_every_pool() -> None:
     assert "Global Pool Query Neutral" in csv_text
 
 
+def test_global_csv_rows_include_the_exact_card_identity_namespace() -> None:
+    shared_name = "Global CSV Shared Identity"
+    player_card, _player_version = _create_editable_card_version(
+        name=shared_name,
+        card_pool="player",
+    )
+    evil_card, _evil_version = _create_editable_card_version(
+        name=shared_name,
+        card_pool="evil",
+    )
+    assert player_card.key == evil_card.key
+    CardFactionAssignment.objects.bulk_create(
+        [
+            CardFactionAssignment(card=evil_card, faction="dark"),
+            CardFactionAssignment(card=evil_card, faction="metal"),
+        ]
+    )
+
+    response = _staff_client("global-csv-identity-user").get(
+        "/exports/csv",
+        {"q": shared_name, "sort": "name_asc"},
+    )
+
+    assert response.status_code == 200
+    rows = list(csv.DictReader(response.content.decode("utf-8").splitlines()))
+    assert len(rows) == 2
+    rows_by_pool = {row["card_pool"]: row for row in rows}
+    assert rows_by_pool["player"]["card_id"] == player_card.id
+    assert rows_by_pool["player"]["card_factions"] == ""
+    assert rows_by_pool["evil"]["card_id"] == evil_card.id
+    assert rows_by_pool["evil"]["card_factions"] == "dark;metal"
+
+
 def test_filters_payload_returns_public_pool_registry_in_canonical_order() -> None:
     public_response = Client(HTTP_HOST="localhost").get("/cards/filters")
     staff_response = _staff_client("filters-pool-registry-staff").get("/cards/filters")
@@ -3727,9 +3761,11 @@ def test_export_cards_csv_honors_selected_sort() -> None:
     )
 
     assert response.status_code == 200
-    rows = response.content.decode("utf-8").splitlines()
-    assert rows[1].split(",")[1] == "Sort Export Alpha Export"
-    assert rows[2].split(",")[1] == "Sort Export Zebra Export"
+    rows = list(csv.DictReader(response.content.decode("utf-8").splitlines()))
+    assert [row["name"] for row in rows] == [
+        "Sort Export Alpha Export",
+        "Sort Export Zebra Export",
+    ]
 
 
 def test_export_cards_csv_honors_mana_family_sort() -> None:
@@ -3752,9 +3788,11 @@ def test_export_cards_csv_honors_mana_family_sort() -> None:
     )
 
     assert response.status_code == 200
-    rows = response.content.decode("utf-8").splitlines()
-    assert rows[1].split(",")[1] == "Family Export Zeta Arcane"
-    assert rows[2].split(",")[1] == "Family Export Alpha Dark"
+    rows = list(csv.DictReader(response.content.decode("utf-8").splitlines()))
+    assert [row["name"] for row in rows] == [
+        "Family Export Zeta Arcane",
+        "Family Export Alpha Dark",
+    ]
 
 
 def test_card_detail_and_group_detail_include_card_group_membership() -> None:

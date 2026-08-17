@@ -51,13 +51,20 @@ export type CardFilterApiPayload = {
   health_max?: string;
 };
 
+type CardFilterRequestOptions = {
+  includeCardPool?: boolean;
+};
+
 export const buildCardFilterApiPayload = (
   state: CardFilterSelectionState,
+  options: CardFilterRequestOptions = {},
 ): CardFilterApiPayload => {
   const normalized = normalizeCardFilterSelectionState(state);
   const manaFamilyKeys = normalized.manaFamilyIds;
   const manaFamilyExcludeKeys = normalized.manaFamilyExcludeIds;
-  const payload: CardFilterApiPayload = { card_pool: normalized.cardPool };
+  const payload: CardFilterApiPayload = {};
+
+  if (options.includeCardPool !== false) payload.card_pool = normalized.cardPool;
 
   if (normalized.query) payload.q = normalized.query;
   Object.assign(payload, buildCardLifecycleApiParams(normalized.lifecycleStatus));
@@ -125,11 +132,12 @@ export const buildCardFilterApiPayload = (
 
 export const buildCardFilterApiSearchParams = (
   state: CardFilterSelectionState,
+  options: CardFilterRequestOptions = {},
 ): URLSearchParams => {
-  const payload = buildCardFilterApiPayload(state);
+  const payload = buildCardFilterApiPayload(state, options);
   const normalized = normalizeCardFilterSelectionState(state);
   const params = new URLSearchParams();
-  params.set('card_pool', payload.card_pool ?? 'player');
+  if (payload.card_pool) params.set('card_pool', payload.card_pool);
 
   if (payload.q) params.set('q', payload.q);
   if (payload.lifecycle_status) params.set('lifecycle_status', payload.lifecycle_status);
