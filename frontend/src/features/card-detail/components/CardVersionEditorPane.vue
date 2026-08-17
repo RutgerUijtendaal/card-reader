@@ -249,56 +249,16 @@
           </div>
 
           <template v-if="field.name === 'rules_text'">
-            <div class="mb-3 theme-card-frame-muted rounded-lg px-3 py-3 text-xs">
-              <p class="theme-section-title font-semibold">
-                Symbol autocomplete
-              </p>
-              <p class="theme-section-muted mt-2">
-                Type <code>[[</code> or <code>[[symbol:</code> inside the rules text to open symbol autocomplete, then use arrow keys and Enter to insert the selected symbol.
-              </p>
-            </div>
-
-            <div class="relative">
-              <textarea
-                ref="rulesTextTextarea"
-                :value="rulesTextValue"
-                class="input-base min-h-32"
-                :disabled="!version.editable || isBusy"
-                @input="onRulesTextInput"
-                @click="syncRulesTextCaret"
-                @keyup="syncRulesTextCaret"
-                @select="syncRulesTextCaret"
-                @keydown="onRulesTextKeydown"
-              />
-
-              <div
-                v-if="showSymbolAutocomplete"
-                class="theme-popover absolute left-0 right-0 top-[calc(100%+0.5rem)] z-10 p-2"
-              >
-                <p class="theme-kicker px-2 pb-2 text-[11px] font-medium uppercase tracking-wide">
-                  Symbols
-                </p>
-                <div class="grid gap-1">
-                  <button
-                    v-for="(option, index) in filteredSymbolInsertOptions"
-                    :key="`autocomplete-${option.id}`"
-                    type="button"
-                    class="theme-section-title flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition"
-                    :class="index === activeAutocompleteIndex ? 'theme-selected-surface' : 'theme-card-frame-muted'"
-                    @mousedown.prevent="applyAutocompleteOption(option.key)"
-                  >
-                    <SymbolToken
-                      :asset-url="option.asset_url"
-                      :label="option.label"
-                      :text-token="option.text_token"
-                      class="h-4 w-4"
-                    />
-                    <span class="min-w-0 flex-1 truncate">{{ option.label }}</span>
-                    <span class="theme-kicker text-xs">{{ option.text_token || option.key }}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
+            <CardMarkupEditor
+              :model-value="form.rules_text"
+              label="Rules text"
+              :symbols="symbolInsertOptions"
+              allow-symbols
+              include-deprecated-cards
+              :disabled="!version.editable || isBusy"
+              min-height-class="min-h-32"
+              @update:model-value="$emit('update-field', 'rules_text', $event)"
+            />
 
             <div
               class="mt-3 grid gap-3"
@@ -631,9 +591,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Lock } from 'lucide-vue-next';
 import AppSelect from '@/shared/components/app/AppSelect.vue';
+import CardMarkupEditor from '@/domain/cards/components/CardMarkupEditor.vue';
 import SymbolToken from '@/domain/cards/components/SymbolToken.vue';
 import JsonEditorField from '@/shared/components/forms/JsonEditorField.vue';
 import {
@@ -641,10 +602,6 @@ import {
   DEPRECATED_CARD_LIFECYCLE_STATUS,
   type CardLifecycleStatus,
 } from '@/domain/cards/utils/filters/cardLifecycle';
-import {
-  applySymbolAutocomplete,
-  findActiveSymbolTrigger,
-} from '@/domain/cards/utils/cards/ruleTextSymbols';
 import { CARD_ROLE_OPTIONS, type CardRole } from '@/domain/cards/cardRoles';
 import { CARD_FACTION_OPTIONS, type CardFaction } from '@/domain/cards/cardFactions';
 import type {
@@ -713,11 +670,6 @@ const emit = defineEmits<{
 }>();
 
 const activeEditorTab = ref<'card' | 'version'>(props.initialTab ?? 'version');
-const rulesTextTextarea = ref<HTMLTextAreaElement | null>(null);
-const rulesTextValue = ref('');
-const rulesTextCaretIndex = ref(0);
-const activeAutocompleteIndex = ref(0);
-const dismissedTriggerStart = ref<number | null>(null);
 const nonSymbolMetadataGroups = metadataGroups.filter((group) => group.name !== 'symbols');
 const lifecycleOptions = [
   { value: ACTIVE_CARD_LIFECYCLE_STATUS, label: 'Active' },
@@ -750,35 +702,6 @@ const reparseTemplateOptions = computed(() =>
     label: option.label,
   })),
 );
-const activeSymbolTrigger = computed(() =>
-  findActiveSymbolTrigger(rulesTextValue.value, rulesTextCaretIndex.value),
-);
-const filteredSymbolInsertOptions = computed(() => {
-  const trigger = activeSymbolTrigger.value;
-  if (!trigger) {
-    return [];
-  }
-
-  const normalizedQuery = trigger.query.trim().toLowerCase();
-  if (!normalizedQuery) {
-    return symbolInsertOptions.value.slice(0, 8);
-  }
-
-  return symbolInsertOptions.value
-    .filter((option) =>
-      [option.label, option.key, option.text_token].some((value) =>
-        value.toLowerCase().includes(normalizedQuery),
-      ),
-    )
-    .slice(0, 8);
-});
-const showSymbolAutocomplete = computed(() => {
-  const trigger = activeSymbolTrigger.value;
-  if (!trigger || filteredSymbolInsertOptions.value.length === 0) {
-    return false;
-  }
-  return dismissedTriggerStart.value !== trigger.start;
-});
 
 const focusClass = (propertyKey: ParseFlagPropertyKey): string =>
   props.reviewFocusPropertyKey === propertyKey
@@ -796,18 +719,6 @@ const lifecycleOptionTitle = (value: CardLifecycleStatus): string | undefined =>
     : undefined;
 
 watch(
-  () => props.form.rules_text,
-  (value) => {
-    rulesTextValue.value = value;
-  },
-  { immediate: true },
-);
-
-watch(activeSymbolTrigger, () => {
-  activeAutocompleteIndex.value = 0;
-});
-
-watch(
   () => props.reviewFocusPropertyKey,
   (propertyKey) => {
     if (propertyKey) {
@@ -816,85 +727,6 @@ watch(
   },
   { immediate: true },
 );
-
-watch(filteredSymbolInsertOptions, (options) => {
-  if (options.length === 0) {
-    activeAutocompleteIndex.value = 0;
-    return;
-  }
-  activeAutocompleteIndex.value = Math.min(activeAutocompleteIndex.value, options.length - 1);
-});
-
-const onRulesTextInput = (event: Event): void => {
-  const target = event.target as HTMLTextAreaElement;
-  rulesTextValue.value = target.value;
-  rulesTextCaretIndex.value = target.selectionStart ?? target.value.length;
-  dismissedTriggerStart.value = null;
-  emit('update-field', 'rules_text', target.value);
-};
-
-const syncRulesTextCaret = (event: Event): void => {
-  const target = event.target as HTMLTextAreaElement;
-  rulesTextCaretIndex.value = target.selectionStart ?? target.value.length;
-  dismissedTriggerStart.value = null;
-};
-
-const onRulesTextKeydown = (event: KeyboardEvent): void => {
-  if (!showSymbolAutocomplete.value) {
-    return;
-  }
-
-  if (event.key === 'ArrowDown') {
-    event.preventDefault();
-    activeAutocompleteIndex.value =
-      (activeAutocompleteIndex.value + 1) % filteredSymbolInsertOptions.value.length;
-    return;
-  }
-
-  if (event.key === 'ArrowUp') {
-    event.preventDefault();
-    activeAutocompleteIndex.value =
-      (activeAutocompleteIndex.value - 1 + filteredSymbolInsertOptions.value.length) %
-      filteredSymbolInsertOptions.value.length;
-    return;
-  }
-
-  if (event.key === 'Enter' || event.key === 'Tab') {
-    event.preventDefault();
-    const option = filteredSymbolInsertOptions.value[activeAutocompleteIndex.value];
-    if (option) {
-      void applyAutocompleteOption(option.key);
-    }
-    return;
-  }
-
-  if (event.key === 'Escape') {
-    event.preventDefault();
-    dismissedTriggerStart.value = activeSymbolTrigger.value?.start ?? null;
-  }
-};
-
-const applyAutocompleteOption = async (symbolKey: string): Promise<void> => {
-  const trigger = activeSymbolTrigger.value;
-  if (!trigger) {
-    return;
-  }
-
-  const { nextText, nextCaretIndex } = applySymbolAutocomplete(
-    rulesTextValue.value,
-    trigger,
-    symbolKey,
-  );
-
-  rulesTextValue.value = nextText;
-  rulesTextCaretIndex.value = nextCaretIndex;
-  dismissedTriggerStart.value = null;
-  emit('update-field', 'rules_text', nextText);
-
-  await nextTick();
-  rulesTextTextarea.value?.focus();
-  rulesTextTextarea.value?.setSelectionRange(nextCaretIndex, nextCaretIndex);
-};
 
 const handleReparseTemplateChange = (value: string | number | null): void => {
   if (typeof value === 'string') {

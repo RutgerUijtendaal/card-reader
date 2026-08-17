@@ -31,7 +31,13 @@ class Deck(TimestampedModel):
         db_column="owner_id",
     )
     name: models.TextField[str, str] = models.TextField(default="")
+    description_markup: models.TextField[str | None, str | None] = models.TextField(
+        default=None, null=True, blank=True
+    )
     description: models.TextField[str | None, str | None] = models.TextField(default=None, null=True, blank=True)
+    long_description_markup: models.TextField[str | None, str | None] = models.TextField(
+        default=None, null=True, blank=True
+    )
     long_description: models.TextField[str | None, str | None] = models.TextField(default=None, null=True, blank=True)
     difficulty: models.CharField[str | None, str | None] = models.CharField(
         max_length=16,

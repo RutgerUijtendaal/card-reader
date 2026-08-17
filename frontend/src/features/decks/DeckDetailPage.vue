@@ -145,8 +145,17 @@
                     />
                   </span>
                 </div>
-                <p class="theme-section-muted text-sm leading-6">
-                  {{ deck.description || 'No description provided.' }}
+                <CardMarkupText
+                  v-if="deck.description_markup || deck.description"
+                  class="theme-section-muted text-sm"
+                  :markup="deck.description_markup || deck.description || ''"
+                  :hover-mode="effectiveHoverMode"
+                />
+                <p
+                  v-else
+                  class="theme-section-muted text-sm leading-6"
+                >
+                  No description provided.
                 </p>
               </section>
             </div>
@@ -228,9 +237,11 @@
                 <h3 class="theme-section-title text-base font-semibold">
                   About this deck
                 </h3>
-                <p class="theme-section-muted whitespace-pre-wrap break-words text-sm leading-6">
-                  {{ deck.long_description }}
-                </p>
+                <CardMarkupText
+                  class="theme-section-muted break-words text-sm"
+                  :markup="deck.long_description_markup || deck.long_description"
+                  :hover-mode="effectiveHoverMode"
+                />
               </section>
               <DeckManaDistribution
                 v-else-if="activeDetailPanel === 'mana'"
@@ -386,6 +397,7 @@ import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import AppStickyAside from '@/shared/components/app/AppStickyAside.vue';
 import CardGalleryItem from '@/domain/cards/components/CardGalleryItem.vue';
+import CardMarkupText from '@/domain/cards/components/CardMarkupText.vue';
 import { fetchCardFilters } from '@/domain/cards/api';
 import CardSortMenu from '@/domain/cards/components/CardSortMenu.vue';
 import GalleryOptionsMenu from '@/domain/cards/components/GalleryOptionsMenu.vue';

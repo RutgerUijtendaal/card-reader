@@ -26,8 +26,8 @@ export const createEmptyDeckForm = (): DeckForm => ({
 
 export const hydrateDeckForm = (form: DeckForm, deck: DeckRecord): void => {
   form.name = deck.name;
-  form.description = deck.description ?? '';
-  form.long_description = deck.long_description ?? '';
+  form.description = deck.description_markup ?? deck.description ?? '';
+  form.long_description = deck.long_description_markup ?? deck.long_description ?? '';
   form.difficulty = deck.difficulty;
   form.visibility = deck.visibility;
   form.hero_card_id = deck.hero_card.id;
@@ -64,8 +64,8 @@ export const buildDeckCardLookup = (
 
 export const buildDeckUpsertPayload = (form: DeckForm): DeckUpsertRequest => ({
   name: form.name.trim(),
-  description: form.description.trim() || null,
-  long_description: form.long_description.trim() || null,
+  description_markup: form.description.trim() || null,
+  long_description_markup: form.long_description.trim() || null,
   difficulty: form.difficulty,
   visibility: form.visibility,
   hero_card_id: form.hero_card_id,

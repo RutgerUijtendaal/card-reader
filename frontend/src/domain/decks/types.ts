@@ -59,7 +59,9 @@ export type DeckSideboardRecord = {
 export type DeckRecord = {
   id: string;
   name: string;
+  description_markup?: string | null;
   description: string | null;
+  long_description_markup?: string | null;
   long_description: string | null;
   difficulty: DeckDifficulty | null;
   visibility: DeckVisibility;
@@ -162,8 +164,12 @@ export type DeckEntryInput = {
 
 export type DeckUpsertRequest = {
   name: string;
-  description: string | null;
-  long_description: string | null;
+  description_markup?: string | null;
+  long_description_markup?: string | null;
+  /** @deprecated Legacy API compatibility; new writers use description_markup. */
+  description?: string | null;
+  /** @deprecated Legacy API compatibility; new writers use long_description_markup. */
+  long_description?: string | null;
   difficulty: DeckDifficulty | null;
   visibility: DeckVisibility;
   hero_card_id: string;

@@ -77,8 +77,8 @@
   <rect class="box left" x="95" y="445" width="210" height="154"/>
   <text class="title" x="150" y="476">Deck</text>
   <text class="field" x="122" y="493">name</text>
-  <text class="field" x="122" y="512">description (nullable)</text>
-  <text class="field" x="122" y="531">long_description (nullable)</text>
+  <text class="field" x="122" y="512">description_markup → description</text>
+  <text class="field" x="122" y="531">long_description_markup → plain</text>
   <text class="field" x="122" y="550">difficulty (nullable)</text>
   <text class="field" x="122" y="569">hero_card, owner, visibility</text>
   <text class="field" x="122" y="588">client_creation_id (nullable)</text>

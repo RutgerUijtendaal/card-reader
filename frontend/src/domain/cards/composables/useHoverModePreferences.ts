@@ -19,6 +19,7 @@ type LegacyGalleryOptionsState = {
 
 type HoverModePreferencesState = {
   defaultHoverMode: WritableComputedRef<HoverMode>;
+  hasSavedDefaultHoverMode: ComputedRef<boolean>;
   hoverPreviewScale: WritableComputedRef<number>;
   getOverrideHoverMode: (surface: HoverModeSurface) => WritableComputedRef<HoverMode | null>;
   getEffectiveHoverMode: (surface: HoverModeSurface) => ComputedRef<HoverMode>;
@@ -105,6 +106,7 @@ const createHoverModePreferencesState = (): HoverModePreferencesState => {
       storedDefaultHoverMode.value = normalizeHoverMode(value);
     },
   });
+  const hasSavedDefaultHoverMode = computed(() => storedDefaultHoverMode.value !== null);
 
   const getOverrideHoverMode = (surface: HoverModeSurface) =>
     computed<HoverMode | null>({
@@ -134,6 +136,7 @@ const createHoverModePreferencesState = (): HoverModePreferencesState => {
 
   return {
     defaultHoverMode,
+    hasSavedDefaultHoverMode,
     hoverPreviewScale,
     getOverrideHoverMode,
     getEffectiveHoverMode,

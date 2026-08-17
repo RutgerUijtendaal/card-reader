@@ -59,9 +59,8 @@
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { onClickOutside, useDebounceFn } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
-import { fetchCards } from '@/domain/cards/api';
+import { useCardSearchResults } from '@/domain/cards/composables/useCardSearchResults';
 import SmallCardSearchResultRow from '@/domain/cards/components/SmallCardSearchResultRow.vue';
-import { managementCardSearchLifecycleParams } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { CardListItem } from '@/domain/cards/types';
 import type { CardPool } from '@/domain/cards/cardPools';
 
@@ -89,14 +88,17 @@ const emit = defineEmits<{
 }>();
 
 const query = ref('');
-const results = ref<CardListItem[]>([]);
-const searching = ref(false);
 const isOpen = ref(false);
 const suppressNextQuerySearch = ref(false);
 const triggerRef = ref<HTMLElement | null>(null);
 const panelRef = ref<HTMLElement | null>(null);
 const panelWidth = ref(320);
-let searchRequestId = 0;
+const cardSearch = useCardSearchResults(() => ({
+  cardPool: props.cardPool,
+  lifecycleStatus: 'all',
+  pageSize: props.pageSize,
+}));
+const { results, searching } = cardSearch;
 const disabledCardIdsSet = computed(() => new Set(props.disabledCardIds));
 const floating = useFloating(triggerRef, panelRef, {
   open: isOpen,
@@ -109,32 +111,12 @@ const x = computed(() => floating.x.value ?? 0);
 const y = computed(() => floating.y.value ?? 0);
 
 const runSearch = async (): Promise<void> => {
-  const requestId = searchRequestId + 1;
-  searchRequestId = requestId;
   const searchTerm = query.value.trim();
   if (props.disabled || searchTerm.length === 0) {
-    results.value = [];
-    searching.value = false;
+    cardSearch.clear();
     return;
   }
-
-  searching.value = true;
-  try {
-    const response = await fetchCards<CardListItem>({
-      q: searchTerm,
-      card_pool: props.cardPool,
-      ...managementCardSearchLifecycleParams(),
-      page: 1,
-      page_size: props.pageSize,
-    });
-    if (requestId === searchRequestId) {
-      results.value = response.results.filter((item): item is CardListItem => item.result_type === 'card');
-    }
-  } finally {
-    if (requestId === searchRequestId) {
-      searching.value = false;
-    }
-  }
+  await cardSearch.search(searchTerm);
 };
 
 const debouncedSearch = useDebounceFn(() => {
@@ -199,9 +181,7 @@ watch(
 watch(
   () => props.cardPool,
   () => {
-    searchRequestId += 1;
-    results.value = [];
-    searching.value = false;
+    cardSearch.clear();
     if (isOpen.value && query.value.trim().length > 0) {
       debouncedSearch();
     }

@@ -66,8 +66,8 @@ describe('useDeckEditorDraft', () => {
 
     expect(controller.buildPayload()).toEqual({
       name: 'Example',
-      description: null,
-      long_description: null,
+      description_markup: null,
+      long_description_markup: null,
       difficulty: null,
       visibility: 'private',
       hero_card_id: 'hero',
@@ -123,7 +123,7 @@ describe('useDeckEditorDraft', () => {
     controller.setDeckLongDescription('  Updated plan\n\nMore notes  ');
     controller.setDeckDifficulty('hard');
 
-    expect(controller.buildPayload().long_description).toBe('Updated plan\n\nMore notes');
+    expect(controller.buildPayload().long_description_markup).toBe('Updated plan\n\nMore notes');
     expect(controller.buildPayload().difficulty).toBe('hard');
   });
 

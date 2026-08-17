@@ -2,8 +2,9 @@ import type { DeckRecord, DeckUpsertRequest } from '@/domain/decks/types';
 
 export const buildDeckUpsertRequestFromRecord = (deck: DeckRecord): DeckUpsertRequest => ({
   name: deck.name.trim(),
-  description: deck.description?.trim() || null,
-  long_description: deck.long_description?.trim() || null,
+  description_markup: deck.description_markup?.trim() || deck.description?.trim() || null,
+  long_description_markup:
+    deck.long_description_markup?.trim() || deck.long_description?.trim() || null,
   difficulty: deck.difficulty,
   visibility: deck.visibility,
   hero_card_id: deck.hero_card.id,
