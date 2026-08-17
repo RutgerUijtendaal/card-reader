@@ -418,6 +418,95 @@ describe('CardGalleryPage pool-aware filters', () => {
     mounted.unmount();
   });
 
+  test('keeps catalog-free edits made while a facet retry is pending', async () => {
+    const retryFilters = createDeferred<{ data: CardFiltersResponse }>();
+    let filterRequestCount = 0;
+    const mounted = await mountGallery(
+      '/cards',
+      'player',
+      undefined,
+      () => {
+        filterRequestCount += 1;
+        return filterRequestCount === 1
+          ? Promise.reject(new Error('facet failure'))
+          : retryFilters.promise;
+      },
+    );
+    const retryButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Retry filter options',
+    );
+    retryButton?.click();
+    const searchInput = mounted.container.querySelector<HTMLInputElement>(
+      'input[placeholder="Search by name, type, rules, or cost..."]',
+    );
+    if (!searchInput) {
+      throw new Error('expected Gallery search input');
+    }
+
+    searchInput.value = 'pending';
+    searchInput.dispatchEvent(new Event('input'));
+    await flushPromises();
+    retryFilters.resolve({ data: filters });
+
+    await vi.waitFor(() => {
+      expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?q=pending');
+      expect(mounted.requestRoutes.at(-1)).toBe('/cards?q=pending');
+    });
+
+    mounted.unmount();
+  });
+
+  test('preserves unresolved catalog-backed route fields through fallback edits', async () => {
+    let filterRequestCount = 0;
+    const recoveredFilters = {
+      ...filters,
+      tags: [{ id: 'tag-recovered', key: 'recovered-tag', label: 'Recovered Tag' }],
+    };
+    const mounted = await mountGallery(
+      '/cards?tag_keys=recovered-tag',
+      'player',
+      undefined,
+      () => {
+        filterRequestCount += 1;
+        return filterRequestCount === 1
+          ? Promise.reject(new Error('facet failure'))
+          : Promise.resolve({ data: recoveredFilters });
+      },
+      false,
+    );
+    const searchInput = mounted.container.querySelector<HTMLInputElement>(
+      'input[placeholder="Search by name, type, rules, or cost..."]',
+    );
+    if (!searchInput) {
+      throw new Error('expected Gallery search input');
+    }
+
+    searchInput.value = 'dragon';
+    searchInput.dispatchEvent(new Event('input'));
+    await flushPromises();
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?tag_keys=recovered-tag');
+
+    const retryButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Retry filter options',
+    );
+    retryButton?.click();
+
+    await vi.waitFor(() => {
+      expect(mounted.router.currentRoute.value.fullPath).toBe(
+        '/cards?q=dragon&tag_keys=recovered-tag',
+      );
+      expect(mounted.requestRoutes).toEqual(['/cards?q=dragon&tag_keys=recovered-tag']);
+    });
+    const cardRequest = apiGet.mock.calls.find(([url]) =>
+      typeof url === 'string' && url.startsWith('/cards?'),
+    )?.[0];
+    const params = new URL(String(cardRequest), 'https://cards.test').searchParams;
+    expect(params.get('q')).toBe('dragon');
+    expect(params.getAll('tag_ids')).toEqual(['tag-recovered']);
+
+    mounted.unmount();
+  });
+
   test('keeps legacy mana-symbol routes pending when facet hydration fails', async () => {
     const mounted = await mountGallery(
       '/cards?mana_symbol_match=all&mana_symbol_keys=arcane-mana'

@@ -156,7 +156,7 @@
 
 <script setup lang="ts">
 import { useScroll, useTimeoutFn } from '@vueuse/core';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { Copy, Download, Pencil } from 'lucide-vue-next';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { useCsvExport } from '@/shared/composables/useCsvExport';
@@ -247,6 +247,8 @@ const currentRouteFilterState = computed(() => (
     : visibleRouteFilterState.value
 ));
 const currentRouteSignature = computed(() => getCardFilterSignature(currentRouteFilterState.value));
+const pendingFilterRouteState = shallowRef<CardFilterState | null>(null);
+const filterRouteUpdatePending = computed(() => pendingFilterRouteState.value !== null);
 const visibleFilterSections = computed(() =>
   getGalleryVisibleFilterSections(workspace.activePool),
 );
@@ -380,21 +382,62 @@ const clearGalleryHoverModeOverride = (): void => {
   clearOverrideHoverMode();
 };
 
-const updateFilterRoute = (): void => {
-  const nextRouteState = sanitizeGalleryFilterStateForPool(
-    readFilterState(),
-    workspace.activePool,
-  );
-  if (!isFilterStateReadyForCatalogStatus(nextRouteState)) {
-    return;
+const preservePendingCatalogFields = (
+  nextState: CardFilterState,
+  routeState: CardFilterState,
+): CardFilterState => {
+  if (!cardFilterStateRequiresCatalog(routeState)) {
+    return nextState;
   }
-  if (sameCardFilterState(nextRouteState, currentRouteFilterState.value)) {
+  return {
+    ...nextState,
+    keywordMatch: routeState.keywordMatch,
+    keywordKeys: routeState.keywordKeys,
+    tagMatch: routeState.tagMatch,
+    tagKeys: routeState.tagKeys,
+    typeMatch: routeState.typeMatch,
+    typeKeys: routeState.typeKeys,
+    typeExcludeKeys: routeState.typeExcludeKeys,
+    manaFamilyMatch: routeState.manaFamilyMatch,
+    manaFamilyKeys: routeState.manaFamilyKeys,
+    manaFamilyExcludeKeys: routeState.manaFamilyExcludeKeys,
+    affinitySymbolMatch: routeState.affinitySymbolMatch,
+    affinitySymbolKeys: routeState.affinitySymbolKeys,
+    affinitySymbolExcludeKeys: routeState.affinitySymbolExcludeKeys,
+    devotionSymbolMatch: routeState.devotionSymbolMatch,
+    devotionSymbolKeys: routeState.devotionSymbolKeys,
+    devotionSymbolExcludeKeys: routeState.devotionSymbolExcludeKeys,
+    otherSymbolMatch: routeState.otherSymbolMatch,
+    otherSymbolKeys: routeState.otherSymbolKeys,
+    otherSymbolExcludeKeys: routeState.otherSymbolExcludeKeys,
+  };
+};
+
+const applyPendingFilterRoute = (nextRouteState: CardFilterState): void => {
+  pendingFilterRouteState.value = nextRouteState;
+  if (!isFilterStateReadyForCatalogStatus(nextRouteState)) {
     return;
   }
   void router.replace({
     path: '/cards',
     query: buildCardFilterRouteQuery(nextRouteState),
+  }).finally(() => {
+    if (pendingFilterRouteState.value === nextRouteState) {
+      pendingFilterRouteState.value = null;
+    }
   });
+};
+
+const updateFilterRoute = (): void => {
+  const nextRouteState = preservePendingCatalogFields(
+    sanitizeGalleryFilterStateForPool(readFilterState(), workspace.activePool),
+    visibleRouteFilterState.value,
+  );
+  if (sameCardFilterState(nextRouteState, currentRouteFilterState.value)) {
+    pendingFilterRouteState.value = null;
+    return;
+  }
+  applyPendingFilterRoute(nextRouteState);
 };
 const {
   start: debouncedUpdateRoute,
@@ -417,9 +460,24 @@ const galleryRequestSignature = computed(
 watch(
   observedFilterState,
   () => {
-    debouncedUpdateRoute();
+    if (filtersLoaded.value) {
+      debouncedUpdateRoute();
+    } else {
+      updateFilterRoute();
+    }
   },
   { deep: true },
+);
+
+watch(
+  [filtersLoaded, filtersError],
+  () => {
+    const pendingState = pendingFilterRouteState.value;
+    if (pendingState && isFilterStateReadyForCatalogStatus(pendingState)) {
+      applyPendingFilterRoute(pendingState);
+    }
+  },
+  { flush: 'sync' },
 );
 
 watch(
@@ -455,9 +513,14 @@ watch(
 );
 
 watch(
-  [galleryRequestSignature, cardCollectionFiltersReady, () => route.fullPath],
-  async ([searchParams, ready]) => {
-    if (!ready) {
+  [
+    galleryRequestSignature,
+    cardCollectionFiltersReady,
+    () => route.fullPath,
+    filterRouteUpdatePending,
+  ],
+  async ([searchParams, ready, , routeUpdatePending]) => {
+    if (!ready || routeUpdatePending) {
       return;
     }
 
@@ -505,6 +568,7 @@ const resetFilters = (): void => {
 };
 
 const retryFilterLoad = (): void => {
+  updateFilterRoute();
   void loadFilters().catch(() => undefined);
 };
 
