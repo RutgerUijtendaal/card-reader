@@ -36,7 +36,7 @@
         :disabled="disabled"
         @input="handleInput"
         @click="refreshTrigger"
-        @keyup="refreshTrigger"
+        @keyup="handleKeyup"
         @keydown="handleKeydown"
         @blur="handleBlur"
       />
@@ -252,6 +252,10 @@ const handleKeydown = (event: KeyboardEvent): void => {
     trigger.value = null;
   }
 };
+const handleKeyup = (event: KeyboardEvent): void => {
+  if (['ArrowDown', 'ArrowUp', 'Enter', 'Tab', 'Escape'].includes(event.key)) return;
+  refreshTrigger();
+};
 const handleBlur = (event: FocusEvent): void => {
   const related = event.relatedTarget;
   if (!(related instanceof Node && popupRef.value?.contains(related))) trigger.value = null;
@@ -282,10 +286,13 @@ const measureTextareaCaret = (
   marker.textContent = textarea.value.slice(caret, caret + 1) || '\u200b';
   mirror.appendChild(marker);
   document.body.appendChild(mirror);
-  const left = Math.max(0, Math.min(marker.offsetLeft - textarea.scrollLeft, textarea.clientWidth - 320));
+  const width = Math.min(448, textarea.clientWidth);
+  const left = Math.max(
+    0,
+    Math.min(marker.offsetLeft - textarea.scrollLeft, textarea.clientWidth - width),
+  );
   const lineHeight = Number.parseFloat(style.lineHeight) || 20;
   const top = Math.max(0, marker.offsetTop - textarea.scrollTop + lineHeight + 8);
-  const width = Math.min(448, textarea.clientWidth);
   mirror.remove();
   return { left, top, width };
 };

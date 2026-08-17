@@ -11,6 +11,14 @@ const symbols = [
     text_token: '{F}',
     asset_url: null,
   },
+  {
+    id: 'symbol-frost',
+    key: 'frost',
+    label: 'Frost',
+    symbol_type: 'mana',
+    text_token: '{I}',
+    asset_url: null,
+  },
 ];
 
 const mountEditor = async (initialValue: string, allowSymbols = false) => {
@@ -68,6 +76,25 @@ describe('CardMarkupEditor', () => {
     await nextTick();
 
     expect(mounted.value.value).toBe('[[symbol:fire]]');
+    mounted.app.unmount();
+  });
+
+  test('keeps arrow-key selection through keyup before inserting', async () => {
+    const mounted = await mountEditor('[[symbol:f', true);
+    const textarea = mounted.container.querySelector('textarea');
+    if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Expected textarea.');
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    textarea.dispatchEvent(new KeyboardEvent('keyup', { key: 'f', bubbles: true }));
+    await nextTick();
+
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    textarea.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown', bubbles: true }));
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    textarea.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
+    await nextTick();
+
+    expect(mounted.value.value).toBe('[[symbol:frost]]');
     mounted.app.unmount();
   });
 });
