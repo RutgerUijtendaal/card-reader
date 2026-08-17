@@ -40,11 +40,14 @@ const card: CardListItem = {
   types: [],
 };
 
-const mountMarkup = async (hoverMode: 'enlarged' | 'details' | 'enlarged-details') => {
+const mountMarkup = async (
+  hoverMode: 'enlarged' | 'details' | 'enlarged-details',
+  markup = 'See [[card:card-1|Card 1]].',
+) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const app = createApp(CardMarkupText, {
-    markup: 'See [[card:card-1|Card 1]].',
+    markup,
     hoverMode,
   });
   app.mount(container);
@@ -81,6 +84,48 @@ describe('CardMarkupText', () => {
 
     expect(document.body.querySelector('.card-hover-tooltip')).not.toBeNull();
     expect(document.body.textContent).toContain('Type Line');
+
+    mounted.app.unmount();
+    mounted.container.remove();
+  });
+
+  test('closes the preview after the pointer leaves its teleported panel', async () => {
+    fetchHoverPreviewCardMock.mockResolvedValue(card);
+    const mounted = await mountMarkup('enlarged');
+    const link = mounted.container.querySelector('a');
+    const panel = document.body.querySelector('.z-50');
+    if (!(link instanceof HTMLAnchorElement) || !(panel instanceof HTMLElement)) {
+      throw new Error('Expected a linked-text preview.');
+    }
+
+    link.dispatchEvent(new MouseEvent('pointerout', { bubbles: true, relatedTarget: panel }));
+    await nextTick();
+    expect(document.body.querySelector('.z-50')).not.toBeNull();
+
+    panel.dispatchEvent(new MouseEvent('pointerleave', { bubbles: true }));
+    await nextTick();
+    expect(document.body.querySelector('.z-50')).toBeNull();
+
+    mounted.app.unmount();
+    mounted.container.remove();
+  });
+
+  test('keeps link activation from toggling a surrounding interactive panel', async () => {
+    const mounted = await mountMarkup(
+      'enlarged',
+      '[External](https://example.com) and [[card:card-1|Card 1]]',
+    );
+    let parentActivations = 0;
+    mounted.container.addEventListener('click', () => { parentActivations += 1; });
+    mounted.container.addEventListener('keydown', () => { parentActivations += 1; });
+
+    for (const link of mounted.container.querySelectorAll('a')) {
+      const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+      click.preventDefault();
+      link.dispatchEvent(click);
+      link.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    }
+    expect(parentActivations).toBe(0);
 
     mounted.app.unmount();
     mounted.container.remove();

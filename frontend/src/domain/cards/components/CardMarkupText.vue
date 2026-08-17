@@ -4,6 +4,7 @@
     v-bind="$attrs"
     class="card-markup-text"
     @click="handleClick"
+    @keydown="handleKeydown"
     @pointerover="handlePointerOver"
     @pointerout="handlePointerOut"
     @focusin="handleFocusIn"
@@ -17,6 +18,8 @@
       ref="panelRef"
       class="z-50"
       :style="{ position: 'fixed', left: `${x}px`, top: `${y}px` }"
+      @pointerleave="closePreview"
+      @focusout="handlePanelFocusOut"
     >
       <CardHoverTooltip
         v-if="hoverCard && showsImage && showsDetails"
@@ -124,6 +127,10 @@ const referenceFromEvent = (event: Event): HTMLAnchorElement | null => {
     ? target.closest<HTMLAnchorElement>('a[data-card-reference-id]')
     : null;
 };
+const linkFromEvent = (event: Event): HTMLAnchorElement | null => {
+  const target = event.target;
+  return target instanceof Element ? target.closest<HTMLAnchorElement>('a') : null;
+};
 const openReference = (anchor: HTMLAnchorElement): void => {
   const cardId = anchor.dataset.cardReferenceId;
   if (!cardId) return;
@@ -142,11 +149,19 @@ const openReference = (anchor: HTMLAnchorElement): void => {
 const closeReference = (event: Event): void => {
   const related = 'relatedTarget' in event ? event.relatedTarget : null;
   if (related instanceof Node && panelRef.value?.contains(related)) return;
+  closePreview();
+};
+const closePreview = (): void => {
   activeCardId.value = null;
   triggerRef.value = null;
 };
 const handleClick = (event: MouseEvent): void => {
-  if (referenceFromEvent(event)) event.stopPropagation();
+  if (linkFromEvent(event)) event.stopPropagation();
+};
+const handleKeydown = (event: KeyboardEvent): void => {
+  if (linkFromEvent(event) && (event.key === 'Enter' || event.key === ' ')) {
+    event.stopPropagation();
+  }
 };
 const handlePointerOver = (event: PointerEvent): void => {
   const reference = referenceFromEvent(event);
@@ -161,6 +176,13 @@ const handleFocusIn = (event: FocusEvent): void => {
 };
 const handleFocusOut = (event: FocusEvent): void => {
   if (referenceFromEvent(event)) closeReference(event);
+};
+const handlePanelFocusOut = (event: FocusEvent): void => {
+  const related = event.relatedTarget;
+  if (related instanceof Node && (
+    panelRef.value?.contains(related) || triggerRef.value?.contains(related)
+  )) return;
+  closePreview();
 };
 </script>
 

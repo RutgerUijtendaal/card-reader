@@ -26,6 +26,16 @@ describe('card markup', () => {
     expect(html).toContain('[[card:card-2|Villain]]');
   });
 
+  it('resumes resolving references after a closing fence', () => {
+    const html = renderCardMarkupHtml(
+      '```\n[[card:card-1|Inside]]\n```\n\n[[card:card-2|Outside]]',
+    );
+
+    expect(html).toContain('[[card:card-1|Inside]]');
+    expect(html).not.toContain('data-card-reference-id="card-1"');
+    expect(html).toContain('data-card-reference-id="card-2"');
+  });
+
   it('disables raw HTML, images, and unsafe URL protocols', () => {
     const html = renderCardMarkupHtml(
       '<script>alert(1)</script> ![alt](https://example.com/a.png) [bad](javascript:alert(1))',

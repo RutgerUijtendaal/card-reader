@@ -106,11 +106,16 @@ def _protect_references(
         if at_line_start and inline_ticks == 0:
             fence = re.match(r" {0,3}(`{3,}|~{3,})", markup[position:])
             if fence is not None:
-                marker = fence.group(1)
+                delimiter = fence.group(0)
+                marker = fence.group(1)[0]
                 if fence_marker is None:
-                    fence_marker = marker[0]
-                elif marker[0] == fence_marker:
+                    fence_marker = marker
+                elif marker == fence_marker:
                     fence_marker = None
+                output.append(delimiter)
+                position += len(delimiter)
+                at_line_start = False
+                continue
         if fence_marker is None and markup[position] == "`":
             tick_match = re.match(r"`+", markup[position:])
             assert tick_match is not None

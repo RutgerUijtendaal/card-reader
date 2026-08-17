@@ -294,8 +294,12 @@ const normalizePayload = (value: unknown): DeckUpsertRequest | null => {
 const normalizeAttempt = (value: unknown): StoredCreateAttempt | null => {
   if (value === null) return null;
   if (!isRecord(value) || typeof value.signature !== 'string' || typeof value.startedAt !== 'string') return null;
-  const payload = normalizePayload(value.payload);
-  return payload === null ? null : { payload, signature: value.signature, startedAt: value.startedAt };
+  if (normalizePayload(value.payload) === null) return null;
+  return {
+    payload: value.payload as DeckUpsertRequest,
+    signature: value.signature,
+    startedAt: value.startedAt,
+  };
 };
 
 const cloneForm = (form: DeckForm): DeckForm => ({

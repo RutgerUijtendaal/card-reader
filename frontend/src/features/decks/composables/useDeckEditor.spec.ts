@@ -1511,18 +1511,7 @@ describe('useDeckEditor', () => {
     await mounted.controller.saveDeck();
 
     expect(createDeckMock).toHaveBeenCalledWith(
-      {
-        name: recoverableForm.name,
-        description_markup: null,
-        long_description_markup: null,
-        difficulty: null,
-        visibility: 'private',
-        hero_card_id: recoverableForm.hero_card_id,
-        entries: [],
-        sideboards: [],
-        tag_ids: [],
-        suggested_type_labels: [],
-      },
+      pendingAttempt.payload,
       'draft-user-1',
     );
     expect(mounted.router.currentRoute.value.fullPath).toBe(

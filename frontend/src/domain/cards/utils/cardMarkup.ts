@@ -115,6 +115,10 @@ const protectReferences = (
       if (fence?.[1]) {
         const marker = fence[1][0] as '`' | '~';
         fenceMarker = fenceMarker === null ? marker : marker === fenceMarker ? null : fenceMarker;
+        output.push(fence[0]);
+        position += fence[0].length;
+        atLineStart = false;
+        continue;
       }
     }
     if (fenceMarker === null && markup[position] === '`') {

@@ -32,6 +32,7 @@
         class="input-base resize-y"
         :class="minHeightClass"
         :value="modelValue"
+        :aria-label="label"
         :placeholder="placeholder"
         :disabled="disabled"
         @input="handleInput"
@@ -53,12 +54,12 @@
           >
             Searching…
           </p>
-          <template v-if="showsCards && cards.length">
+          <template v-if="visibleCards.length">
             <p class="theme-kicker px-2 pt-1 text-xs font-semibold uppercase tracking-wide">
               Cards
             </p>
             <SmallCardSearchResultRow
-              v-for="(card, index) in cards"
+              v-for="(card, index) in visibleCards"
               :key="card.id"
               :card="card"
               :selected="selectedIndex === index"
@@ -75,7 +76,7 @@
               v-for="(symbol, index) in filteredSymbols"
               :key="symbol.id"
               class="theme-card-frame flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm"
-              :class="selectedIndex === cards.length + index ? 'theme-selected-surface-strong' : ''"
+              :class="selectedIndex === visibleCards.length + index ? 'theme-selected-surface-strong' : ''"
               type="button"
               @pointerdown.prevent
               @click="insertSymbol(symbol)"
@@ -85,7 +86,7 @@
             </button>
           </template>
           <p
-            v-if="!searching && cards.length === 0 && filteredSymbols.length === 0"
+            v-if="!searching && visibleCards.length === 0 && filteredSymbols.length === 0"
             class="theme-section-muted px-2 py-3 text-sm"
           >
             No matching references.
@@ -168,6 +169,7 @@ const cardSearch = useCardSearchResults(() => ({
 const { results: cards, searching } = cardSearch;
 const showsCards = computed(() => trigger.value?.kind !== 'symbol');
 const showsSymbols = computed(() => props.allowSymbols && trigger.value?.kind !== 'card');
+const visibleCards = computed(() => (showsCards.value ? cards.value : []));
 const filteredSymbols = computed(() => {
   if (!showsSymbols.value) return [];
   const query = trigger.value?.query.trim().toLowerCase() ?? '';
@@ -178,7 +180,7 @@ const filteredSymbols = computed(() => {
     )
     .slice(0, 8);
 });
-const itemCount = computed(() => cards.value.length + filteredSymbols.value.length);
+const itemCount = computed(() => visibleCards.value.length + filteredSymbols.value.length);
 const popupStyle = computed(() => ({
   left: `${popupPosition.value.left}px`,
   top: `${popupPosition.value.top}px`,
@@ -230,10 +232,10 @@ const insertSymbol = (symbol: SymbolFilterOption): void =>
   insertValue(buildSymbolReference(symbol.key));
 const insertSelected = (): void => {
   const index = selectedIndex.value;
-  const card = cards.value[index];
+  const card = visibleCards.value[index];
   if (card) insertCard(card);
   else {
-    const symbol = filteredSymbols.value[index - cards.value.length];
+    const symbol = filteredSymbols.value[index - visibleCards.value.length];
     if (symbol) insertSymbol(symbol);
   }
 };

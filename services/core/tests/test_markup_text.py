@@ -27,6 +27,12 @@ def test_render_markup_plain_keeps_code_references_literal() -> None:
     )
 
 
+def test_render_markup_plain_resumes_references_after_closing_fence() -> None:
+    markup = "```\n[[card:inside|Inside]]\n```\n\n[[card:outside|Outside]]"
+
+    assert render_markup_plain(markup) == "[[card:inside|Inside]]\n\nOutside"
+
+
 def test_render_markup_plain_keeps_malformed_reference_literal_and_compacts_summary() -> None:
     markup = "**A**\n\n[[card:missing-label]]  B"
 
