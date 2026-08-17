@@ -2232,7 +2232,25 @@ def test_global_csv_rows_include_the_exact_card_identity_namespace() -> None:
     )
 
     assert response.status_code == 200
-    rows = list(csv.DictReader(response.content.decode("utf-8").splitlines()))
+    csv_lines = response.content.decode("utf-8").splitlines()
+    assert csv_lines[0].split(",") == [
+        "card_key",
+        "name",
+        "mana_cost",
+        "mana_symbols",
+        "attack",
+        "health",
+        "rules_text",
+        "types",
+        "tags",
+        "symbols",
+        "keywords",
+        "confidence",
+        "card_id",
+        "card_pool",
+        "card_factions",
+    ]
+    rows = list(csv.DictReader(csv_lines))
     assert len(rows) == 2
     rows_by_pool = {row["card_pool"]: row for row in rows}
     assert rows_by_pool["player"]["card_id"] == player_card.id

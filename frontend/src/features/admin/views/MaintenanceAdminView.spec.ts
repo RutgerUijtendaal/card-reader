@@ -107,6 +107,11 @@ describe('MaintenanceAdminView', () => {
             tags: [],
             symbols: [],
             types: [],
+            card_pools: [
+              { key: 'player', label: 'Player', rank: 0 },
+              { key: 'evil', label: 'Evil', rank: 1 },
+              { key: 'neutral', label: 'Neutral', rank: 2 },
+            ],
           },
         });
       }
@@ -175,6 +180,43 @@ describe('MaintenanceAdminView', () => {
     expect(apiPost).toHaveBeenCalledWith(
       '/admin/maintenance/queue-filtered-latest-reparse',
       { q: 'Shared metadata' },
+    );
+
+    const poolSelect = mounted.container.querySelector('select');
+    if (!(poolSelect instanceof HTMLSelectElement)) {
+      throw new Error('expected filtered reparse pool selector');
+    }
+    poolSelect.value = 'evil';
+    poolSelect.dispatchEvent(new Event('change'));
+    await nextTick();
+
+    previewButton.click();
+    await flushPromises();
+    const latestPreviewCall = apiGet.mock.calls.filter(
+      ([url]) => typeof url === 'string' && url.startsWith('/cards?'),
+    ).at(-1);
+    const latestPreviewUrl = new URL(latestPreviewCall?.[0] as string, 'http://localhost');
+    expect(latestPreviewUrl.searchParams.get('card_pool')).toBe('evil');
+
+    queueButton.click();
+    await flushPromises();
+    expect(apiPost).toHaveBeenLastCalledWith(
+      '/admin/maintenance/queue-filtered-latest-reparse',
+      { card_pool: 'evil', q: 'Shared metadata' },
+    );
+
+    searchInput.value = '';
+    searchInput.dispatchEvent(new Event('input'));
+    await nextTick();
+    expect(previewButton.disabled).toBe(false);
+    expect(queueButton.disabled).toBe(false);
+    expect(mounted.container.textContent).toContain('1 filter selected');
+
+    queueButton.click();
+    await flushPromises();
+    expect(apiPost).toHaveBeenLastCalledWith(
+      '/admin/maintenance/queue-filtered-latest-reparse',
+      { card_pool: 'evil' },
     );
 
     mounted.unmount();

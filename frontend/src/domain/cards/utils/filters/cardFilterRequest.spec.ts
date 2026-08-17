@@ -90,12 +90,20 @@ describe('cardFilterRequest', () => {
   });
 
   test('omits the card pool for explicitly global requests', () => {
-    const params = buildCardFilterApiSearchParams(selection, { includeCardPool: false });
-    const payload = buildCardFilterApiPayload(selection, { includeCardPool: false });
+    const params = buildCardFilterApiSearchParams(selection, { cardPool: null });
+    const payload = buildCardFilterApiPayload(selection, { cardPool: null });
 
     expect(params.has('card_pool')).toBe(false);
     expect(payload).not.toHaveProperty('card_pool');
     expect(params.getAll('keyword_ids')).toEqual(['kw-1']);
     expect(payload.keyword_ids).toEqual(['kw-1']);
+  });
+
+  test('honors an explicit card pool override', () => {
+    const params = buildCardFilterApiSearchParams(selection, { cardPool: 'evil' });
+    const payload = buildCardFilterApiPayload(selection, { cardPool: 'evil' });
+
+    expect(params.get('card_pool')).toBe('evil');
+    expect(payload.card_pool).toBe('evil');
   });
 });

@@ -52,7 +52,7 @@ export type CardFilterApiPayload = {
 };
 
 type CardFilterRequestOptions = {
-  includeCardPool?: boolean;
+  cardPool?: CardPool | null;
 };
 
 export const buildCardFilterApiPayload = (
@@ -63,8 +63,9 @@ export const buildCardFilterApiPayload = (
   const manaFamilyKeys = normalized.manaFamilyIds;
   const manaFamilyExcludeKeys = normalized.manaFamilyExcludeIds;
   const payload: CardFilterApiPayload = {};
+  const cardPool = options.cardPool === undefined ? normalized.cardPool : options.cardPool;
 
-  if (options.includeCardPool !== false) payload.card_pool = normalized.cardPool;
+  if (cardPool) payload.card_pool = cardPool;
 
   if (normalized.query) payload.q = normalized.query;
   Object.assign(payload, buildCardLifecycleApiParams(normalized.lifecycleStatus));

@@ -72,11 +72,8 @@ def export_cards_csv(
     writer = csv.DictWriter(
         stream,
         fieldnames=[
-            "card_id",
             "card_key",
             "name",
-            "card_pool",
-            "card_factions",
             "mana_cost",
             "mana_symbols",
             "attack",
@@ -87,6 +84,9 @@ def export_cards_csv(
             "symbols",
             "keywords",
             "confidence",
+            "card_id",
+            "card_pool",
+            "card_factions",
         ],
     )
     writer.writeheader()
