@@ -1756,7 +1756,7 @@ def test_deck_create_is_idempotent_per_owner_and_creation_key() -> None:
     assert DeckCreation.objects.filter(owner=owner, client_creation_id=creation_key).count() == 1
 
 
-def test_deck_create_replay_rejects_newly_non_player_cards_without_returning_card_data() -> None:
+def test_deck_create_replay_returns_confirmed_deck_after_card_pool_change() -> None:
     username = "deck-idempotency-reclassified-user"
     password = "password"
     _create_user(username, password)
@@ -1793,13 +1793,14 @@ def test_deck_create_replay_rejects_newly_non_player_cards_without_returning_car
     )
     lookup_response = client.get(f"/my/decks/by-creation-key/{creation_key}")
 
-    assert replay_response.status_code == 409
-    assert lookup_response.status_code == 409
-    assert replay_response.json() == {
-        "detail": "The deck created by this key is no longer eligible for replay."
-    }
-    assert reclassified.id not in replay_response.content.decode()
-    assert reclassified.label not in replay_response.content.decode()
+    assert replay_response.status_code == 200
+    assert lookup_response.status_code == 200
+    assert replay_response.json()["id"] == create_response.json()["id"]
+    assert lookup_response.json()["id"] == create_response.json()["id"]
+    assert replay_response.json()["status"]["is_valid"] is False
+    assert lookup_response.json()["status"]["is_valid"] is False
+    assert replay_response.json()["mainboard"]["entries"][0]["card"]["id"] == reclassified.id
+    assert lookup_response.json()["mainboard"]["entries"][0]["card"]["id"] == reclassified.id
 
 
 def test_deck_creation_key_is_owner_scoped_and_lookup_is_private() -> None:
@@ -3170,7 +3171,7 @@ def test_evil_and_neutral_cards_are_public_for_lists_and_details() -> None:
         assert response.status_code == 200
         assert [row["id"] for row in response.json()["results"]] == [card.id]
         assert anonymous.get(f"/cards/{card.id}").status_code == 200
-        assert card.id not in public_ids
+        assert card.id in public_ids
         summary = deck_hero_summary_payload(card)
         assert summary["key"] == card.key
         assert summary["card_pool"] == card.card_pool

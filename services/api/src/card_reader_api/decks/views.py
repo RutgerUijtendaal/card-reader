@@ -27,7 +27,6 @@ from card_reader_core.services.decks import (
     DeckSummaryPage,
     DeckUpdateInput,
     deck_building_rules_metadata_json,
-    deck_uses_non_player_card,
 )
 from card_reader_core.services.deck_tags import DeckTagService
 
@@ -35,14 +34,6 @@ from card_reader_core.services.deck_tags import DeckTagService
 def _user_id(request: Request) -> str:
     return str(getattr(request.user, "pk", ""))
 
-
-def _ineligible_creation_replay_response(deck: Deck) -> Response | None:
-    if not deck_uses_non_player_card(deck):
-        return None
-    return Response(
-        {"detail": "The deck created by this key is no longer eligible for replay."},
-        status=status.HTTP_409_CONFLICT,
-    )
 
 def _deck_list_response(
     serializer: DeckListQuerySerializer,
@@ -275,9 +266,6 @@ class OwnerDeckListCreateView(APIView):
                 client_creation_id,
             )
             if existing is not None:
-                ineligible_response = _ineligible_creation_replay_response(existing)
-                if ineligible_response is not None:
-                    return ineligible_response
                 return Response(
                     deck_payload(
                         existing,
@@ -357,9 +345,6 @@ class OwnerDeckCreationLookupView(APIView):
                     status=status.HTTP_410_GONE,
                 )
             return not_found("Deck not found")
-        ineligible_response = _ineligible_creation_replay_response(deck)
-        if ineligible_response is not None:
-            return ineligible_response
         return Response(
             deck_payload(
                 deck,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import TypeVar
 
 from django.db.models import (
     Case,
@@ -16,6 +17,7 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, Lower
 from django.db.models.expressions import Combinable
+from django.db.models.base import Model
 
 from card_reader_core.models import (
     BLOOD_CARD_FACTION,
@@ -37,6 +39,7 @@ from card_reader_core.models import (
     STANDARD_CARD_ROLE,
     CardFaction,
     CardFactionAssignment,
+    CardGroup,
     CardPool,
     CardRole,
     CardRoleFilter,
@@ -106,6 +109,7 @@ DEFAULT_SORT_COMPONENTS: dict[CardPool, tuple[DefaultSortComponent, ...]] = {
 }
 
 TypeSortLookup = dict[str, tuple[int, str]]
+_SortableModel = TypeVar("_SortableModel", bound=Model)
 
 
 def build_type_sort_lookup(*, card_pool: CardPool) -> TypeSortLookup:
@@ -202,6 +206,45 @@ def apply_default_card_sort(
     return annotated.order_by(*ordering, "name", "card__label", "card__id")
 
 
+def apply_default_card_group_sort(
+    queryset: QuerySet[CardGroup],
+    *,
+    card_pool: CardPool,
+) -> QuerySet[CardGroup]:
+    components = DEFAULT_SORT_COMPONENTS.get(card_pool)
+    if components is None:
+        raise ValueError(f"Unsupported card pool for default sorting: {card_pool}.")
+
+    annotated = queryset
+    ordering: list[str | Combinable] = []
+    for component in components:
+        if isinstance(component, ManaFamilyDefaultSort):
+            ordering.append("anchor_card__mana_family_sort_key")
+        elif isinstance(component, FactionDefaultSort):
+            annotated = _annotate_faction_sort(
+                annotated,
+                component=component,
+                card_id_field="anchor_card_id",
+            )
+            ordering.extend(("default_faction_rank", "default_faction_mask"))
+        elif isinstance(component, RoleDefaultSort):
+            annotated = _annotate_role_sort(
+                annotated,
+                component=component,
+                card_id_field="anchor_card_id",
+            )
+            ordering.extend(("default_role_rank", "default_role_mask"))
+        else:
+            ordering.append(F("anchor_card__latest_version__mana_value").asc(nulls_last=True))
+    return annotated.order_by(
+        *ordering,
+        "anchor_card__latest_version__name",
+        "anchor_card__label",
+        "anchor_card__id",
+        "id",
+    )
+
+
 def apply_type_card_sort(
     queryset: QuerySet[CardVersion],
     *,
@@ -252,11 +295,14 @@ def _annotate_best_type_rank(
 
 
 def _annotate_faction_sort(
-    queryset: QuerySet[CardVersion],
+    queryset: QuerySet[_SortableModel],
     *,
     component: FactionDefaultSort,
-) -> QuerySet[CardVersion]:
-    assignments = CardFactionAssignment.objects.filter(card_id=OuterRef("card_id"))
+    card_id_field: str = "card_id",
+) -> QuerySet[_SortableModel]:
+    assignments = CardFactionAssignment.objects.filter(
+        card_id=OuterRef(card_id_field)
+    )
     rank_query = (
         assignments.annotate(
             sort_rank=Case(
@@ -300,14 +346,15 @@ def _annotate_faction_sort(
 
 
 def _annotate_role_sort(
-    queryset: QuerySet[CardVersion],
+    queryset: QuerySet[_SortableModel],
     *,
     component: RoleDefaultSort,
-) -> QuerySet[CardVersion]:
+    card_id_field: str = "card_id",
+) -> QuerySet[_SortableModel]:
     role_order = _effective_role_sort_order(component)
     persisted_order = tuple(role for role in role_order if role != STANDARD_CARD_ROLE)
     empty_rank = role_order.index(STANDARD_CARD_ROLE)
-    assignments = CardRoleAssignment.objects.filter(card_id=OuterRef("card_id"))
+    assignments = CardRoleAssignment.objects.filter(card_id=OuterRef(card_id_field))
     rank_query = (
         assignments.annotate(
             sort_rank=Case(

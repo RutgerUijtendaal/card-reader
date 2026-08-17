@@ -32,15 +32,17 @@ from card_reader_core.models import (
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE, CardListRow
 from card_reader_core.repositories.cards import (
     CARD_SORT_DEFAULT,
+    CARD_SORT_TYPES_ASC,
+    CARD_SORT_UPDATED_DESC,
     CARD_SORT_VALUES,
     CardFilterParams,
+    CardSort,
 )
 from card_reader_core.rules import render_enriched_rule_text
 from card_reader_core.services.decks import normalize_deck_building_config
 
 if TYPE_CHECKING:
     from card_reader_core.models import CardGroup, Deck
-    from card_reader_core.repositories.cards import CardSort
     from card_reader_core.services.cards import CardEditState, CardMetadata
 
 MANA_FAMILY_KEYS = tuple(family.key for family in MANA_FAMILIES)
@@ -348,7 +350,7 @@ class CardFiltersQuerySerializer(
     mana_cost_min = serializers.IntegerField(required=False, allow_null=True)
     mana_cost_max = serializers.IntegerField(required=False, allow_null=True)
     template_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    card_pool = serializers.ChoiceField(choices=CARD_POOLS, required=False, default="player")
+    card_pool = serializers.ChoiceField(choices=CARD_POOLS, required=False)
     card_roles = serializers.ListField(
         child=serializers.ChoiceField(choices=CARD_ROLE_FILTER_VALUES),
         required=False,
@@ -382,9 +384,7 @@ class CardFiltersQuerySerializer(
         required=False,
         default=DEFAULT_CARD_LIFECYCLE_FILTER,
     )
-    sort = serializers.ChoiceField(
-        choices=CARD_SORT_VALUES, required=False, default=CARD_SORT_DEFAULT
-    )
+    sort = serializers.ChoiceField(choices=CARD_SORT_VALUES, required=False)
     page = serializers.IntegerField(required=False, min_value=1, default=1)
     page_size = serializers.IntegerField(
         required=False, min_value=1, default=DEFAULT_CARD_PAGE_SIZE
@@ -422,7 +422,10 @@ class CardFiltersQuerySerializer(
             "mana_cost_min": self._int_or_none("mana_cost_min"),
             "mana_cost_max": self._int_or_none("mana_cost_max"),
             "template_id": self._string_or_none("template_id"),
-            "card_pool": self.validated_data.get("card_pool", "player"),
+            "card_pool": cast(
+                CardPool | None,
+                self.validated_data.get("card_pool"),
+            ),
             "card_roles": cast(
                 list[CardRoleFilter] | None, self._string_list_or_none("card_roles")
             ),
@@ -458,6 +461,13 @@ class CardFiltersQuerySerializer(
         }
 
     def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        if attrs.get("card_pool") is None and attrs.get("sort") in {
+            CARD_SORT_DEFAULT,
+            CARD_SORT_TYPES_ASC,
+        }:
+            raise serializers.ValidationError(
+                {"sort": "This sort requires an explicit card_pool."}
+            )
         roles = attrs.get("card_roles")
         if attrs.get("card_role_match") == "all" and isinstance(roles, list):
             if "standard" in roles and len(set(roles)) > 1:
@@ -487,7 +497,11 @@ class CardFiltersQuerySerializer(
 
     def _sort_value(self, key: str) -> CardSort:
         value = self.validated_data.get(key)
-        return value if value in CARD_SORT_VALUES else CARD_SORT_DEFAULT
+        if value in CARD_SORT_VALUES:
+            return cast(CardSort, value)
+        if self.validated_data.get("card_pool") is None:
+            return CARD_SORT_UPDATED_DESC
+        return CARD_SORT_DEFAULT
 
     def _lifecycle_status_value(self, key: str) -> CardLifecycleFilter:
         value = self.validated_data.get(key)

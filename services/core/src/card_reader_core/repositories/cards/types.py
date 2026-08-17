@@ -125,7 +125,7 @@ class CardFilterParams(TypedDict):
     mana_cost_min: int | None
     mana_cost_max: int | None
     template_id: str | None
-    card_pool: CardPool
+    card_pool: CardPool | None
     card_roles: list[CardRoleFilter] | None
     card_role_exclude: list[CardRoleFilter] | None
     card_role_match: CardRoleMatch
@@ -144,6 +144,21 @@ class CardFilterParams(TypedDict):
 class ParsedCardSaveResult:
     version: CardVersion
     created_new_version: bool
+
+
+class GroupedCardListReference(TypedDict):
+    result_type: Literal["card", "card_group"]
+    item_id: str
+    card_version_id: str | None
+    group_id: str | None
+
+
+@dataclass(frozen=True)
+class PaginatedGroupedCardList:
+    count: int
+    page: int
+    page_size: int
+    results: list[GroupedCardListReference]
 
 
 class FieldSourcesPayload(TypedDict):

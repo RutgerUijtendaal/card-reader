@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal, TypedDict
+from typing import TYPE_CHECKING, Literal
 
 from card_reader_api.card_groups.serializers import (
     card_group_gallery_payload,
@@ -21,6 +22,8 @@ from card_reader_core.repositories.cards import (
     card_default_sort_key,
     card_type_sort_key,
     get_card_list_rows_by_version_ids,
+    GroupedCardListReference,
+    list_default_grouped_card_references,
     list_matching_card_candidates,
 )
 from card_reader_core.services.card_groups import CardGroupService
@@ -31,12 +34,8 @@ if TYPE_CHECKING:
     from card_reader_core.repositories.cards import CardLifecycleFilter, CardSort
 
 
-class GroupedGalleryItem(TypedDict):
-    result_type: Literal["card", "card_group"]
-    item_id: str
+class GroupedGalleryItem(GroupedCardListReference):
     sort_card_id: str
-    card_version_id: str | None
-    group_id: str | None
     label: str
     name: str
     mana_value: int | None
@@ -50,6 +49,12 @@ class GroupedGalleryItem(TypedDict):
 def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
     page = filters["page"]
     page_size = filters["page_size"]
+    if filters["sort"] == CARD_SORT_DEFAULT:
+        return _default_grouped_gallery_payload(
+            filters,
+            page=page,
+            page_size=page_size,
+        )
     matching_rows = list_matching_card_candidates(
         query=filters["query"],
         card_ids=filters["card_ids"],
@@ -98,7 +103,8 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
     groups = [
         group
         for group in CardGroupService().get_groups_for_cards(matching_card_ids)
-        if group.anchor_card.card_pool == filters["card_pool"]
+        if filters["card_pool"] is None
+        or group.anchor_card.card_pool == filters["card_pool"]
     ]
     lifecycle_status = filters["lifecycle_status"]
 
@@ -173,6 +179,7 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
     type_sort_lookup = (
         build_type_sort_lookup(card_pool=filters["card_pool"])
         if filters["sort"] == CARD_SORT_TYPES_ASC
+        and filters["card_pool"] is not None
         else None
     )
     grouped_items.sort(
@@ -199,6 +206,44 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
         "previous_page": normalized_page - 1 if normalized_page > 1 else None,
         "page": normalized_page,
         "page_size": normalized_page_size,
+        "results": results,
+    }
+
+
+def _default_grouped_gallery_payload(
+    filters: CardListFilterParams,
+    *,
+    page: int,
+    page_size: int,
+) -> dict[str, object]:
+    card_pool = filters["card_pool"]
+    if card_pool is None:
+        raise ValueError("Grouped default sorting requires one explicit card pool.")
+    reference_page = list_default_grouped_card_references(
+        filters,
+        page=page,
+        page_size=page_size,
+    )
+    group_ids = [
+        reference["group_id"]
+        for reference in reference_page.results
+        if reference["group_id"] is not None
+    ]
+    groups = CardGroupService().get_groups(group_ids)
+    results = _hydrate_grouped_gallery_payloads(
+        reference_page.results,
+        groups,
+        filters["lifecycle_status"],
+        card_pool=card_pool,
+    )
+    return {
+        "count": reference_page.count,
+        "next_page": reference_page.page + 1
+        if reference_page.page * reference_page.page_size < reference_page.count
+        else None,
+        "previous_page": reference_page.page - 1 if reference_page.page > 1 else None,
+        "page": reference_page.page,
+        "page_size": reference_page.page_size,
         "results": results,
     }
 
@@ -237,11 +282,11 @@ def _build_grouped_gallery_item(
 
 
 def _hydrate_grouped_gallery_payloads(
-    page_items: list[GroupedGalleryItem],
+    page_items: Sequence[GroupedCardListReference],
     groups: list["CardGroup"],
     lifecycle_status: "CardLifecycleFilter",
     *,
-    card_pool: str,
+    card_pool: str | None,
 ) -> list[dict[str, object]]:
     card_version_ids = [
         item["card_version_id"]
@@ -288,7 +333,7 @@ def _grouped_gallery_sort_key(
     item: GroupedGalleryItem,
     sort: CardSort,
     *,
-    card_pool: CardPool,
+    card_pool: CardPool | None,
     type_sort_lookup: dict[str, tuple[int, str]] | None = None,
 ) -> tuple[object, ...]:
     item_id = item["item_id"]
@@ -298,6 +343,8 @@ def _grouped_gallery_sort_key(
     updated_at = item["updated_at"]
 
     if sort == CARD_SORT_DEFAULT:
+        if card_pool is None:
+            raise ValueError("Grouped default sorting requires one explicit card pool.")
         return (
             *card_default_sort_key(
                 card_pool=card_pool,

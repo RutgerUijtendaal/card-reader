@@ -33,7 +33,6 @@ def card_filter_query_data(request: Request, *, include_list_controls: bool = Fa
         "mana_cost_min": request.query_params.get("mana_cost_min"),
         "mana_cost_max": request.query_params.get("mana_cost_max"),
         "template_id": request.query_params.get("template_id"),
-        "card_pool": request.query_params.get("card_pool") or "player",
         "card_roles": request.query_params.getlist("card_roles"),
         "card_role_exclude": request.query_params.getlist("card_role_exclude"),
         "card_role_match": request.query_params.get("card_role_match") or "any",
@@ -48,6 +47,9 @@ def card_filter_query_data(request: Request, *, include_list_controls: bool = Fa
     lifecycle_status = request.query_params.get("lifecycle_status")
     if lifecycle_status is not None:
         data["lifecycle_status"] = lifecycle_status
+    card_pool = request.query_params.get("card_pool")
+    if card_pool is not None:
+        data["card_pool"] = card_pool
     sort = request.query_params.get("sort")
     if sort is not None:
         data["sort"] = sort

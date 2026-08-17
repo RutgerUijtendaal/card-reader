@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -2167,6 +2168,45 @@ def test_filters_payload_counts_all_card_pools_for_every_viewer() -> None:
     assert staff_type["linked_card_count"] == 2
 
 
+def test_card_list_and_csv_without_card_pool_cover_every_pool() -> None:
+    player_card, player_version = _create_editable_card_version(
+        name="Global Pool Query Player"
+    )
+    evil_card, evil_version = _create_editable_card_version(
+        name="Global Pool Query Evil"
+    )
+    neutral_card, neutral_version = _create_editable_card_version(
+        name="Global Pool Query Neutral"
+    )
+    evil_card.card_pool = "evil"
+    evil_card.save(update_fields=["card_pool"])
+    neutral_card.card_pool = "neutral"
+    neutral_card.save(update_fields=["card_pool"])
+    for version in (player_version, evil_version, neutral_version):
+        _create_card_image(version)
+
+    list_response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {"q": "Global Pool Query"},
+    )
+    csv_response = _staff_client("global-pool-csv-user").get(
+        "/exports/csv",
+        {"q": "Global Pool Query"},
+    )
+
+    assert list_response.status_code == 200
+    assert {row["id"] for row in list_response.json()["results"]} == {
+        player_card.id,
+        evil_card.id,
+        neutral_card.id,
+    }
+    assert csv_response.status_code == 200
+    csv_text = csv_response.content.decode("utf-8")
+    assert "Global Pool Query Player" in csv_text
+    assert "Global Pool Query Evil" in csv_text
+    assert "Global Pool Query Neutral" in csv_text
+
+
 def test_filters_payload_returns_public_pool_registry_in_canonical_order() -> None:
     public_response = Client(HTTP_HOST="localhost").get("/cards/filters")
     staff_response = _staff_client("filters-pool-registry-staff").get("/cards/filters")
@@ -2988,11 +3028,12 @@ def test_cards_list_uses_pool_aware_player_default_before_pagination() -> None:
     )
 
     client = Client(HTTP_HOST="localhost")
-    first_response = client.get("/cards", {"q": "Default Player", "page": 1, "page_size": 2})
-    second_response = client.get("/cards", {"q": "Default Player", "page": 2, "page_size": 2})
-    third_response = client.get("/cards", {"q": "Default Player", "page": 3, "page_size": 2})
-    fourth_response = client.get("/cards", {"q": "Default Player", "page": 4, "page_size": 2})
-    fifth_response = client.get("/cards", {"q": "Default Player", "page": 5, "page_size": 2})
+    query = {"q": "Default Player", "card_pool": "player", "page_size": 2}
+    first_response = client.get("/cards", {**query, "page": 1})
+    second_response = client.get("/cards", {**query, "page": 2})
+    third_response = client.get("/cards", {**query, "page": 3})
+    fourth_response = client.get("/cards", {**query, "page": 4})
+    fifth_response = client.get("/cards", {**query, "page": 5})
 
     assert first_response.status_code == 200
     assert second_response.status_code == 200
@@ -3251,7 +3292,10 @@ def test_cards_list_supports_type_sorting() -> None:
         card_version_id=filler_mana_three_version.id, type_ids=[mana_type.id]
     )
 
-    response = Client(HTTP_HOST="localhost").get("/cards", {"sort": "types_asc", "q": "Sort Type"})
+    response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {"sort": "types_asc", "card_pool": "player", "q": "Sort Type"},
+    )
 
     assert response.status_code == 200
     result_ids = [row["id"] for row in response.json()["results"][:7]]
@@ -3296,11 +3340,23 @@ def test_cards_list_type_sorting_happens_before_pagination() -> None:
     client = Client(HTTP_HOST="localhost")
     first_response = client.get(
         "/cards",
-        {"sort": "types_asc", "q": "Sort Page Type", "page": 1, "page_size": 2},
+        {
+            "sort": "types_asc",
+            "card_pool": "player",
+            "q": "Sort Page Type",
+            "page": 1,
+            "page_size": 2,
+        },
     )
     second_response = client.get(
         "/cards",
-        {"sort": "types_asc", "q": "Sort Page Type", "page": 2, "page_size": 2},
+        {
+            "sort": "types_asc",
+            "card_pool": "player",
+            "q": "Sort Page Type",
+            "page": 2,
+            "page_size": 2,
+        },
     )
 
     assert first_response.status_code == 200
@@ -3332,7 +3388,7 @@ def test_cards_list_type_sort_uses_type_key_when_counts_and_labels_tie() -> None
 
     response = Client(HTTP_HOST="localhost").get(
         "/cards",
-        {"sort": "types_asc", "q": "Sort Type Tie"},
+        {"sort": "types_asc", "card_pool": "player", "q": "Sort Type Tie"},
     )
 
     assert response.status_code == 200
@@ -3443,6 +3499,75 @@ def test_grouped_gallery_paginates_before_hydrating_payloads() -> None:
     assert zeta_card.id
 
 
+def test_grouped_gallery_default_sort_bounds_candidates_before_hydration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import card_reader_core.repositories.cards.queries as card_queries
+
+    anchor_card, anchor_version = _create_editable_card_version(
+        name="Bounded Default Group Anchor"
+    )
+    member_card, member_version = _create_editable_card_version(
+        name="Bounded Default Group Member"
+    )
+    _create_card_image(anchor_version)
+    _create_card_image(member_version)
+    _create_card_group(
+        "bounded-default-group",
+        anchor_card=anchor_card,
+        members=[anchor_card, member_card],
+    )
+    for index in range(6):
+        _card, version = _create_editable_card_version(
+            name=f"Bounded Default Standalone {index}"
+        )
+        _create_card_image(version)
+
+    original_sort_key = card_queries.card_default_sort_key
+    evaluated_candidates = 0
+
+    def counting_sort_key(**kwargs: Any) -> tuple[object, ...]:
+        nonlocal evaluated_candidates
+        evaluated_candidates += 1
+        return original_sort_key(**kwargs)
+
+    monkeypatch.setattr(card_queries, "card_default_sort_key", counting_sort_key)
+
+    response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {
+            "show_groups": "true",
+            "sort": "default",
+            "card_pool": "player",
+            "q": "Bounded Default",
+            "page": 1,
+            "page_size": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["count"] == 7
+    assert len(response.json()["results"]) == 1
+    assert evaluated_candidates == 2
+
+    evaluated_candidates = 0
+    later_response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {
+            "show_groups": "true",
+            "sort": "default",
+            "card_pool": "player",
+            "q": "Bounded Default",
+            "page": 6,
+            "page_size": 1,
+        },
+    )
+
+    assert later_response.status_code == 200
+    assert len(later_response.json()["results"]) == 1
+    assert evaluated_candidates <= 4
+
+
 def test_grouped_gallery_type_sort_uses_anchor_card_types() -> None:
     spell_type = _create_type(key="sort-group-spell", label="Spell")
     creature_type = _create_type(key="sort-group-creature", label="Creature")
@@ -3470,7 +3595,12 @@ def test_grouped_gallery_type_sort_uses_anchor_card_types() -> None:
 
     response = Client(HTTP_HOST="localhost").get(
         "/cards",
-        {"show_groups": "true", "sort": "types_asc", "q": "Sort Type Group"},
+        {
+            "show_groups": "true",
+            "sort": "types_asc",
+            "card_pool": "player",
+            "q": "Sort Type Group",
+        },
     )
 
     assert response.status_code == 200
@@ -3516,7 +3646,12 @@ def test_grouped_gallery_default_sort_uses_anchor_card_values() -> None:
 
     response = Client(HTTP_HOST="localhost").get(
         "/cards",
-        {"show_groups": "true", "sort": "default", "q": "Default Group Matching"},
+        {
+            "show_groups": "true",
+            "sort": "default",
+            "card_pool": "player",
+            "q": "Default Group Matching",
+        },
     )
 
     assert response.status_code == 200
@@ -3550,6 +3685,7 @@ def test_grouped_gallery_default_sort_uses_group_identity_for_shared_anchors() -
         {
             "show_groups": "true",
             "sort": "default",
+            "card_pool": "player",
             "q": "Duplicate Anchor Default",
             "page": 1,
             "page_size": 1,
@@ -3560,6 +3696,7 @@ def test_grouped_gallery_default_sort_uses_group_identity_for_shared_anchors() -
         {
             "show_groups": "true",
             "sort": "default",
+            "card_pool": "player",
             "q": "Duplicate Anchor Default",
             "page": 2,
             "page_size": 1,
@@ -3716,6 +3853,41 @@ def test_cross_pool_group_relationships_expose_all_members_to_every_viewer() -> 
     assert [response.json() for response in card_responses[1:]] == [
         anonymous_card_response.json()
     ] * 3
+
+
+def test_card_group_detail_without_card_pool_uses_global_identity() -> None:
+    anchor_card, anchor_version = _create_editable_card_version(
+        name="Global Evil Group Anchor"
+    )
+    member_card, member_version = _create_editable_card_version(
+        name="Global Evil Group Member"
+    )
+    for card in (anchor_card, member_card):
+        card.card_pool = "evil"
+        card.save(update_fields=["card_pool"])
+    _create_card_image(anchor_version)
+    _create_card_image(member_version)
+    group = _create_card_group(
+        "global-evil-group",
+        anchor_card=anchor_card,
+        members=[anchor_card, member_card],
+    )
+    client = Client(HTTP_HOST="localhost")
+
+    global_response = client.get(f"/card-groups/{group.id}")
+    evil_response = client.get(
+        f"/card-groups/{group.id}",
+        {"card_pool": "evil"},
+    )
+    player_response = client.get(
+        f"/card-groups/{group.id}",
+        {"card_pool": "player"},
+    )
+
+    assert global_response.status_code == 200
+    assert evil_response.status_code == 200
+    assert global_response.json() == evil_response.json()
+    assert player_response.status_code == 404
 
 
 def test_card_detail_includes_viewer_visible_deck_references() -> None:
@@ -5201,6 +5373,41 @@ def test_filtered_maintenance_reparse_queues_only_matching_latest_versions() -> 
     assert items[0].target_card_id == alpha_card.id
     assert items[0].target_card_version_id == alpha_version.id
     assert items[0].target_card_id != beta_card.id
+
+
+def test_filtered_maintenance_reparse_without_card_pool_covers_every_pool() -> None:
+    username = "superuser-global-filtered-reparse-user"
+    password = "password"
+    _create_user(username, password, is_staff=True, is_superuser=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+    cards_and_versions = [
+        _create_editable_card_version(name=f"Global Reparse {pool.title()}")
+        for pool in ("player", "evil", "neutral")
+    ]
+    for (card, version), pool in zip(
+        cards_and_versions,
+        ("player", "evil", "neutral"),
+        strict=True,
+    ):
+        card.card_pool = pool
+        card.save(update_fields=["card_pool"])
+        _create_card_image(version)
+
+    response = client.post(
+        "/admin/maintenance/queue-filtered-latest-reparse",
+        data={"q": "Global Reparse"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    target_card_ids = set(
+        ImportJobItem.objects.filter(
+            target_card_id__in=[card.id for card, _version in cards_and_versions]
+        ).values_list("target_card_id", flat=True)
+    )
+    assert target_card_ids == {card.id for card, _version in cards_and_versions}
 
 
 def _create_user(

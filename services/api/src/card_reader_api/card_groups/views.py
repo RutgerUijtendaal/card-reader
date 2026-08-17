@@ -29,7 +29,12 @@ class PublicCardGroupDetailView(APIView):
         filters = serializer.validated_filters()
         lifecycle_status = filters["lifecycle_status"]
         card_pool = filters["card_pool"]
-        group = CardGroupService().get_group_for_pool(group_id, card_pool=card_pool)
+        service = CardGroupService()
+        group = (
+            service.get_group(group_id)
+            if card_pool is None
+            else service.get_group_for_pool(group_id, card_pool=card_pool)
+        )
         if group is None:
             return not_found("Card group not found")
         viewer_id = str(getattr(request.user, "pk", "")) if is_authenticated(request.user) else None

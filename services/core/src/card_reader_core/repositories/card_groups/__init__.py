@@ -21,6 +21,16 @@ def get_card_group_for_pool(group_id: str, *, card_pool: CardPool) -> CardGroup 
     return _group_queryset().filter(id=group_id, anchor_card__card_pool=card_pool).first()
 
 
+def get_card_groups(group_ids: list[str]) -> list[CardGroup]:
+    if not group_ids:
+        return []
+    groups_by_id = {
+        group.id: group
+        for group in _group_queryset().filter(id__in=list(dict.fromkeys(group_ids)))
+    }
+    return [groups_by_id[group_id] for group_id in group_ids if group_id in groups_by_id]
+
+
 def list_card_groups() -> list[CardGroup]:
     return list(_group_queryset().order_by("name", "created_at"))
 
