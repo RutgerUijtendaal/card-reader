@@ -6,6 +6,7 @@ import type { RouteLocationRaw } from 'vue-router';
 import CardGalleryPage from '@/features/card-gallery/CardGalleryPage.vue';
 import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import type { CardFiltersResponse } from '@/domain/cards/types';
+import { clearGalleryNavigationState } from '@/domain/cards/utils/gallery/galleryNavigation';
 
 const { apiGet } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -142,6 +143,7 @@ const mountGallery = async (
 describe('CardGalleryPage pool-aware filters', () => {
   afterEach(() => {
     vi.clearAllMocks();
+    clearGalleryNavigationState();
     document.body.innerHTML = '';
   });
 
@@ -398,6 +400,10 @@ describe('CardGalleryPage pool-aware filters', () => {
     searchInput.value = 'dragon';
     searchInput.dispatchEvent(new Event('input'));
 
+    await flushPromises();
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards');
+    expect(mounted.requestRoutes).toEqual(['/cards']);
+
     await vi.waitFor(() => {
       expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?q=dragon');
       expect(mounted.requestRoutes).toEqual(['/cards', '/cards?q=dragon']);
@@ -503,6 +509,85 @@ describe('CardGalleryPage pool-aware filters', () => {
     const params = new URL(String(cardRequest), 'https://cards.test').searchParams;
     expect(params.get('q')).toBe('dragon');
     expect(params.getAll('tag_ids')).toEqual(['tag-recovered']);
+
+    mounted.unmount();
+  });
+
+  test('preserves the complete visible route through fallback edits', async () => {
+    let filterRequestCount = 0;
+    const recoveredFilters = {
+      ...filters,
+      tags: [{ id: 'tag-recovered', key: 'recovered-tag', label: 'Recovered Tag' }],
+    };
+    const mounted = await mountGallery(
+      '/cards?q=old&lifecycle_status=deprecated&template_id=template-1'
+        + '&mana_cost_min=3&tag_keys=recovered-tag',
+      'player',
+      undefined,
+      () => {
+        filterRequestCount += 1;
+        return filterRequestCount === 1
+          ? Promise.reject(new Error('facet failure'))
+          : Promise.resolve({ data: recoveredFilters });
+      },
+      false,
+    );
+    const searchInput = mounted.container.querySelector<HTMLInputElement>(
+      'input[placeholder="Search by name, type, rules, or cost..."]',
+    );
+    if (!searchInput) {
+      throw new Error('expected Gallery search input');
+    }
+
+    searchInput.value = 'dragon';
+    searchInput.dispatchEvent(new Event('input'));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(mounted.router.currentRoute.value.fullPath).toBe(
+      '/cards?q=old&lifecycle_status=deprecated&template_id=template-1'
+        + '&mana_cost_min=3&tag_keys=recovered-tag',
+    );
+
+    const retryButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Retry filter options',
+    );
+    retryButton?.click();
+
+    await vi.waitFor(() => {
+      expect(mounted.router.currentRoute.value.fullPath).toBe(
+        '/cards?q=dragon&lifecycle_status=deprecated&template_id=template-1'
+          + '&mana_cost_min=3&tag_keys=recovered-tag',
+      );
+    });
+
+    mounted.unmount();
+  });
+
+  test('reset cancels pending fallback edits', async () => {
+    const mounted = await mountGallery(
+      '/cards?q=old&tag_keys=recovered-tag',
+      'player',
+      undefined,
+      () => Promise.reject(new Error('facet failure')),
+      false,
+    );
+    const searchInput = mounted.container.querySelector<HTMLInputElement>(
+      'input[placeholder="Search by name, type, rules, or cost..."]',
+    );
+    if (!searchInput) {
+      throw new Error('expected Gallery search input');
+    }
+
+    searchInput.value = 'pending';
+    searchInput.dispatchEvent(new Event('input'));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(mounted.requestRoutes).toEqual([]);
+
+    mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Reset filters"]')?.click();
+
+    await vi.waitFor(() => {
+      expect(mounted.router.currentRoute.value.fullPath).toBe('/cards');
+      expect(mounted.requestRoutes).toEqual(['/cards']);
+    });
 
     mounted.unmount();
   });
