@@ -403,6 +403,56 @@ def test_renaming_a_symbol_to_a_canonical_key_reconciles_its_default_rule() -> N
     ).exists()
 
 
+def test_renaming_between_canonical_symbol_keys_replaces_the_obsolete_family_rule() -> None:
+    symbol = Symbol.objects.get(key="arcane-mana")
+    ensure_default_mana_family_classification_rules(symbol_keys={symbol.key})
+
+    updated = CatalogService().update_symbol(
+        entry_id=symbol.id,
+        key="dark-mana",
+    )
+
+    assert updated is not None
+    assert updated.key == "dark-mana"
+    assert set(
+        CardClassificationRule.objects.filter(
+            card_pool="player",
+            target_kind="mana_family",
+            source_kind="symbol",
+            symbol_id=symbol.id,
+        ).values_list("target_key", flat=True)
+    ) == {"dark"}
+
+
+def test_canonical_symbol_rename_rejects_unrelated_family_rules() -> None:
+    symbol = Symbol.objects.get(key="arcane-mana")
+    ensure_default_mana_family_classification_rules(symbol_keys={symbol.key})
+    ClassificationRuleService().create_rule(
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="divine",
+        source_kind="symbol",
+        source_id=symbol.id,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="conflict with its canonical key.*divine",
+    ):
+        CatalogService().update_symbol(entry_id=symbol.id, key="dark-mana")
+
+    symbol.refresh_from_db()
+    assert symbol.key == "arcane-mana"
+    assert set(
+        CardClassificationRule.objects.filter(
+            card_pool="player",
+            target_kind="mana_family",
+            source_kind="symbol",
+            symbol_id=symbol.id,
+        ).values_list("target_key", flat=True)
+    ) == {"arcane", "divine"}
+
+
 def test_symbol_rename_rolls_back_when_default_rule_reconciliation_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -419,13 +469,14 @@ def test_symbol_rename_rolls_back_when_default_rule_reconciliation_fails(
         symbol_type="mana",
     )
 
-    def fail_rule_reconciliation(*, symbol_keys: set[str] | None = None) -> int:
-        assert symbol_keys == {"arcane-mana"}
+    def fail_rule_reconciliation(*, symbol: Symbol, previous_key: str) -> int:
+        assert symbol.key == "arcane-mana"
+        assert previous_key == "pending-arcane-symbol"
         raise RuntimeError("rule reconciliation failed")
 
     monkeypatch.setattr(
         catalog_service_module,
-        "ensure_default_mana_family_classification_rules",
+        "reconcile_mana_family_rules_for_symbol_rename",
         fail_rule_reconciliation,
     )
 

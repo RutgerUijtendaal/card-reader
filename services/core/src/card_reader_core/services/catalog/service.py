@@ -64,6 +64,7 @@ from card_reader_core.services.classification_rules import (
     ClassificationRuleService,
     classification_rule_payload,
     ensure_default_mana_family_classification_rules,
+    reconcile_mana_family_rules_for_symbol_rename,
 )
 from .input_normalization import CatalogInputNormalizer
 from .types import (
@@ -510,8 +511,9 @@ class CatalogService:
                 new_key=updated_symbol.key,
             )
         if updated_symbol.key != previous_key:
-            ensure_default_mana_family_classification_rules(
-                symbol_keys={updated_symbol.key}
+            reconcile_mana_family_rules_for_symbol_rename(
+                symbol=updated_symbol,
+                previous_key=previous_key,
             )
 
         return updated_symbol
