@@ -20,3 +20,7 @@ This directory contains feature descriptions, operational guides, and technical 
 
 - [Card database diagram](card-database-diagram.svg) shows the main card, version, metadata, import, group, and deck relationships.
 - [Tabletop Simulator imports](../tts/README.md) documents the shared persistent-sheet payload, native custom-deck creation, and stable artwork cache refresh.
+
+## Planning
+
+- [Campaign building plan](campaign-building-plan.md) preserves the proposed GM game-start flow, Campaign and pile domain boundaries, rule-resolution requirements, TTS direction, open decisions, and suggested delivery checkpoints.
