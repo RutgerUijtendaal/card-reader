@@ -1,5 +1,8 @@
 import { computed, ref } from 'vue';
 import type { Ref } from 'vue';
+import type { CardRoleFilter } from '@/domain/cards/cardRoles';
+import type { CardPool } from '@/domain/cards/cardPools';
+import type { CardFaction } from '@/domain/cards/cardFactions';
 import type {
   CardFilterSelectionState,
 } from '@/domain/cards/utils/filters/cardFilterState';
@@ -21,10 +24,17 @@ import {
 export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   const query = ref('');
   const lifecycleStatus = ref<CardLifecycleFilterValue>(DEFAULT_CARD_LIFECYCLE_FILTER);
+  const cardPool = ref<CardPool>('player');
+  const cardRoleMatch = ref<'any' | 'all'>('any');
+  const cardRoleIds = ref<CardRoleFilter[]>([]);
+  const cardRoleExcludeIds = ref<CardRoleFilter[]>([]);
+  const cardFactionMatch = ref<'any' | 'all'>('any');
+  const cardFactionIds = ref<CardFaction[]>([]);
+  const cardFactionExcludeIds = ref<CardFaction[]>([]);
   const keywordMatch = ref<'any' | 'all'>('any');
   const tagMatch = ref<'any' | 'all'>('any');
   const typeMatch = ref<'any' | 'all'>('any');
-  const manaSymbolMatch = ref<'any' | 'all'>('any');
+  const manaFamilyMatch = ref<'any' | 'all'>('any');
   const affinitySymbolMatch = ref<'any' | 'all'>('any');
   const devotionSymbolMatch = ref<'any' | 'all'>('any');
   const otherSymbolMatch = ref<'any' | 'all'>('any');
@@ -37,8 +47,8 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   const healthMax = ref('');
   const keywordIds = ref<string[]>([]);
   const tagIds = ref<string[]>([]);
-  const manaTypeSymbolIds = ref<string[]>([]);
-  const manaTypeSymbolExcludeIds = ref<string[]>([]);
+  const manaFamilyIds = ref<string[]>([]);
+  const manaFamilyExcludeIds = ref<string[]>([]);
   const affinitySymbolIds = ref<string[]>([]);
   const affinitySymbolExcludeIds = ref<string[]>([]);
   const devotionSymbolIds = ref<string[]>([]);
@@ -52,10 +62,17 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     normalizeCardFilterSelectionState({
       query: query.value,
       lifecycleStatus: lifecycleStatus.value,
+      cardPool: cardPool.value,
+      cardRoleMatch: cardRoleMatch.value,
+      cardRoleIds: cardRoleIds.value,
+      cardRoleExcludeIds: cardRoleExcludeIds.value,
+      cardFactionMatch: cardFactionMatch.value,
+      cardFactionIds: cardFactionIds.value,
+      cardFactionExcludeIds: cardFactionExcludeIds.value,
       keywordMatch: keywordMatch.value,
       tagMatch: tagMatch.value,
       typeMatch: typeMatch.value,
-      manaSymbolMatch: manaSymbolMatch.value,
+      manaFamilyMatch: manaFamilyMatch.value,
       affinitySymbolMatch: affinitySymbolMatch.value,
       devotionSymbolMatch: devotionSymbolMatch.value,
       otherSymbolMatch: otherSymbolMatch.value,
@@ -68,8 +85,8 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
       healthMax: healthMax.value,
       keywordIds: keywordIds.value,
       tagIds: tagIds.value,
-      manaTypeSymbolIds: manaTypeSymbolIds.value,
-      manaTypeSymbolExcludeIds: manaTypeSymbolExcludeIds.value,
+      manaFamilyIds: manaFamilyIds.value,
+      manaFamilyExcludeIds: manaFamilyExcludeIds.value,
       affinitySymbolIds: affinitySymbolIds.value,
       affinitySymbolExcludeIds: affinitySymbolExcludeIds.value,
       devotionSymbolIds: devotionSymbolIds.value,
@@ -85,10 +102,17 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     const normalized = normalizeCardFilterSelectionState(state);
     query.value = normalized.query;
     lifecycleStatus.value = normalized.lifecycleStatus ?? DEFAULT_CARD_LIFECYCLE_FILTER;
+    cardPool.value = normalized.cardPool;
+    cardRoleMatch.value = normalized.cardRoleMatch;
+    cardRoleIds.value = [...normalized.cardRoleIds];
+    cardRoleExcludeIds.value = [...normalized.cardRoleExcludeIds];
+    cardFactionMatch.value = normalized.cardFactionMatch ?? 'any';
+    cardFactionIds.value = [...(normalized.cardFactionIds ?? [])];
+    cardFactionExcludeIds.value = [...(normalized.cardFactionExcludeIds ?? [])];
     keywordMatch.value = normalized.keywordMatch;
     tagMatch.value = normalized.tagMatch;
     typeMatch.value = normalized.typeMatch;
-    manaSymbolMatch.value = normalized.manaSymbolMatch;
+    manaFamilyMatch.value = normalized.manaFamilyMatch;
     affinitySymbolMatch.value = normalized.affinitySymbolMatch;
     devotionSymbolMatch.value = normalized.devotionSymbolMatch;
     otherSymbolMatch.value = normalized.otherSymbolMatch;
@@ -101,8 +125,8 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     healthMax.value = normalized.healthMax;
     keywordIds.value = [...normalized.keywordIds];
     tagIds.value = [...normalized.tagIds];
-    manaTypeSymbolIds.value = [...normalized.manaTypeSymbolIds];
-    manaTypeSymbolExcludeIds.value = [...normalized.manaTypeSymbolExcludeIds];
+    manaFamilyIds.value = [...normalized.manaFamilyIds];
+    manaFamilyExcludeIds.value = [...normalized.manaFamilyExcludeIds];
     affinitySymbolIds.value = [...normalized.affinitySymbolIds];
     affinitySymbolExcludeIds.value = [...normalized.affinitySymbolExcludeIds];
     devotionSymbolIds.value = [...normalized.devotionSymbolIds];
@@ -127,10 +151,17 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   return {
     query,
     lifecycleStatus,
+    cardPool,
+    cardRoleMatch,
+    cardRoleIds,
+    cardRoleExcludeIds,
+    cardFactionMatch,
+    cardFactionIds,
+    cardFactionExcludeIds,
     keywordMatch,
     tagMatch,
     typeMatch,
-    manaSymbolMatch,
+    manaFamilyMatch,
     affinitySymbolMatch,
     devotionSymbolMatch,
     otherSymbolMatch,
@@ -143,8 +174,8 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     healthMax,
     keywordIds,
     tagIds,
-    manaTypeSymbolIds,
-    manaTypeSymbolExcludeIds,
+    manaFamilyIds,
+    manaFamilyExcludeIds,
     affinitySymbolIds,
     affinitySymbolExcludeIds,
     devotionSymbolIds,

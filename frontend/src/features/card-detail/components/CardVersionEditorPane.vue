@@ -43,27 +43,120 @@
         v-if="activeEditorTab === 'card'"
         class="space-y-4"
       >
-        <div class="theme-muted-panel p-3">
-          <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="theme-muted-panel p-4">
+          <div>
             <div class="min-w-0">
               <p class="theme-section-title text-sm font-semibold">
-                Hero Card
+                Card Classification
               </p>
               <p class="theme-section-muted text-xs">
-                Manual card-level deckbuilding flag.
+                Set where this card belongs and how it is classified in the game.
               </p>
             </div>
 
-            <label class="theme-section-title flex shrink-0 items-center gap-3 text-sm font-semibold">
-              <input
-                :checked="form.is_hero"
-                type="checkbox"
-                class="theme-checkbox h-4 w-4"
+            <div class="mt-4 grid gap-x-4 gap-y-3 sm:grid-cols-[5rem_minmax(0,1fr)] sm:items-center">
+              <p class="theme-section-title text-xs font-semibold">
+                Pool
+              </p>
+              <AppSelect
+                :model-value="form.card_pool"
+                :options="cardPoolOptions"
+                wrapper-class="w-full sm:max-w-48"
+                aria-label="Card pool"
                 :disabled="!version.editable || isBusy"
-                @change="$emit('update-hero', ($event.target as HTMLInputElement).checked)"
-              >
-              <span>{{ form.is_hero ? 'Marked as hero' : 'Not marked as hero' }}</span>
-            </label>
+                @update:model-value="handleCardPoolChange"
+              />
+
+              <p class="theme-section-title self-start pt-2 text-xs font-semibold">
+                Roles
+              </p>
+              <fieldset>
+                <legend class="sr-only">
+                  Roles
+                </legend>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    v-for="option in cardRoleOptions"
+                    :key="option.value"
+                    type="button"
+                    class="theme-section-title min-h-9 rounded-lg border px-3 py-1.5 text-xs font-semibold transition"
+                    :class="form.card_roles.includes(option.value) ? 'theme-selected-surface' : 'theme-card-frame-muted'"
+                    :aria-pressed="form.card_roles.includes(option.value)"
+                    :disabled="!version.editable || isBusy"
+                    :data-testid="`card-role-option-${option.value}`"
+                    @click="$emit('toggle-card-role', option.value, !form.card_roles.includes(option.value))"
+                  >
+                    {{ option.label }}
+                  </button>
+                  <span
+                    v-if="form.card_roles.length === 0"
+                    class="theme-section-muted text-xs"
+                  >
+                    Normal
+                  </span>
+                </div>
+              </fieldset>
+
+              <p class="theme-section-title self-start pt-2 text-xs font-semibold">
+                Mana Families
+              </p>
+              <fieldset>
+                <legend class="sr-only">
+                  Mana Families
+                </legend>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    v-for="option in manaFamilyOptions"
+                    :key="option.value"
+                    type="button"
+                    class="theme-section-title min-h-9 rounded-lg border px-3 py-1.5 text-xs font-semibold transition"
+                    :class="form.card_mana_families.includes(option.value) ? 'theme-selected-surface' : 'theme-card-frame-muted'"
+                    :aria-pressed="form.card_mana_families.includes(option.value)"
+                    :disabled="!version.editable || isBusy"
+                    :data-testid="`card-mana-family-option-${option.value}`"
+                    @click="$emit('toggle-card-mana-family', option.value, !form.card_mana_families.includes(option.value))"
+                  >
+                    {{ option.label }}
+                  </button>
+                  <span
+                    v-if="form.card_mana_families.length === 0"
+                    class="theme-section-muted text-xs"
+                  >
+                    Colorless
+                  </span>
+                </div>
+              </fieldset>
+
+              <p class="theme-section-title self-start pt-2 text-xs font-semibold">
+                Factions
+              </p>
+              <fieldset>
+                <legend class="sr-only">
+                  Factions
+                </legend>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    v-for="option in cardFactionOptions"
+                    :key="option.value"
+                    type="button"
+                    class="theme-section-title min-h-9 rounded-lg border px-3 py-1.5 text-xs font-semibold transition"
+                    :class="form.card_factions.includes(option.value) ? 'theme-selected-surface' : 'theme-card-frame-muted'"
+                    :aria-pressed="form.card_factions.includes(option.value)"
+                    :disabled="!version.editable || isBusy"
+                    :data-testid="`card-faction-option-${option.value}`"
+                    @click="$emit('toggle-card-faction', option.value, !form.card_factions.includes(option.value))"
+                  >
+                    {{ option.label }}
+                  </button>
+                  <span
+                    v-if="form.card_factions.length === 0"
+                    class="theme-section-muted text-xs"
+                  >
+                    No faction
+                  </span>
+                </div>
+              </fieldset>
+            </div>
           </div>
         </div>
 
@@ -451,7 +544,14 @@
       class="theme-divider flex shrink-0 flex-wrap items-center justify-end gap-3 border-t pt-4"
     >
       <p
-        v-if="saveMessage"
+        v-if="saveError"
+        class="theme-error-text mr-auto text-sm"
+        role="alert"
+      >
+        {{ saveError }}
+      </p>
+      <p
+        v-else-if="saveMessage"
         class="theme-success-text mr-auto text-sm"
       >
         {{ saveMessage }}
@@ -484,13 +584,20 @@
         />
       </label>
       <p
-        v-else-if="saveMessage"
+        v-if="saveError"
+        class="theme-error-text mr-auto text-sm"
+        role="alert"
+      >
+        {{ saveError }}
+      </p>
+      <p
+        v-else-if="!version.editable && saveMessage"
         class="theme-success-text mr-auto text-sm"
       >
         {{ saveMessage }}
       </p>
       <p
-        v-if="version.editable && saveMessage"
+        v-if="version.editable && saveMessage && !saveError"
         class="theme-success-text text-sm"
       >
         {{ saveMessage }}
@@ -538,6 +645,8 @@ import {
   applySymbolAutocomplete,
   findActiveSymbolTrigger,
 } from '@/domain/cards/utils/cards/ruleTextSymbols';
+import { CARD_ROLE_OPTIONS, type CardRole } from '@/domain/cards/cardRoles';
+import { CARD_FACTION_OPTIONS, type CardFaction } from '@/domain/cards/cardFactions';
 import type {
   CardVersionDetail,
   MetadataGroupName,
@@ -546,6 +655,8 @@ import type {
   SymbolFilterOption,
 } from '@/domain/cards/types';
 import type { ParseFlagPropertyKey } from '@/domain/review/types';
+import { CARD_POOL_OPTIONS, isCardPool, type CardPool } from '@/domain/cards/cardPools';
+import { MANA_FAMILY_OPTIONS, type ManaFamily } from '@/domain/cards/manaFamilies';
 import type { EditorForm, MetadataSearchState, ReparseTemplateOption } from '@/features/card-detail/types';
 import { metadataGroups, scalarFields } from '@/features/card-detail/types';
 
@@ -558,6 +669,7 @@ const props = defineProps<{
   isSaving: boolean;
   isQueuingReparse: boolean;
   saveMessage: string;
+  saveError: string;
   deckBuildingConfigExample: string;
   fieldSource: (fieldName: ScalarFieldName) => 'auto' | 'manual';
   metadataSource: (groupName: MetadataGroupName) => 'auto' | 'manual';
@@ -575,6 +687,7 @@ const props = defineProps<{
   ruleTextUnknownSymbolKeys: string[];
   deprecatedStatusDisabled?: boolean;
   reviewFocusPropertyKey?: string | null;
+  initialTab?: 'card' | 'version';
 }>();
 
 const emit = defineEmits<{
@@ -591,12 +704,15 @@ const emit = defineEmits<{
   (e: 'toggle-additional-symbol', optionId: string, checked: boolean): void;
   (e: 'update-group-search', groupName: MetadataGroupName, value: string): void;
   (e: 'update-field', fieldName: ScalarFieldName, value: string): void;
-  (e: 'update-hero', value: boolean): void;
+  (e: 'update-card-pool', value: CardPool): void;
+  (e: 'toggle-card-role', role: CardRole, checked: boolean): void;
+  (e: 'toggle-card-faction', faction: CardFaction, checked: boolean): void;
+  (e: 'toggle-card-mana-family', manaFamily: ManaFamily, checked: boolean): void;
   (e: 'update-deck-building-config', value: string): void;
   (e: 'update-lifecycle-status', value: CardLifecycleStatus): void;
 }>();
 
-const activeEditorTab = ref<'card' | 'version'>('version');
+const activeEditorTab = ref<'card' | 'version'>(props.initialTab ?? 'version');
 const rulesTextTextarea = ref<HTMLTextAreaElement | null>(null);
 const rulesTextValue = ref('');
 const rulesTextCaretIndex = ref(0);
@@ -607,6 +723,10 @@ const lifecycleOptions = [
   { value: ACTIVE_CARD_LIFECYCLE_STATUS, label: 'Active' },
   { value: DEPRECATED_CARD_LIFECYCLE_STATUS, label: 'Deprecated' },
 ] as const;
+const cardRoleOptions = CARD_ROLE_OPTIONS;
+const cardFactionOptions = CARD_FACTION_OPTIONS;
+const manaFamilyOptions = MANA_FAMILY_OPTIONS;
+const cardPoolOptions = CARD_POOL_OPTIONS;
 const symbolInsertOptions = computed(() => props.optionsForGroup('symbols') as SymbolFilterOption[]);
 const rulesTextSymbolIds = computed(() => props.ruleTextSymbols.map((symbol) => symbol.id));
 const additionalSymbolIds = computed(() => props.additionalSymbolIds);
@@ -779,6 +899,12 @@ const applyAutocompleteOption = async (symbolKey: string): Promise<void> => {
 const handleReparseTemplateChange = (value: string | number | null): void => {
   if (typeof value === 'string') {
     emit('update-reparse-template', value);
+  }
+};
+
+const handleCardPoolChange = (value: string | number | null): void => {
+  if (isCardPool(value)) {
+    emit('update-card-pool', value);
   }
 };
 </script>

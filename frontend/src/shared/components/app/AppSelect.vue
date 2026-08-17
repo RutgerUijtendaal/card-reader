@@ -8,6 +8,9 @@
       :value="normalizedValue"
       class="input-base app-select-input"
       :class="selectClass"
+      @pointerdown="toggleExpanded"
+      @keydown="handleKeydown"
+      @blur="collapse"
       @change="handleChange"
     >
       <option
@@ -27,7 +30,8 @@
       </option>
     </select>
     <span
-      class="app-select-chevron"
+      class="app-select-chevron transition-transform duration-150"
+      :class="{ 'rotate-180': isExpanded }"
       aria-hidden="true"
     >
       <svg
@@ -48,7 +52,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 defineOptions({
   inheritAttrs: false,
@@ -85,12 +89,14 @@ const emit = defineEmits<{
   (e: 'change', value: SelectValue | null): void;
 }>();
 
+const isExpanded = ref(false);
 const placeholderValue = '__placeholder__';
 const normalizedValue = computed(() =>
   props.modelValue === null || props.modelValue === undefined ? placeholderValue : String(props.modelValue),
 );
 
 const handleChange = (event: Event): void => {
+  isExpanded.value = false;
   const nextRawValue = (event.target as HTMLSelectElement).value;
   if (nextRawValue === placeholderValue) {
     emit('update:modelValue', null);
@@ -102,5 +108,23 @@ const handleChange = (event: Event): void => {
   const nextValue = matchedOption?.value ?? nextRawValue;
   emit('update:modelValue', nextValue);
   emit('change', nextValue);
+};
+
+const toggleExpanded = (): void => {
+  isExpanded.value = !isExpanded.value;
+};
+
+const collapse = (): void => {
+  isExpanded.value = false;
+};
+
+const handleKeydown = (event: KeyboardEvent): void => {
+  if (event.key === 'Escape' || event.key === 'Tab') {
+    collapse();
+    return;
+  }
+  if (event.key === 'Enter' || event.key === ' ' || event.key.startsWith('Arrow')) {
+    isExpanded.value = true;
+  }
 };
 </script>

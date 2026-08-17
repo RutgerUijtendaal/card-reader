@@ -1,5 +1,8 @@
 <template>
-  <div class="relative w-full">
+  <div
+    class="relative w-full"
+    :class="compact ? 'flex justify-center' : ''"
+  >
     <button
       v-if="showsHotkeysPopover"
       ref="triggerRef"
@@ -64,6 +67,7 @@
     <div
       v-else
       class="theme-hotkeys-panel"
+      :data-hotkey-count="globalHotkeys.length"
     >
       <div class="flex items-center gap-2">
         <span class="theme-hotkeys-icon-wrap">
@@ -164,6 +168,7 @@ import { computed, watch, type CSSProperties } from 'vue';
 import { ChevronRight, Keyboard } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { useFloatingPopover } from '@/shared/composables/useFloatingPopover';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import { useAuthStore } from '@/domain/session/store';
 
 type HotkeyDefinition = {
@@ -188,6 +193,7 @@ const props = withDefaults(
 );
 
 const auth = useAuthStore();
+const workspace = useCardPoolWorkspaceStore();
 const route = useRoute();
 const { isOpen, triggerRef, panelRef, x, y, availableHeight, toggle, close } = useFloatingPopover({
   placement: 'right-end',
@@ -249,7 +255,7 @@ const globalHotkeys = computed<HotkeyDefinition[]>(() => [
   { id: 'search', label: 'Search', keys: ['/'] },
   { id: 'hover-mode', label: 'Hover Mode', keys: ['Alt+1/2/3/4/5'] },
   { id: 'hover-size', label: 'Hover Size', keys: ['Alt+Wheel'] },
-  ...(auth.authenticated
+  ...(auth.authenticated && workspace.activePool === 'player'
     ? [{ id: 'new-deck', label: 'New Deck', keys: ['N', 'N'] }]
     : []),
 ]);
@@ -276,4 +282,5 @@ const popoverStyle = computed<CSSProperties>(() => ({
 
 watch(() => route.path, close);
 watch(() => props.compact, close);
+watch(() => workspace.activePool, close);
 </script>

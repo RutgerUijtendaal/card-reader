@@ -6,7 +6,11 @@ from card_reader_core.services.user_roles import has_developer_role
 
 
 def is_authenticated(user: Any) -> bool:
-    return bool(user and getattr(user, "is_authenticated", False))
+    return bool(
+        user
+        and getattr(user, "is_authenticated", False)
+        and getattr(user, "is_active", False)
+    )
 
 
 def can_access_admin(user: Any) -> bool:
@@ -37,7 +41,7 @@ def can_manage_developer_data(user: Any) -> bool:
     return can_access_admin(user) and bool(getattr(user, "is_active", False))
 
 
-def capability_payload(user: Any) -> dict[str, bool]:
+def capability_payload(user: Any) -> dict[str, object]:
     return {
         "can_access_authenticated_features": can_access_authenticated_features(user),
         "can_access_admin": can_access_admin(user),

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Card Reader Classification"
+  short_description: "Maintain card classification and identity"
+  default_prompt: "Use $card-reader-classification to change Card Reader pools, roles, factions, mana families, identity, sorting, filtering, or review behavior."

@@ -25,21 +25,15 @@ def apply_deck_filters(
     if normalized_search_query:
         filtered = filtered.filter(
             Q(name__icontains=normalized_search_query)
-            | Q(hero_card__label__icontains=normalized_search_query)
-            | Q(hero_card__latest_version__name__icontains=normalized_search_query)
             | Q(owner__username__icontains=normalized_search_query)
-            | Q(entries__card__label__icontains=normalized_search_query)
-            | Q(entries__card__latest_version__name__icontains=normalized_search_query)
-            | Q(sideboards__entries__card__label__icontains=normalized_search_query)
-            | Q(sideboards__entries__card__latest_version__name__icontains=normalized_search_query)
+            | _hero_text_query(normalized_search_query)
+            | _entry_text_query(normalized_search_query)
+            | _sideboard_text_query(normalized_search_query)
         )
 
     normalized_hero_query = (hero_query or "").strip()
     if normalized_hero_query:
-        filtered = filtered.filter(
-            Q(hero_card__label__icontains=normalized_hero_query)
-            | Q(hero_card__latest_version__name__icontains=normalized_hero_query)
-        )
+        filtered = filtered.filter(_hero_text_query(normalized_hero_query))
 
     normalized_author_query = (author_query or "").strip()
     if normalized_author_query:
@@ -48,10 +42,8 @@ def apply_deck_filters(
     normalized_card_query = (card_query or "").strip()
     if normalized_card_query:
         filtered = filtered.filter(
-            Q(entries__card__label__icontains=normalized_card_query)
-            | Q(entries__card__latest_version__name__icontains=normalized_card_query)
-            | Q(sideboards__entries__card__label__icontains=normalized_card_query)
-            | Q(sideboards__entries__card__latest_version__name__icontains=normalized_card_query)
+            _entry_text_query(normalized_card_query)
+            | _sideboard_text_query(normalized_card_query)
         )
 
     normalized_affinity_symbol_ids = [symbol_id.strip() for symbol_id in affinity_symbol_ids or [] if symbol_id.strip()]
@@ -92,18 +84,35 @@ def apply_deck_filters(
     return filtered.distinct()
 
 
+def _hero_text_query(query: str) -> Q:
+    return Q(hero_card__label__icontains=query) | Q(
+        hero_card__latest_version__name__icontains=query
+    )
+
+
+def _entry_text_query(query: str) -> Q:
+    return Q(entries__card__label__icontains=query) | Q(
+        entries__card__latest_version__name__icontains=query
+    )
+
+
+def _sideboard_text_query(query: str) -> Q:
+    return Q(sideboards__entries__card__label__icontains=query) | Q(
+        sideboards__entries__card__latest_version__name__icontains=query
+    )
+
+
 def _affinity_symbol_query(symbol_id: str) -> Q:
-    return (
-        Q(
+    hero_query = Q(
             hero_card__latest_version__card_version_symbols__symbol_id=symbol_id,
             hero_card__latest_version__card_version_symbols__symbol__symbol_type="affinity",
         )
-        | Q(
+    entry_query = Q(
             entries__card__latest_version__card_version_symbols__symbol_id=symbol_id,
             entries__card__latest_version__card_version_symbols__symbol__symbol_type="affinity",
         )
-        | Q(
+    sideboard_query = Q(
             sideboards__entries__card__latest_version__card_version_symbols__symbol_id=symbol_id,
             sideboards__entries__card__latest_version__card_version_symbols__symbol__symbol_type="affinity",
         )
-    )
+    return hero_query | entry_query | sideboard_query

@@ -4,8 +4,6 @@ from typing import TYPE_CHECKING
 
 from django.db import models
 
-from card_reader_core.metadata import NO_MANA_FAMILY_SORT_KEY
-
 from .base import TimestampedModel, uuid_str
 
 if TYPE_CHECKING:
@@ -50,9 +48,6 @@ class CardVersion(TimestampedModel):
     mana_cost: models.TextField[str, str] = models.TextField(default="")
     mana_symbols_json = models.JSONField(default=list)
     mana_value: models.IntegerField[int | None, int | None] = models.IntegerField(default=None, null=True, db_index=True)
-    mana_family_sort_key: models.PositiveSmallIntegerField[int, int] = models.PositiveSmallIntegerField(
-        default=NO_MANA_FAMILY_SORT_KEY
-    )
     attack: models.IntegerField[int | None, int | None] = models.IntegerField(default=None, null=True)
     health: models.IntegerField[int | None, int | None] = models.IntegerField(default=None, null=True)
     rules_text_raw: models.TextField[str, str] = models.TextField(default="")
@@ -94,7 +89,6 @@ class CardVersion(TimestampedModel):
         db_table = "card_version"
         indexes = [
             models.Index(fields=["card", "is_latest"], name="ix_card_version_card_latest"),
-            models.Index(fields=["is_latest", "mana_family_sort_key"], name="ix_cv_latest_mana_family"),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -113,7 +107,7 @@ class CardVersionImage(TimestampedModel):
         db_column="card_version_id",
     )
     source_file: models.TextField[str, str] = models.TextField()
-    stored_path: models.TextField[str, str] = models.TextField()
+    stored_path: models.TextField[str, str] = models.TextField(db_index=True)
     width: models.IntegerField[int, int] = models.IntegerField(default=0)
     height: models.IntegerField[int, int] = models.IntegerField(default=0)
     checksum: models.TextField[str, str] = models.TextField(db_index=True)

@@ -3,7 +3,7 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { OperationsQueueItem } from '@/domain/operations/types';
 import ImportActivityPanel from '@/features/import-jobs/components/ImportActivityPanel.vue';
-import type { ImportJob } from '@/features/import-jobs/types';
+import type { ImportJob, ImportJobDetail } from '@/features/import-jobs/types';
 
 const activeJob: ImportJob = {
   id: 'active-job',
@@ -15,6 +15,19 @@ const activeJob: ImportJob = {
   processed_items: 4,
   created_at: '2026-08-09T10:00:00Z',
   updated_at: '2026-08-09T10:01:00Z',
+  card_pool: 'player',
+  card_role_mode: 'automatic',
+  card_role_override: [],
+  card_faction_mode: 'automatic',
+  card_faction_override: [],
+  card_mana_family_mode: 'automatic',
+  card_mana_family_override: [],
+  classification_rule_snapshot: {
+    schema_version: 3,
+    card_pool: 'player',
+    rules: [],
+    digest: 'abc123',
+  },
 };
 
 const recentJob: OperationsQueueItem = {
@@ -39,13 +52,18 @@ const mountPanel = async (
     recentJobs?: OperationsQueueItem[];
     activeLoaded?: boolean;
     historyLoaded?: boolean;
+    selectedJobDetail?: ImportJobDetail | null;
   } = {},
 ) => {
   const onRefresh = vi.fn();
   const onCancel = vi.fn();
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/operations', component: { template: '<div />' } }],
+    routes: [
+      { path: '/operations', component: { template: '<div />' } },
+      { path: '/review', component: { template: '<div />' } },
+      { path: '/cards/:cardId/edit', component: { template: '<div />' } },
+    ],
   });
   await router.push('/operations');
   await router.isReady();
@@ -54,6 +72,7 @@ const mountPanel = async (
   const app = createApp(ImportActivityPanel, {
     activeJobs: options.activeJobs ?? [activeJob],
     recentJobs: options.recentJobs ?? [recentJob],
+    templateLabelByKey: { 'mtg-like-v1': 'Default card' },
     activeLoaded: options.activeLoaded ?? true,
     historyLoaded: options.historyLoaded ?? true,
     refreshing: false,
@@ -63,6 +82,8 @@ const mountPanel = async (
     cancelingCount: 0,
     cancellingJobIds: new Set<string>(),
     lastRefreshedAt: '10:05:00',
+    selectedJobDetail: options.selectedJobDetail ?? null,
+    detailLoading: false,
     onRefresh,
     onCancel,
   });
@@ -85,7 +106,8 @@ describe('ImportActivityPanel', () => {
         .querySelector('[data-testid="import-activity-panel"]')
         ?.classList.contains('theme-card-frame'),
     ).toBe(false);
-    expect(mounted.host.textContent).toContain('mtg-like-v1 · Unversioned');
+    expect(mounted.host.textContent).toContain('Default card · Unversioned');
+    expect(mounted.host.textContent).not.toContain('mtg-like-v1');
     expect(mounted.host.textContent).toContain('Default card · 16.2.0');
     expect(mounted.host.textContent).not.toContain('uploads/finished-job');
     expect(
@@ -95,7 +117,9 @@ describe('ImportActivityPanel', () => {
     expect(actions?.classList.contains('flex-nowrap')).toBe(true);
     expect(actions?.classList.contains('flex-wrap')).toBe(false);
 
-    mounted.host.querySelector<HTMLButtonElement>('button[aria-label="Refresh import activity"]')?.click();
+    mounted.host
+      .querySelector<HTMLButtonElement>('button[aria-label="Refresh import activity"]')
+      ?.click();
     Array.from(mounted.host.querySelectorAll('button'))
       .find((button) => button.textContent?.trim() === 'Interrupt')
       ?.click();
@@ -120,12 +144,161 @@ describe('ImportActivityPanel', () => {
   test('shows active controls while recent history is still loading', async () => {
     const mounted = await mountPanel({ historyLoaded: false });
 
-    expect(mounted.host.textContent).toContain('mtg-like-v1 · Unversioned');
+    expect(mounted.host.textContent).toContain('Default card · Unversioned');
     expect(mounted.host.textContent).toContain('Interrupt');
     expect(mounted.host.querySelector('[aria-label="Loading active imports"]')).toBeNull();
     expect(
       mounted.host.querySelector('[aria-label="Loading recent import history"]'),
     ).not.toBeNull();
+
+    mounted.app.unmount();
+  });
+
+  test('shows import warnings and a neutral classification review handoff', async () => {
+    const detail: ImportJobDetail = {
+      ...activeJob,
+      id: 'finished-job',
+      status: 'completed',
+      processed_items: 1,
+      total_items: 1,
+      items: [
+        {
+          id: 'item-id',
+          source_file: 'event.webp',
+          status: 'completed',
+          error_message: null,
+          warning_code: 'matched_deprecated_card',
+          warning_message: 'Matched a deprecated card.',
+          warnings: [
+            { code: 'matched_deprecated_card', message: 'Matched a deprecated card.' },
+            {
+              code: 'card_classification_changed_while_queued',
+              message: 'Classification changed while queued.',
+              details: {
+                queued: { card_pool: 'player', card_roles: ['hero'] },
+                live: { card_pool: 'player', card_roles: [] },
+              },
+            },
+            {
+              code: 'evil_faction_unresolved',
+              message: 'No Evil faction was inferred.',
+              details: {
+                reason: 'ambiguous_name',
+                checksum_candidate_count: 0,
+                name_candidate_count: 2,
+              },
+            },
+          ],
+          resolved_card_roles: ['event'],
+          resolved_card_factions: ['order'],
+          resolved_card_mana_families: ['arcane'],
+          classification_inference: {
+            roles: {
+              mode: 'automatic',
+              matched_type_sources: [{ id: 'type-event', key: 'event' }],
+            },
+            factions: {
+              mode: 'automatic',
+              matched_tag_sources: [{ id: 'tag-order', key: 'order' }],
+            },
+            mana_families: {
+              mode: 'automatic',
+              matched_symbol_sources: [{ id: 'symbol-arcane', key: 'arcane-mana' }],
+            },
+          },
+          target_card_id: 'card-id',
+          target_card_version_id: 'version-id',
+          target_card_pool_snapshot: null,
+          target_card_roles_snapshot: [],
+          target_card_factions_snapshot: [],
+          target_card_mana_families_snapshot: [],
+          card_tab_url: '/cards/card-id/edit?tab=card',
+          classification_review: {
+            id: 'review-id',
+            status: 'open',
+            url: '/review?view=classification&status=open',
+          },
+        },
+      ],
+    };
+    const mounted = await mountPanel({ selectedJobDetail: detail });
+
+    expect(mounted.host.textContent).toContain('Matched a deprecated card.');
+    expect(mounted.host.textContent).toContain('Classification changed while queued.');
+    expect(mounted.host.textContent).toContain('No Evil faction was inferred.');
+    expect(mounted.host.textContent).toContain('Ambiguous name or alias');
+    expect(mounted.host.textContent).toContain('Name candidates:');
+    expect(mounted.host.textContent).toContain('Role types');
+    expect(mounted.host.textContent).toContain('Evil');
+    expect(mounted.host.textContent).toContain('Queued');
+    expect(mounted.host.textContent).toContain('Live');
+    expect(mounted.host.textContent).toContain('Normal');
+    expect(mounted.host.textContent).toContain('Factions: Order');
+    expect(mounted.host.textContent).toContain('Mana: Arcane');
+    expect(
+      mounted.host.querySelector('a[href="/cards/card-id/edit?tab=card"]')?.textContent,
+    ).toContain('Review card classification');
+    expect(mounted.host.querySelectorAll('a[href="/cards/card-id/edit?tab=card"]')).toHaveLength(1);
+    const reviewLink = Array.from(mounted.host.querySelectorAll('a')).find((link) =>
+      link.textContent?.includes('Sent to Review · open'),
+    );
+    expect(reviewLink?.getAttribute('href')).toContain('view=classification');
+
+    mounted.app.unmount();
+  });
+
+  test('does not present unprocessed classification defaults as resolved Normal cards', async () => {
+    const detail: ImportJobDetail = {
+      ...activeJob,
+      items: [
+        {
+          id: 'queued-item',
+          source_file: 'queued.webp',
+          status: 'queued',
+          error_message: null,
+          warning_code: null,
+          warning_message: null,
+          warnings: [],
+          resolved_card_roles: [],
+          resolved_card_factions: [],
+          resolved_card_mana_families: [],
+          classification_inference: {},
+          target_card_id: null,
+          target_card_version_id: null,
+          target_card_pool_snapshot: null,
+          target_card_roles_snapshot: [],
+          target_card_factions_snapshot: [],
+          target_card_mana_families_snapshot: [],
+          card_tab_url: null,
+        },
+        {
+          id: 'failed-item',
+          source_file: 'failed.webp',
+          status: 'failed',
+          error_message: 'OCR failed.',
+          warning_code: null,
+          warning_message: null,
+          warnings: [],
+          resolved_card_roles: [],
+          resolved_card_factions: [],
+          resolved_card_mana_families: [],
+          classification_inference: {},
+          target_card_id: null,
+          target_card_version_id: null,
+          target_card_pool_snapshot: null,
+          target_card_roles_snapshot: [],
+          target_card_factions_snapshot: [],
+          target_card_mana_families_snapshot: [],
+          card_tab_url: null,
+        },
+      ],
+    };
+    const mounted = await mountPanel({ selectedJobDetail: detail });
+
+    expect(mounted.host.textContent).toContain('Classification pending');
+    expect(mounted.host.textContent).toContain('Classification unavailable');
+    expect(mounted.host.textContent).not.toContain('Normal — no special roles');
+    expect(mounted.host.textContent).not.toContain('Resolution');
 
     mounted.app.unmount();
   });

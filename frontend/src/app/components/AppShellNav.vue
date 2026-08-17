@@ -16,7 +16,9 @@
         @click="$emit('toggleCollapse')"
       >
         <span class="absolute inset-0 rounded-xl" />
-        <span class="absolute inset-0 flex items-center justify-center transition-opacity group-hover:opacity-0">
+        <span
+          class="absolute inset-0 flex items-center justify-center transition-opacity group-hover:opacity-0"
+        >
           <img
             :src="cardLogoUrl"
             alt=""
@@ -32,7 +34,7 @@
         v-else
         class="flex min-w-0 items-center gap-3 rounded-xl transition"
         :class="collapsed ? 'justify-center' : ''"
-        to="/cards"
+        :to="galleryLocation"
         @click="handleNavClick"
       >
         <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
@@ -55,7 +57,9 @@
         type="button"
         class="nav-link shrink-0"
         :class="collapsed ? 'justify-center px-0' : ''"
-        :aria-label="mobile ? 'Close navigation' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        :aria-label="
+          mobile ? 'Close navigation' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'
+        "
         :title="mobile ? 'Close navigation' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         @click="mobile ? $emit('closeMobile') : $emit('toggleCollapse')"
       >
@@ -77,7 +81,7 @@
     <nav class="grid w-full gap-2">
       <template
         v-for="item in publicItems"
-        :key="item.to"
+        :key="item.label"
       >
         <RouterLink
           class="nav-link relative"
@@ -90,6 +94,7 @@
           <component
             :is="item.icon"
             class="h-[1.125rem] w-[1.125rem] shrink-0"
+            :data-card-pool-icon="item.cardPool"
           />
           <span v-if="!collapsed">{{ item.label }}</span>
           <span
@@ -113,7 +118,7 @@
 
       <template
         v-for="item in staffItems"
-        :key="item.to"
+        :key="item.label"
       >
         <RouterLink
           class="nav-link relative"
@@ -126,6 +131,7 @@
           <component
             :is="item.icon"
             class="h-[1.125rem] w-[1.125rem] shrink-0"
+            :data-card-pool-icon="item.cardPool"
           />
           <span v-if="!collapsed">{{ item.label }}</span>
           <span
@@ -144,6 +150,13 @@
     </nav>
 
     <div class="mt-auto w-full space-y-4 pt-6">
+      <div class="app-sidebar-divider pt-4">
+        <CardPoolWorkspaceSwitcher
+          :collapsed="collapsed"
+          @selected="handleNavClick"
+        />
+      </div>
+
       <div class="app-sidebar-divider pt-4">
         <div :class="collapsed ? 'flex justify-center' : ''">
           <AppHotkeysPanel :compact="collapsed" />
@@ -189,19 +202,30 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Activity, Bell, BookOpen, ChevronRight, ClipboardCheck, Folders, Gamepad2, Hammer, Images, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Settings, SlidersHorizontal, Upload, X } from 'lucide-vue-next';
+import type { Component } from 'vue';
+import { ChevronRight, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-vue-next';
 import { RouterLink, useRouter } from 'vue-router';
+import type { RouteLocationRaw } from 'vue-router';
 import AppHotkeysPanel from '@/app/components/AppHotkeysPanel.vue';
+import CardPoolWorkspaceSwitcher from '@/app/components/CardPoolWorkspaceSwitcher.vue';
 import ThemeModeMenu from '@/app/components/ThemeModeMenu.vue';
 import { useAccessRequestSummary } from '@/domain/access-requests/composables/useAccessRequestSummary';
 import { useNotificationSummary } from '@/domain/notifications/composables/useNotificationSummary';
 import { useReviewSummary } from '@/domain/review/composables/useReviewSummary';
 import { useAuthStore } from '@/domain/session/store';
+import {
+  buildWorkspaceGalleryLocation,
+  useCardPoolWorkspaceStore,
+} from '@/domain/cards/cardPoolWorkspace';
+import { CARD_POOL_ICONS } from '@/domain/cards/cardPoolIcons';
+import type { CardPool } from '@/domain/cards/cardPools';
+import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 
 type NavItem = {
   label: string;
-  to: string;
-  icon: typeof Images;
+  to: RouteLocationRaw;
+  icon: Component;
+  cardPool?: CardPool;
   requiresStaff?: boolean;
   requiresAuth?: boolean;
   requiresAuthenticatedUser?: boolean;
@@ -227,24 +251,63 @@ const emit = defineEmits<{
 }>();
 
 const auth = useAuthStore();
+const workspace = useCardPoolWorkspaceStore();
 const router = useRouter();
 const cardLogoUrl = `${import.meta.env.BASE_URL}card_logo_transparent.webp`;
-const { openParseFlagItemCount } = useReviewSummary();
+const { openReviewCount } = useReviewSummary();
 const { unreadNotificationCount } = useNotificationSummary();
 const { pendingAccessRequestCount } = useAccessRequestSummary();
 
+const galleryLocation = computed(() => buildWorkspaceGalleryLocation(workspace.activePool));
 const items = computed<NavItem[]>(() => [
-  { label: 'Gallery', to: '/cards', icon: Images },
-  { label: 'Decks', to: '/decks', icon: BookOpen },
-  { label: 'Playtester', to: '/playtester', icon: Gamepad2 },
-  { label: 'My Decks', to: '/my/decks', icon: Folders, requiresAuth: true },
-  { label: 'Build a deck', to: '/my/decks/new?return_to=my_decks', icon: Hammer, requiresAuth: true },
-  { label: 'Notifications', to: '/notifications', icon: Bell, requiresAuthenticatedUser: true, badgeCount: unreadNotificationCount.value },
-  { label: 'Settings', to: '/settings', icon: SlidersHorizontal },
-  { label: 'Imports', to: '/imports', icon: Upload, requiresStaff: true },
-  { label: 'Operations', to: '/operations', icon: Activity, requiresStaff: true },
-  { label: 'Review Queue', to: '/review', icon: ClipboardCheck, requiresStaff: true, badgeCount: openParseFlagItemCount.value },
-  { label: 'Admin', to: '/admin', icon: Settings, requiresStaff: true, badgeCount: pendingAccessRequestCount.value },
+  {
+    label: 'Gallery',
+    to: galleryLocation.value,
+    icon: CARD_POOL_ICONS[workspace.activePool],
+    cardPool: workspace.activePool,
+  },
+  ...(workspace.activePool === 'player'
+    ? [
+        { label: 'Decks', to: '/decks', icon: APP_SECTION_ICONS.decks },
+        { label: 'Playtester', to: '/playtester', icon: APP_SECTION_ICONS.playtester },
+        { label: 'My Decks', to: '/my/decks', icon: APP_SECTION_ICONS.myDecks, requiresAuth: true },
+        {
+          label: 'Build a deck',
+          to: '/my/decks/new?return_to=my_decks',
+          icon: APP_SECTION_ICONS.deckBuilder,
+          requiresAuth: true,
+        },
+      ]
+    : []),
+  {
+    label: 'Notifications',
+    to: '/notifications',
+    icon: APP_SECTION_ICONS.notifications,
+    requiresAuthenticatedUser: true,
+    badgeCount: unreadNotificationCount.value,
+  },
+  { label: 'Settings', to: '/settings', icon: APP_SECTION_ICONS.settings },
+  { label: 'Imports', to: '/imports', icon: APP_SECTION_ICONS.imports, requiresStaff: true },
+  {
+    label: 'Operations',
+    to: '/operations',
+    icon: APP_SECTION_ICONS.operations,
+    requiresStaff: true,
+  },
+  {
+    label: 'Review Queue',
+    to: '/review',
+    icon: APP_SECTION_ICONS.review,
+    requiresStaff: true,
+    badgeCount: openReviewCount.value,
+  },
+  {
+    label: 'Admin',
+    to: '/admin',
+    icon: APP_SECTION_ICONS.admin,
+    requiresStaff: true,
+    badgeCount: pendingAccessRequestCount.value,
+  },
 ]);
 
 const canShowItem = (item: NavItem): boolean => {
@@ -260,8 +323,12 @@ const canShowItem = (item: NavItem): boolean => {
   return true;
 };
 
-const publicItems = computed(() => items.value.filter((item) => !item.requiresStaff && canShowItem(item)));
-const staffItems = computed(() => items.value.filter((item) => item.requiresStaff && canShowItem(item)));
+const publicItems = computed(() =>
+  items.value.filter((item) => !item.requiresStaff && canShowItem(item)),
+);
+const staffItems = computed(() =>
+  items.value.filter((item) => item.requiresStaff && canShowItem(item)),
+);
 
 const handleNavClick = (): void => {
   if (props.mobile) {
@@ -276,7 +343,6 @@ const signOut = async (): Promise<void> => {
   }
   await router.push('/cards');
 };
-
 </script>
 
 <style scoped>

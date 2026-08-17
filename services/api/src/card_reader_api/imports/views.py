@@ -1,10 +1,5 @@
 from __future__ import annotations
 
-import logging
-from pathlib import Path
-from uuid import uuid4
-
-from django.core.files.uploadedfile import UploadedFile
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -18,16 +13,14 @@ from card_reader_api.imports.serializers import (
     import_job_payload,
 )
 from card_reader_core.repositories.content_versions import get_current_content_version
-from card_reader_core.repositories.import_jobs import (
-    SUPPORTED_IMAGE_SUFFIXES,
-    fetch_items_for_job,
-    fetch_job,
-    list_import_jobs,
+from card_reader_api.imports.creation import (
+    ImportAdmissionConflict,
+    ImportAdmissionRejected,
+    ImportAdmissionUncertain,
+    ImportUploadAdmission,
 )
+from card_reader_core.repositories.import_jobs import fetch_items_for_job, fetch_job, list_import_jobs
 from card_reader_core.services.imports import ImportService
-from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
-
-logger = logging.getLogger(__name__)
 
 
 class ImportListView(APIView):
@@ -46,39 +39,61 @@ class CurrentContentVersionView(APIView):
 
 class ImportUploadView(APIView):
     def post(self, request: Request) -> Response:
-        serializer = ImportUploadSerializer(
-            data={
-                "template_id": request.data.get("template_id", ""),
-                "content_version_base": request.data.get("content_version_base", ""),
-                "content_version_description": request.data.get("content_version_description", ""),
-                "options_json": request.data.get("options_json", "{}"),
-                "files": request.FILES.getlist("files"),
-            }
-        )
+        upload_data: dict[str, object] = {
+            "options_json": request.data.get("options_json", "{}"),
+            "files": request.FILES.getlist("files"),
+            "card_role_mode": request.data.get("card_role_mode", "automatic"),
+            "card_role_override": request.data.get("card_role_override", "[]"),
+            "card_faction_mode": request.data.get("card_faction_mode", "automatic"),
+            "card_faction_override": request.data.get("card_faction_override", "[]"),
+            "card_mana_family_mode": request.data.get(
+                "card_mana_family_mode", "automatic"
+            ),
+            "card_mana_family_override": request.data.get(
+                "card_mana_family_override", "[]"
+            ),
+        }
+        for required_field in (
+            "creation_key",
+            "template_id",
+            "content_version_base",
+            "content_version_description",
+            "card_pool",
+        ):
+            if required_field in request.data:
+                upload_data[required_field] = request.data[required_field]
+
+        serializer = ImportUploadSerializer(data=upload_data)
         if not serializer.is_valid():
             return serializer_error(serializer)
 
-        upload_dir = _save_supported_uploads(serializer.validated_data["files"])
-        if upload_dir is None:
-            return bad_request("No supported image files found in upload")
-
         try:
-            job = ImportService().create_job(
-                source_path=str(upload_dir),
-                template_id=serializer.validated_data["template_id"],
-                options=serializer.validated_data["options_json"],
-                content_version_base=serializer.validated_data["content_version_base"],
-                content_version_description=serializer.validated_data["content_version_description"],
-            )
-        except ValueError as exc:
+            result = ImportUploadAdmission().admit(serializer.validated_data)
+        except ImportAdmissionConflict as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except ImportAdmissionRejected as exc:
             return bad_request(str(exc))
-        except Exception:
-            logger.exception("Failed to create import job from upload. upload_dir=%s", upload_dir)
+        except ImportAdmissionUncertain as exc:
             return Response(
-                {"detail": "Failed to create import job from upload. See API logs."},
+                {"detail": str(exc)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        return Response(import_job_payload(job), status=status.HTTP_201_CREATED)
+        return Response(
+            {
+                **import_job_payload(result.job),
+                "job_id": result.job.id,
+                "idempotent_replay": result.idempotent_replay,
+            },
+            status=status.HTTP_200_OK if result.idempotent_replay else status.HTTP_201_CREATED,
+        )
+
+
+class ImportCreationKeyView(APIView):
+    def get(self, _request: Request, creation_key: object) -> Response:
+        job = ImportService().get_job_by_creation_key(creation_key=str(creation_key))
+        if job is None:
+            return not_found("Job not found")
+        return Response({**import_job_payload(job), "job_id": job.id, "idempotent_replay": True})
 
 
 class ImportDetailView(APIView):
@@ -95,23 +110,3 @@ class ImportCancelView(APIView):
         if job is None:
             return not_found("Job not found")
         return Response(import_job_payload(job), status=status.HTTP_202_ACCEPTED)
-
-
-def _save_supported_uploads(files: list[UploadedFile]) -> str | None:
-    upload_dir = build_storage_relative_path("uploads", str(uuid4()))
-    resolve_storage_path(upload_dir).mkdir(parents=True, exist_ok=True)
-    saved_count = 0
-
-    for index, upload in enumerate(files):
-        original_name = Path(upload.name or f"upload-{index}.img").name
-        if Path(original_name).suffix.lower() not in SUPPORTED_IMAGE_SUFFIXES:
-            continue
-        target_file = resolve_storage_path(
-            build_storage_relative_path(upload_dir, f"{index:04d}-{original_name}")
-        )
-        with target_file.open("wb") as stream:
-            for chunk in upload.chunks():
-                stream.write(chunk)
-        saved_count += 1
-
-    return upload_dir if saved_count else None

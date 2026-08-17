@@ -24,7 +24,13 @@ class TtsCardSheetImageView(APIView):
 
 
 def _sheet_response(request: Request, sheet_id: str, *, include_body: bool) -> HttpResponse:
+    sheet_service = TtsCardSheetService()
     for attempt in range(2):
+        sheet = TtsCardSheet.objects.filter(id=sheet_id).first()
+        if sheet is None:
+            return HttpResponse("TTS card sheet not found.", status=404, content_type="text/plain")
+        if not sheet_service.ensure_sheet_current(sheet_id):
+            break
         sheet = TtsCardSheet.objects.filter(id=sheet_id).first()
         if sheet is None:
             return HttpResponse("TTS card sheet not found.", status=404, content_type="text/plain")
@@ -63,7 +69,7 @@ def _sheet_response(request: Request, sheet_id: str, *, include_body: bool) -> H
             continue
         return _apply_sheet_headers(response, sheet=sheet, etag=etag)
 
-    TtsCardSheetService().request_render(sheet_id)
+    sheet_service.request_render(sheet_id)
     unavailable_response = HttpResponse(
         "TTS card sheet is still being prepared.",
         status=503,

@@ -27,6 +27,7 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
+      "unrs-resolver",
       "vue-demi"
     ]
   }

@@ -1,24 +1,23 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import tarfile
 import tempfile
 
-from .schema import DeveloperDataManifest, DeveloperDataPayload
+from card_reader_core.storage import calculate_checksum
+
+from .schema import (
+    SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS,
+    DeveloperDataManifest,
+    DeveloperDataPayload,
+    adopt_payload_for_format,
+    card_reference_identity,
+)
 
 
 class DeveloperDataError(RuntimeError):
     pass
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def canonical_json_bytes(value: object) -> bytes:
@@ -65,7 +64,7 @@ def load_extracted_bundle(extraction_root: Path) -> tuple[DeveloperDataManifest,
         manifest = DeveloperDataManifest.model_validate_json(manifest_path.read_text(encoding="utf-8"))
     except Exception as exc:
         raise DeveloperDataError("Developer-data manifest is invalid.") from exc
-    if manifest.format_version != 1:
+    if manifest.format_version not in SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS:
         raise DeveloperDataError(f"Unsupported developer-data format: {manifest.format_version}")
 
     expected_paths: set[str] = set()
@@ -77,7 +76,7 @@ def load_extracted_bundle(extraction_root: Path) -> tuple[DeveloperDataManifest,
         target = extraction_root / Path(normalized)
         if not target.is_file():
             raise DeveloperDataError(f"Developer-data file is missing: {normalized}")
-        if target.stat().st_size != entry.size_bytes or sha256_file(target) != entry.sha256:
+        if target.stat().st_size != entry.size_bytes or calculate_checksum(target) != entry.sha256:
             raise DeveloperDataError(f"Developer-data file checksum mismatch: {normalized}")
 
     actual_paths = {
@@ -89,10 +88,45 @@ def load_extracted_bundle(extraction_root: Path) -> tuple[DeveloperDataManifest,
         unexpected = sorted(actual_paths.symmetric_difference(expected_paths))
         raise DeveloperDataError(f"Developer-data archive file list differs from its manifest: {unexpected}")
     try:
-        payload = DeveloperDataPayload.model_validate_json(data_path.read_text(encoding="utf-8"))
+        raw_payload = json.loads(data_path.read_text(encoding="utf-8"))
+        payload = DeveloperDataPayload.model_validate(
+            adopt_payload_for_format(raw_payload, format_version=manifest.format_version)
+        )
     except Exception as exc:
         raise DeveloperDataError("Developer-data payload is invalid.") from exc
+    _validate_public_payload_scope(payload)
     return manifest, payload
+
+
+def _validate_public_payload_scope(payload: DeveloperDataPayload) -> None:
+    card_pools_by_identity = {
+        (card.card_pool, tuple(card.card_factions), card.key): card.card_pool
+        for card in payload.cards
+    }
+    cross_pool_groups = []
+    for group in payload.card_groups:
+        referenced_card_identities = {
+            card_reference_identity(group.anchor_card_ref),
+            *(card_reference_identity(member.card_ref) for member in group.members),
+        }
+        referenced_pools = {
+            card_pools_by_identity[identity]
+            for identity in referenced_card_identities
+            if identity in card_pools_by_identity
+        }
+        if len(referenced_pools) > 1:
+            cross_pool_groups.append(group.key)
+    if cross_pool_groups:
+        raise DeveloperDataError(
+            "Developer-data archive contains cross-pool card groups: "
+            + ", ".join(sorted(cross_pool_groups))
+        )
+
+    non_player_card_keys = sorted(card.key for card in payload.cards if card.card_pool != "player")
+    if non_player_card_keys:
+        raise DeveloperDataError(
+            "Developer-data archive contains non-Player cards: " + ", ".join(non_player_card_keys)
+        )
 
 
 def _validate_archive_member(value: str) -> str:

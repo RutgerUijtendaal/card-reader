@@ -105,6 +105,33 @@ Core stack:
 - Django owns the domain schema through migrations in `services/core`.
 - When adding, removing, or changing Django database models or relationships, update `docs/card-database-diagram.svg` when the card-related schema diagram is affected.
 - When changing documented feature behavior, workflows, permissions, API contracts, onboarding, or operations, review the relevant guides under `docs/` and update them when they are no longer accurate. Also review `docs/README.md` when documentation is added, removed, or renamed.
+- The target card classification model has four independent card-level dimensions:
+  - `card_pool` is exactly one of `player`, `evil`, or `neutral`; unknown values are invalid.
+  - `card_roles` is a set of zero or more code-owned roles: `hero`, `boss`, `location`, `boon`, `event`, `shop_item`, `directive`, `reminder`, and `mana`; roles may coexist.
+  - `card_factions` is a set of zero or more code-owned factions: `order`, `blood`, `dark`, and `metal`; factions may coexist.
+  - `card_mana_families` is a set of zero or more code-owned families: `arcane`, `dark`, `divine`, `martial`, `occult`, and `primal`; families may coexist across every pool. Colorless is the derived empty state and is never persisted.
+  - Normal is the product label for the derived empty-role state and must not be persisted as a role. Keep `standard` only as the existing internal/query sentinel for that derived state.
+  - Pool/role/faction/mana-family conventions belong in core code, not mutually-exclusive or same-pool database constraints. Cross-pool relationships are allowed.
+  - Pool, roles, factions, and mana families belong to the stable `Card` record; template remains version/parser configuration.
+  - Stored Card mana families are authoritative for classification, filtering, sorting, and deck-building decisions. `CardVersion` Symbols remain authoritative for printed mana cost and value, mana distribution, Affinity and Devotion, exact raw-Symbol filters, parser output, and diagnostic evidence. Symbol edits must never silently mutate stored Card families.
+  - Mana-family assignments and the indexed `Card.mana_family_sort_key` form one invariant. Runtime mutations must use the cards classification seam so the complete assignment set and cached sort key update atomically.
+  - Mana families do not participate in Card identity, alias namespaces, or merge namespace validation.
+  - Stable human-readable card identity is scoped by pool plus the exact canonical faction set: normalized primary names, aliases, and ordinary untargeted image-hash matching must resolve inside one explicit `(card_pool, card_factions)` namespace. Same-name cards may coexist in different faction namespaces. Roles and mana families never participate in identity matching.
+  - Empty factions on an untargeted Evil import mean unknown classification rather than an intentional stable Evil namespace. After ordinary empty-namespace matching, search currently factioned Evil Cards across all historical image checksums and then normalized primary names and aliases. Reuse only one unambiguous Card: either evidence set may resolve alone, both singleton sets must agree, and any multiple or conflicting candidates must refuse the merge. Preserve a matched Card's stored roles, factions, and mana families and create a durable staff classification-review item when inferred values differ. An unmatched or ambiguous import may create or reuse a transitional no-faction Evil Card, must emit `evil_faction_unresolved` with candidate counts, and must link reviewers to its Card tab. Targeted reparses, known-faction imports, other pools, and imports with reparse matching disabled do not use this fallback.
+  - Faction assignments and the derived faction identity key form one invariant. Runtime faction mutations must go through the cards identity seam so assignments plus card and alias namespace keys update atomically.
+  - Neutral remains a separate stable pool. Do not include it implicitly in Player or Evil queries; any future Neutral overlay must be an explicit multi-pool view state.
+- Ordinary Gallery filter visibility is code-owned frontend presentation policy, not card validity, authorization, or import inference:
+  - Hide the Roles facet in Player, Evil, and Neutral. Roles remain persisted code-owned classification for inference, overrides, manual editing, business logic, Admin, Review, and explicit API queries.
+  - Show Factions only in Evil. Show Mana, including its mana-cost range, Affinity, and Devotion only in Player. All other Gallery facets retain their current visibility until another approved filter pass changes them.
+  - Keep the facet matrix and sanitation in one cards-domain Gallery policy. Do not infer it from card data, result counts, Tags, Types, symbols, or classification rules, and do not add database/Admin/developer-data configuration for it.
+  - Before loading Gallery results, remove every hidden facet's include, exclude, match-mode, and numeric state from the canonical route and request. Admin, Review, global maintenance, and purpose-specific Player deck filters must not inherit this Gallery-only policy.
+- Ordinary Gallery filter value availability is a separate backend-derived concern:
+  - For Keywords, Tags, and Types, an exact `card_pool` request returns only values linked to the latest version of at least one active Card in that pool. It is independent of the Gallery's other active filters rather than a fully dynamic facet count.
+  - Omitting `card_pool` preserves the complete all-pool catalog used by Admin, Review, maintenance, and other global consumers. Invalid pool values are rejected.
+  - Gallery must discard stale cross-pool catalog responses and reconcile unavailable route selections so hidden values cannot remain as ghost filters. A failed catalog request must not be treated as a successful empty catalog or erase route state.
+  - Keep the initial implementation query-backed and bounded, with query-count coverage and no cache, persistence, migration, or developer-data change. Measure before introducing caching, and leave Symbols, Mana, Templates, numeric ranges, Roles, Factions, and whole-facet visibility unchanged.
+- The Player/Evil/Neutral workspace scopes ordinary browsing and workspace-owned card collections, not global staff operations. Admin and Review always cover all pools regardless of the selected shell workspace; their mixed-pool records, counts, queues, searches, suggestions, and previews must retain explicit pool labels where ambiguity is possible. Every new import must start without a template or card-pool default and require both selections explicitly; imports must not inherit the shell workspace.
+- Player, Evil, and Neutral card data are equally public for anonymous, ordinary, inactive-session, and staff viewers. This includes direct objects, collections, filter catalogs, generations, groups, embedded payloads, exports returned from otherwise-authorized endpoints, and direct or immutable images. Do not add viewer-dependent card-pool scopes, pool capability fields, redacted card placeholders, or pool-specific visibility checks. Global reads cover all pools, exact-pool reads use an explicit `card_pool`, and genuine Player-only workflows use an explicit Player predicate. Persistent TTS card sheets remain pool-partitioned public derived artifacts with stable URLs.
 - SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.
 - Import flow remains async:
   - API creates jobs and items.
@@ -117,9 +144,13 @@ Core stack:
   - paginated or query-backed card collections should sort in the backend
   - already-loaded embedded card collections may sort client-side for presentation
   - shared sort keys and semantics must stay aligned across both layers
+  - `default` is the canonical single-pool sort: Player orders by mana family, then Hero before the default role order, then ascending mana value; Evil orders by Order, Blood, Dark, Metal, then no faction, followed by Boss, Location, the default role order, and ascending mana value; Neutral uses the default role order
+  - the default role order is Normal, Hero, Boss, Location, Boon, Event, Shop Item, Directive, Reminder, then Mana; pool-specific priority roles are moved ahead of that order without duplicating them
+  - multi-valued factions, roles, and mana families sort by their earliest effective value, then their complete effective membership vector; grouped Gallery results use their anchor Card's values
+  - keep the pool sort as declarative mirrored component lists in backend and frontend code so future priority changes remain localized; query-backed defaults must translate those components to SQL annotations and paginate in the database
   - canonical mana-family order is Arcane, Dark, Divine, Martial, Occult, then Primal; changing it requires a release
   - paired mana and affinity symbols represent the same canonical family for family sorting, filtering, and deck-builder hero presets
-  - query-backed mana-family sorting uses the indexed `CardVersion.mana_family_sort_key`; numeric colorless symbols and unmatched affinities stay in the no-family bucket
+  - query-backed mana-family sorting uses the indexed `Card.mana_family_sort_key`; empty assignments stay in the Colorless/no-family bucket
 - Card lifecycle status controls normal visibility:
   - `active` is the default for play/browsing surfaces such as gallery, grouped gallery, public group detail, catalog linked-card counts/previews, and exports.
   - `deprecated` cards should stay directly retrievable by id and available in explicit management/query flows such as `lifecycle_status=all` or `lifecycle_status=deprecated`.
@@ -135,7 +166,7 @@ Core stack:
   - Frontend code should consume `/decks/rules` for defaults and examples, keeping local fallback defaults only for load/error resilience.
 - Deck list surfaces that only need listing metadata should use summary deck records/endpoints and `DeckListRecord`-compatible shared components; fetch full `DeckRecord` only for detail, editor, export, or playtest flows that need full board entries.
 - The card detail editor separates card-level and version-level edits:
-  - `Card` tab owns Hero Card, Card Status, and Deck-Building Config.
+  - The `Card` tab owns Card Pool, multi-valued Card Roles, Factions, and Mana Families, Card Status, and Deck-Building Config; Normal, No faction, and Colorless are derived when their assignment sets are empty.
   - `Card Version` tab owns parsed scalar fields, symbols, metadata groups, template selection, reset, and reparse actions.
 - User notifications are durable, core-owned in-app records.
   - `NotificationService` is the only public creation API; API views, frontend code, and feature call sites must not write notification rows directly.
@@ -143,11 +174,20 @@ Core stack:
   - Stored in-app notifications are the source of truth. Future email, push, realtime, and digest delivery should dispatch after notification creation instead of branching inside cards, decks, parse flags, or other feature services.
   - Store rendered title/message snapshots plus structured metadata so old notifications remain readable and future channels can render richer payloads.
   - Noisy notification types must intentionally use stable dedupe keys or explicitly opt into one notification per event.
+- Classification review items are durable, core-owned staff work records.
+  - Create one immutable evidence snapshot per mismatching import item; do not coalesce separate imports for the same Card.
+  - Classification review is resolved or dismissed explicitly after staff inspection. Card edits do not silently close review items.
+  - Card merges retarget open and historical classification review items to the surviving Card while preserving their captured snapshots and reviewed version.
+  - Classification review rows remain global staff work records across card-pool changes; use the immutable pool snapshot only as historical evidence when the Card no longer exists.
+  - Classification mismatches belong in Review rather than import warnings. Do not reintroduce a parallel `card_classification_mismatch` warning path.
 
 ## Auth Rules
 - Auth is enabled by default.
-- Card gallery and card assets are public. Deck TTS exports follow deck visibility; gallery and
-  content-version TTS exports require staff access.
+- Player, Evil, and Neutral card galleries, details, groups, generations, embedded payloads, and
+  direct assets are public. Pool-partitioned TTS card-sheet images are public at stable URLs for all three pools.
+  Deck TTS exports follow deck visibility; gallery and content-version TTS export creation requires
+  staff access.
+- Player remains the default workspace. Player-only deck building, Playtester, deck TTS eligibility, and developer-data publication are product contracts rather than card-visibility permissions.
 - Import jobs, review, admin, catalog, templates, and user-selected exports require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
 - Developer-data metadata, browser downloads, and bootstrap-code creation require an active
@@ -156,17 +196,18 @@ Core stack:
   user remains active and still has developer-data access. Bundle creation and build history are
   staff-only.
 - The Vue app uses Django session auth with CSRF protection.
-- `/auth/me` and `/auth/login` return a CSRF token for unsafe browser requests.
+- `/auth/me` and `/auth/login` return a CSRF token for unsafe browser requests and do not return card-pool entitlement fields.
 
-## Seed Files
-- Default seed JSON files live in `services/api/src/card_reader_api/seeds`:
+## Seed And Fixture Files
+- Catalog seed fixtures used by integration tests live in
+  `services/integration/tests/fixtures/catalog`:
   - `seed-keywords.json`
   - `seed-symbols.json`
   - `seed-tags.json`
   - `seed-templates.json`
   - `seed-types.json`
-  - `seed-users.example.json`
-- Local development users live in:
+- The example and local development users live in:
+  - `services/api/src/card_reader_api/seeds/seed-users.example.json`
   - `services/api/src/card_reader_api/seeds/seed-users.local.json`
 - `seed-users.local.json` is gitignored.
 
@@ -191,8 +232,10 @@ Core stack:
 - `api`, `parser`, and `developer-data-builder` share runtime data at `/var/lib/card-reader`.
 - `tts-sheet-renderer` uses the API image, core polling-worker abstraction, shared database, and shared
   runtime storage. TTS sheet rows are the durable coalescing queue; no external broker is required.
-- Persistent TTS sheet slots are append-only. Never move, compact, delete, or reuse a Card identity's
-  assigned sheet coordinate; merges preserve source slots and resolve them to the target Card.
+- Persistent TTS sheets and slots are partitioned by card pool, and their image endpoint is a stable
+  public derived artifact for every pool. Slots are append-only: never move, compact, delete, or
+  reuse a Card identity's assigned sheet coordinate; merges preserve source slots and resolve them
+  to the target Card.
 - Website TTS exports for decks, sideboards, gallery selections, and content versions all use the
   `card-reader.tts-cards.v2` persistent-sheet payload. The object importer spawns those sheets directly and must not
   depend on scripting regions, preloaded card libraries, name matching, or automatic library synchronization.
@@ -275,6 +318,11 @@ Local app URL:
 - `GET /notifications/summary`
 - `PATCH /notifications/{notification_id}`
 - `POST /notifications/mark-all-read`
+- `GET /review/classification-items`
+- `PATCH /review/classification-items/{item_id}`
+- `GET /review/parse-flags`
+- `PATCH /review/parse-flags/items/{item_id}`
+- `GET /review/summary`
 - `GET /developer-data/current`
 - `POST /developer-data/grants`
 - `POST /developer-data/grants/exchange`

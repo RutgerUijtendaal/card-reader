@@ -8,14 +8,20 @@ from rest_framework import serializers
 
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload, symbol_option
-from card_reader_core.metadata import NO_MANA_FAMILY_SORT_KEY
+from card_reader_api.common.serializer_values import ValidatedStringValuesMixin
 from card_reader_core.models import (
+    PLAYER_CARD_POOL,
     Card,
     CardVersion,
     CardVersionImage,
     Deck,
     DeckDifficulty,
+    DeckEntry,
+    DeckSideboard,
     DeckVisibility,
+    card_faction_keys,
+    card_mana_family_keys,
+    card_role_keys,
 )
 from card_reader_core.repositories.cards import get_card_image
 from card_reader_core.services.cards import CardMetadata
@@ -36,7 +42,18 @@ class DeckListFilterParams(TypedDict):
     deck_tag_match: str | None
 
 
-def deck_summary_payload(deck: Deck, *, include_pending_suggestions: bool = False) -> dict[str, object]:
+def deck_summary_payload(
+    deck: Deck,
+    *,
+    include_pending_suggestions: bool = False,
+) -> dict[str, object]:
+    entries = list(deck.entries.all())
+    sideboards = list(deck.sideboards.all())
+    has_non_player_cards = _deck_contains_non_player_cards(
+        deck,
+        entries=entries,
+        sideboards=sideboards,
+    )
     validation = DeckService().get_deck_validation(deck)
     totals = DeckService().get_deck_totals(deck)
     return {
@@ -54,12 +71,13 @@ def deck_summary_payload(deck: Deck, *, include_pending_suggestions: bool = Fals
             "total_cards": totals.mainboard_total_cards,
             "unique_cards": totals.mainboard_unique_cards,
         },
-        "sideboard_count": len(list(deck.sideboards.all())),
+        "sideboard_count": len(sideboards),
         "status": {
             "is_valid": validation.is_valid,
             "label": validation.status_label,
             "deprecated_card_count": validation.deprecated_card_count,
         },
+        "has_non_player_cards": has_non_player_cards,
         "tags": deck_tags_payload(deck),
         "pending_tag_suggestions": pending_deck_tag_suggestions_payload(deck)
         if include_pending_suggestions
@@ -69,11 +87,20 @@ def deck_summary_payload(deck: Deck, *, include_pending_suggestions: bool = Fals
     }
 
 
-def deck_payload(deck: Deck, *, include_pending_suggestions: bool = False) -> dict[str, object]:
-    validation = DeckService().get_deck_validation(deck)
+def deck_payload(
+    deck: Deck,
+    *,
+    include_pending_suggestions: bool = False,
+) -> dict[str, object]:
     totals = DeckService().get_deck_totals(deck)
     entries = list(deck.entries.all())
     sideboards = list(deck.sideboards.all())
+    has_non_player_cards = _deck_contains_non_player_cards(
+        deck,
+        entries=entries,
+        sideboards=sideboards,
+    )
+    validation = DeckService().get_deck_validation(deck)
     constraint_entries = [
         DeckConstraintEntry(card=entry.card, quantity=int(entry.quantity), board="mainboard")
         for entry in entries
@@ -136,6 +163,7 @@ def deck_payload(deck: Deck, *, include_pending_suggestions: bool = False) -> di
             "deprecated_card_count": validation.deprecated_card_count,
             "deprecated_card_ids": validation.deprecated_card_ids or [],
         },
+        "has_non_player_cards": has_non_player_cards,
         "deck_building_rules": effective_deck_building_rules_json(
             hero_card=deck.hero_card,
             entries=constraint_entries,
@@ -147,6 +175,23 @@ def deck_payload(deck: Deck, *, include_pending_suggestions: bool = False) -> di
         "created_at": deck.created_at.isoformat(),
         "updated_at": deck.updated_at.isoformat(),
     }
+
+
+def _deck_contains_non_player_cards(
+    deck: Deck,
+    *,
+    entries: Iterable[DeckEntry],
+    sideboards: Iterable[DeckSideboard],
+) -> bool:
+    if deck.hero_card.card_pool != PLAYER_CARD_POOL:
+        return True
+    if any(entry.card.card_pool != PLAYER_CARD_POOL for entry in entries):
+        return True
+    return any(
+        entry.card.card_pool != PLAYER_CARD_POOL
+        for sideboard in sideboards
+        for entry in sideboard.entries.all()
+    )
 
 
 def deck_tags_payload(deck: Deck) -> list[dict[str, object]]:
@@ -207,6 +252,10 @@ def deck_hero_summary_payload(card: Card) -> dict[str, object]:
             "id": card.id,
             "key": card.key,
             "label": card.label,
+            "card_pool": card.card_pool,
+            "card_roles": list(card_role_keys(card)),
+            "card_factions": list(card_faction_keys(card)),
+            "card_mana_families": list(card_mana_family_keys(card)),
             "name": card.label,
             "image_url": None,
             "symbols": [],
@@ -218,6 +267,10 @@ def deck_hero_summary_payload(card: Card) -> dict[str, object]:
         "id": card.id,
         "key": card.key,
         "label": card.label,
+        "card_pool": card.card_pool,
+        "card_roles": list(card_role_keys(card)),
+        "card_factions": list(card_faction_keys(card)),
+        "card_mana_families": list(card_mana_family_keys(card)),
         "name": version.name,
         "image_url": image_url,
         "symbols": [
@@ -251,7 +304,10 @@ def deck_card_payload(card: Card) -> dict[str, object]:
             "result_type": "card",
             "key": card.key,
             "label": card.label,
-            "is_hero": card.is_hero,
+            "card_pool": card.card_pool,
+            "card_roles": list(card_role_keys(card)),
+            "card_factions": list(card_faction_keys(card)),
+            "card_mana_families": list(card_mana_family_keys(card)),
             "deck_building_config": normalize_deck_building_config(card.deck_building_config_json),
             "lifecycle_status": card.lifecycle_status,
             "template_id": "",
@@ -264,7 +320,7 @@ def deck_card_payload(card: Card) -> dict[str, object]:
             "mana_cost": "",
             "mana_symbols": [],
             "mana_value": None,
-            "mana_family_sort_key": NO_MANA_FAMILY_SORT_KEY,
+            "mana_family_sort_key": card.mana_family_sort_key,
             "attack": None,
             "health": None,
             "rules_text": "",
@@ -319,6 +375,7 @@ class SideboardEntryWriteSerializer(serializers.Serializer[dict[str, object]]):
 
 
 class DeckSideboardWriteSerializer(serializers.Serializer[dict[str, object]]):
+    id = serializers.CharField(required=False, allow_blank=False)
     name = serializers.CharField(required=True, allow_blank=False)
     entries = SideboardEntryWriteSerializer(many=True, required=True, allow_empty=True)
 
@@ -344,8 +401,22 @@ class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
         default=list,
     )
 
+    def validate_sideboards(
+        self,
+        value: list[dict[str, object]],
+    ) -> list[dict[str, object]]:
+        source_ids = [str(sideboard["id"]) for sideboard in value if "id" in sideboard]
+        if len(source_ids) != len(set(source_ids)):
+            raise serializers.ValidationError(
+                "Each existing sideboard can only be submitted once."
+            )
+        return value
 
-class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
+
+class DeckListQuerySerializer(
+    ValidatedStringValuesMixin,
+    serializers.Serializer[dict[str, object]],
+):
     q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     view = serializers.ChoiceField(choices=['summary'], required=False, allow_null=True)
     page = serializers.IntegerField(required=False, allow_null=True, min_value=1)
@@ -420,14 +491,3 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
             created_at if isinstance(created_at, datetime) else None,
             deck_id if isinstance(deck_id, str) else None,
         )
-
-    def _string_or_none(self, key: str) -> str | None:
-        value = self.validated_data.get(key)
-        return value if isinstance(value, str) else None
-
-    def _string_list_or_none(self, key: str) -> list[str] | None:
-        value = self.validated_data.get(key)
-        if not isinstance(value, list):
-            return None
-        out = [item for item in value if isinstance(item, str)]
-        return out or None

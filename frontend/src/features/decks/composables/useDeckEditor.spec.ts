@@ -48,7 +48,7 @@ const {
   toastErrorMock,
   toastInfoMock,
   resetFiltersMock,
-  applyHeroAffinityManaPresetMock,
+  applyHeroManaFamilyPresetMock,
   loadFiltersMock,
   searchCardsMock,
   fetchCardMock,
@@ -68,7 +68,7 @@ const {
   toastErrorMock: vi.fn(),
   toastInfoMock: vi.fn(),
   resetFiltersMock: vi.fn(),
-  applyHeroAffinityManaPresetMock: vi.fn(),
+  applyHeroManaFamilyPresetMock: vi.fn(),
   loadFiltersMock: vi.fn(async (): Promise<void> => undefined),
   searchCardsMock: vi.fn(async () => undefined),
   fetchCardMock: vi.fn(),
@@ -117,7 +117,7 @@ vi.mock('@/features/decks/composables/useDeckEditorFilters', () => ({
     cardScale: { value: 'normal' },
     loadFilters: loadFiltersMock,
     resetFilters: resetFiltersMock,
-    applyHeroAffinityManaPreset: applyHeroAffinityManaPresetMock,
+    applyHeroManaFamilyPreset: applyHeroManaFamilyPresetMock,
   }),
 }));
 
@@ -140,7 +140,7 @@ const buildHero = (id: string, name: string) => ({
   result_type: 'card' as const,
   key: id,
   label: name,
-  is_hero: true,
+  card_pool: 'player' as const, card_roles: ['hero' as const],
   template_id: '',
   version_id: `${id}-version`,
   version_number: 1,
@@ -208,7 +208,7 @@ const flushAsyncEditorWork = async (): Promise<void> => {
 
 const buildCard = (id: string, name: string) => ({
   ...buildHero(id, name),
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   type_line: 'Unit',
 });
 
@@ -289,7 +289,7 @@ describe('useDeckEditor', () => {
         result_type: 'card',
         key: 'hero-1',
         label: 'Hero',
-        is_hero: true,
+        card_pool: 'player' as const, card_roles: ['hero' as const],
         template_id: '',
         version_id: 'hero-version',
         version_number: 1,
@@ -487,13 +487,13 @@ describe('useDeckEditor', () => {
     const resumePromise = mounted.controller.resumeLocalDraft();
     await nextTick();
 
-    expect(applyHeroAffinityManaPresetMock).not.toHaveBeenCalled();
+    expect(applyHeroManaFamilyPresetMock).not.toHaveBeenCalled();
 
     resolveFilters();
     await resumePromise;
 
-    expect(applyHeroAffinityManaPresetMock).toHaveBeenCalledTimes(1);
-    expect(applyHeroAffinityManaPresetMock).toHaveBeenCalledWith(
+    expect(applyHeroManaFamilyPresetMock).toHaveBeenCalledTimes(1);
+    expect(applyHeroManaFamilyPresetMock).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Refreshed Hero' }),
     );
 
@@ -1737,7 +1737,7 @@ describe('useDeckEditor', () => {
     mounted.controller.openCards();
     expect(mounted.controller.editorMode.value).toBe('cards');
     expect(mounted.controller.canAutosync.value).toBe(true);
-    expect(applyHeroAffinityManaPresetMock).toHaveBeenCalledTimes(1);
+    expect(applyHeroManaFamilyPresetMock).toHaveBeenCalledTimes(1);
     await vi.waitFor(() => {
       expect(mounted.router.currentRoute.value.query.editor_mode).toBe('cards');
     });
@@ -1772,7 +1772,7 @@ describe('useDeckEditor', () => {
     expect(updateDeckMock).not.toHaveBeenCalled();
 
     mounted.controller.openCards();
-    expect(applyHeroAffinityManaPresetMock).toHaveBeenLastCalledWith(
+    expect(applyHeroManaFamilyPresetMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ id: 'hero-2' }),
     );
 
@@ -1808,6 +1808,48 @@ describe('useDeckEditor', () => {
     await vi.advanceTimersByTimeAsync(900);
 
     expect(updateDeckMock).toHaveBeenCalledTimes(1);
+    mounted.unmount();
+  });
+
+  test('uses refreshed persisted sideboard ids on the save after replacement', async () => {
+    const mounted = await mountController();
+    mounted.controller.deck.form.sideboards = [
+      {
+        id: 'editor-sideboard-1',
+        source_id: 'persisted-sideboard-old',
+        name: 'Original name',
+        entries: [],
+      },
+    ];
+    updateDeckMock
+      .mockResolvedValueOnce({
+        id: 'deck-1',
+        sideboards: [{ id: 'persisted-sideboard-new', name: 'Original name', entries: [] }],
+        status: { is_valid: true },
+      })
+      .mockResolvedValueOnce({
+        id: 'deck-1',
+        sideboards: [{ id: 'persisted-sideboard-newer', name: 'Renamed', entries: [] }],
+        status: { is_valid: true },
+      });
+
+    await mounted.controller.saveDeck();
+    mounted.controller.deck.renameSideboard('editor-sideboard-1', 'Renamed');
+    await mounted.controller.saveDeck();
+
+    expect(updateDeckMock).toHaveBeenNthCalledWith(
+      2,
+      'deck-1',
+      expect.objectContaining({
+        sideboards: [
+          expect.objectContaining({
+            id: 'persisted-sideboard-new',
+            name: 'Renamed',
+          }),
+        ],
+      }),
+    );
+
     mounted.unmount();
   });
 

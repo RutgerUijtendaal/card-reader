@@ -44,6 +44,7 @@ All website exports share this shape:
   "sheets": [
     {
       "sheet_id": "sheet-id",
+      "card_pool": "player",
       "face_url": "https://cards.example/tts/card-sheets/sheet-id/image.webp",
       "columns": 9,
       "rows": 7,
@@ -78,7 +79,8 @@ The hero is required for a main-deck export; unavailable non-hero cards are incl
 quantity and role.
 
 An export references the persistent sheets that already contain its Cards. It does not create a compact
-export-specific atlas, so a sparse selection may reference several sheets.
+export-specific atlas, so a sparse selection may reference several sheets. Sheets are partitioned by
+`card_pool` (`player`, `evil`, or `neutral`); one sheet never mixes cards from different pools.
 
 ## Artwork refresh and caching
 

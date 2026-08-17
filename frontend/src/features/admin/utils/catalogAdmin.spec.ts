@@ -16,6 +16,10 @@ describe('catalogAdminUtils', () => {
         label: 'Card catalog',
         kinds: ['keywords', 'tags', 'symbols', 'types', 'suggested-tags', 'suggested-types'],
       },
+      {
+        label: 'Card classification',
+        kinds: ['card-roles', 'card-factions', 'card-mana-families'],
+      },
       { label: 'Deck tags', kinds: ['deck-roles', 'deck-types', 'suggested-deck-types'] },
     ]);
     expect(isKnownCatalogKind('tags')).toBe(true);

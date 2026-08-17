@@ -89,7 +89,9 @@ const buildHero = (): DeckCardSummary =>
     result_type: 'card',
     key: 'hero-1',
     label: 'Hero',
-    is_hero: true,
+    card_pool: 'player' as const, card_roles: ['hero' as const],
+    card_factions: [],
+    card_mana_families: ['martial'],
     template_id: '',
     version_id: 'hero-version',
     version_number: 1,
@@ -144,6 +146,7 @@ describe('useDeckEditorFilters', () => {
     const params = controller.buildSearchParams();
 
     expect(params.get('q')).toBe('mage');
+    expect(params.get('sort')).toBe('default');
     expect(params.get('lifecycle_status')).toBe('all');
     expect(params.getAll('card_ids')).toEqual(['card-a', 'card-b']);
   });
@@ -155,6 +158,29 @@ describe('useDeckEditorFilters', () => {
     });
 
     expect(controller.buildSearchParams().get('lifecycle_status')).toBeNull();
+  });
+
+  test('omits unsupported role and faction filters from card gallery requests', () => {
+    const controller = useDeckEditorFilters({
+      deckCardIds: ref([]),
+      editorMode: ref<DeckEditorMode>('cards'),
+    });
+
+    const sections = controller.filterSectionsState.value;
+    sections.onUpdateSelectedCardRoles(['boss']);
+    sections.onUpdateExcludedCardRoles(['event']);
+    sections.onUpdateCardRoleMatch('all');
+    sections.onUpdateSelectedCardFactions(['dark']);
+    sections.onUpdateExcludedCardFactions(['blood']);
+    sections.onUpdateCardFactionMatch('all');
+
+    const params = controller.buildSearchParams();
+    expect(params.has('card_roles')).toBe(false);
+    expect(params.has('card_role_exclude')).toBe(false);
+    expect(params.has('card_role_match')).toBe(false);
+    expect(params.has('card_factions')).toBe(false);
+    expect(params.has('card_faction_exclude')).toBe(false);
+    expect(params.has('card_faction_match')).toBe(false);
   });
 
   test('uses an empty-deck sentinel when current deck only is enabled without cards', () => {
@@ -226,7 +252,7 @@ describe('useDeckEditorFilters', () => {
     await controller.loadFilters();
     controller.updateQuery('old search');
     controller.setCurrentDeckOnly(true);
-    controller.applyHeroAffinityManaPreset(buildHero());
+    controller.applyHeroManaFamilyPreset(buildHero());
 
     const params = controller.buildSearchParams();
     expect(controller.query.value).toBe('');
@@ -245,7 +271,7 @@ describe('useDeckEditorFilters', () => {
     });
 
     await controller.loadFilters();
-    controller.applyHeroAffinityManaPreset(buildHero());
+    controller.applyHeroManaFamilyPreset(buildHero());
     editorMode.value = 'hero';
 
     const params = controller.buildSearchParams();

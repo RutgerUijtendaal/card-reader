@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from card_reader_core.models import CardVersion
+    from card_reader_core.models import CardPool, CardVersion
     from card_reader_parser.parsers.card_parser import CardParser
 
 FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures"
@@ -38,9 +38,11 @@ def load_case(case_path: Path) -> dict[str, Any]:
 
 def run_case(case_path: Path, parser: CardParser) -> dict[str, Any]:
     from card_reader_core.repositories.import_jobs import create_import_job
+    from card_reader_core.services.classification_rules import ClassificationRuleService
     from card_reader_core.services.parser_jobs import ImportProcessorService
 
     case = load_case(case_path)
+    card_pool = _case_card_pool(case)
     image_path = (FIXTURES_ROOT / case["input"]["image"]).resolve()
     assert image_path.exists(), f"Fixture image does not exist: {image_path}"
 
@@ -49,6 +51,12 @@ def run_case(case_path: Path, parser: CardParser) -> dict[str, Any]:
         source_path=image_path,
         template_id=str(case["input"]["template_key"]),
         options=_job_options(case),
+        card_pool=card_pool,
+        classification_rule_snapshot=ClassificationRuleService().build_snapshot(
+            card_pool=card_pool,
+            include_roles=True,
+            include_factions=True,
+        ),
     )
     processor.process_job(job.id)
 
@@ -114,12 +122,14 @@ def load_db_state() -> dict[str, object]:
         "card": {
             "key": card.key,
             "label": card.label,
+            "card_pool": str(card.card_pool),
         },
         "fields": {
             "template_key": latest_version.template.key,
             "name": latest_version.name,
             "type_line": latest_version.type_line,
             "mana_cost": latest_version.mana_cost,
+            "mana_value": latest_version.mana_value,
             "mana_symbols": latest_version.mana_symbols_json,
             "attack": latest_version.attack,
             "health": latest_version.health,
@@ -143,6 +153,7 @@ def load_db_state() -> dict[str, object]:
         "field_sources": latest_version.field_sources_json,
         "job": {
             "status": str(job.status),
+            "card_pool": str(job.card_pool),
             "total_items": job.total_items,
             "processed_items": job.processed_items,
             "item_statuses": [str(row.status) for row in item_rows],
@@ -154,6 +165,14 @@ def _job_options(case: dict[str, Any]) -> dict[str, object]:
     options = case["input"].get("job_options", {})
     assert isinstance(options, dict), "case.input.job_options must be an object"
     return options
+
+
+def _case_card_pool(case: dict[str, Any]) -> CardPool:
+    from card_reader_core.models import is_card_pool
+
+    raw_pool = case["input"]["card_pool"]
+    assert is_card_pool(raw_pool), f"case.input.card_pool must be a supported card pool, got {raw_pool!r}"
+    return raw_pool
 
 
 def _load_symbol_types(card_version_id: str) -> dict[str, str]:

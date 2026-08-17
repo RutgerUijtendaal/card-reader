@@ -27,6 +27,30 @@
           No image
         </div>
       </div>
+      <div class="space-y-2 p-2.5">
+        <p class="theme-section-title truncate text-xs font-semibold">
+          {{ card.card_version_name || card.card_label }}
+        </p>
+        <div class="flex flex-wrap gap-1">
+          <span class="theme-pill theme-pill-accent px-2 py-0.5 text-[10px] font-semibold">
+            {{ cardPoolLabel(card.card_pool) }}
+          </span>
+          <span
+            v-for="role in displayRoles(card.card_roles)"
+            :key="role"
+            class="theme-pill theme-pill-neutral px-2 py-0.5 text-[10px] font-semibold"
+          >
+            {{ role }}
+          </span>
+          <span
+            v-for="faction in displayFactions(card.card_factions)"
+            :key="`faction-${faction}`"
+            class="theme-pill theme-pill-success px-2 py-0.5 text-[10px] font-semibold"
+          >
+            {{ faction }}
+          </span>
+        </div>
+      </div>
     </RouterLink>
   </div>
 
@@ -62,6 +86,9 @@ import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
+import { displayCardRoleLabels } from '@/domain/cards/cardRoles';
+import { displayCardFactionLabels } from '@/domain/cards/cardFactions';
+import { cardPoolLabel } from '@/domain/cards/cardPools';
 import { buildAdminCardDetailLocation } from '@/features/admin/routeState';
 import type { LinkedCardPreview } from '@/features/admin/types';
 
@@ -85,6 +112,8 @@ const hoverPreviewX = computed(() => floating.x.value ?? 0);
 const hoverPreviewY = computed(() => floating.y.value ?? 0);
 
 const detailLocation = (cardId: string) => buildAdminCardDetailLocation(cardId, route.query);
+const displayRoles = displayCardRoleLabels;
+const displayFactions = displayCardFactionLabels;
 
 const showHoverPreview = (card: LinkedCardPreview, event: MouseEvent): void => {
   if (!card.image_url) {

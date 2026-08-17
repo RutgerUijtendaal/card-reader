@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from card_reader_core.metadata import MANA_FAMILIES, ManaFamilyDefinition
-from card_reader_core.models import Card, CardVersion, CardVersionImage, Keyword, ParseResult, Symbol, Tag, Type
+from card_reader_core.models import Card, CardPool, CardVersion, CardVersionImage, Keyword, ParseResult, Symbol, Tag, Type
 from card_reader_core.repositories.cards import (
     FieldSourcesPayload,
     ParsedSnapshotPayload,
@@ -24,6 +24,8 @@ from card_reader_core.repositories.metadata import (
     get_tags_for_card_versions,
     get_types_for_card_version,
     get_types_for_card_versions,
+    list_available_keywords,
+    list_available_tags,
     list_keywords,
     list_symbols,
     list_tags,
@@ -48,12 +50,27 @@ class CardEditState(TypedDict):
     parse_result: ParseResult | None
 
 
-def get_filter_metadata() -> CardFilterMetadata:
+def get_filter_metadata(
+    *,
+    card_pool: CardPool | None,
+    available_only: bool = False,
+) -> CardFilterMetadata:
+    if available_only:
+        if card_pool is None:
+            raise ValueError("card_pool is required when available_only is true")
+        keywords = list_available_keywords(card_pool=card_pool)
+        tags = list_available_tags(card_pool=card_pool)
+    else:
+        keywords = list_keywords()
+        tags = list_tags()
     return {
-        "keywords": list_keywords(),
-        "tags": list_tags(),
+        "keywords": keywords,
+        "tags": tags,
         "symbols": list_symbols(),
-        "types": list_types_for_card_sort(),
+        "types": list_types_for_card_sort(
+            card_pool=card_pool,
+            available_only=available_only,
+        ),
         "mana_families": MANA_FAMILIES,
     }
 

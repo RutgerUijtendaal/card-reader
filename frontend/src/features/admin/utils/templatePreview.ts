@@ -4,6 +4,7 @@ import type {
 } from '@/features/admin/types';
 import type { RegionBounds, TemplateDefinition, TemplateRegionDefinition } from '@/domain/templates/types';
 import type { JsonObject } from '@/shared/types/json';
+import { isCardPool } from '@/domain/cards/cardPools';
 
 export const TEMPLATE_PREVIEW_STORAGE_KEY = 'card-reader.template-preview';
 
@@ -177,6 +178,7 @@ export const normalizeTemplatePreviewCard = (
     typeof value.id !== 'string' ||
     typeof value.label !== 'string' ||
     typeof value.name !== 'string' ||
+    !isCardPool(value.card_pool) ||
     typeof value.template_id !== 'string'
   ) {
     return null;
@@ -186,6 +188,7 @@ export const normalizeTemplatePreviewCard = (
     id: value.id,
     label: value.label,
     name: value.name,
+    card_pool: value.card_pool,
     template_id: value.template_id,
     image_url: typeof value.image_url === 'string' ? value.image_url : null,
   };

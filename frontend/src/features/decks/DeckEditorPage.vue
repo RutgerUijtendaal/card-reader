@@ -4,7 +4,7 @@
     :aria-busy="controller.isCreating.value"
   >
     <AppPageHeader
-      :icon="Hammer"
+      :icon="APP_SECTION_ICONS.deckBuilder"
       :title="controller.deckId.value ? 'Edit Deck' : 'Build Deck'"
       :subtitle="deckEditorSubtitle"
       :back-to="controller.isCreating.value ? null : controller.backLink.value"
@@ -495,7 +495,6 @@ import {
   CloudUpload,
   Crown,
   FileText,
-  Hammer,
   LayoutGrid,
   LoaderCircle,
   Save,
@@ -505,6 +504,7 @@ import {
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
+import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import InfoTooltip from '@/shared/components/InfoTooltip.vue';
 import ConfirmModal from '@/shared/components/modals/ConfirmModal.vue';
 import DeckBuilderFiltersPanel from '@/features/decks/components/DeckBuilderFiltersPanel.vue';
@@ -545,7 +545,7 @@ const deckSaveActionIcon = computed(() => {
   if (controller.manualSaving.value || controller.creationState.value.status === 'creating') {
     return LoaderCircle;
   }
-  return controller.isPublished.value ? Save : Hammer;
+  return controller.isPublished.value ? Save : APP_SECTION_ICONS.deckBuilder;
 });
 const deckSaveActionLabel = computed(() => {
   if (controller.terminalNavigationPending.value) {

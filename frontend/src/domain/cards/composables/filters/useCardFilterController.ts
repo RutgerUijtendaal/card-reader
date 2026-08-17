@@ -1,5 +1,6 @@
-import { computed, ref } from 'vue';
+import { computed, ref, toValue, watch, type MaybeRefOrGetter, type WatchSource } from 'vue';
 import { fetchCardFilters } from '@/domain/cards/api';
+import type { CardPool } from '@/domain/cards/cardPools';
 import type { CardFiltersResponse } from '@/domain/cards/types';
 import type { CardFilterState } from '@/domain/cards/utils/filters/cardFilterState';
 import { createCardFilterCatalog } from '@/domain/cards/utils/filters/cardFilterSelection';
@@ -14,9 +15,16 @@ const EMPTY_FILTERS: CardFiltersResponse = {
   types: [],
 };
 
-export const useCardFilterController = () => {
+interface CardFilterControllerOptions {
+  resultSetKey?: WatchSource<unknown>;
+  cardPool?: MaybeRefOrGetter<CardPool>;
+}
+
+export const useCardFilterController = (options: CardFilterControllerOptions = {}) => {
   const filters = ref<CardFiltersResponse>(EMPTY_FILTERS);
   const filtersLoaded = ref(false);
+  const filtersError = ref<unknown>(null);
+  let requestGeneration = 0;
   const filterCatalog = computed(() => createCardFilterCatalog(filters.value));
   const filterState = useCardFilterState(filterCatalog);
   const favorites = useMetadataFilterFavorites();
@@ -36,9 +44,45 @@ export const useCardFilterController = () => {
   };
 
   const loadFilters = async (): Promise<void> => {
-    filters.value = await fetchCardFilters();
+    const generation = ++requestGeneration;
+    const requestedPool = options.cardPool ? toValue(options.cardPool) : undefined;
+    filtersError.value = null;
+    let nextFilters: CardFiltersResponse;
+    try {
+      nextFilters = await fetchCardFilters(requestedPool);
+    } catch (error) {
+      if (
+        generation === requestGeneration
+        && (!options.cardPool || requestedPool === toValue(options.cardPool))
+      ) {
+        filtersError.value = error;
+      }
+      throw error;
+    }
+    if (
+      generation !== requestGeneration
+      || (options.cardPool && requestedPool !== toValue(options.cardPool))
+    ) {
+      return;
+    }
+    filters.value = nextFilters;
     filtersLoaded.value = true;
+    filtersError.value = null;
   };
+
+  if (options.resultSetKey) {
+    watch(
+      options.resultSetKey,
+      () => {
+        requestGeneration += 1;
+        filters.value = EMPTY_FILTERS;
+        filtersLoaded.value = false;
+        filtersError.value = null;
+        void loadFilters().catch(() => undefined);
+      },
+      { flush: 'sync' },
+    );
+  }
 
   const applyRouteFilterState = (state: CardFilterState): void => {
     filterState.applyFilterState(state);
@@ -47,6 +91,7 @@ export const useCardFilterController = () => {
   return {
     filters,
     filtersLoaded,
+    filtersError,
     filterCatalog,
     filterSectionsState: sections.filterSectionsState,
     query: filterState.query,

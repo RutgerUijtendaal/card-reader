@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.db import transaction
 from django.db.models import Prefetch, QuerySet
 
-from card_reader_core.models import Card, CardGroup, CardGroupMember, CardVersionImage
+from card_reader_core.models import Card, CardGroup, CardGroupMember, CardPool, CardVersionImage
 
 
 def card_group_key_exists(*, key: str, exclude_id: str | None = None) -> bool:
@@ -15,6 +15,20 @@ def card_group_key_exists(*, key: str, exclude_id: str | None = None) -> bool:
 
 def get_card_group(group_id: str) -> CardGroup | None:
     return _group_queryset().filter(id=group_id).first()
+
+
+def get_card_group_for_pool(group_id: str, *, card_pool: CardPool) -> CardGroup | None:
+    return _group_queryset().filter(id=group_id, anchor_card__card_pool=card_pool).first()
+
+
+def get_card_groups(group_ids: list[str]) -> list[CardGroup]:
+    if not group_ids:
+        return []
+    groups_by_id = {
+        group.id: group
+        for group in _group_queryset().filter(id__in=list(dict.fromkeys(group_ids)))
+    }
+    return [groups_by_id[group_id] for group_id in group_ids if group_id in groups_by_id]
 
 
 def list_card_groups() -> list[CardGroup]:
@@ -85,6 +99,9 @@ def _group_queryset() -> QuerySet[CardGroup]:
         "anchor_card__latest_version__template",
         "anchor_card__latest_version__previous_version",
     ).prefetch_related(
+        "anchor_card__role_assignments",
+        "anchor_card__faction_assignments",
+        "anchor_card__mana_family_assignments",
         Prefetch(
             "members",
             queryset=CardGroupMember.objects.select_related(
@@ -94,6 +111,9 @@ def _group_queryset() -> QuerySet[CardGroup]:
                 "card__latest_version__previous_version",
             )
             .prefetch_related(
+                "card__role_assignments",
+                "card__faction_assignments",
+                "card__mana_family_assignments",
                 Prefetch(
                     "card__latest_version__images",
                     queryset=CardVersionImage.objects.order_by("-created_at"),

@@ -61,6 +61,28 @@
           />
         </div>
       </div>
+
+      <div
+        v-if="!isCreatingNew && classificationRules.length > 0"
+        class="theme-muted-panel"
+      >
+        <div class="theme-kicker text-xs font-medium uppercase tracking-[0.16em]">
+          Classification rules
+        </div>
+        <p class="theme-section-muted mt-1 text-sm">
+          This metadata entry can infer these pool-specific classifications.
+        </p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <RouterLink
+            v-for="rule in classificationRules"
+            :key="rule.id"
+            class="theme-pill theme-pill-accent hover:underline"
+            :to="classificationRuleLocation(rule)"
+          >
+            {{ cardPoolLabel(rule.card_pool) }} · {{ rule.target_key }}
+          </RouterLink>
+        </div>
+      </div>
     </div>
 
     <div class="theme-divider mt-5 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
@@ -91,6 +113,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { RouterLink } from 'vue-router';
+import { cardPoolLabel } from '@/domain/cards/cardPools';
 import CatalogLinkedCardsGrid from '@/features/admin/components/CatalogLinkedCardsGrid.vue';
 import CatalogLinkedDecksGrid from '@/features/admin/components/CatalogLinkedDecksGrid.vue';
 import CatalogEntryForm from '@/features/admin/components/CatalogEntryForm.vue';
@@ -100,6 +124,7 @@ import type {
   CatalogRow,
   LinkedCardPreview,
   LinkedDeckPreview,
+  ClassificationRuleRecord,
 } from '@/features/admin/types';
 
 const props = withDefaults(defineProps<{
@@ -118,9 +143,11 @@ const props = withDefaults(defineProps<{
   linkedCardCount: number;
   linkedDecks?: LinkedDeckPreview[];
   linkedDeckCount?: number;
+  classificationRules?: ClassificationRuleRecord[];
 }>(), {
   linkedDecks: () => [],
   linkedDeckCount: 0,
+  classificationRules: () => [],
 });
 
 const isDeckTagKind = computed(() => props.selectedKind === 'deck-roles' || props.selectedKind === 'deck-types');
@@ -158,4 +185,17 @@ const handlePrimaryAction = (): void => {
 
   emit('save');
 };
+
+const classificationRuleLocation = (rule: ClassificationRuleRecord) => ({
+  path: '/admin',
+  query: {
+    admin_tab: 'catalog',
+    admin_kind: rule.target_kind === 'role'
+      ? 'card-roles'
+      : rule.target_kind === 'faction'
+        ? 'card-factions'
+        : 'card-mana-families',
+    admin_entry: `${rule.target_kind}:${rule.target_key}`,
+  },
+});
 </script>

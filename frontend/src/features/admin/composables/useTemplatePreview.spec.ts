@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { computed, nextTick, ref } from 'vue';
+import { createPinia, setActivePinia } from 'pinia';
 import { api } from '@/shared/api/client';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import { TEMPLATE_PREVIEW_STORAGE_KEY } from '@/features/admin/utils/templatePreview';
 import { useTemplatePreview } from '@/features/admin/composables/useTemplatePreview';
 
@@ -11,6 +13,7 @@ vi.mock('@/shared/api/client', () => ({
 }));
 
 const mockedGet = vi.mocked(api.get);
+const selectionKey = (templateKey: string): string => templateKey;
 
 const relativeDefinitionJson = JSON.stringify({
   id: 'mtg-like-v1',
@@ -69,9 +72,10 @@ describe('useTemplatePreview', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     localStorage.clear();
+    setActivePinia(createPinia());
     mockedGet.mockReset();
     mockedGet.mockImplementation(async (url) => {
-      if (url === '/cards') {
+      if (url === '/admin/templates/preview-cards') {
         return {
           data: {
             count: 0,
@@ -145,10 +149,11 @@ describe('useTemplatePreview', () => {
     localStorage.setItem(
       TEMPLATE_PREVIEW_STORAGE_KEY,
       JSON.stringify({
-        'mtg-like-v1': {
+        [selectionKey('mtg-like-v1')]: {
           id: 'card-1',
           label: 'Card One',
           name: 'Card One',
+          card_pool: 'player',
           template_id: 'mtg-like-v1',
           image_url: '/cards/card-1/image',
           scope: 'current-template',
@@ -162,12 +167,13 @@ describe('useTemplatePreview', () => {
             id: 'card-1',
             label: 'Card One',
             name: 'Card One',
+            card_pool: 'player',
             template_id: 'mtg-like-v1',
             image_url: '/cards/card-1/image',
           },
         };
       }
-      if (url === '/cards') {
+      if (url === '/admin/templates/preview-cards') {
         return {
           data: {
             count: 0,
@@ -197,10 +203,11 @@ describe('useTemplatePreview', () => {
     localStorage.setItem(
       TEMPLATE_PREVIEW_STORAGE_KEY,
       JSON.stringify({
-        'mtg-like-v1': {
+        [selectionKey('mtg-like-v1')]: {
           id: 'missing-card',
           label: 'Missing Card',
           name: 'Missing Card',
+          card_pool: 'player',
           template_id: 'mtg-like-v1',
           image_url: '/cards/missing-card/image',
           scope: 'current-template',
@@ -211,7 +218,7 @@ describe('useTemplatePreview', () => {
       if (url === '/cards/missing-card') {
         throw new Error('Not found');
       }
-      if (url === '/cards') {
+      if (url === '/admin/templates/preview-cards') {
         return {
           data: {
             count: 0,
@@ -242,18 +249,20 @@ describe('useTemplatePreview', () => {
     localStorage.setItem(
       TEMPLATE_PREVIEW_STORAGE_KEY,
       JSON.stringify({
-        'mtg-like-v1': {
+        [selectionKey('mtg-like-v1')]: {
           id: 'card-1',
           label: 'Card One',
           name: 'Card One',
+          card_pool: 'player',
           template_id: 'mtg-like-v1',
           image_url: '/cards/card-1/image',
           scope: 'current-template',
         },
-        'mtg-like-v2': {
+        [selectionKey('mtg-like-v2')]: {
           id: 'card-2',
           label: 'Card Two',
           name: 'Card Two',
+          card_pool: 'evil',
           template_id: 'mtg-like-v2',
           image_url: '/cards/card-2/image',
           scope: 'all-cards',
@@ -267,6 +276,7 @@ describe('useTemplatePreview', () => {
             id: 'card-1',
             label: 'Card One',
             name: 'Card One',
+            card_pool: 'player',
             template_id: 'mtg-like-v1',
             image_url: '/cards/card-1/image',
           },
@@ -278,12 +288,13 @@ describe('useTemplatePreview', () => {
             id: 'card-2',
             label: 'Card Two',
             name: 'Card Two',
+            card_pool: 'player',
             template_id: 'mtg-like-v2',
             image_url: '/cards/card-2/image',
           },
         };
       }
-      if (url === '/cards') {
+      if (url === '/admin/templates/preview-cards') {
         return {
           data: {
             count: 0,
@@ -322,10 +333,11 @@ describe('useTemplatePreview', () => {
     localStorage.setItem(
       TEMPLATE_PREVIEW_STORAGE_KEY,
       JSON.stringify({
-        'mtg-like-v1': {
+        [selectionKey('mtg-like-v1')]: {
           id: 'card-1',
           label: 'Card One',
           name: 'Card One',
+          card_pool: 'player',
           template_id: 'mtg-like-v1',
           image_url: '/cards/card-1/image',
           scope: 'all-cards',
@@ -339,12 +351,13 @@ describe('useTemplatePreview', () => {
             id: 'card-1',
             label: 'Card One',
             name: 'Card One',
+            card_pool: 'player',
             template_id: 'mtg-like-v1',
             image_url: '/cards/card-1/image',
           },
         };
       }
-      if (url === '/cards') {
+      if (url === '/admin/templates/preview-cards') {
         const params = config && typeof config === 'object' && 'params' in config ? config.params : {};
         const results =
           params && typeof params === 'object' && 'template_id' in params && params.template_id === 'mtg-like-v2'
@@ -354,6 +367,7 @@ describe('useTemplatePreview', () => {
                   id: 'unrelated-card',
                   label: 'Unrelated Card',
                   name: 'Unrelated Card',
+                  card_pool: 'neutral',
                   template_id: 'other-template',
                   image_url: '/cards/unrelated-card/image',
                   result_type: 'card',
@@ -399,7 +413,7 @@ describe('useTemplatePreview', () => {
     const secondTemplateSearch = createDeferred<CardsResponse>();
 
     mockedGet.mockImplementation((async (url, config) => {
-      if (url === '/cards') {
+      if (url === '/admin/templates/preview-cards') {
         const params = config && typeof config === 'object' && 'params' in config ? config.params : {};
         if (params && typeof params === 'object' && 'template_id' in params && params.template_id === 'mtg-like-v1') {
           return firstTemplateSearch.promise;
@@ -435,6 +449,7 @@ describe('useTemplatePreview', () => {
             id: 'stale-card',
             label: 'Stale Card',
             name: 'Stale Card',
+            card_pool: 'evil',
             template_id: 'mtg-like-v1',
             image_url: '/cards/stale-card/image',
             result_type: 'card',
@@ -471,10 +486,11 @@ describe('useTemplatePreview', () => {
     localStorage.setItem(
       TEMPLATE_PREVIEW_STORAGE_KEY,
       JSON.stringify({
-        'mtg-like-v1': {
+        [selectionKey('mtg-like-v1')]: {
           id: 'card-1',
           label: 'Card One',
           name: 'Card One',
+          card_pool: 'player',
           template_id: 'mtg-like-v1',
           image_url: '/cards/card-1/image',
           scope: 'current-template',
@@ -485,7 +501,7 @@ describe('useTemplatePreview', () => {
       if (url === '/cards/card-1') {
         return savedCardDetail.promise;
       }
-      if (url === '/cards') {
+      if (url === '/admin/templates/preview-cards') {
         return {
           data: {
             count: 0,
@@ -511,6 +527,7 @@ describe('useTemplatePreview', () => {
       id: 'card-2',
       label: 'Card Two',
       name: 'Card Two',
+      card_pool: 'evil',
       template_id: 'mtg-like-v1',
       image_url: '/cards/card-2/image',
     });
@@ -520,6 +537,7 @@ describe('useTemplatePreview', () => {
         id: 'card-1',
         label: 'Card One',
         name: 'Card One',
+        card_pool: 'player',
         template_id: 'mtg-like-v1',
         image_url: '/cards/card-1/image',
       },
@@ -542,11 +560,67 @@ describe('useTemplatePreview', () => {
     await flushDebounce();
 
     expect(mockedGet).toHaveBeenCalledWith(
-      '/cards',
+      '/admin/templates/preview-cards',
       expect.objectContaining({
         params: expect.objectContaining({
           template_id: 'mtg-like-v1',
         }),
+      }),
+    );
+  });
+
+  test('keeps preview selection and search global when the shell workspace changes', async () => {
+    mockedGet.mockImplementation(async (url) => {
+      if (url !== '/admin/templates/preview-cards') {
+        throw new Error(`Unhandled request: ${String(url)}`);
+      }
+      return {
+        data: {
+          results: [
+            {
+              id: 'player-card',
+              label: 'Shared Card',
+              name: 'Shared Card',
+              card_pool: 'player',
+              template_id: 'mtg-like-v1',
+              image_url: null,
+            },
+            {
+              id: 'evil-card',
+              label: 'Shared Card',
+              name: 'Shared Card',
+              card_pool: 'evil',
+              template_id: 'mtg-like-v1',
+              image_url: null,
+            },
+          ],
+        },
+      };
+    });
+    const workspace = useCardPoolWorkspaceStore();
+    const preview = useTemplatePreview({
+      definitionJson: ref(relativeDefinitionJson),
+      templateKey: computed(() => 'mtg-like-v1'),
+    });
+
+    await preview.restorePreviewCard();
+    await vi.runOnlyPendingTimersAsync();
+    await nextTick();
+    expect(preview.selectedPreviewCard.value?.id).toBe('player-card');
+    expect(preview.previewCards.value.map((card) => card.card_pool)).toEqual(['player', 'evil']);
+    const requestCount = mockedGet.mock.calls.length;
+
+    workspace.selectPool('evil');
+    await nextTick();
+    await vi.runOnlyPendingTimersAsync();
+    await nextTick();
+
+    expect(preview.selectedPreviewCard.value?.id).toBe('player-card');
+    expect(mockedGet).toHaveBeenCalledTimes(requestCount);
+    expect(mockedGet).toHaveBeenLastCalledWith(
+      '/admin/templates/preview-cards',
+      expect.objectContaining({
+        params: expect.not.objectContaining({ card_pool: expect.anything() }),
       }),
     );
   });

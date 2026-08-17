@@ -35,7 +35,10 @@
 
     <CardFilterSections
       :state="controller.filters.filterSectionsState.value"
-      :visible-sections="controller.deck.isHeroStep.value ? ['mana', 'affinity'] : undefined"
+      :show-card-pool="false"
+      :visible-sections="controller.deck.isHeroStep.value
+        ? ['mana', 'affinity']
+        : DECK_BUILDER_VISIBLE_FILTER_SECTIONS"
       :default-open-sections="controller.deck.isHeroStep.value ? ['mana', 'affinity'] : undefined"
     />
 
@@ -72,6 +75,7 @@ import GalleryOptionsMenu from '@/domain/cards/components/GalleryOptionsMenu.vue
 import CardFilterSections from '@/domain/cards/components/filters/CardFilterSections.vue';
 import GalleryFilterSidebar from '@/domain/cards/components/filters/GalleryFilterSidebar.vue';
 import type { DeckEditorController } from '@/features/decks/composables/useDeckEditor';
+import { DECK_BUILDER_VISIBLE_FILTER_SECTIONS } from '@/features/decks/utils/deckBuilderFilterPolicy';
 
 defineProps<{
   controller: DeckEditorController;

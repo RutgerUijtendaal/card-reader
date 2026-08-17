@@ -28,7 +28,11 @@ def create_template(
     label: str,
     definition_json: dict[str, object],
 ) -> Template:
-    return Template.objects.create(key=key, label=label, definition_json=definition_json)
+    return Template.objects.create(
+        key=key,
+        label=label,
+        definition_json=definition_json,
+    )
 
 
 def update_template(

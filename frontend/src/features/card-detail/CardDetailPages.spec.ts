@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import CardDetailPage from '@/features/card-detail/CardDetailPage.vue';
 import CardPublicDetailPage from '@/features/card-detail/CardPublicDetailPage.vue';
 
-const { editorState, publicState, routerPushMock } = vi.hoisted(() => {
+const { editorState, publicState, routerPushMock, workspaceState } = vi.hoisted(() => {
   const refValue = <T,>(value: T) => ({ value, __v_isRef: true });
   const route = {
     params: { id: 'card-1' },
@@ -18,7 +18,7 @@ const { editorState, publicState, routerPushMock } = vi.hoisted(() => {
     attack: '',
     health: '',
     rules_text: '',
-    is_hero: false,
+    card_pool: 'player' as const, card_roles: [],
     deck_building_config: '{}',
     lifecycle_status: 'active',
     keyword_ids: [],
@@ -28,6 +28,9 @@ const { editorState, publicState, routerPushMock } = vi.hoisted(() => {
   };
   return {
     routerPushMock: vi.fn(),
+    workspaceState: {
+      activePool: 'player' as 'player' | 'evil' | 'neutral',
+    },
     editorState: {
       card: refValue<unknown | null>(null),
       versions: refValue([]),
@@ -46,6 +49,7 @@ const { editorState, publicState, routerPushMock } = vi.hoisted(() => {
       isQueuingReparse: refValue(false),
       promotingVersionId: refValue<string | null>(null),
       saveMessage: refValue(''),
+      saveError: refValue(''),
       deckBuildingConfigExample: refValue('{}'),
       form,
       selectedVersion: refValue<unknown | null>(null),
@@ -143,6 +147,10 @@ vi.mock('@/domain/session/store', () => ({
   }),
 }));
 
+vi.mock('@/domain/cards/cardPoolWorkspace', () => ({
+  useCardPoolWorkspaceStore: () => workspaceState,
+}));
+
 vi.mock('@/shared/api/client', () => ({
   api: {
     post: vi.fn(),
@@ -233,6 +241,9 @@ const resetState = (): void => {
     name: 'Loaded Card',
     card_groups: [],
     deck_references: [],
+    card_pool: 'player',
+    card_roles: [],
+    card_factions: [],
   };
   editorState.card.value = card;
   editorState.selectedVersion.value = null;
@@ -247,6 +258,7 @@ const resetState = (): void => {
   publicState.canEdit.value = false;
   publicState.loadCard.mockClear();
   publicState.openEditor.mockClear();
+  workspaceState.activePool = 'player';
 };
 
 const mountPage = async (page: typeof CardDetailPage | typeof CardPublicDetailPage) => {
@@ -401,6 +413,29 @@ describe('CardPublicDetailPage loading state', () => {
     expect(mounted.container.querySelector('[data-testid="card-version-selector"]')).not.toBeNull();
     expect(mounted.container.querySelector('[data-testid="card-deck-references"]')).not.toBeNull();
     expect(mounted.container.textContent).not.toContain('No printings found.');
+
+    mounted.unmount();
+  });
+
+  test('labels a card whose pool differs from the active workspace', async () => {
+    resetState();
+    workspaceState.activePool = 'evil';
+
+    const mounted = await mountPage(CardPublicDetailPage);
+    const badge = mounted.container.querySelector('[data-testid="cross-pool-card-badge"]');
+
+    expect(badge?.textContent?.trim()).toBe('Player');
+    expect(badge?.getAttribute('aria-label')).toBe('Player card');
+
+    mounted.unmount();
+  });
+
+  test('does not add a redundant pool label inside the matching workspace', async () => {
+    resetState();
+
+    const mounted = await mountPage(CardPublicDetailPage);
+
+    expect(mounted.container.querySelector('[data-testid="cross-pool-card-badge"]')).toBeNull();
 
     mounted.unmount();
   });

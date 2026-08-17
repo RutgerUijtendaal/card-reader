@@ -3,28 +3,37 @@ from __future__ import annotations
 from django.http import FileResponse, Http404
 from django.utils.http import http_date, quote_etag
 from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from card_reader_api.cards.file_views import file_response, immutable_card_image_response, symbol_asset_response
+from card_reader_api.cards.file_views import (
+    card_back_owns_immutable_image,
+    cards_for_immutable_image,
+    file_response,
+    immutable_card_image_response,
+    symbol_asset_response,
+)
 from card_reader_api.cards.grouped_gallery import grouped_gallery_payload
 from card_reader_api.cards.deck_references import card_deck_references_payload
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.query_params import card_filter_query_data
 from card_reader_api.cards.serializers import (
+    CardFilterMetadataScopeSerializer,
     CardFiltersQuerySerializer,
     CardVersionParseFlagCreateSerializer,
     LatestCardReparseSerializer,
     LatestVersionUpdateSerializer,
     card_group_summary_payload,
+    card_list_row_payload,
     card_payload,
     metadata_option,
     symbol_option,
 )
 from card_reader_api.common.auth_access import is_authenticated
-from card_reader_api.common.responses import serializer_error
+from card_reader_api.common.permissions import AuthenticatedAllowed
+from card_reader_api.common.responses import paginated_payload, serializer_error
 from card_reader_api.cards.services import CardActionService, CardReparseError
 from card_reader_core.repositories.cards import (
     get_card,
@@ -33,6 +42,11 @@ from card_reader_core.repositories.cards import (
     list_cards,
 )
 from card_reader_core.repositories.parse_flags import ParseFlagItemInput
+from card_reader_core.models import (
+    CARD_FACTION_DEFINITIONS,
+    CARD_POOL_DEFINITIONS,
+    CARD_ROLE_FILTER_DEFINITIONS,
+)
 from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import (
     get_card_version_edit_state,
@@ -87,7 +101,13 @@ class CardListView(APIView):
             mana_cost_min=filters["mana_cost_min"],
             mana_cost_max=filters["mana_cost_max"],
             template_id=filters["template_id"],
-            is_hero=filters["is_hero"],
+            card_pool=filters["card_pool"],
+            card_roles=filters["card_roles"],
+            card_role_exclude=filters["card_role_exclude"],
+            card_role_match=filters["card_role_match"],
+            card_factions=filters["card_factions"],
+            card_faction_exclude=filters["card_faction_exclude"],
+            card_faction_match=filters["card_faction_match"],
             attack_min=filters["attack_min"],
             attack_max=filters["attack_max"],
             health_min=filters["health_min"],
@@ -97,38 +117,26 @@ class CardListView(APIView):
             page=filters["page"],
             page_size=filters["page_size"],
         )
-        payloads = []
-        for row in cards.results:
-            payloads.append(
-                card_payload(
-                    row.version.card,
-                    row.version,
-                    image_url=card_image_asset_url(row.image, fallback_url=f"/cards/{row.version.card.id}/image"),
-                    metadata={
-                        "keywords": row.keywords,
-                        "tags": row.tags,
-                        "symbols": row.symbols,
-                        "types": row.types,
-                    },
-                )
-            )
         return Response(
-            {
-                "count": cards.count,
-                "next_page": cards.page + 1 if cards.page * cards.page_size < cards.count else None,
-                "previous_page": cards.page - 1 if cards.page > 1 else None,
-                "page": cards.page,
-                "page_size": cards.page_size,
-                "results": payloads,
-            }
+            paginated_payload(
+                cards,
+                [card_list_row_payload(row) for row in cards.results],
+            )
         )
 
 
 class CardFiltersView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, _request: Request) -> Response:
-        metadata = get_filter_metadata()
+    def get(self, request: Request) -> Response:
+        scope_serializer = CardFilterMetadataScopeSerializer(data=request.query_params)
+        if not scope_serializer.is_valid():
+            return serializer_error(scope_serializer)
+        requested_pool = scope_serializer.requested_card_pool()
+        metadata = get_filter_metadata(
+            card_pool=requested_pool,
+            available_only=requested_pool is not None,
+        )
         symbols_by_key = {symbol.key: symbol for symbol in metadata["symbols"]}
         return Response(
             {
@@ -136,11 +144,42 @@ class CardFiltersView(APIView):
                 "tags": [metadata_option(row) for row in metadata["tags"]],
                 "symbols": [symbol_option(row) for row in metadata["symbols"]],
                 "types": [metadata_option(row) for row in metadata["types"]],
+                "card_pools": [
+                    {
+                        "key": definition.key,
+                        "label": definition.label,
+                        "rank": definition.rank,
+                    }
+                    for definition in CARD_POOL_DEFINITIONS
+                ],
+                "card_roles": [
+                    {
+                        "key": definition.key,
+                        "label": definition.label,
+                        "rank": definition.rank,
+                        "derived": definition.derived,
+                    }
+                    for definition in CARD_ROLE_FILTER_DEFINITIONS
+                ],
+                "card_factions": [
+                    {
+                        "key": definition.key,
+                        "label": definition.label,
+                        "rank": definition.rank,
+                    }
+                    for definition in CARD_FACTION_DEFINITIONS
+                ],
                 "mana_families": [
                     {
                         "key": family.key,
                         "label": family.label,
                         "rank": family.rank,
+                        "display_symbol_key": family.display_symbol_key,
+                        "display_symbol": symbol_option(
+                            symbols_by_key[family.display_symbol_key]
+                        )
+                        if family.display_symbol_key in symbols_by_key
+                        else None,
                         "mana_symbol": symbol_option(symbols_by_key[family.mana_symbol_key])
                         if family.mana_symbol_key in symbols_by_key
                         else None,
@@ -164,11 +203,17 @@ class CardDetailView(APIView):
         metadata = get_card_version_metadata(version.id)
         edit_state = get_card_version_edit_state(version)
         card_groups = [
-            card_group_summary_payload(group, card_id=card.id)
+            card_group_summary_payload(
+                group,
+                card_id=card.id,
+            )
             for group in CardGroupService().get_groups_for_card(card.id)
         ]
         viewer_id = str(getattr(request.user, "pk", "")) if is_authenticated(request.user) else None
-        deck_references = card_deck_references_payload(card.id, viewer_id=viewer_id)
+        deck_references = card_deck_references_payload(
+            card.id,
+            viewer_id=viewer_id,
+        )
         return Response(
             card_payload(
                 card,
@@ -185,11 +230,10 @@ class CardDetailView(APIView):
 class CardGenerationsView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, _request: Request, card_id: str) -> Response:
+    def get(self, request: Request, card_id: str) -> Response:
         card = get_card(card_id)
         if card is None:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
-
         versions = list_card_generations(card_id)
         if not versions:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -276,9 +320,12 @@ class CardVersionPromoteView(APIView):
 
 
 class CardVersionParseFlagView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AuthenticatedAllowed]
 
     def post(self, request: Request, card_id: str, version_id: str) -> Response:
+        card = get_card(card_id)
+        if card is None:
+            return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
         serializer = CardVersionParseFlagCreateSerializer(data=request.data)
         if not serializer.is_valid():
             return serializer_error(serializer)
@@ -340,7 +387,7 @@ class LatestCardReparseView(APIView):
 class CardImageView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, _request: Request, card_id: str) -> FileResponse:
+    def get(self, request: Request, card_id: str) -> FileResponse:
         card, _version, image = get_card_with_image(card_id)
         if card is None or image is None:
             raise Http404("Card image not found")
@@ -357,11 +404,12 @@ class CardImageView(APIView):
 class CardVersionImageView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, _request: Request, card_id: str, version_id: str) -> FileResponse:
-        if get_card(card_id) is None:
+    def get(self, request: Request, card_id: str, version_id: str) -> FileResponse:
+        card = get_card(card_id)
+        if card is None:
             raise Http404("Card not found")
         image = get_card_image(version_id)
-        if image is None:
+        if image is None or image.card_version.card.id != card.id:
             raise Http404("Card image not found")
         image_path = resolve_card_image_path(image)
         if image_path is None:
@@ -372,7 +420,11 @@ class CardVersionImageView(APIView):
 class ImmutableCardImageView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, _request: Request, relative_path: str) -> FileResponse:
+    def get(self, request: Request, relative_path: str) -> FileResponse:
+        cards = cards_for_immutable_image(relative_path)
+        is_card_back = card_back_owns_immutable_image(relative_path)
+        if not cards and not is_card_back:
+            raise Http404("Card image not found")
         return immutable_card_image_response(relative_path)
 
 

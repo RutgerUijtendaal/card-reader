@@ -3,6 +3,7 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 
+import pytest
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
@@ -11,8 +12,23 @@ from PIL import Image
 from card_reader_api.catalog.assets import store_symbol_asset
 from card_reader_api.maintenance import services as maintenance_services
 from card_reader_api.maintenance.services import MaintenanceService
-from card_reader_core.models import Card, CardGroup, CardVersion, CardVersionImage, Deck, DeckEntry, ImportJob, ImportJobItem, Template
+from card_reader_core.models import (
+    Card,
+    CardGroup,
+    CardVersion,
+    CardVersionImage,
+    Deck,
+    DeckEntry,
+    ImportJob,
+    ImportJobItem,
+    Template,
+)
+from card_reader_core.repositories.cards import (
+    LatestCardVersionReparseSource,
+    change_card_identity,
+)
 from card_reader_core.services.cards import convert_card_images_to_webp
+from card_reader_core.services.imports import ImportService
 from card_reader_core.services.templates import TemplateService
 from card_reader_core.config.settings import settings
 from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
@@ -188,7 +204,7 @@ def test_convert_card_images_to_webp_endpoint_returns_summary(
     assert payload["missing"] == 0
     assert payload["failed"] == 0
     assert payload["bytes_before"] > payload["bytes_after"]
-def test_queue_reparse_latest_versions_groups_jobs_by_template(
+def test_queue_reparse_latest_versions_groups_jobs_by_template_and_classification(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -257,6 +273,7 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
     card_a.save(update_fields=["latest_version"])
     card_b.save(update_fields=["latest_version"])
     card_c.save(update_fields=["latest_version"])
+    change_card_identity(card=card_b, card_factions=("blood",))
 
     CardVersionImage.objects.create(
         card_version_id=version_a.id,
@@ -282,9 +299,9 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
     jobs = list(ImportJob.objects.select_related("template").order_by("template__key"))
     items = list(ImportJobItem.objects.order_by("source_file"))
 
-    assert "Queued 2 reparse jobs for 3 latest card images." == result.message
+    assert "Queued 3 reparse jobs for 3 latest card images." == result.message
     assert result.removed_paths == []
-    assert len(jobs) == 2
+    assert len(jobs) == 3
     assert {job.template.key for job in jobs} == {"mtg-like-v1", "sorcery-v1"}
     assert all(job.total_items >= 1 for job in jobs)
     assert {item.source_file for item in items} == {
@@ -297,6 +314,70 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
         (card_b.id, version_b.id),
         (card_c.id, version_c.id),
     }
+    assert {
+        item.target_card_id: item.target_card_factions_snapshot_json for item in items
+    } == {
+        card_a.id: [],
+        card_b.id: ["blood"],
+        card_c.id: [],
+    }
+
+
+def test_maintenance_reparse_rolls_back_every_group_when_later_creation_fails(
+    monkeypatch,
+) -> None:
+    template = Template.objects.create(
+        key="maintenance-atomic",
+        label="Maintenance Atomic",
+        definition_json=_template_definition("atomic_top_bar"),
+    )
+    sources = [
+        LatestCardVersionReparseSource(
+            card_id="player-card",
+            card_version_id="player-version",
+            template_id=template.key,
+            image_path=Path("player-image.webp"),
+            card_pool="player",
+            card_roles=(),
+            card_factions=(),
+            card_mana_families=(),
+        ),
+        LatestCardVersionReparseSource(
+            card_id="game-master-card",
+            card_version_id="game-master-version",
+            template_id=template.key,
+            image_path=Path("game-master-image.webp"),
+            card_pool="evil",
+            card_roles=(),
+            card_factions=(),
+            card_mana_families=(),
+        ),
+    ]
+    creation_count = 0
+
+    def fail_second_group(_service: ImportService, **kwargs: object) -> ImportJob:
+        nonlocal creation_count
+        creation_count += 1
+        if creation_count == 2:
+            raise RuntimeError("simulated grouped creation failure")
+        return ImportJob.objects.create(
+            source_path=str(kwargs["source_path"]),
+            template=Template.objects.get(key=str(kwargs["template_id"])),
+        )
+
+    monkeypatch.setattr(ImportService, "create_reparse_job_with_files", fail_second_group)
+
+    with pytest.raises(RuntimeError, match="simulated grouped creation failure"):
+        MaintenanceService()._queue_reparse_sources(
+            sources,
+            empty_message="empty",
+            unreadable_message="unreadable",
+            source_name_prefix="atomic",
+            message_suffix=".",
+        )
+
+    assert creation_count == 2
+    assert not ImportJob.objects.exists()
 
 
 def test_queue_reparse_latest_versions_by_filters_targets_only_matching_cards(
@@ -393,7 +474,10 @@ def test_queue_reparse_latest_versions_by_filters_targets_only_matching_cards(
             "mana_cost_min": None,
             "mana_cost_max": None,
             "template_id": None,
-            "is_hero": None,
+            "card_pool": "player",
+            "card_roles": None,
+            "card_role_exclude": None,
+            "card_role_match": "any",
             "attack_min": None,
             "attack_max": None,
             "health_min": None,
@@ -506,6 +590,90 @@ def test_template_reparse_endpoint_queues_matching_latest_versions(
     assert len(items) == 1
     assert items[0].target_card_id == card_a.id
     assert items[0].target_card_version_id == version_a.id
+
+
+def test_template_reparse_rolls_back_every_group_when_later_creation_fails(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+    source_template = Template.objects.create(
+        key="atomic-reparse-source",
+        label="Atomic Reparse Source",
+        definition_json=_template_definition("source_top_bar"),
+    )
+    target_template = Template.objects.create(
+        key="atomic-reparse-target",
+        label="Atomic Reparse Target",
+        definition_json=_template_definition("target_top_bar"),
+    )
+
+    cards = [
+        Card.objects.create(key="atomic-player-card", label="Atomic Player Card"),
+        Card.objects.create(
+            key="atomic-game-master-card",
+            label="Atomic Evil Card",
+            card_pool="evil",
+        ),
+    ]
+    for index, card in enumerate(cards):
+        version = CardVersion.objects.create(
+            card=card,
+            version_number=1,
+            template=source_template,
+            image_hash=f"atomic-reparse-{index}",
+            name=card.label,
+            is_latest=True,
+        )
+        card.latest_version = version
+        card.save(update_fields=["latest_version"])
+        image_path = resolve_storage_path(f"images/atomic-reparse-{index}.webp")
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        image_path.write_bytes(b"image")
+        CardVersionImage.objects.create(
+            card_version=version,
+            source_file=build_storage_relative_path("images", image_path.name),
+            stored_path=build_storage_relative_path("images", image_path.name),
+            checksum=f"atomic-reparse-{index}",
+        )
+
+    original_create = ImportService.create_reparse_job_with_files
+    creation_count = 0
+
+    def fail_second_group(service: ImportService, **kwargs: object) -> ImportJob:
+        nonlocal creation_count
+        creation_count += 1
+        if creation_count == 2:
+            raise RuntimeError("simulated grouped creation failure")
+        return original_create(service, **kwargs)
+
+    monkeypatch.setattr(ImportService, "create_reparse_job_with_files", fail_second_group)
+
+    username = "staff-atomic-template-reparse-user"
+    password = "password"
+    user = get_user_model().objects.create_user(username=username, password=password, is_staff=True)
+    client = Client(
+        HTTP_HOST="localhost",
+        enforce_csrf_checks=True,
+        raise_request_exception=False,
+    )
+    csrf_token = client.post(
+        "/auth/login",
+        data={"username": user.username, "password": password},
+        content_type="application/json",
+    ).json()["csrf_token"]
+
+    response = client.post(
+        f"/admin/templates/{target_template.id}/reparse",
+        data={"source_template_id": source_template.key},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 500
+    assert creation_count == 2
+    assert not ImportJob.objects.exists()
+    assert not ImportJobItem.objects.exists()
 
 
 def test_backfill_metadata_suggestions_runs_management_command(monkeypatch) -> None:

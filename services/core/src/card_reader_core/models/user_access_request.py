@@ -66,7 +66,7 @@ class UserAccessRequest(TimestampedModel):
             models.Index(fields=["status", "-created_at"], name="ix_access_request_status"),
             models.Index(
                 fields=["normalized_contact_handle", "status"],
-                name="ix_access_request_contact_status",
+                name="ix_access_contact_status",
             ),
         ]
         constraints = [

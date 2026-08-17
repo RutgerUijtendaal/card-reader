@@ -96,12 +96,10 @@ def set_notification_read_state(
         return None
     if not read and notification.dedupe_key:
         conflicting_notification = (
-            UserNotification.objects.select_related("recipient", "actor")
+            notification_queryset(recipient_id)
             .filter(
-                recipient_id=recipient_id,
                 dedupe_key=notification.dedupe_key,
                 read_at__isnull=True,
-                archived_at__isnull=True,
             )
             .exclude(id=notification.id)
             .order_by("-last_event_at", "-created_at")

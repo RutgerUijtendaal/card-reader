@@ -5,29 +5,47 @@ import {
   type CardFilterSelectionState,
   type CardFilterState,
 } from '@/domain/cards/utils/filters/cardFilterState';
+import { isManaFamily } from '@/domain/cards/manaFamilies';
 
 export type CardFilterCatalog = {
   keywords: MetadataOption[];
   tags: MetadataOption[];
   types: MetadataOption[];
-  manaSymbols: SymbolFilterOption[];
+  manaFamilies: SymbolFilterOption[];
   affinitySymbols: SymbolFilterOption[];
   allAffinitySymbols: SymbolFilterOption[];
   devotionSymbols: SymbolFilterOption[];
   otherSymbols: SymbolFilterOption[];
-  manaFamilyBySymbolKey: Record<string, string>;
+  legacyManaFamilyBySymbolKey: Record<string, string>;
 };
 
-export const LEGACY_MANA_SYMBOL_ID_PREFIX = 'legacy-mana-symbol:';
+export const cardFilterStateRequiresCatalog = (state: CardFilterState): boolean => (
+  [
+    ...state.manaFamilyKeys,
+    ...state.manaFamilyExcludeKeys,
+  ].some((key) => !isManaFamily(key))
+  || [
+    state.keywordKeys,
+    state.tagKeys,
+    state.typeKeys,
+    state.typeExcludeKeys,
+    state.affinitySymbolKeys,
+    state.affinitySymbolExcludeKeys,
+    state.devotionSymbolKeys,
+    state.devotionSymbolExcludeKeys,
+    state.otherSymbolKeys,
+    state.otherSymbolExcludeKeys,
+  ].some((keys) => keys.length > 0)
+);
 
 export const createCardFilterCatalog = (filters: CardFiltersResponse): CardFilterCatalog => {
-  const manaFamilyBySymbolKey: Record<string, string> = {};
-  const manaSymbols = (filters.mana_families ?? []).map((family): SymbolFilterOption => {
-    const displaySymbol = family.mana_symbol ?? family.affinity_symbol;
+  const legacyManaFamilyBySymbolKey: Record<string, string> = {};
+  const manaFamilies = (filters.mana_families ?? []).map((family): SymbolFilterOption => {
+    const displaySymbol = family.display_symbol ?? family.mana_symbol ?? family.affinity_symbol;
     [family.mana_symbol, family.affinity_symbol].forEach((symbol) => {
-      if (symbol) manaFamilyBySymbolKey[symbol.key] = family.key;
+      if (symbol) legacyManaFamilyBySymbolKey[symbol.key] = family.key;
     });
-    if (family.key === 'primal') manaFamilyBySymbolKey['primla-affinity'] = family.key;
+    if (family.key === 'primal') legacyManaFamilyBySymbolKey['primla-affinity'] = family.key;
     return {
       id: family.key,
       key: family.key,
@@ -37,26 +55,47 @@ export const createCardFilterCatalog = (filters: CardFiltersResponse): CardFilte
       asset_url: displaySymbol?.asset_url ?? null,
     };
   });
-  if (manaSymbols.length === 0) {
-    manaSymbols.push(...(filters.symbols ?? [])
-      .filter((row) => row.symbol_type === 'mana' && !row.key.startsWith('colorless-mana-'))
-      .map((row) => ({ ...row, id: `${LEGACY_MANA_SYMBOL_ID_PREFIX}${row.id}` })));
-  }
-  const pairedAffinityKeys = new Set(Object.keys(manaFamilyBySymbolKey));
+  const pairedAffinityKeys = new Set(Object.keys(legacyManaFamilyBySymbolKey));
   const allAffinitySymbols = (filters.symbols ?? []).filter((row) => row.symbol_type === 'affinity');
   return {
     keywords: filters.keywords ?? [],
     tags: filters.tags ?? [],
     types: filters.types ?? [],
-    manaSymbols,
+    manaFamilies,
     affinitySymbols: allAffinitySymbols.filter((row) => !pairedAffinityKeys.has(row.key)),
     allAffinitySymbols,
     devotionSymbols: (filters.symbols ?? []).filter((row) => row.symbol_type === 'devotion'),
     otherSymbols: (filters.symbols ?? []).filter(
       (row) => !['mana', 'devotion', 'affinity'].includes(row.symbol_type),
     ),
-    manaFamilyBySymbolKey,
+    legacyManaFamilyBySymbolKey,
   };
+};
+
+const retainAvailableKeys = (keys: string[], options: MetadataOption[]): string[] => {
+  const availableKeys = new Set(options.map((option) => option.key));
+  return keys.filter((key) => availableKeys.has(key));
+};
+
+export const reconcileCardFilterStateWithCatalog = (
+  state: CardFilterState,
+  catalog: CardFilterCatalog,
+): CardFilterState => {
+  const normalized = normalizeCardFilterState(state);
+  const keywordKeys = retainAvailableKeys(normalized.keywordKeys, catalog.keywords);
+  const tagKeys = retainAvailableKeys(normalized.tagKeys, catalog.tags);
+  const typeKeys = retainAvailableKeys(normalized.typeKeys, catalog.types);
+  const typeExcludeKeys = retainAvailableKeys(normalized.typeExcludeKeys, catalog.types);
+  return normalizeCardFilterState({
+    ...normalized,
+    keywordKeys,
+    keywordMatch: keywordKeys.length > 0 ? normalized.keywordMatch : 'any',
+    tagKeys,
+    tagMatch: tagKeys.length > 0 ? normalized.tagMatch : 'any',
+    typeKeys,
+    typeExcludeKeys,
+    typeMatch: typeKeys.length > 0 || typeExcludeKeys.length > 0 ? normalized.typeMatch : 'any',
+  });
 };
 
 const resolveIdsFromKeys = (keys: string[], options: MetadataOption[]): string[] => {
@@ -69,23 +108,41 @@ const resolveKeysFromIds = (ids: string[], options: MetadataOption[]): string[] 
   return ids.map((id) => keyById.get(id)).filter((key): key is string => typeof key === 'string');
 };
 
+const resolveManaFamilyKeys = (
+  keys: string[],
+  legacyManaFamilyBySymbolKey: Readonly<Record<string, string>>,
+): string[] => keys
+  .map((key) => legacyManaFamilyBySymbolKey[key] ?? key)
+  .filter(isManaFamily);
+
 export const buildCardFilterSelectionState = (
   state: CardFilterState,
   catalog: CardFilterCatalog,
 ): CardFilterSelectionState => {
-  const pairedAffinityKeys = state.affinitySymbolKeys.filter((key) => catalog.manaFamilyBySymbolKey[key]);
-  const unmatchedAffinityKeys = state.affinitySymbolKeys.filter((key) => !catalog.manaFamilyBySymbolKey[key]);
-  const translateAffinityPredicate = state.manaSymbolKeys.length === 0
+  const pairedAffinityKeys = state.affinitySymbolKeys.filter(
+    (key) => catalog.legacyManaFamilyBySymbolKey[key],
+  );
+  const unmatchedAffinityKeys = state.affinitySymbolKeys.filter(
+    (key) => !catalog.legacyManaFamilyBySymbolKey[key],
+  );
+  const translateAffinityPredicate = state.manaFamilyKeys.length === 0
     && pairedAffinityKeys.length > 0
     && unmatchedAffinityKeys.length === 0;
 
   return normalizeCardFilterSelectionState({
     query: state.query,
     lifecycleStatus: state.lifecycleStatus,
+    cardPool: state.cardPool,
+    cardRoleMatch: state.cardRoleMatch,
+    cardRoleIds: state.cardRoleKeys,
+    cardRoleExcludeIds: state.cardRoleExcludeKeys,
+    cardFactionMatch: state.cardFactionMatch,
+    cardFactionIds: state.cardFactionKeys,
+    cardFactionExcludeIds: state.cardFactionExcludeKeys,
     keywordMatch: state.keywordMatch,
     tagMatch: state.tagMatch,
     typeMatch: state.typeMatch,
-    manaSymbolMatch: translateAffinityPredicate ? state.affinitySymbolMatch : state.manaSymbolMatch,
+    manaFamilyMatch: translateAffinityPredicate ? state.affinitySymbolMatch : state.manaFamilyMatch,
     affinitySymbolMatch: state.affinitySymbolMatch,
     devotionSymbolMatch: state.devotionSymbolMatch,
     otherSymbolMatch: state.otherSymbolMatch,
@@ -98,28 +155,25 @@ export const buildCardFilterSelectionState = (
     healthMax: state.healthMax,
     keywordIds: resolveIdsFromKeys(state.keywordKeys, catalog.keywords),
     tagIds: resolveIdsFromKeys(state.tagKeys, catalog.tags),
-    manaTypeSymbolIds: resolveIdsFromKeys(
+    manaFamilyIds: resolveManaFamilyKeys(
       [
-        ...state.manaSymbolKeys.map((key) => catalog.manaFamilyBySymbolKey[key] ?? key),
-        ...(translateAffinityPredicate
-          ? pairedAffinityKeys.map((key) => catalog.manaFamilyBySymbolKey[key])
-          : []),
+        ...state.manaFamilyKeys,
+        ...(translateAffinityPredicate ? pairedAffinityKeys : []),
       ],
-      catalog.manaSymbols,
+      catalog.legacyManaFamilyBySymbolKey,
     ),
-    manaTypeSymbolExcludeIds: resolveIdsFromKeys(
-      [
-        ...state.manaSymbolExcludeKeys.map((key) => catalog.manaFamilyBySymbolKey[key] ?? key),
-        ...state.affinitySymbolExcludeKeys.map((key) => catalog.manaFamilyBySymbolKey[key]).filter((key): key is string => Boolean(key)),
-      ],
-      catalog.manaSymbols,
+    manaFamilyExcludeIds: resolveManaFamilyKeys(
+      [...state.manaFamilyExcludeKeys, ...state.affinitySymbolExcludeKeys],
+      catalog.legacyManaFamilyBySymbolKey,
     ),
     affinitySymbolIds: resolveIdsFromKeys(
       translateAffinityPredicate ? [] : state.affinitySymbolKeys,
       catalog.allAffinitySymbols,
     ),
     affinitySymbolExcludeIds: resolveIdsFromKeys(
-      state.affinitySymbolExcludeKeys.filter((key) => !catalog.manaFamilyBySymbolKey[key]),
+      state.affinitySymbolExcludeKeys.filter(
+        (key) => !catalog.legacyManaFamilyBySymbolKey[key],
+      ),
       catalog.affinitySymbols,
     ),
     devotionSymbolIds: resolveIdsFromKeys(state.devotionSymbolKeys, catalog.devotionSymbols),
@@ -138,10 +192,17 @@ export const buildCardFilterStateFromSelection = (
   normalizeCardFilterState({
     query: state.query,
     lifecycleStatus: state.lifecycleStatus,
+    cardPool: state.cardPool,
+    cardRoleMatch: state.cardRoleMatch,
+    cardRoleKeys: state.cardRoleIds,
+    cardRoleExcludeKeys: state.cardRoleExcludeIds,
+    cardFactionMatch: state.cardFactionMatch,
+    cardFactionKeys: state.cardFactionIds,
+    cardFactionExcludeKeys: state.cardFactionExcludeIds,
     keywordMatch: state.keywordMatch,
     tagMatch: state.tagMatch,
     typeMatch: state.typeMatch,
-    manaSymbolMatch: state.manaSymbolMatch,
+    manaFamilyMatch: state.manaFamilyMatch,
     affinitySymbolMatch: state.affinitySymbolMatch,
     devotionSymbolMatch: state.devotionSymbolMatch,
     otherSymbolMatch: state.otherSymbolMatch,
@@ -154,8 +215,8 @@ export const buildCardFilterStateFromSelection = (
     healthMax: state.healthMax,
     keywordKeys: resolveKeysFromIds(state.keywordIds, catalog.keywords),
     tagKeys: resolveKeysFromIds(state.tagIds, catalog.tags),
-    manaSymbolKeys: resolveKeysFromIds(state.manaTypeSymbolIds, catalog.manaSymbols),
-    manaSymbolExcludeKeys: resolveKeysFromIds(state.manaTypeSymbolExcludeIds, catalog.manaSymbols),
+    manaFamilyKeys: state.manaFamilyIds.filter(isManaFamily),
+    manaFamilyExcludeKeys: state.manaFamilyExcludeIds.filter(isManaFamily),
     affinitySymbolKeys: resolveKeysFromIds(state.affinitySymbolIds, catalog.allAffinitySymbols),
     affinitySymbolExcludeKeys: resolveKeysFromIds(state.affinitySymbolExcludeIds, catalog.allAffinitySymbols),
     devotionSymbolKeys: resolveKeysFromIds(state.devotionSymbolIds, catalog.devotionSymbols),

@@ -22,7 +22,7 @@
         <RouterLink
           v-for="group in card?.card_groups ?? []"
           :key="group.id"
-          :to="`/card-groups/${group.id}`"
+          :to="buildCardGroupDetailLocation(group.id, route.query, group.card_pool)"
           class="btn-secondary inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
         >
           <span>{{ group.name }}</span>
@@ -94,6 +94,7 @@
         <aside class="min-w-0 xl:h-full xl:min-h-0 xl:border-l xl:border-[var(--color-border)] xl:pl-6">
           <CardVersionEditorPane
             :version="selectedVersion"
+            :initial-tab="initialEditorTab"
             :form="form"
             :reparse-templates="reparseTemplates"
             :reparse-template-id="reparseTemplateId"
@@ -101,6 +102,7 @@
             :is-saving="isSaving"
             :is-queuing-reparse="isQueuingReparse"
             :save-message="saveMessage"
+            :save-error="saveError"
             :deck-building-config-example="deckBuildingConfigExample"
             :field-source="fieldSource"
             :metadata-source="metadataSource"
@@ -131,7 +133,10 @@
             @toggle-additional-symbol="toggleAdditionalSymbol"
             @update-group-search="setMetadataSearch"
             @update-field="updateField"
-            @update-hero="updateHero"
+            @update-card-pool="updateCardPool"
+            @toggle-card-role="toggleCardRole"
+            @toggle-card-faction="toggleCardFaction"
+            @toggle-card-mana-family="toggleCardManaFamily"
             @update-deck-building-config="updateDeckBuildingConfig"
             @update-lifecycle-status="updateLifecycleStatus"
           />
@@ -156,6 +161,7 @@ import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import { buildAdminCardMergeSourceLocation } from '@/domain/cards/utils/cards/adminCardNavigation';
 import { buildCardReturnLocation } from '@/domain/card-navigation/cardReturnState';
+import { buildCardGroupDetailLocation } from '@/domain/cards/utils/gallery/galleryNavigation';
 import CardDetailLoadingSkeleton from '@/features/card-detail/components/CardDetailLoadingSkeleton.vue';
 import CardDetailPager from '@/domain/cards/components/CardResultPager.vue';
 import CardVersionEditorPane from '@/features/card-detail/components/CardVersionEditorPane.vue';
@@ -167,6 +173,10 @@ import {
   type CardLifecycleStatus,
 } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { ScalarFieldName } from '@/domain/cards/types';
+import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardFaction } from '@/domain/cards/cardFactions';
+import type { CardPool } from '@/domain/cards/cardPools';
+import type { ManaFamily } from '@/domain/cards/manaFamilies';
 
 const {
   card,
@@ -186,6 +196,7 @@ const {
   isQueuingReparse,
   promotingVersionId,
   saveMessage,
+  saveError,
   deckBuildingConfigExample,
   form,
   selectedVersion,
@@ -227,14 +238,33 @@ const {
 } = useCardDetailState();
 
 const router = useRouter();
+const initialEditorTab = route.query.tab === 'card' ? 'card' : 'version';
 const cardIsGroupAnchor = computed(() => card.value?.card_groups.some((group) => group.is_anchor) ?? false);
 
 const updateField = (fieldName: ScalarFieldName, value: string): void => {
   form[fieldName] = value;
 };
 
-const updateHero = (value: boolean): void => {
-  form.is_hero = value;
+const updateCardPool = (value: CardPool): void => {
+  form.card_pool = value;
+};
+
+const toggleCardRole = (role: CardRole, checked: boolean): void => {
+  form.card_roles = checked
+    ? [...new Set([...form.card_roles, role])]
+    : form.card_roles.filter((value) => value !== role);
+};
+
+const toggleCardFaction = (faction: CardFaction, checked: boolean): void => {
+  form.card_factions = checked
+    ? [...new Set([...form.card_factions, faction])]
+    : form.card_factions.filter((value) => value !== faction);
+};
+
+const toggleCardManaFamily = (manaFamily: ManaFamily, checked: boolean): void => {
+  form.card_mana_families = checked
+    ? [...new Set([...form.card_mana_families, manaFamily])]
+    : form.card_mana_families.filter((value) => value !== manaFamily);
 };
 
 const updateDeckBuildingConfig = (value: string): void => {

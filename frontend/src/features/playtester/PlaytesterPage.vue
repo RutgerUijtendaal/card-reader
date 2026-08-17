@@ -4,7 +4,7 @@
     :class="isPreSetupStage ? 'playtester-page-pre-setup' : ''"
   >
     <AppPageHeader
-      :icon="Gamepad2"
+      :icon="APP_SECTION_ICONS.playtester"
       :title="pageTitle"
       :subtitle="pageSubtitle"
       :back-to="isPreSetupStage ? null : '/playtester'"
@@ -252,10 +252,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useEventListener } from '@vueuse/core';
-import { BookOpenText, Gamepad2 } from 'lucide-vue-next';
+import { BookOpenText } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
+import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import ConfirmModal from '@/shared/components/modals/ConfirmModal.vue';
 import { useAuthStore } from '@/domain/session/store';
@@ -335,6 +336,7 @@ import {
   PLAYTEST_STACK_OPENING_BUDGET_RATIO,
   PLAYTEST_STACK_PLAY_BUDGET_RATIO,
 } from '@/features/playtester/utils/stacks';
+import { isPlaytestDeckEligible } from '@/features/playtester/utils/deckEligibility';
 
 type PointerDragStart = {
   instanceId: string;
@@ -1825,18 +1827,22 @@ const resetTransientPlaytestUi = (): void => {
 const applyLoadedDeck = (
   loadedDeck: DeckRecord,
   preferredDraft: StoredPlaytestDraft | null = null,
-): void => {
+): boolean => {
+  if (!isPlaytestDeckEligible(loadedDeck)) {
+    return false;
+  }
   deck.value = loadedDeck;
   const draft = preferredDraft ?? storage.load(loadedDeck.id);
   if (draft && !isStoredDraftStale(draft, loadedDeck)) {
     replacePlaytestState(draft.state);
-    return;
+    return true;
   }
   if (draft) {
     staleDraft.value = draft;
     saveSuspended.value = true;
   }
   replacePlaytestState(createInitialPlaytestState(loadedDeck));
+  return true;
 };
 
 const enterPreSetupStage = (): void => {
@@ -1865,14 +1871,18 @@ const loadPlaytestDeck = async (targetDeckId: string): Promise<void> => {
     const pendingDeck = pendingRouteDeck.value;
     if (pendingDeck?.deck.id === targetDeckId) {
       pendingRouteDeck.value = null;
-      applyLoadedDeck(pendingDeck.deck, pendingDeck.draft);
+      if (!applyLoadedDeck(pendingDeck.deck, pendingDeck.draft)) {
+        await router.replace('/playtester');
+      }
       return;
     }
     const loadedDeck = await fetchVisibleDeck(targetDeckId);
     if (requestId !== activeDeckLoadRequestId) {
       return;
     }
-    applyLoadedDeck(loadedDeck);
+    if (!applyLoadedDeck(loadedDeck)) {
+      await router.replace('/playtester');
+    }
   } finally {
     if (requestId === activeDeckLoadRequestId) {
       activeDeckLoading.value = false;

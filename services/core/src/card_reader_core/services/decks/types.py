@@ -33,6 +33,7 @@ class DeckValidationSummary:
 class DeckSideboardInput:
     name: str
     entries: list[DeckEntryInput]
+    source_id: str | None = None
 
 
 @dataclass(frozen=True)

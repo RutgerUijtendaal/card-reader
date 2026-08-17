@@ -96,13 +96,252 @@
   ],
   "coverage": {
     "min_cards": 750,
-    "min_heroes": 70,
+    "min_cards_by_pool": {
+      "player": 750,
+      "evil": 0,
+      "neutral": 0
+    },
+    "min_cards_by_role": {
+      "standard": 1,
+      "hero": 70,
+      "boss": 0,
+      "location": 0,
+      "boon": 0,
+      "event": 0,
+      "shop_item": 0,
+      "directive": 0,
+      "reminder": 0,
+      "mana": 1
+    },
+    "min_cards_by_faction": {
+      "order": 0,
+      "blood": 0,
+      "dark": 0,
+      "metal": 0
+    },
+    "min_cards_by_mana_family": {
+      "arcane": 1,
+      "dark": 1,
+      "divine": 1,
+      "martial": 1,
+      "occult": 1,
+      "primal": 1
+    },
     "min_deprecated_cards": 3,
     "min_card_groups": 5,
     "min_cards_with_multiple_versions": 160,
     "required_template_keys": [
       "basic-mana",
+      "full-height",
       "mtg-like-v1"
+    ],
+    "required_tag_keys": [
+      "order",
+      "blood",
+      "dark",
+      "metal"
+    ],
+    "required_classification_rules": [
+      {
+        "card_pool": "player",
+        "target_kind": "role",
+        "target_key": "hero",
+        "source_kind": "type",
+        "source_key": "hero",
+        "enabled": true
+      },
+      {
+        "card_pool": "player",
+        "target_kind": "role",
+        "target_key": "mana",
+        "source_kind": "type",
+        "source_key": "mana",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "role",
+        "target_key": "boss",
+        "source_kind": "type",
+        "source_key": "boss",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "role",
+        "target_key": "location",
+        "source_kind": "type",
+        "source_key": "location",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "role",
+        "target_key": "directive",
+        "source_kind": "type",
+        "source_key": "directive",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "role",
+        "target_key": "reminder",
+        "source_kind": "type",
+        "source_key": "reminder",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "role",
+        "target_key": "mana",
+        "source_kind": "type",
+        "source_key": "mana",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "faction",
+        "target_key": "order",
+        "source_kind": "tag",
+        "source_key": "order",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "faction",
+        "target_key": "blood",
+        "source_kind": "tag",
+        "source_key": "blood",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "faction",
+        "target_key": "dark",
+        "source_kind": "tag",
+        "source_key": "dark",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "faction",
+        "target_key": "metal",
+        "source_kind": "tag",
+        "source_key": "metal",
+        "enabled": true
+      },
+      {
+        "card_pool": "neutral",
+        "target_kind": "role",
+        "target_key": "boon",
+        "source_kind": "type",
+        "source_key": "boon",
+        "enabled": true
+      },
+      {
+        "card_pool": "neutral",
+        "target_kind": "role",
+        "target_key": "event",
+        "source_kind": "type",
+        "source_key": "event",
+        "enabled": true
+      },
+      {
+        "card_pool": "player",
+        "target_kind": "mana_family",
+        "target_key": "arcane",
+        "source_kind": "symbol",
+        "source_key": "arcane-mana",
+        "enabled": true
+      },
+      {
+        "card_pool": "player",
+        "target_kind": "mana_family",
+        "target_key": "arcane",
+        "source_kind": "symbol",
+        "source_key": "arcane-affinity",
+        "enabled": true
+      },
+      {
+        "card_pool": "player",
+        "target_kind": "mana_family",
+        "target_key": "dark",
+        "source_kind": "symbol",
+        "source_key": "dark-mana",
+        "enabled": true
+      },
+      {
+        "card_pool": "player",
+        "target_kind": "mana_family",
+        "target_key": "dark",
+        "source_kind": "symbol",
+        "source_key": "dark-affinity",
+        "enabled": true
+      },
+      {
+        "card_pool": "player",
+        "target_kind": "mana_family",
+        "target_key": "divine",
+        "source_kind": "symbol",
+        "source_key": "divine-mana",
+        "enabled": true
+      },
+      {
+        "card_pool": "player",
+        "target_kind": "mana_family",
+        "target_key": "divine",
+        "source_kind": "symbol",
+        "source_key": "divine-affinity",
+        "enabled": true
+      },
+      {
+        "card_pool": "player",
+        "target_kind": "mana_family",
+        "target_key": "martial",
+        "source_kind": "symbol",
+        "source_key": "martial-mana",
+        "enabled": true
+      },
+      {
+        "card_pool": "player",
+        "target_kind": "mana_family",
+        "target_key": "martial",
+        "source_kind": "symbol",
+        "source_key": "martial-affinity",
+        "enabled": true
+      },
+      {
+        "card_pool": "player",
+        "target_kind": "mana_family",
+        "target_key": "occult",
+        "source_kind": "symbol",
+        "source_key": "occult-mana",
+        "enabled": true
+      },
+      {
+        "card_pool": "player",
+        "target_kind": "mana_family",
+        "target_key": "occult",
+        "source_kind": "symbol",
+        "source_key": "occult-affinity",
+        "enabled": true
+      },
+      {
+        "card_pool": "player",
+        "target_kind": "mana_family",
+        "target_key": "primal",
+        "source_kind": "symbol",
+        "source_key": "primal-mana",
+        "enabled": true
+      },
+      {
+        "card_pool": "player",
+        "target_kind": "mana_family",
+        "target_key": "primal",
+        "source_kind": "symbol",
+        "source_key": "primal-affinity",
+        "enabled": true
+      }
     ]
   }
 }

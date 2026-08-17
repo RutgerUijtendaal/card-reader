@@ -1,0 +1,4 @@
+interface:
+  display_name: "Card Reader TTS"
+  short_description: "Maintain persistent TTS export workflows"
+  default_prompt: "Use $card-reader-tts to change Card Reader persistent TTS sheets, renderer behavior, exports, or the Tabletop Simulator importer."

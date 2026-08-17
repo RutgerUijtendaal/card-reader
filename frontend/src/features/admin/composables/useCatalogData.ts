@@ -10,9 +10,11 @@ import type {
   TagRecord,
   TypeRecord,
   DeckTagRecord,
+  ClassificationDefinitionRecord,
 } from '@/features/admin/types';
 
 export const useCatalogData = (resetNewEntryForm: () => void) => {
+  let loadGeneration = 0;
   const selectedKind = ref<CatalogKind>('keywords');
   const searchFilters = reactive<CatalogSearchState>({
     keywords: '',
@@ -21,6 +23,9 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     types: '',
     'suggested-tags': '',
     'suggested-types': '',
+    'card-roles': '',
+    'card-factions': '',
+    'card-mana-families': '',
     'deck-roles': '',
     'deck-types': '',
     'suggested-deck-types': '',
@@ -32,6 +37,9 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     types: TypeRecord[];
     'suggested-tags': SuggestionRecord[];
     'suggested-types': SuggestionRecord[];
+    'card-roles': ClassificationDefinitionRecord[];
+    'card-factions': ClassificationDefinitionRecord[];
+    'card-mana-families': ClassificationDefinitionRecord[];
     'deck-roles': DeckTagRecord[];
     'deck-types': DeckTagRecord[];
     'suggested-deck-types': SuggestionRecord[];
@@ -42,6 +50,9 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     types: [],
     'suggested-tags': [],
     'suggested-types': [],
+    'card-roles': [],
+    'card-factions': [],
+    'card-mana-families': [],
     'deck-roles': [],
     'deck-types': [],
     'suggested-deck-types': [],
@@ -68,13 +79,20 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
   };
 
   const loadCatalog = async (): Promise<void> => {
+    const generation = ++loadGeneration;
     const [data, deckTagData] = await Promise.all([fetchCatalog(), fetchDeckTagCatalog()]);
+    if (generation !== loadGeneration) {
+      return;
+    }
     catalog.keywords = data.known.keywords ?? [];
     catalog.tags = data.known.tags ?? [];
     catalog.symbols = data.known.symbols ?? [];
     catalog.types = data.known.types ?? [];
     catalog['suggested-tags'] = data.suggested.tags ?? [];
     catalog['suggested-types'] = data.suggested.types ?? [];
+    catalog['card-roles'] = data.classification?.roles ?? [];
+    catalog['card-factions'] = data.classification?.factions ?? [];
+    catalog['card-mana-families'] = data.classification?.mana_families ?? [];
     catalog['deck-roles'] = deckTagData.roles;
     catalog['deck-types'] = deckTagData.types;
     catalog['suggested-deck-types'] = deckTagData.suggestedTypes;

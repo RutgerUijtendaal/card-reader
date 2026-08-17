@@ -2,11 +2,14 @@ import type { MetadataOption, SymbolFilterOption } from '@/domain/cards/types';
 import type { CardLifecycleFilterValue } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { MetadataFavoriteGroup } from '@/domain/cards/composables/filters/useMetadataFilterFavorites';
 import type { TriStateSelection } from '@/domain/cards/utils/filters/triStateSelection';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 export type MatchMode = 'any' | 'all';
 export type LifecycleFilterValue = CardLifecycleFilterValue;
 export type SymbolFilterTriState = TriStateSelection;
 export type CardFilterSectionKey =
+  | 'roles'
+  | 'factions'
   | 'mana'
   | 'types'
   | 'affinity'
@@ -16,15 +19,34 @@ export type CardFilterSectionKey =
   | 'tags';
 
 export type CardFilterSectionsState = {
-  selectedManaTypeSymbolIds: string[];
+  cardPool: CardPool;
+  onUpdateCardPool: (value: CardPool) => void;
+  cardPoolOptions: MetadataOption[];
+  selectedCardRoles: string[];
+  onUpdateSelectedCardRoles: (value: string[]) => void;
+  excludedCardRoles: string[];
+  onUpdateExcludedCardRoles: (value: string[]) => void;
+  cardRoleMatch: MatchMode;
+  onUpdateCardRoleMatch: (value: MatchMode) => void;
+  cardRoleOptions: MetadataOption[];
+  selectedCardFactions: string[];
+  onUpdateSelectedCardFactions: (value: string[]) => void;
+  excludedCardFactions: string[];
+  onUpdateExcludedCardFactions: (value: string[]) => void;
+  cardFactionMatch: MatchMode;
+  onUpdateCardFactionMatch: (value: MatchMode) => void;
+  cardFactionOptions: MetadataOption[];
+  resetCardRoleGroup: () => void;
+  resetCardFactionGroup: () => void;
+  selectedManaFamilyIds: string[];
   lifecycleStatus: LifecycleFilterValue;
   onUpdateLifecycleStatus: (value: LifecycleFilterValue) => void;
-  onUpdateSelectedManaTypeSymbolIds: (value: string[]) => void;
-  excludedManaTypeSymbolIds: string[];
-  onUpdateExcludedManaTypeSymbolIds: (value: string[]) => void;
-  manaSymbolMatch: MatchMode;
-  onUpdateManaSymbolMatch: (value: MatchMode) => void;
-  manaTypeOptions: SymbolFilterOption[];
+  onUpdateSelectedManaFamilyIds: (value: string[]) => void;
+  excludedManaFamilyIds: string[];
+  onUpdateExcludedManaFamilyIds: (value: string[]) => void;
+  manaFamilyMatch: MatchMode;
+  onUpdateManaFamilyMatch: (value: MatchMode) => void;
+  manaFamilyOptions: SymbolFilterOption[];
   manaCostMin: string;
   onUpdateManaCostMin: (value: string) => void;
   manaCostMax: string;

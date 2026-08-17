@@ -18,8 +18,8 @@ export const domainDependencies = {
   notifications: ['session'],
   operations: [],
   review: ['cards', 'session'],
-  session: [],
-  templates: ['maintenance'],
+  session: ['cards'],
+  templates: ['cards', 'maintenance'],
 };
 
 export const assertDomainDependencyGraph = (dependencies) => {

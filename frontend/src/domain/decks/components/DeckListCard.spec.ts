@@ -36,7 +36,7 @@ const buildDeck = (): DeckRecord => ({
     id: 'card-1',
     key: 'card-1',
     label: 'Azure Hero',
-    is_hero: true,
+    card_pool: 'player' as const, card_roles: ['hero' as const],
     template_id: 'template-1',
     version_id: 'version-1',
     version_number: 1,
@@ -94,6 +94,7 @@ const buildDeck = (): DeckRecord => ({
     label: 'Ready',
     issues: [],
   },
+  has_non_player_cards: false,
   tags: [
     { id: 'role-damage', kind: 'role', key: 'damage', label: 'Damage' },
     { id: 'type-armor', kind: 'type', key: 'armor', label: 'Armor' },

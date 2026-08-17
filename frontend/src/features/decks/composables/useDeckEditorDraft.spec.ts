@@ -11,7 +11,7 @@ const buildCard = (id: string, name: string, manaValue = 1): DeckCardSummary =>
     result_type: 'card',
     key: id,
     label: name,
-    is_hero: false,
+    card_pool: 'player' as const, card_roles: [],
     template_id: '',
     version_id: `${id}-version`,
     version_number: 1,
@@ -44,7 +44,7 @@ describe('useDeckEditorDraft', () => {
   test('builds a payload with named sideboards', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
       cardB: buildCard('cardB', 'Card B', 3),
     });
@@ -85,7 +85,7 @@ describe('useDeckEditorDraft', () => {
 
   test('hydrates and serializes a multiline long description', () => {
     const editorMode = ref<DeckEditorMode>('cards');
-    const hero = { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' };
+    const hero = { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' };
     const cardLookup = ref<Record<string, DeckCardSummary>>({ hero });
     const controller = useDeckEditorDraft({
       editorMode,
@@ -110,6 +110,7 @@ describe('useDeckEditorDraft', () => {
         mainboard_unique_cards: 0,
       },
       status: { is_valid: false, label: 'In Progress', issues: [] },
+      has_non_player_cards: false,
       created_at: '',
       updated_at: '',
     };
@@ -129,7 +130,7 @@ describe('useDeckEditorDraft', () => {
   test('reorders mainboard entries and preserves the payload order', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
       cardB: buildCard('cardB', 'Card B', 3),
       cardC: buildCard('cardC', 'Card C', 4),
@@ -165,7 +166,7 @@ describe('useDeckEditorDraft', () => {
   test('reorders sideboard entries without changing the mainboard', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
       cardB: buildCard('cardB', 'Card B', 3),
       cardC: buildCard('cardC', 'Card C', 4),
@@ -202,7 +203,7 @@ describe('useDeckEditorDraft', () => {
   test('targets add/remove actions at the active board', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
@@ -225,7 +226,7 @@ describe('useDeckEditorDraft', () => {
   test('removes one gallery copy at a time and deletes the final copy', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
@@ -250,7 +251,7 @@ describe('useDeckEditorDraft', () => {
     try {
       const editorMode = ref<DeckEditorMode>('cards');
       const cardLookup = ref<Record<string, DeckCardSummary>>({
-        hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+        hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
         cardA: buildCard('cardA', 'Card A', 2),
         cardB: buildCard('cardB', 'Card B', 3),
       });
@@ -287,7 +288,7 @@ describe('useDeckEditorDraft', () => {
   test('does not remove gallery cards during setup mode', () => {
     const editorMode = ref<DeckEditorMode>('hero');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
@@ -306,7 +307,7 @@ describe('useDeckEditorDraft', () => {
   test('board row action increments one copy on the active board', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
@@ -325,7 +326,7 @@ describe('useDeckEditorDraft', () => {
   test('board row action respects board-specific quantity limits', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
@@ -350,7 +351,7 @@ describe('useDeckEditorDraft', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const legendary = buildLegendaryCard();
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       legendary,
     });
     const controller = useDeckEditorDraft({
@@ -375,7 +376,7 @@ describe('useDeckEditorDraft', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const legendary = buildLegendaryCard();
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       legendary,
     });
     const controller = useDeckEditorDraft({
@@ -400,7 +401,7 @@ describe('useDeckEditorDraft', () => {
     const manaB = { ...buildCard('manaB', 'Mana B', 0), types: [{ id: 'mana', key: 'mana', label: 'Mana' }] };
     const manaC = { ...buildCard('manaC', 'Mana C', 0), types: [{ id: 'mana', key: 'mana', label: 'Mana' }] };
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       legendary,
       manaA,
       manaB,
@@ -432,7 +433,7 @@ describe('useDeckEditorDraft', () => {
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
         ...buildCard('hero', 'Hero Card', 0),
-        is_hero: true,
+        card_pool: 'player' as const, card_roles: ['hero' as const],
         type_line: 'Hero',
         deck_building_config: {
           overrides: {
@@ -458,7 +459,7 @@ describe('useDeckEditorDraft', () => {
   test('uses self-targeted copy limits only for the owning card', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       selfLimited: {
         ...buildCard('selfLimited', 'Self Limited Card', 2),
         deck_building_config: {
@@ -527,7 +528,7 @@ describe('useDeckEditorDraft', () => {
   test('uses backend numeric alias precedence for local rule resolution', () => {
     const hero = {
       ...buildCard('hero', 'Hero Card', 0),
-      is_hero: true,
+      card_pool: 'player' as const, card_roles: ['hero' as const],
       type_line: 'Hero',
       deck_building_config: {
         overrides: {
@@ -560,7 +561,7 @@ describe('useDeckEditorDraft', () => {
       },
     };
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       filler: buildCard('filler', 'Filler', 2),
       capRaiser,
     });
@@ -590,7 +591,7 @@ describe('useDeckEditorDraft', () => {
       },
     };
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       filler: buildCard('filler', 'Filler', 2),
       capLowerer,
     });
@@ -614,7 +615,7 @@ describe('useDeckEditorDraft', () => {
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
         ...buildCard('hero', 'Hero Card', 0),
-        is_hero: true,
+        card_pool: 'player' as const, card_roles: ['hero' as const],
         type_line: 'Hero',
         deck_building_config: {
           overrides: {
@@ -646,7 +647,7 @@ describe('useDeckEditorDraft', () => {
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
         ...buildCard('hero', 'Hero Card', 0),
-        is_hero: true,
+        card_pool: 'player' as const, card_roles: ['hero' as const],
         type_line: 'Hero',
         deck_building_config: {
           overrides: {
@@ -683,7 +684,7 @@ describe('useDeckEditorDraft', () => {
       },
     };
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       candidate,
     });
     const controller = useDeckEditorDraft({
@@ -705,7 +706,7 @@ describe('useDeckEditorDraft', () => {
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
         ...buildCard('hero', 'Hero Card', 0),
-        is_hero: true,
+        card_pool: 'player' as const, card_roles: ['hero' as const],
         type_line: 'Hero',
         deck_building_config: {
           overrides: {
@@ -739,7 +740,7 @@ describe('useDeckEditorDraft', () => {
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       strictHero: {
         ...buildCard('strictHero', 'Strict Hero', 0),
-        is_hero: true,
+        card_pool: 'player' as const, card_roles: ['hero' as const],
         type_line: 'Hero',
         deck_building_config: {
           overrides: {
@@ -768,7 +769,7 @@ describe('useDeckEditorDraft', () => {
   test('does not treat validity-only deck constraints as setup blockers', () => {
     const editorMode = ref<DeckEditorMode>('hero');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
     });
     const controller = useDeckEditorDraft({
       editorMode,
@@ -804,7 +805,7 @@ describe('useDeckEditorDraft', () => {
   test('does not show a setup issue when deck name is empty', () => {
     const editorMode = ref<DeckEditorMode>('hero');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
     });
     const controller = useDeckEditorDraft({
       editorMode,
@@ -824,7 +825,7 @@ describe('useDeckEditorDraft', () => {
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
         ...buildCard('hero', 'Hero Card', 0),
-        is_hero: true,
+        card_pool: 'player' as const, card_roles: ['hero' as const],
         type_line: 'Hero',
         deck_building_config: {
           overrides: {
@@ -853,7 +854,7 @@ describe('useDeckEditorDraft', () => {
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
         ...buildCard('hero', 'Hero Card', 0),
-        is_hero: true,
+        card_pool: 'player' as const, card_roles: ['hero' as const],
         type_line: 'Hero',
         deck_building_config: {
           overrides: {
@@ -880,7 +881,7 @@ describe('useDeckEditorDraft', () => {
   test('board row secondary action removes one copy without removing the entry', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
@@ -905,7 +906,7 @@ describe('useDeckEditorDraft', () => {
   test('board row actions target the active sideboard when selected', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
@@ -930,7 +931,7 @@ describe('useDeckEditorDraft', () => {
   test('moves one copy from mainboard to sideboard', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
@@ -955,7 +956,7 @@ describe('useDeckEditorDraft', () => {
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
         ...buildCard('hero', 'Hero Card', 0),
-        is_hero: true,
+        card_pool: 'player' as const, card_roles: ['hero' as const],
         type_line: 'Hero',
         deck_building_config: {
           overrides: {
@@ -984,7 +985,7 @@ describe('useDeckEditorDraft', () => {
   test('moves one copy from sideboard to mainboard', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
@@ -1006,7 +1007,7 @@ describe('useDeckEditorDraft', () => {
   test('merges one moved copy into an existing destination row when valid', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
@@ -1029,7 +1030,7 @@ describe('useDeckEditorDraft', () => {
   test('blocks row moves when destination limits would be exceeded', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
@@ -1055,7 +1056,7 @@ describe('useDeckEditorDraft', () => {
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
         ...buildCard('hero', 'Hero Card', 0),
-        is_hero: true,
+        card_pool: 'player' as const, card_roles: ['hero' as const],
         type_line: 'Hero',
         deck_building_config: {
           overrides: {
@@ -1086,7 +1087,7 @@ describe('useDeckEditorDraft', () => {
   test('blocks row moves into mainboard when deck limits would be exceeded', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
       filler: buildCard('filler', 'Filler', 2),
     });
@@ -1116,7 +1117,7 @@ describe('useDeckEditorDraft', () => {
   test('returns move destinations for other boards only', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
@@ -1145,7 +1146,7 @@ describe('useDeckEditorDraft', () => {
   test('tracks mainboard and overall totals separately', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
       cardB: buildCard('cardB', 'Card B', 4),
     });
@@ -1169,7 +1170,7 @@ describe('useDeckEditorDraft', () => {
   test('deduplicates overall unique cards across mainboard and sideboards', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
       cardB: buildCard('cardB', 'Card B', 4),
     });
@@ -1193,7 +1194,7 @@ describe('useDeckEditorDraft', () => {
   test('flags whether mainboard Mana cards reach the free mulligan threshold', () => {
     const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: { ...buildCard('hero', 'Hero Card', 0), card_pool: 'player' as const, card_roles: ['hero' as const], type_line: 'Hero' },
       manaA: { ...buildCard('manaA', 'Mana A', 0), types: [{ id: 'mana', key: 'mana', label: 'Mana' }] },
       spellA: buildCard('spellA', 'Spell A', 2),
     });

@@ -1,4 +1,8 @@
 import type { CardHoverTooltipModel, CardTooltipSymbolLookup } from '@/domain/cards/types/cardModels';
+import type { CardRole, CardRoleFilter } from '@/domain/cards/cardRoles';
+import type { CardPool } from '@/domain/cards/cardPools';
+import type { CardFaction } from '@/domain/cards/cardFactions';
+import type { ManaFamily } from '@/domain/cards/manaFamilies';
 
 export type ScalarFieldName = 'name' | 'type_line' | 'mana_cost' | 'attack' | 'health' | 'rules_text';
 export type MetadataGroupName = 'keywords' | 'tags' | 'types' | 'symbols';
@@ -17,11 +21,20 @@ export type SymbolFilterOption = MetadataOption & {
 };
 
 export type ManaFamilyOption = {
-  key: string;
+  key: ManaFamily;
   label: string;
   rank: number;
+  display_symbol_key?: string;
+  display_symbol?: SymbolFilterOption | null;
   mana_symbol: SymbolFilterOption | null;
   affinity_symbol: SymbolFilterOption | null;
+};
+
+export type CardClassificationOption<T extends string = string> = {
+  key: T;
+  label: string;
+  rank: number;
+  derived?: boolean;
 };
 
 export type CardFiltersResponse = {
@@ -30,6 +43,9 @@ export type CardFiltersResponse = {
   symbols: SymbolFilterOption[];
   types: MetadataOption[];
   mana_families?: ManaFamilyOption[];
+  card_pools?: CardClassificationOption<CardPool>[];
+  card_roles?: CardClassificationOption<CardRoleFilter>[];
+  card_factions?: CardClassificationOption<CardFaction>[];
 };
 
 export type FieldSourceValue = 'auto' | 'manual';
@@ -65,6 +81,7 @@ export type CardGroupSummary = {
   id: string;
   key: string;
   name: string;
+  card_pool: CardPool;
   anchor_card_id: string;
   member_count: number;
   card_ids: string[];
@@ -105,6 +122,11 @@ export type CardGroupGalleryItem = {
   group_name: string;
   anchor_card_id: string;
   anchor_card_name: string;
+  card_pool: CardPool;
+  card_roles: CardRole[];
+  card_factions: CardFaction[];
+  card_mana_families: ManaFamily[];
+  mana_family_sort_key: number;
   member_count: number;
   preview_cards: CardGroupPreviewCard[];
 };

@@ -15,7 +15,7 @@ from card_reader_api.common.urls import build_public_api_url
 from card_reader_api.exports.serializers import TtsCardExportRequestSerializer
 from card_reader_api.exports.tts_cards import encode_tts_card_export
 from card_reader_core.repositories.exports import export_cards_csv
-from card_reader_core.services.decks import DeckService
+from card_reader_core.services.decks import DeckService, deck_export_uses_non_player_card
 from card_reader_core.services.exports import (
     TtsCardExportError,
     TtsCardExportErrorCode,
@@ -36,7 +36,7 @@ _RETRYABLE_TTS_CARD_EXPORT_ERRORS = {
 
 
 class ExportCsvView(APIView):
-    def get(self, request: Request) -> HttpResponse:
+    def get(self, request: Request) -> HttpResponse | Response:
         serializer = CardFiltersQuerySerializer(data=card_filter_query_data(request))
         if not serializer.is_valid():
             return serializer_error(serializer)
@@ -70,6 +70,13 @@ class ExportCsvView(APIView):
             mana_cost_min=filters["mana_cost_min"],
             mana_cost_max=filters["mana_cost_max"],
             template_id=filters["template_id"],
+            card_pool=filters["card_pool"],
+            card_roles=filters["card_roles"],
+            card_role_exclude=filters["card_role_exclude"],
+            card_role_match=filters["card_role_match"],
+            card_factions=filters["card_factions"],
+            card_faction_exclude=filters["card_faction_exclude"],
+            card_faction_match=filters["card_faction_match"],
             attack_min=filters["attack_min"],
             attack_max=filters["attack_max"],
             health_min=filters["health_min"],
@@ -105,7 +112,7 @@ class CardTtsExportView(APIView):
                 export_data = service.build_gallery_export(gallery_filters)
             else:
                 export_data = service.build_content_version_export(
-                    str(source["content_version_id"])
+                    str(source["content_version_id"]),
                 )
         except TtsCardExportError as exc:
             return _tts_card_export_error_response(exc)
@@ -129,11 +136,15 @@ class DeckTtsExportView(APIView):
 
     def get(self, request: Request, deck_id: str) -> HttpResponse | Response:
         viewer_id = _user_id(request) if is_authenticated(request.user) else None
-        deck = DeckService().get_deck_for_viewer(deck_id, viewer_id=viewer_id)
+        deck = DeckService().get_visible_deck_for_viewer(deck_id, viewer_id=viewer_id)
         if deck is None:
             return not_found("Deck not found")
-
         sideboard_id = request.query_params.get("sideboard_id")
+        if deck_export_uses_non_player_card(
+            deck,
+            sideboard_id=sideboard_id,
+        ):
+            return not_found("Deck not found")
         try:
             export_data = TtsCardExportService().build_deck_export(
                 str(deck.id),

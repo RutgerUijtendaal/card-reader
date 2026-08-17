@@ -56,8 +56,11 @@ pnpm --filter @card-reader/api dev-data:doctor
 
 Auth is always enabled.
 
-- `/cards`, `/cards/filters`, card image endpoints, the temporary `/tts/cache-test/card-image`
-  diagnostic, symbol assets, `/health`, and `/auth/*` are public.
+- Player, Evil, and Neutral `/cards`, `/cards/filters`, card-group, generation, and direct card image
+  endpoints are public. Invalid pools, lifecycle filtering, immutable-path containment, and image
+  ownership checks remain enforced. Pool-partitioned TTS sheet images are public derived artifacts.
+- The temporary `/tts/cache-test/card-image` diagnostic, symbol assets, `/health`, and `/auth/*`
+  are public.
 - Public deck detail and deck TTS export are available to any viewer who can access the deck.
 - Import jobs, review, administrative settings APIs, catalog, templates, CSV exports, and
   `POST /exports/tts/cards` require `is_staff=true`.
@@ -69,19 +72,24 @@ Auth is always enabled.
   yield a hashed bearer token that can retry the pinned download for 30 minutes.
 
 The Vue app uses Django session auth with CSRF protection. `/auth/me` and `/auth/login` return the
-current user payload and a CSRF token used by the browser client for unsafe requests.
+current user payload and a CSRF token used by the browser client for unsafe requests. Session
+payloads expose action capabilities but do not carry card-pool entitlements.
 
 ## Seeds
 
-Default seed JSON files live in `src/card_reader_api/seeds`:
+Catalog seed fixtures used by the integration suite live in
+`../integration/tests/fixtures/catalog`:
 
 - `seed-keywords.json`
 - `seed-symbols.json`
+- `seed-tags.json`
 - `seed-templates.json`
-- `seed-users.example.json`
+- `seed-types.json`
 
-Private local users live in `src/card_reader_api/seeds/seed-users.local.json`. The local users file is
-gitignored and read by `python manage.py seed_users`.
+The example users file instead lives at
+`src/card_reader_api/seeds/seed-users.example.json`. Private local users live at
+`src/card_reader_api/seeds/seed-users.local.json`; that local file is gitignored and read by
+`python manage.py seed_users`.
 
 Re-running `seed_users` updates existing configured users, including their password and staff flags.
 

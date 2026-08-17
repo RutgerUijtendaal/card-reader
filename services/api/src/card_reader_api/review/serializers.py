@@ -3,8 +3,17 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from card_reader_api.cards.public_urls import card_image_asset_url
-from card_reader_core.models import CardVersion, CardVersionParseFlag, CardVersionParseFlagItem
-from card_reader_core.repositories.cards import get_card_image
+from card_reader_core.models import (
+    CardClassificationReviewItem,
+    CardVersion,
+    CardVersionParseFlag,
+    CardVersionParseFlagItem,
+    Card,
+    card_faction_keys,
+    card_mana_family_keys,
+    card_role_keys,
+)
+from card_reader_core.repositories.cards import get_card_image, select_usable_card_image
 
 
 class ParseFlagItemsQuerySerializer(serializers.Serializer[dict[str, object]]):
@@ -13,9 +22,75 @@ class ParseFlagItemsQuerySerializer(serializers.Serializer[dict[str, object]]):
     page_size = serializers.IntegerField(required=False, min_value=1, default=50)
 
 
+class ClassificationReviewItemsQuerySerializer(serializers.Serializer[dict[str, object]]):
+    status = serializers.ChoiceField(choices=["open", "resolved", "dismissed", "all"], required=False, default="open")
+    page = serializers.IntegerField(required=False, min_value=1, default=1)
+    page_size = serializers.IntegerField(required=False, min_value=1, max_value=100, default=50)
+
+
 class ParseFlagItemUpdateSerializer(serializers.Serializer[dict[str, object]]):
     status = serializers.ChoiceField(choices=["resolved", "dismissed"])
     review_note = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+class ClassificationReviewItemUpdateSerializer(serializers.Serializer[dict[str, object]]):
+    status = serializers.ChoiceField(choices=["resolved", "dismissed"])
+    review_note = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+def classification_review_item_payload(
+    item: CardClassificationReviewItem,
+) -> dict[str, object]:
+    card = item.card
+    version = item.card_version
+    image_url: str | None = None
+    if card is not None and version is not None:
+        image = select_usable_card_image(version.images.all())
+        image_url = card_image_asset_url(
+            image,
+            fallback_url=f"/cards/{card.id}/versions/{version.id}/image",
+        )
+    reviewed_by = item.reviewed_by
+    current_classification = (
+        {
+            "card_pool": card.card_pool,
+            "card_roles": list(card_role_keys(card)),
+            "card_factions": list(card_faction_keys(card)),
+            "card_mana_families": list(card_mana_family_keys(card)),
+        }
+        if card is not None
+        else item.existing_classification_json
+    )
+    return {
+        "id": item.id,
+        "status": item.status,
+        "created_at": item.created_at.isoformat(),
+        "updated_at": item.updated_at.isoformat(),
+        "review_note": item.review_note,
+        "reviewed_at": item.reviewed_at.isoformat() if item.reviewed_at else None,
+        "reviewed_by": None
+        if reviewed_by is None
+        else {
+            "id": str(reviewed_by.pk),
+            "username": reviewed_by.get_username(),
+        },
+        "import_job_id": item.import_item.job.id,
+        "import_item_id": item.import_item.id,
+        "card": {
+            "id": card.id if card is not None else None,
+            "label": card.label if card is not None else "Card unavailable",
+            "name": version.name if version is not None else "Card unavailable",
+            "card_pool": current_classification.get("card_pool", item.card_pool),
+            "card_roles": current_classification.get("card_roles", []),
+            "card_factions": current_classification.get("card_factions", []),
+            "card_mana_families": current_classification.get("card_mana_families", []),
+            "image_url": image_url,
+        },
+        "version": _version_payload(version) if version is not None else None,
+        "existing_classification": item.existing_classification_json,
+        "inferred_classification": item.inferred_classification_json,
+        "inference_evidence": item.inference_evidence_json,
+    }
 
 
 def parse_flag_payload(flag: CardVersionParseFlag) -> dict[str, object]:
@@ -33,7 +108,11 @@ def parse_flag_payload(flag: CardVersionParseFlag) -> dict[str, object]:
             "id": str(submitted_by.pk),
             "username": submitted_by.get_username(),
         },
-        "card": _card_payload(card_id=card.id, card_label=card.label, card_name=version.name, image_url=image_url),
+        "card": _card_payload(
+            card=card,
+            card_name=version.name,
+            image_url=image_url,
+        ),
         "version": _version_payload(version),
         "items": [_parse_flag_item_fields(item) for item in flag.items.all()],
     }
@@ -53,7 +132,11 @@ def parse_flag_item_payload(item: CardVersionParseFlagItem) -> dict[str, object]
             "id": str(submitted_by.pk),
             "username": submitted_by.get_username(),
         },
-        "card": _card_payload(card_id=card.id, card_label=card.label, card_name=version.name, image_url=image_url),
+        "card": _card_payload(
+            card=card,
+            card_name=version.name,
+            image_url=image_url,
+        ),
         "version": _version_payload(version),
     }
 
@@ -81,11 +164,20 @@ def _parse_flag_item_fields(item: CardVersionParseFlagItem) -> dict[str, object]
     }
 
 
-def _card_payload(*, card_id: str, card_label: str, card_name: str, image_url: str | None) -> dict[str, object]:
+def _card_payload(
+    *,
+    card: Card,
+    card_name: str,
+    image_url: str | None,
+) -> dict[str, object]:
     return {
-        "id": card_id,
-        "label": card_label,
+        "id": card.id,
+        "label": card.label,
         "name": card_name,
+        "card_pool": card.card_pool,
+        "card_roles": list(card_role_keys(card)),
+        "card_factions": list(card_faction_keys(card)),
+        "card_mana_families": list(card_mana_family_keys(card)),
         "image_url": image_url,
     }
 

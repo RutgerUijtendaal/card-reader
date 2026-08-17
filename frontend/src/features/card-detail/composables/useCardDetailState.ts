@@ -1,4 +1,3 @@
-import { onKeyStroke } from '@vueuse/core';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
@@ -12,6 +11,7 @@ import {
 import { useGalleryCardNavigation } from '@/domain/cards/utils/gallery/galleryNavigation';
 import type {
   CardFiltersResponse,
+  CardGroupSummary,
   CardVersionDetail,
   FieldSourceValue,
   MetadataGroupName,
@@ -20,6 +20,7 @@ import type {
   SymbolFilterOption,
   SymbolLookupMap,
 } from '@/domain/cards/types';
+import type { CardPool } from '@/domain/cards/cardPools';
 import type {
   CardDetail,
   EditorForm,
@@ -27,7 +28,7 @@ import type {
   ReparseTemplateOption,
 } from '@/features/card-detail/types';
 import { metadataGroups, scalarFields } from '@/features/card-detail/types';
-import { isEditableKeyboardTarget } from '@/shared/utils/keyboard';
+import { formatCardDetailDate } from '@/features/card-detail/utils/cardDetailFormatters';
 import { fetchTemplates } from '@/domain/templates/api';
 import { fetchDeckRulesMetadata } from '@/domain/decks/api';
 import {
@@ -36,6 +37,7 @@ import {
   formatDeckBuildingConfigJson,
 } from '@/domain/decks/utils/deckRules';
 import { queryString } from '@/shared/router/routeState';
+import { getApiErrorMessage } from '@/shared/api/errors';
 import {
   patchLatestCardVersion,
   promoteCardVersion,
@@ -59,6 +61,7 @@ export const useCardDetailState = () => {
   const isQueuingReparse = ref(false);
   const promotingVersionId = ref<string | null>(null);
   const saveMessage = ref('');
+  const saveError = ref('');
   let loadRequestId = 0;
 
   const form = reactive<EditorForm>({
@@ -68,7 +71,10 @@ export const useCardDetailState = () => {
     attack: '',
     health: '',
     rules_text: '',
-    is_hero: false,
+    card_pool: 'player',
+    card_roles: [],
+    card_factions: [],
+    card_mana_families: [],
     deck_building_config: formatDeckBuildingConfigJson(fallbackDeckBuildingDefaultConfig),
     lifecycle_status: ACTIVE_CARD_LIFECYCLE_STATUS,
     keyword_ids: [],
@@ -167,6 +173,7 @@ export const useCardDetailState = () => {
         versions.value[0]?.version_id ??
         '';
       saveMessage.value = '';
+      saveError.value = '';
     } finally {
       if (requestId === loadRequestId) {
         isLoadingInitial.value = false;
@@ -183,7 +190,10 @@ export const useCardDetailState = () => {
     form.attack = version.attack === null ? '' : String(version.attack);
     form.health = version.health === null ? '' : String(version.health);
     form.rules_text = version.rules_text_enriched ?? version.rules_text ?? '';
-    form.is_hero = version.is_hero;
+    form.card_pool = version.card_pool;
+    form.card_roles = [...version.card_roles];
+    form.card_factions = [...(version.card_factions ?? [])];
+    form.card_mana_families = [...(version.card_mana_families ?? [])];
     form.deck_building_config = formatDeckBuildingConfigJson(
       Object.keys(version.deck_building_config ?? {}).length > 0
         ? version.deck_building_config
@@ -196,37 +206,60 @@ export const useCardDetailState = () => {
     form.additional_symbol_ids = uniqueIds(version.symbol_ids);
     reparseTemplateId.value = version.template_id;
     saveMessage.value = '';
+    saveError.value = '';
   };
 
   const selectVersion = (versionId: string): void => {
     selectedVersionId.value = versionId;
   };
 
-  const applyUpdatedVersion = (updated: CardVersionDetail): void => {
-    versions.value = versions.value.map((version) =>
-      version.version_id === updated.version_id ? updated : version,
-    );
+  const applyUpdatedVersion = (updated: CardVersionDetail): boolean => {
+    const previousVersion = versions.value.find((version) => version.version_id === updated.version_id);
+    const poolChanged = previousVersion?.card_pool !== updated.card_pool;
+    versions.value = synchronizeCardClassification(versions.value, updated);
     if (card.value) {
       card.value = {
         ...card.value,
         name: updated.name,
         label: updated.name,
         lifecycle_status: updated.lifecycle_status,
+        card_groups: poolChanged
+          ? reconcileCardGroupsAfterPoolChange(card.value.card_groups, updated.card_pool)
+          : card.value.card_groups,
       };
     }
     selectedVersionId.value = updated.version_id;
     syncFormFromSelectedVersion();
+    return poolChanged;
   };
 
-  const patchLatestVersion = async (payload: Record<string, unknown>, successMessage = 'Version updated.'): Promise<void> => {
+  const patchLatestVersion = async (
+    payload: Record<string, unknown>,
+    successMessage = 'Version updated.',
+  ): Promise<boolean> => {
     const version = selectedVersion.value;
-    if (!version?.editable) return;
+    if (!version?.editable) return false;
     isSaving.value = true;
     saveMessage.value = '';
+    saveError.value = '';
     try {
       const updatedVersion = await patchLatestCardVersion(version.id, payload);
-      applyUpdatedVersion(updatedVersion);
+      const poolChanged = applyUpdatedVersion(updatedVersion);
+      if (poolChanged) {
+        try {
+          const refreshedCard = await fetchCard<CardDetail>(updatedVersion.id);
+          if (card.value?.id === refreshedCard.id) {
+            card.value = refreshedCard;
+          }
+        } catch (error) {
+          console.error('Refresh card groups after pool change failed', error);
+        }
+      }
       saveMessage.value = successMessage;
+      return true;
+    } catch (error) {
+      saveError.value = cardSaveErrorMessage(error);
+      return false;
     } finally {
       isSaving.value = false;
     }
@@ -235,6 +268,8 @@ export const useCardDetailState = () => {
   const saveVersionEdits = async (): Promise<void> => {
     const version = selectedVersion.value;
     if (!version?.editable) return;
+    saveMessage.value = '';
+    saveError.value = '';
     const selectedTemplateId = reparseTemplateId.value;
     const templateChanged = selectedTemplateId !== version.template_id;
     const updates = buildVersionUpdatePayload(form, version, effectiveSymbolIds.value);
@@ -246,11 +281,11 @@ export const useCardDetailState = () => {
       saveMessage.value = 'No changes to save.';
       return;
     }
-    await patchLatestVersion(
+    const saved = await patchLatestVersion(
       updates,
       'Changes saved. Edited fields and metadata are now locked to manual ownership.',
     );
-    if (templateChanged) {
+    if (saved && templateChanged) {
       await queueLatestCardReparseForTemplate(selectedTemplateId);
     }
   };
@@ -258,11 +293,13 @@ export const useCardDetailState = () => {
   const saveCardEdits = async (): Promise<void> => {
     const version = selectedVersion.value;
     if (!version?.editable) return;
+    saveMessage.value = '';
+    saveError.value = '';
     let updates: Record<string, unknown>;
     try {
       updates = buildCardUpdatePayload(form, version);
     } catch (error) {
-      saveMessage.value = error instanceof Error ? error.message : 'Deck-building config must be valid JSON.';
+      saveError.value = error instanceof Error ? error.message : 'Deck-building config must be valid JSON.';
       return;
     }
     if (Object.keys(updates).length === 0) {
@@ -307,6 +344,7 @@ export const useCardDetailState = () => {
     if (!version?.editable) return;
     isQueuingReparse.value = true;
     saveMessage.value = '';
+    saveError.value = '';
     try {
       saveMessage.value = await queueCardReparse(version.id, templateId);
     } finally {
@@ -323,6 +361,7 @@ export const useCardDetailState = () => {
 
     promotingVersionId.value = versionId;
     saveMessage.value = '';
+    saveError.value = '';
     try {
       const promotedVersion = await promoteCardVersion(targetCard.id, versionId);
       versions.value = versions.value.map((item) =>
@@ -418,31 +457,6 @@ export const useCardDetailState = () => {
     form.additional_symbol_ids = uniqueIds(next);
   };
 
-  const formatDate = (value: string): string => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return value;
-    }
-    return date.toLocaleDateString();
-  };
-
-  onKeyStroke(['ArrowLeft', 'ArrowRight'], (event) => {
-    if (!galleryNavigation.hasGalleryContext.value || isEditableKeyboardTarget(event)) {
-      return;
-    }
-
-    if (event.key === 'ArrowLeft' && galleryNavigation.previousCardId.value) {
-      event.preventDefault();
-      galleryNavigation.goToPreviousCard();
-      return;
-    }
-
-    if (event.key === 'ArrowRight' && (galleryNavigation.nextCardId.value || galleryNavigation.hasMoreResults.value)) {
-      event.preventDefault();
-      void galleryNavigation.goToNextCard();
-    }
-  });
-
   watch(() => route.params.id, loadCard);
   watch(selectedVersion, syncFormFromSelectedVersion, { immediate: true });
 
@@ -466,6 +480,7 @@ export const useCardDetailState = () => {
     isQueuingReparse,
     promotingVersionId,
     saveMessage,
+    saveError,
     deckBuildingConfigExample,
     form,
     metadataSearch,
@@ -507,8 +522,16 @@ export const useCardDetailState = () => {
     toggleMetadataSelection,
     toggleAdditionalSymbol,
     toAbsoluteApiUrl,
-    formatDate,
+    formatDate: formatCardDetailDate,
   };
+};
+
+export const cardSaveErrorMessage = (error: unknown): string => {
+  const message = getApiErrorMessage(error, 'Card changes could not be saved.');
+  if (!message.toLowerCase().includes('conflict')) {
+    return message;
+  }
+  return `${message} Merge the duplicate cards before changing this card's name, pool, or factions.`;
 };
 
 const normalizeFieldValue = (version: CardVersionDetail, fieldName: ScalarFieldName): string => {
@@ -553,8 +576,23 @@ const buildCardUpdatePayload = (
 ): Record<string, unknown> => {
   const updates: Record<string, unknown> = {};
 
-  if (form.is_hero !== version.is_hero) {
-    updates.is_hero = form.is_hero;
+  if (form.card_pool !== version.card_pool) {
+    updates.card_pool = form.card_pool;
+  }
+  if (JSON.stringify([...form.card_roles].sort()) !== JSON.stringify([...version.card_roles].sort())) {
+    updates.card_roles = form.card_roles;
+  }
+  if (
+    JSON.stringify([...form.card_factions].sort())
+    !== JSON.stringify([...(version.card_factions ?? [])].sort())
+  ) {
+    updates.card_factions = form.card_factions;
+  }
+  if (
+    JSON.stringify([...form.card_mana_families].sort())
+    !== JSON.stringify([...(version.card_mana_families ?? [])].sort())
+  ) {
+    updates.card_mana_families = form.card_mana_families;
   }
   const deckBuildingConfig = parseJsonObject(form.deck_building_config);
   if (JSON.stringify(deckBuildingConfig) !== JSON.stringify(version.deck_building_config ?? {})) {
@@ -603,6 +641,42 @@ const sameIds = (left: string[], right: string[]): boolean =>
   JSON.stringify(sortedIds(left)) === JSON.stringify(sortedIds(right));
 
 const uniqueIds = (ids: string[]): string[] => Array.from(new Set(ids));
+
+export const reconcileCardGroupsAfterPoolChange = (
+  groups: CardGroupSummary[],
+  cardPool: CardPool,
+): CardGroupSummary[] => groups.map((group) =>
+  group.is_anchor ? { ...group, card_pool: cardPool } : group,
+);
+
+export type CardClassificationFields = Pick<
+  CardVersionDetail,
+  | 'version_id'
+  | 'card_pool'
+  | 'card_roles'
+  | 'card_factions'
+  | 'card_mana_families'
+  | 'deck_building_config'
+  | 'lifecycle_status'
+>;
+
+export const synchronizeCardClassification = <T extends CardClassificationFields>(
+  versions: T[],
+  updated: T,
+): T[] =>
+  versions.map((version) =>
+    version.version_id === updated.version_id
+      ? updated
+      : {
+          ...version,
+          card_pool: updated.card_pool,
+          card_roles: [...updated.card_roles],
+          card_factions: [...(updated.card_factions ?? [])],
+          card_mana_families: [...(updated.card_mana_families ?? [])],
+          deck_building_config: updated.deck_building_config,
+          lifecycle_status: updated.lifecycle_status,
+        },
+  );
 
 const parseJsonObject = (value: string): Record<string, unknown> => {
   const parsed = JSON.parse(value.trim() || '{}') as unknown;

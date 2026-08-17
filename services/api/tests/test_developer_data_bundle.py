@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import io
 import json
 from pathlib import Path
 import shutil
 import tarfile
 
+from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.db import IntegrityError, transaction
 import pytest
 
@@ -17,8 +19,12 @@ from card_reader_core.models import (
     Card,
     CardAlias,
     CardBack,
+    CardClassificationRule,
+    CardFactionAssignment,
+    CardManaFamilyAssignment,
     CardGroup,
     CardGroupMember,
+    CardRoleAssignment,
     CardVersion,
     CardVersionImage,
     CardVersionKeyword,
@@ -39,13 +45,448 @@ from card_reader_core.models import (
     Type,
 )
 from card_reader_core.operations.developer_data import (
+    DEVELOPER_DATA_FORMAT_VERSION,
     DeveloperDataError,
     PublishedBundleStore,
     export_developer_data,
     import_developer_data,
-    sha256_file,
     validate_archive,
 )
+from card_reader_core.operations.developer_data.importer import (
+    _validate_payload_references,
+    validate_import_readiness,
+)
+from card_reader_core.operations.developer_data.exporter import _build_payload
+from card_reader_core.operations.developer_data.schema import CardRecord, adopt_payload_for_format
+from card_reader_core.repositories.cards import set_card_mana_families
+from card_reader_core.storage import calculate_checksum
+from card_reader_core.services.classification_rules import (
+    ClassificationRuleService,
+    ensure_default_mana_family_classification_rules,
+)
+
+
+def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
+    adopted = adopt_payload_for_format(
+        {"cards": [{"key": "hero", "is_hero": True}, {"key": "standard", "is_hero": False}]},
+        format_version=1,
+    )
+
+    assert adopted == {
+        "classification_rules": [],
+        "cards": [
+            {
+                "key": "hero",
+                "card_pool": "player",
+                "card_roles": ["hero"],
+                "card_factions": [],
+                "card_mana_families": [],
+            },
+            {
+                "key": "standard",
+                "card_pool": "player",
+                "card_roles": [],
+                "card_factions": [],
+                "card_mana_families": [],
+            },
+        ],
+    }
+
+
+def test_version_one_payload_adoption_adds_mana_role_from_latest_type() -> None:
+    adopted = adopt_payload_for_format(
+        {
+            "cards": [
+                {
+                    "key": "legacy-mana",
+                    "is_hero": False,
+                    "latest_version_number": 1,
+                    "versions": [
+                        {
+                            "version_number": 1,
+                            "type_keys": ["directive", "reminder", "mana"],
+                        }
+                    ],
+                }
+            ]
+        },
+        format_version=1,
+    )
+
+    assert adopted["cards"][0]["card_roles"] == ["mana"]  # type: ignore[index]
+
+
+@pytest.mark.parametrize(
+    "legacy_card", [{"key": "missing"}, {"key": "wrong-type", "is_hero": "true"}]
+)
+def test_version_one_payload_adoption_rejects_invalid_hero_fields(
+    legacy_card: dict[str, object],
+) -> None:
+    with pytest.raises(ValueError, match="is_hero must be a Boolean"):
+        adopt_payload_for_format({"cards": [legacy_card]}, format_version=1)
+
+
+def test_version_two_card_record_rejects_duplicate_roles() -> None:
+    with pytest.raises(ValueError, match="Card roles must be unique"):
+        CardRecord.model_validate(
+            {
+                "key": "duplicate-role-card",
+                "label": "Duplicate Role Card",
+                "card_pool": "player",
+                "card_roles": ["hero", "hero"],
+                "card_factions": [],
+                "card_mana_families": [],
+                "deck_building_config": {},
+                "lifecycle_status": "active",
+                "latest_version_number": None,
+                "aliases": [],
+                "versions": [],
+            }
+        )
+
+
+def test_version_two_card_record_rejects_duplicate_factions() -> None:
+    with pytest.raises(ValueError, match="Card factions must be unique"):
+        CardRecord.model_validate(
+            {
+                "key": "duplicate-faction-card",
+                "label": "Duplicate Faction Card",
+                "card_pool": "evil",
+                "card_roles": ["boss"],
+                "card_factions": ["order", "order"],
+                "card_mana_families": [],
+                "deck_building_config": {},
+                "lifecycle_status": "active",
+                "latest_version_number": None,
+                "aliases": [],
+                "versions": [],
+            }
+        )
+
+
+def test_classification_rule_export_order_uses_source_natural_keys() -> None:
+    zeta = Tag.objects.create(key="zeta-export-rule", label="Zeta")
+    alpha = Tag.objects.create(key="alpha-export-rule", label="Alpha")
+    service = ClassificationRuleService()
+    service.create_rule(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="tag",
+        source_id=zeta.id,
+    )
+    service.create_rule(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="tag",
+        source_id=alpha.id,
+    )
+
+    payload = _build_payload(cards=[], groups=[])
+    source_keys = [
+        rule.source_key
+        for rule in payload.classification_rules
+        if rule.target_kind == "role" and rule.target_key == "hero"
+    ]
+    assert source_keys == ["alpha-export-rule", "zeta-export-rule"]
+
+
+def test_legacy_payload_adoption_namespaces_card_group_references() -> None:
+    adopted = adopt_payload_for_format(
+        {
+            "cards": [
+                {
+                    "key": "legacy-card",
+                    "is_hero": False,
+                }
+            ],
+            "card_groups": [
+                {
+                    "key": "legacy-group",
+                    "name": "Legacy Group",
+                    "anchor_card_key": "legacy-card",
+                    "members": [{"card_key": "legacy-card", "position": 1}],
+                }
+            ],
+        },
+        format_version=1,
+    )
+
+    reference = {
+        "key": "legacy-card",
+        "card_pool": "player",
+        "card_factions": [],
+        "card_mana_families": [],
+    }
+    assert adopted["card_groups"] == [  # type: ignore[index]
+        {
+            "key": "legacy-group",
+            "name": "Legacy Group",
+            "anchor_card_ref": reference,
+            "members": [{"position": 1, "card_ref": reference}],
+        }
+    ]
+
+
+def test_version_two_adoption_backfills_player_families_and_latest_type_roles() -> None:
+    adopted = adopt_payload_for_format(
+        {
+            "cards": [
+                {
+                    "key": "legacy-player",
+                    "card_pool": "player",
+                    "card_roles": ["hero"],
+                    "card_factions": [],
+                    "latest_version_number": 1,
+                    "versions": [
+                        {
+                            "version_number": 1,
+                            "symbol_keys": ["arcane-mana"],
+                            "type_keys": ["mana"],
+                        }
+                    ],
+                },
+                {
+                    "key": "legacy-evil",
+                    "card_pool": "evil",
+                    "card_roles": ["boss"],
+                    "card_factions": ["dark"],
+                    "latest_version_number": 1,
+                    "versions": [
+                        {
+                            "version_number": 1,
+                            "symbol_keys": ["dark-affinity"],
+                            "type_keys": ["directive", "reminder", "mana"],
+                        }
+                    ],
+                },
+            ],
+            "card_groups": [
+                {
+                    "key": "legacy-v2-group",
+                    "anchor_card_ref": {
+                        "key": "legacy-player",
+                        "card_pool": "player",
+                        "card_factions": [],
+                    },
+                    "members": [
+                        {
+                            "position": 1,
+                            "card_ref": {
+                                "key": "legacy-evil",
+                                "card_pool": "evil",
+                                "card_factions": ["dark"],
+                            },
+                        }
+                    ],
+                }
+            ],
+        },
+        format_version=2,
+    )
+
+    assert [
+        card["card_mana_families"] for card in adopted["cards"]  # type: ignore[index]
+    ] == [["arcane"], []]
+    assert [
+        card["card_roles"] for card in adopted["cards"]  # type: ignore[index]
+    ] == [["hero", "mana"], ["boss", "directive", "reminder", "mana"]]
+    group = adopted["card_groups"][0]  # type: ignore[index]
+    assert group["anchor_card_ref"]["card_mana_families"] == ["arcane"]
+    assert group["members"][0]["card_ref"]["card_mana_families"] == []
+
+
+def test_version_three_adoption_adds_latest_type_roles_without_rewriting_families() -> None:
+    adopted = adopt_payload_for_format(
+        {
+            "cards": [
+                {
+                    "key": "retained-version-three-evil",
+                    "card_pool": "evil",
+                    "card_roles": ["boss"],
+                    "card_mana_families": ["dark"],
+                    "latest_version_number": 2,
+                    "versions": [
+                        {"version_number": 1, "type_keys": ["mana"]},
+                        {
+                            "version_number": 2,
+                            "type_keys": ["directive", "reminder"],
+                        },
+                    ],
+                }
+            ]
+        },
+        format_version=3,
+    )
+
+    card = adopted["cards"][0]  # type: ignore[index]
+    assert card["card_roles"] == ["boss", "directive", "reminder"]
+    assert card["card_mana_families"] == ["dark"]
+
+
+def test_version_four_adoption_preserves_authoritative_stored_roles() -> None:
+    payload = {
+        "cards": [
+            {
+                "key": "current-player-without-mana-role",
+                "card_pool": "player",
+                "card_roles": [],
+                "card_mana_families": ["arcane"],
+                "latest_version_number": 1,
+                "versions": [{"version_number": 1, "type_keys": ["mana"]}],
+            },
+            {
+                "key": "current-evil-without-type-roles",
+                "card_pool": "evil",
+                "card_roles": ["boss"],
+                "card_mana_families": [],
+                "latest_version_number": 1,
+                "versions": [
+                    {
+                        "version_number": 1,
+                        "type_keys": ["directive", "reminder"],
+                    }
+                ],
+            },
+        ]
+    }
+
+    adopted = adopt_payload_for_format(payload, format_version=4)
+
+    assert adopted is payload
+    assert [card["card_roles"] for card in adopted["cards"]] == [[], ["boss"]]
+
+
+def test_developer_data_coverage_rejects_missing_required_classification_rule(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    selection_path = tmp_path / "selection.json"
+    archive_path = tmp_path / "missing-template-role.tar.gz"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        CardClassificationRule.objects.filter(
+            card_pool="player",
+            target_kind="role",
+            target_key="hero",
+        ).delete()
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+
+        with pytest.raises(DeveloperDataError, match="missing required classification rules"):
+            export_developer_data(
+                selection_path=selection_path,
+                output_path=archive_path,
+                source_revision="missing-role-test",
+            )
+        transaction.set_rollback(True)
+
+
+def test_import_accepts_only_unmodified_migration_defaults(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    target_storage = tmp_path / "target-storage"
+    selection_path = tmp_path / "selection.json"
+    archive_path = tmp_path / "migration-defaults.tar.gz"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        selection["include_all_cards"] = True
+        selection_path.write_text(
+            json.dumps(selection),
+            encoding="utf-8",
+        )
+        export_developer_data(
+            selection_path=selection_path,
+            output_path=archive_path,
+            source_revision="migration-default-import-test",
+        )
+
+        _clear_domain_data()
+        _seed_migration_defaults()
+        Template.objects.filter(key="full-height").update(label="Admin customization")
+        monkeypatch.setattr(settings, "app_data_dir", target_storage)
+        with pytest.raises(DeveloperDataError, match="requires an empty domain"):
+            import_developer_data(archive_path=archive_path)
+
+        _clear_domain_data()
+        _seed_migration_defaults()
+        result = import_developer_data(archive_path=archive_path)
+
+        assert result.counts["cards"] == 4
+        assert Template.objects.filter(key="full-height", label="Full height").exists()
+        assert CardClassificationRule.objects.count() == 18
+        transaction.set_rollback(True)
+
+
+def test_version_three_import_preserves_an_intentionally_omitted_default_rule(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    target_storage = tmp_path / "target-storage"
+    selection_path = tmp_path / "selection.json"
+    current_archive_path = tmp_path / "current-omitted-mana-rule.tar.gz"
+    archive_path = tmp_path / "omitted-mana-rule.tar.gz"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        selection["include_all_cards"] = True
+        CardClassificationRule.objects.filter(
+            card_pool="player",
+            target_kind="mana_family",
+            target_key="arcane",
+            source_kind="symbol",
+            symbol__key="arcane-mana",
+        ).delete()
+        coverage = selection["coverage"]
+        assert isinstance(coverage, dict)
+        required_rules = coverage["required_classification_rules"]
+        assert isinstance(required_rules, list)
+        coverage["required_classification_rules"] = [
+            rule
+            for rule in required_rules
+            if not (
+                isinstance(rule, dict)
+                and rule.get("target_kind") == "mana_family"
+            )
+        ]
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+        export_developer_data(
+            selection_path=selection_path,
+            output_path=current_archive_path,
+            source_revision="omitted-mana-rule-test",
+        )
+        _build_archive_with_format_version(
+            current_archive_path,
+            archive_path,
+            tmp_path / "version-three-archive",
+            format_version=3,
+        )
+
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", target_storage)
+        import_developer_data(archive_path=archive_path)
+
+        assert Symbol.objects.filter(key="arcane-mana").exists()
+        assert not CardClassificationRule.objects.filter(
+            card_pool="player",
+            target_kind="mana_family",
+            target_key="arcane",
+            source_kind="symbol",
+            symbol__key="arcane-mana",
+        ).exists()
+        transaction.set_rollback(True)
 
 
 def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
@@ -61,6 +502,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         _clear_domain_data()
         monkeypatch.setattr(settings, "app_data_dir", source_storage)
         selection = _build_synthetic_source(source_storage)
+        selection["include_all_cards"] = True
         selection_path.write_text(json.dumps(selection), encoding="utf-8")
 
         manifest = export_developer_data(
@@ -68,8 +510,18 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
             output_path=archive_path,
             source_revision="synthetic-test-revision",
         )
-        assert manifest.counts["cards"] == 3
-        assert manifest.counts["card_versions"] == 4
+        assert manifest.counts["cards"] == 4
+        assert manifest.counts["card_versions"] == 5
+        assert manifest.format_version == DEVELOPER_DATA_FORMAT_VERSION
+
+        _, validated_payload = validate_archive(archive_path)
+        mainboard_record = next(
+            card for card in validated_payload.cards if card.key == "synthetic-mainboard"
+        )
+        mainboard_record.card_roles = ["boon"]
+        assert "no active mainboard cards are included" not in validate_import_readiness(
+            validated_payload
+        )
 
         with tarfile.open(archive_path, "r:gz") as archive:
             data_member = archive.extractfile("data.json")
@@ -77,6 +529,11 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
             payload_text = data_member.read().decode("utf-8")
         assert "raw_ocr_json" not in payload_text
         assert "source_file" not in payload_text
+        assert '"card_pool"' in payload_text
+        assert '"card_roles"' in payload_text
+        assert '"card_factions"' in payload_text
+        assert '"card_mana_families"' in payload_text
+        assert '"is_hero"' not in payload_text
         assert "synthetic-user" not in payload_text
         published_store = PublishedBundleStore(root=tmp_path / "published")
         published = published_store.publish(archive_path)
@@ -115,14 +572,61 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         result = import_developer_data(
             archive_path=archive_path,
             expected_bundle_version="synthetic-v1",
-            expected_archive_sha256=sha256_file(archive_path),
+            expected_archive_sha256=calculate_checksum(archive_path),
         )
 
-        assert result.counts["cards"] == 3
-        assert result.copied_assets == 6
-        assert Card.objects.filter(key="synthetic-hero", is_hero=True).exists()
+        assert result.counts["cards"] == 4
+        assert result.copied_assets == 7
+        assert Card.objects.filter(key="synthetic-hero", role_assignments__role="hero").exists()
+        assert Card.objects.filter(
+            key="synthetic-deprecated", role_assignments__role="location"
+        ).exists()
         assert CardAlias.objects.filter(key="synthetic-hero-alias").exists()
         assert CardGroup.objects.filter(key="synthetic-group").exists()
+        assert CardClassificationRule.objects.count() == 9
+        imported_hero = Card.objects.get(key="synthetic-hero")
+        assert list(
+            CardManaFamilyAssignment.objects.filter(card=imported_hero).values_list(
+                "mana_family", flat=True
+            )
+        ) == ["arcane"]
+        assert CardClassificationRule.objects.filter(
+            card_pool="player",
+            target_kind="mana_family",
+            target_key="arcane",
+            source_kind="symbol",
+            symbol__key="arcane-mana",
+            enabled=True,
+        ).exists()
+        assert CardClassificationRule.objects.filter(
+            card_pool="evil",
+            target_kind="faction",
+            target_key="blood",
+            tag__key="blood",
+            enabled=True,
+        ).exists()
+        assert set(
+            CardClassificationRule.objects.filter(
+                card_pool="evil",
+                target_kind="faction",
+                target_key__in=("dark", "metal"),
+                enabled=True,
+            ).values_list("target_key", "tag__key")
+        ) == {("dark", "dark"), ("metal", "metal")}
+        assert Template.objects.get(key="synthetic-template").definition_json["regions"][0][
+            "parser_type"
+        ] == "name"
+        assert set(
+            Card.objects.get(
+                key="synthetic-mainboard",
+                faction_identity_key='["order","blood"]',
+            ).faction_assignments.values_list("faction", flat=True)
+        ) == {"order", "blood"}
+        assert Card.objects.filter(key="synthetic-mainboard").count() == 2
+        imported_group = CardGroup.objects.get(key="synthetic-group")
+        assert (
+            imported_group.members.get(position=2).card.faction_identity_key == '["order","blood"]'
+        )
         latest = Card.objects.get(key="synthetic-hero").latest_version
         assert latest is not None
         assert latest.version_number == 2
@@ -141,6 +645,42 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         transaction.set_rollback(True)
 
 
+@pytest.mark.parametrize("marked_version_number", [1, 2])
+def test_bundle_validation_rejects_inconsistent_latest_version_markers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    marked_version_number: int,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    selection_path = tmp_path / "selection.json"
+    archive_path = tmp_path / "latest-version-markers.tar.gz"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        selection["include_all_cards"] = True
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+        export_developer_data(
+            selection_path=selection_path,
+            output_path=archive_path,
+            source_revision="latest-version-marker-test",
+        )
+        _, payload = validate_archive(archive_path)
+        hero = next(card for card in payload.cards if card.key == "synthetic-hero")
+        for version in hero.versions:
+            version.is_latest = version.version_number == marked_version_number
+        if marked_version_number == hero.latest_version_number:
+            hero.versions[0].is_latest = True
+
+        with pytest.raises(
+            DeveloperDataError,
+            match=f"card {hero.key} has an invalid latest version",
+        ):
+            _validate_payload_references(payload)
+        transaction.set_rollback(True)
+
+
 def test_bundle_selection_can_include_complete_card_and_group_catalogs(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -154,6 +694,21 @@ def test_bundle_selection_can_include_complete_card_and_group_catalogs(
         monkeypatch.setattr(settings, "app_data_dir", source_storage)
         selection = _build_synthetic_source(source_storage)
         Card.objects.create(key="additional-public-card", label="Additional Public Card")
+        Card.objects.create(
+            key="non-player-game-master-card",
+            label="Non-Player Evil Card",
+            card_pool="evil",
+        )
+        Card.objects.create(
+            key="synthetic-hero",
+            label="Non-Player Evil Twin",
+            card_pool="evil",
+        )
+        Card.objects.create(
+            key="synthetic-hero",
+            label="Non-Player Neutral Twin",
+            card_pool="neutral",
+        )
         selection.update(
             {
                 "include_all_cards": True,
@@ -170,8 +725,123 @@ def test_bundle_selection_can_include_complete_card_and_group_catalogs(
             source_revision="complete-catalog-test-revision",
         )
 
-        assert manifest.counts["cards"] == 4
+        assert manifest.counts["cards"] == 5
         assert manifest.counts["card_groups"] == 1
+        with tarfile.open(archive_path, "r:gz") as archive:
+            data_member = archive.extractfile("data.json")
+            assert data_member is not None
+            payload = json.loads(data_member.read())
+        assert {card["key"] for card in payload["cards"]} == {
+            "additional-public-card",
+            "synthetic-deprecated",
+            "synthetic-hero",
+            "synthetic-mainboard",
+        }
+        transaction.set_rollback(True)
+
+
+def test_complete_catalog_selection_still_validates_required_card_keys(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    archive_path = tmp_path / "complete-catalog-missing-selection.tar.gz"
+    selection_path = tmp_path / "selection.json"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        selection.update(
+            {
+                "include_all_cards": True,
+                "card_keys": ["missing-required-card"],
+                "card_group_keys": [],
+            }
+        )
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+
+        with pytest.raises(
+            DeveloperDataError,
+            match="Selected cards were not found: missing-required-card",
+        ):
+            export_developer_data(
+                selection_path=selection_path,
+                output_path=archive_path,
+                source_revision="complete-catalog-missing-selection-test",
+            )
+        transaction.set_rollback(True)
+
+
+def test_group_selection_keeps_same_key_faction_twins_out_of_bundle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    archive_path = tmp_path / "group-selection-dev-data.tar.gz"
+    selection_path = tmp_path / "selection.json"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        selection.update(
+            {
+                "card_keys": ["synthetic-deprecated"],
+                "card_group_keys": ["synthetic-group"],
+                "coverage": {
+                    **selection["coverage"],  # type: ignore[dict-item]
+                    "min_cards": 3,
+                    "min_cards_by_pool": {"player": 3, "evil": 0, "neutral": 0},
+                },
+            }
+        )
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+
+        manifest = export_developer_data(
+            selection_path=selection_path,
+            output_path=archive_path,
+            source_revision="group-selection-test-revision",
+        )
+
+        assert manifest.counts["cards"] == 3
+        _, payload = validate_archive(archive_path)
+        mainboards = [card for card in payload.cards if card.key == "synthetic-mainboard"]
+        assert [card.card_factions for card in mainboards] == [["order", "blood"]]
+        transaction.set_rollback(True)
+
+
+def test_explicit_card_selection_rejects_same_key_faction_twins(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    archive_path = tmp_path / "ambiguous-selection-dev-data.tar.gz"
+    selection_path = tmp_path / "selection.json"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        selection.update(
+            {
+                "card_keys": ["synthetic-mainboard"],
+                "card_group_keys": [],
+            }
+        )
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+
+        with pytest.raises(
+            DeveloperDataError,
+            match=(
+                "Selected card keys are ambiguous across faction namespaces: synthetic-mainboard"
+            ),
+        ):
+            export_developer_data(
+                selection_path=selection_path,
+                output_path=archive_path,
+                source_revision="ambiguous-selection-test-revision",
+            )
         transaction.set_rollback(True)
 
 
@@ -320,16 +990,21 @@ def test_import_rejects_unreferenced_manifest_assets(
         transaction.set_rollback(True)
 
 
-def test_doctor_resolves_symbol_assets_under_symbols_root(
+def test_doctor_resolves_symbol_assets_and_honors_legacy_bundle_coverage(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source_storage = tmp_path / "source-storage"
+    selection_path = tmp_path / "selection.json"
 
     with transaction.atomic():
         _clear_domain_data()
         monkeypatch.setattr(settings, "app_data_dir", source_storage)
-        _build_synthetic_source(source_storage)
+        monkeypatch.setattr(settings, "developer_data_selection_file", selection_path)
+        selection_path.write_text(
+            json.dumps(_build_synthetic_source(source_storage)),
+            encoding="utf-8",
+        )
         for index in range(14):
             Card.objects.create(
                 key=f"doctor-mainboard-{index}",
@@ -341,6 +1016,16 @@ def test_doctor_resolves_symbol_assets_under_symbols_root(
         )
 
         call_command("doctor_dev_data")
+        CardClassificationRule.objects.filter(
+            card_pool="player",
+            target_kind="role",
+            target_key="hero",
+        ).delete()
+        with pytest.raises(CommandError, match="required classification rule is missing"):
+            call_command("doctor_dev_data", source_format_version=2)
+        CardClassificationRule.objects.all().delete()
+        Tag.objects.exclude(key="synthetic").delete()
+        call_command("doctor_dev_data", source_format_version=1)
         transaction.set_rollback(True)
 
 
@@ -356,14 +1041,58 @@ def test_archive_validation_rejects_unsafe_paths(tmp_path: Path) -> None:
         validate_archive(archive_path)
 
 
+@pytest.mark.parametrize(
+    ("card_key", "card_pool", "expected_error"),
+    [
+        ("synthetic-deprecated", "evil", "non-Player cards: synthetic-deprecated"),
+        ("synthetic-deprecated", "neutral", "non-Player cards: synthetic-deprecated"),
+        ("synthetic-mainboard", "evil", "cross-pool card groups: synthetic-group"),
+    ],
+)
+def test_archive_validation_rejects_non_player_cards_and_cross_pool_groups(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    card_key: str,
+    card_pool: str,
+    expected_error: str,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    archive_path = tmp_path / "synthetic-dev-data.tar.gz"
+    invalid_archive_path = tmp_path / "non-player-dev-data.tar.gz"
+    selection_path = tmp_path / "selection.json"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection_path.write_text(
+            json.dumps(_build_synthetic_source(source_storage)), encoding="utf-8"
+        )
+        export_developer_data(
+            selection_path=selection_path,
+            output_path=archive_path,
+            source_revision="non-player-archive-test-revision",
+        )
+        _build_reclassified_archive(
+            archive_path,
+            invalid_archive_path,
+            tmp_path / "non-player-archive",
+            card_key=card_key,
+            card_pool=card_pool,
+        )
+
+        with pytest.raises(DeveloperDataError, match=expected_error):
+            validate_archive(invalid_archive_path)
+        transaction.set_rollback(True)
+
+
 def _build_alias_collision_archive(source: Path, target: Path, extraction_root: Path) -> None:
     extraction_root.mkdir()
     with tarfile.open(source, "r:gz") as archive:
         archive.extractall(extraction_root, filter="data")
     data_path = extraction_root / "data.json"
     payload = json.loads(data_path.read_text(encoding="utf-8"))
-    mainboard = next(card for card in payload["cards"] if card["key"] == "synthetic-mainboard")
-    mainboard["aliases"].append({"key": "synthetic-hero-alias", "label": "Collision"})
+    deprecated = next(card for card in payload["cards"] if card["key"] == "synthetic-deprecated")
+    deprecated["aliases"].append({"key": "synthetic-hero-alias", "label": "Collision"})
     serialized = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
     data_path.write_bytes(serialized)
     manifest_path = extraction_root / "manifest.json"
@@ -371,7 +1100,78 @@ def _build_alias_collision_archive(source: Path, target: Path, extraction_root: 
     data_entry = next(entry for entry in manifest["files"] if entry["path"] == "data.json")
     data_entry["sha256"] = hashlib.sha256(serialized).hexdigest()
     data_entry["size_bytes"] = len(serialized)
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    with tarfile.open(target, "w:gz") as archive:
+        for path in sorted(extraction_root.rglob("*")):
+            archive.add(path, arcname=path.relative_to(extraction_root).as_posix())
+
+
+def _build_archive_with_format_version(
+    source: Path,
+    target: Path,
+    extraction_root: Path,
+    *,
+    format_version: int,
+) -> None:
+    extraction_root.mkdir()
+    with tarfile.open(source, "r:gz") as archive:
+        archive.extractall(extraction_root, filter="data")
+    manifest_path = extraction_root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["format_version"] = format_version
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    with tarfile.open(target, "w:gz") as archive:
+        for path in sorted(extraction_root.rglob("*")):
+            archive.add(path, arcname=path.relative_to(extraction_root).as_posix())
+
+
+def _build_reclassified_archive(
+    source: Path,
+    target: Path,
+    extraction_root: Path,
+    *,
+    card_key: str,
+    card_pool: str,
+) -> None:
+    extraction_root.mkdir()
+    with tarfile.open(source, "r:gz") as archive:
+        archive.extractall(extraction_root, filter="data")
+    data_path = extraction_root / "data.json"
+    payload = json.loads(data_path.read_text(encoding="utf-8"))
+    group_references = [
+        reference
+        for group in payload["card_groups"]
+        for reference in [
+            group["anchor_card_ref"],
+            *(member["card_ref"] for member in group["members"]),
+        ]
+        if reference["key"] == card_key
+    ]
+    referenced_factions = group_references[0]["card_factions"] if group_references else None
+    card = next(
+        card
+        for card in payload["cards"]
+        if card["key"] == card_key
+        and (referenced_factions is None or card["card_factions"] == referenced_factions)
+    )
+    card["card_pool"] = card_pool
+    for reference in group_references:
+        if reference["card_factions"] == card["card_factions"]:
+            reference["card_pool"] = card_pool
+    serialized = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
+    data_path.write_bytes(serialized)
+    manifest_path = extraction_root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    data_entry = next(entry for entry in manifest["files"] if entry["path"] == "data.json")
+    data_entry["sha256"] = hashlib.sha256(serialized).hexdigest()
+    data_entry["size_bytes"] = len(serialized)
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     with tarfile.open(target, "w:gz") as archive:
         for path in sorted(extraction_root.rglob("*")):
             archive.add(path, arcname=path.relative_to(extraction_root).as_posix())
@@ -409,7 +1209,9 @@ def _build_archive_with_unreferenced_asset(
             "size_bytes": len(content),
         }
     )
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     with tarfile.open(target, "w:gz") as archive:
         for path in sorted(extraction_root.rglob("*")):
             archive.add(path, arcname=path.relative_to(extraction_root).as_posix())
@@ -420,6 +1222,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         "images/hero-v1.webp": b"hero-v1",
         "images/hero-v2.webp": b"hero-v2",
         "images/mainboard.webp": b"mainboard",
+        "images/mainboard-dark.webp": b"mainboard-dark",
         "images/deprecated.webp": b"deprecated",
         "images/card-back.webp": b"card-back",
         "symbols/defaults/arcane.webp": b"symbol",
@@ -431,6 +1234,22 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
 
     keyword = Keyword.objects.create(key="arrival", label="Arrival", identifiers_json=["arrival"])
     tag = Tag.objects.create(key="synthetic", label="Synthetic", identifiers_json=["synthetic"])
+    required_inference_tags = (
+        "hero",
+        "boss",
+        "location",
+        "shop-item",
+        "order",
+        "blood",
+        "dark",
+        "metal",
+    )
+    Tag.objects.bulk_create(
+        [
+            Tag(key=key, label=key.replace("-", " ").title(), identifiers_json=[key])
+            for key in required_inference_tags
+        ]
+    )
     card_type = Type.objects.create(key="creature", label="Creature", identifiers_json=["creature"])
     symbol = Symbol.objects.create(
         key="arcane-mana",
@@ -443,11 +1262,49 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         text_token="{AM}",
         enabled=True,
     )
+    ensure_default_mana_family_classification_rules()
     template = Template.objects.create(
         key="synthetic-template",
         label="Synthetic Template",
-        definition_json={"id": "synthetic-template", "version": 1, "regions": []},
+        definition_json={
+            "id": "synthetic-template",
+            "version": 1,
+            "regions": [
+                {
+                    "region_id": "name_bar",
+                    "parser_type": "name",
+                    "cut_region": {
+                        "unit": "relative",
+                        "x": 0.04,
+                        "y": 0.02,
+                        "w": 0.92,
+                        "h": 0.07,
+                    },
+                    "ocr_config": {},
+                }
+            ],
+        },
     )
+    rule_definitions = [
+        ("player", "role", "hero", "hero"),
+        ("evil", "role", "boss", "boss"),
+        ("evil", "role", "location", "location"),
+        ("evil", "faction", "order", "order"),
+        ("evil", "faction", "blood", "blood"),
+        ("evil", "faction", "dark", "dark"),
+        ("evil", "faction", "metal", "metal"),
+        ("neutral", "role", "shop_item", "shop-item"),
+    ]
+    classification_rule_service = ClassificationRuleService()
+    tags_by_key = {row.key: row for row in Tag.objects.filter(key__in=required_inference_tags)}
+    for card_pool, target_kind, target_key, source_key in rule_definitions:
+        classification_rule_service.create_rule(
+            card_pool=card_pool,
+            target_kind=target_kind,
+            target_key=target_key,
+            source_kind="tag",
+            source_id=tags_by_key[source_key].id,
+        )
     DeckTag.objects.create(kind="role", key="control", label="Control")
     content_version = ContentVersion.objects.create(
         version_number="1.0.0",
@@ -460,9 +1317,10 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
     hero = Card.objects.create(
         key="synthetic-hero",
         label="Synthetic Hero",
-        is_hero=True,
         deck_building_config_json={"mainboard_card_count": {"value": 60}},
     )
+    set_card_mana_families(card=hero, mana_families=("arcane",))
+    CardRoleAssignment.objects.create(card=hero, role="hero")
     hero_v1 = _create_version(
         card=hero,
         template=template,
@@ -491,13 +1349,28 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
     )
     hero_v2.parse_result = parse_result
     hero_v2.save(update_fields=["parse_result"])
-    CardAlias.objects.create(card=hero, key="synthetic-hero-alias", label="Hero Alias")
+    CardAlias.objects.create(
+        card=hero,
+        card_pool=hero.card_pool,
+        key="synthetic-hero-alias",
+        label="Hero Alias",
+    )
     CardVersionKeyword.objects.create(card_version=hero_v2, keyword=keyword)
     CardVersionTag.objects.create(card_version=hero_v2, tag=tag)
     CardVersionSymbol.objects.create(card_version=hero_v2, symbol=symbol)
     CardVersionType.objects.create(card_version=hero_v2, type=card_type)
 
-    mainboard = Card.objects.create(key="synthetic-mainboard", label="Synthetic Mainboard")
+    mainboard = Card.objects.create(
+        key="synthetic-mainboard",
+        label="Synthetic Mainboard",
+        faction_identity_key='["order","blood"]',
+    )
+    CardFactionAssignment.objects.bulk_create(
+        [
+            CardFactionAssignment(card=mainboard, faction="order"),
+            CardFactionAssignment(card=mainboard, faction="blood"),
+        ]
+    )
     mainboard_version = _create_version(
         card=mainboard,
         template=template,
@@ -508,11 +1381,28 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
     )
     mainboard.latest_version = mainboard_version
     mainboard.save(update_fields=["latest_version"])
+    dark_mainboard = Card.objects.create(
+        key="synthetic-mainboard",
+        label="Synthetic Mainboard Dark",
+        faction_identity_key='["dark"]',
+    )
+    CardFactionAssignment.objects.create(card=dark_mainboard, faction="dark")
+    dark_mainboard_version = _create_version(
+        card=dark_mainboard,
+        template=template,
+        content_version=content_version,
+        version_number=1,
+        stored_path="images/mainboard-dark.webp",
+        content=assets["images/mainboard-dark.webp"],
+    )
+    dark_mainboard.latest_version = dark_mainboard_version
+    dark_mainboard.save(update_fields=["latest_version"])
     deprecated = Card.objects.create(
         key="synthetic-deprecated",
         label="Synthetic Deprecated",
         lifecycle_status="deprecated",
     )
+    CardRoleAssignment.objects.create(card=deprecated, role="location")
     deprecated_version = _create_version(
         card=deprecated,
         template=template,
@@ -524,7 +1414,9 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
     deprecated.latest_version = deprecated_version
     deprecated.save(update_fields=["latest_version"])
 
-    group = CardGroup.objects.create(key="synthetic-group", name="Synthetic Group", anchor_card=hero)
+    group = CardGroup.objects.create(
+        key="synthetic-group", name="Synthetic Group", anchor_card=hero
+    )
     CardGroupMember.objects.create(group=group, card=hero, position=1)
     CardGroupMember.objects.create(group=group, card=mainboard, position=2)
     card_back_content = assets["images/card-back.webp"]
@@ -540,15 +1432,51 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
     )
     return {
         "bundle_version": "synthetic-v1",
-        "card_keys": [hero.key, mainboard.key, deprecated.key],
+        "card_keys": [hero.key, deprecated.key],
         "card_group_keys": [group.key],
         "coverage": {
             "min_cards": 3,
-            "min_heroes": 1,
+            "min_cards_by_pool": {"player": 3, "evil": 0, "neutral": 0},
+            "min_cards_by_role": {
+                "standard": 1,
+                "hero": 1,
+                "boon": 0,
+                "event": 0,
+                "location": 1,
+                "boss": 0,
+                "shop_item": 0,
+                "directive": 0,
+                "reminder": 0,
+                "mana": 0,
+            },
+            "min_cards_by_faction": {"order": 1, "blood": 1, "dark": 0, "metal": 0},
+            "min_cards_by_mana_family": {"arcane": 1},
             "min_deprecated_cards": 1,
             "min_card_groups": 1,
             "min_cards_with_multiple_versions": 1,
             "required_template_keys": [template.key],
+            "required_tag_keys": list(required_inference_tags),
+            "required_classification_rules": [
+                {
+                    "card_pool": card_pool,
+                    "target_kind": target_kind,
+                    "target_key": target_key,
+                    "source_kind": "tag",
+                    "source_key": source_key,
+                    "enabled": True,
+                }
+                for card_pool, target_kind, target_key, source_key in rule_definitions
+            ]
+            + [
+                {
+                    "card_pool": "player",
+                    "target_kind": "mana_family",
+                    "target_key": "arcane",
+                    "source_kind": "symbol",
+                    "source_key": "arcane-mana",
+                    "enabled": True,
+                }
+            ],
         },
     }
 
@@ -605,6 +1533,7 @@ def _clear_domain_data() -> None:
     Card.objects.all().delete()
     CardBack.objects.all().delete()
     MetadataSuggestion.objects.all().delete()
+    CardClassificationRule.objects.all().delete()
     ContentVersion.objects.all().delete()
     DeckTag.objects.all().delete()
     Keyword.objects.all().delete()
@@ -612,3 +1541,11 @@ def _clear_domain_data() -> None:
     Tag.objects.all().delete()
     Type.objects.all().delete()
     Template.objects.all().delete()
+
+
+def _seed_migration_defaults() -> None:
+    classification_migration = importlib.import_module(
+        "card_reader_core.migrations."
+        "0055_seed_classification_rules_and_full_height_template"
+    )
+    classification_migration.seed_classification_rules_and_template(django_apps, None)

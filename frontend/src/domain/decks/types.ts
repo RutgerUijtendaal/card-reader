@@ -91,12 +91,23 @@ export type DeckRecord = {
     deprecated_card_count?: number;
     deprecated_card_ids?: string[];
   };
+  has_non_player_cards: boolean;
   deck_building_rules?: DeckBuildingRules;
   created_at: string;
   updated_at: string;
 };
 
-export type DeckHeroSummary = Pick<DeckCardSummary, 'id' | 'key' | 'label' | 'name' | 'image_url' | 'symbols'>;
+export type DeckHeroSummary = Pick<
+  DeckCardSummary,
+  | 'id'
+  | 'key'
+  | 'label'
+  | 'name'
+  | 'image_url'
+  | 'symbols'
+  | 'card_pool'
+  | 'card_roles'
+>;
 
 export type DeckSummaryRecord = {
   id: string;
@@ -121,6 +132,7 @@ export type DeckSummaryRecord = {
     label: string;
     deprecated_card_count?: number;
   };
+  has_non_player_cards: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -157,6 +169,7 @@ export type DeckUpsertRequest = {
   hero_card_id: string;
   entries: DeckEntryInput[];
   sideboards: Array<{
+    id?: string;
     name: string;
     entries: DeckEntryInput[];
   }>;

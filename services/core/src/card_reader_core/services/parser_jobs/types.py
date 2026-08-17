@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from card_reader_core.models import Keyword, Symbol, Tag, Type
+from card_reader_core.models import CardPool, Keyword, Symbol, Tag, Type
 
 
 class CardParserProtocol(Protocol):
@@ -13,6 +13,7 @@ class CardParserProtocol(Protocol):
         image_path: Path,
         template_id: str,
         *,
+        card_pool: CardPool,
         symbols: list[Symbol],
         known_keywords: list[Keyword],
         known_tags: list[Tag],
@@ -32,6 +33,7 @@ class ParserResources:
     known_keywords: list[Keyword]
     known_tags: list[Tag]
     known_types: list[Type]
+    known_symbol_ids: set[str]
     detectable_symbols: list[Symbol]
 
 

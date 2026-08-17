@@ -2,15 +2,24 @@ import {
   normalizeCardFilterSelectionState,
   type CardFilterSelectionState,
 } from '@/domain/cards/utils/filters/cardFilterState';
-import { LEGACY_MANA_SYMBOL_ID_PREFIX } from '@/domain/cards/utils/filters/cardFilterSelection';
 import {
   buildCardLifecycleApiParams,
   type CardLifecycleFilterValue,
 } from '@/domain/cards/utils/filters/cardLifecycle';
+import type { CardRoleFilter } from '@/domain/cards/cardRoles';
+import type { CardPool } from '@/domain/cards/cardPools';
+import type { CardFaction } from '@/domain/cards/cardFactions';
 
 export type CardFilterApiPayload = {
   q?: string;
   lifecycle_status?: CardLifecycleFilterValue;
+  card_pool?: CardPool;
+  card_roles?: CardRoleFilter[];
+  card_role_exclude?: CardRoleFilter[];
+  card_role_match?: 'any' | 'all';
+  card_factions?: CardFaction[];
+  card_faction_exclude?: CardFaction[];
+  card_faction_match?: 'any' | 'all';
   keyword_ids?: string[];
   keyword_match?: 'any' | 'all';
   tag_ids?: string[];
@@ -42,26 +51,38 @@ export type CardFilterApiPayload = {
   health_max?: string;
 };
 
+type CardFilterRequestOptions = {
+  cardPool?: CardPool | null;
+};
+
 export const buildCardFilterApiPayload = (
   state: CardFilterSelectionState,
+  options: CardFilterRequestOptions = {},
 ): CardFilterApiPayload => {
   const normalized = normalizeCardFilterSelectionState(state);
-  const legacyManaSymbolIds = normalized.manaTypeSymbolIds
-    .filter((id) => id.startsWith(LEGACY_MANA_SYMBOL_ID_PREFIX))
-    .map((id) => id.slice(LEGACY_MANA_SYMBOL_ID_PREFIX.length));
-  const manaFamilyKeys = normalized.manaTypeSymbolIds.filter(
-    (id) => !id.startsWith(LEGACY_MANA_SYMBOL_ID_PREFIX),
-  );
-  const legacyManaSymbolExcludeIds = normalized.manaTypeSymbolExcludeIds
-    .filter((id) => id.startsWith(LEGACY_MANA_SYMBOL_ID_PREFIX))
-    .map((id) => id.slice(LEGACY_MANA_SYMBOL_ID_PREFIX.length));
-  const manaFamilyExcludeKeys = normalized.manaTypeSymbolExcludeIds.filter(
-    (id) => !id.startsWith(LEGACY_MANA_SYMBOL_ID_PREFIX),
-  );
+  const manaFamilyKeys = normalized.manaFamilyIds;
+  const manaFamilyExcludeKeys = normalized.manaFamilyExcludeIds;
   const payload: CardFilterApiPayload = {};
+  const cardPool = options.cardPool === undefined ? normalized.cardPool : options.cardPool;
+
+  if (cardPool) payload.card_pool = cardPool;
 
   if (normalized.query) payload.q = normalized.query;
   Object.assign(payload, buildCardLifecycleApiParams(normalized.lifecycleStatus));
+  if (normalized.cardRoleIds.length > 0) {
+    payload.card_roles = normalized.cardRoleIds;
+    payload.card_role_match = normalized.cardRoleMatch;
+  }
+  if (normalized.cardRoleExcludeIds.length > 0) {
+    payload.card_role_exclude = normalized.cardRoleExcludeIds;
+  }
+  if ((normalized.cardFactionIds?.length ?? 0) > 0) {
+    payload.card_factions = normalized.cardFactionIds;
+    payload.card_faction_match = normalized.cardFactionMatch ?? 'any';
+  }
+  if ((normalized.cardFactionExcludeIds?.length ?? 0) > 0) {
+    payload.card_faction_exclude = normalized.cardFactionExcludeIds;
+  }
   if (normalized.keywordIds.length > 0) {
     payload.keyword_ids = normalized.keywordIds;
     payload.keyword_match = normalized.keywordMatch;
@@ -77,16 +98,10 @@ export const buildCardFilterApiPayload = (
   if (normalized.typeExcludeIds.length > 0) payload.type_exclude_ids = normalized.typeExcludeIds;
   if (manaFamilyKeys.length > 0) {
     payload.mana_family_keys = manaFamilyKeys;
-    payload.mana_family_match = normalized.manaSymbolMatch;
+    payload.mana_family_match = normalized.manaFamilyMatch;
   }
   if (manaFamilyExcludeKeys.length > 0)
     payload.mana_family_exclude_keys = manaFamilyExcludeKeys;
-  if (legacyManaSymbolIds.length > 0) {
-    payload.mana_symbol_ids = legacyManaSymbolIds;
-    payload.mana_symbol_match = normalized.manaSymbolMatch;
-  }
-  if (legacyManaSymbolExcludeIds.length > 0)
-    payload.mana_symbol_exclude_ids = legacyManaSymbolExcludeIds;
   if (normalized.affinitySymbolIds.length > 0) {
     payload.affinity_symbol_ids = normalized.affinitySymbolIds;
     payload.affinity_symbol_match = normalized.affinitySymbolMatch;
@@ -118,13 +133,28 @@ export const buildCardFilterApiPayload = (
 
 export const buildCardFilterApiSearchParams = (
   state: CardFilterSelectionState,
+  options: CardFilterRequestOptions = {},
 ): URLSearchParams => {
-  const payload = buildCardFilterApiPayload(state);
+  const payload = buildCardFilterApiPayload(state, options);
   const normalized = normalizeCardFilterSelectionState(state);
   const params = new URLSearchParams();
+  if (payload.card_pool) params.set('card_pool', payload.card_pool);
 
   if (payload.q) params.set('q', payload.q);
   if (payload.lifecycle_status) params.set('lifecycle_status', payload.lifecycle_status);
+  payload.card_roles?.forEach((role) => params.append('card_roles', role));
+  payload.card_role_exclude?.forEach((role) => params.append('card_role_exclude', role));
+  if (payload.card_roles) params.set('card_role_match', payload.card_role_match ?? normalized.cardRoleMatch);
+  payload.card_factions?.forEach((faction) => params.append('card_factions', faction));
+  payload.card_faction_exclude?.forEach((faction) =>
+    params.append('card_faction_exclude', faction),
+  );
+  if (payload.card_factions) {
+    params.set(
+      'card_faction_match',
+      payload.card_faction_match ?? normalized.cardFactionMatch ?? 'any',
+    );
+  }
   if (payload.keyword_ids) {
     payload.keyword_ids.forEach((id) => params.append('keyword_ids', id));
     params.set('keyword_match', payload.keyword_match ?? normalized.keywordMatch);
@@ -140,12 +170,12 @@ export const buildCardFilterApiSearchParams = (
   payload.type_exclude_ids?.forEach((id) => params.append('type_exclude_ids', id));
   if (payload.mana_family_keys) {
     payload.mana_family_keys.forEach((key) => params.append('mana_family_keys', key));
-    params.set('mana_family_match', payload.mana_family_match ?? normalized.manaSymbolMatch);
+    params.set('mana_family_match', payload.mana_family_match ?? normalized.manaFamilyMatch);
   }
   payload.mana_family_exclude_keys?.forEach((key) => params.append('mana_family_exclude_keys', key));
   if (payload.mana_symbol_ids) {
     payload.mana_symbol_ids.forEach((id) => params.append('mana_symbol_ids', id));
-    params.set('mana_symbol_match', payload.mana_symbol_match ?? normalized.manaSymbolMatch);
+    params.set('mana_symbol_match', payload.mana_symbol_match ?? normalized.manaFamilyMatch);
   }
   payload.mana_symbol_exclude_ids?.forEach((id) => params.append('mana_symbol_exclude_ids', id));
   if (payload.affinity_symbol_ids) {

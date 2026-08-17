@@ -1,14 +1,48 @@
+import csv
+import hashlib
 import json
+from collections.abc import Iterator
 from datetime import timedelta
-from importlib import import_module
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
+from uuid import uuid4
 
 import pytest
 
-from card_reader_core.models import Card, CardAlias, CardGroup, CardGroupMember, CardMergeRedirect, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, ContentVersion, Deck, DeckEntry, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Template, Type  # noqa: E402
+from card_reader_core.models import (
+    Card,
+    CardAlias,
+    CardClassificationReviewItem,
+    CardFactionAssignment,
+    CardGroup,
+    CardGroupMember,
+    CardMergeRedirect,
+    CardRoleAssignment,
+    CardVersion,
+    CardVersionImage,
+    CardVersionMetadataSuggestion,
+    ContentVersion,
+    Deck,
+    DeckEntry,
+    ImportJob,
+    ImportJobItem,
+    Keyword,
+    MetadataSuggestion,
+    ParseResult,
+    Symbol,
+    Tag,
+    Template,
+    Type,
+)  # noqa: E402
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE  # noqa: E402
-from card_reader_core.repositories.cards import get_latest_card_version, save_parsed_card  # noqa: E402
+from card_reader_core.repositories.cards import (  # noqa: E402
+    change_card_identity,
+    get_latest_card_version,
+    save_parsed_card,
+    set_card_mana_families,
+    update_latest_card_version,
+)
 from card_reader_core.repositories.import_jobs import create_import_job_with_files  # noqa: E402
 from card_reader_core.repositories.metadata import (  # noqa: E402
     delete_symbol,
@@ -20,28 +54,37 @@ from card_reader_core.repositories.metadata import (  # noqa: E402
     update_symbol,
 )
 from card_reader_core.services.imports import ImportService  # noqa: E402
+from card_reader_core.services.classification_rules import ClassificationRuleService  # noqa: E402
 from card_reader_core.services.parser_jobs import ImportProcessorService  # noqa: E402
 from card_reader_core.config.settings import settings  # noqa: E402
-from card_reader_core.storage import build_storage_relative_path, relativize_image_storage_path, resolve_storage_path  # noqa: E402
+from card_reader_core.storage import (
+    build_storage_relative_path,
+    relativize_image_storage_path,
+    resolve_storage_path,
+)  # noqa: E402
 from django.contrib.auth import get_user_model  # noqa: E402
-from django.apps import apps  # noqa: E402
 from django.db import connection  # noqa: E402
 from django.core.files.uploadedfile import SimpleUploadedFile  # noqa: E402
 from django.test.utils import CaptureQueriesContext  # noqa: E402
 from django.test import Client  # noqa: E402
 from django.utils import timezone  # noqa: E402
 
+from card_reader_api.imports.creation import StagedImportUpload  # noqa: E402
 from card_reader_api.seeds.users import seed_users  # noqa: E402
 
 
-def _valid_template_definition(*, region_id: str = "top_bar") -> dict[str, object]:
+def _valid_template_definition(
+    *,
+    region_id: str = "top_bar",
+    parser_type: str = "name_mana_cost",
+) -> dict[str, object]:
     return {
         "id": "mtg-like-v1",
         "version": 7,
         "regions": [
             {
                 "region_id": region_id,
-                "parser_type": "name_mana_cost",
+                "parser_type": parser_type,
                 "cut_region": {
                     "unit": "relative",
                     "x": 0.04,
@@ -62,24 +105,59 @@ def test_health() -> None:
 
 
 def test_create_import_upload_rejects_unknown_template() -> None:
+    creation_key = str(uuid4())
     response = _staff_client("import-unknown-template-user").post(
         "/imports/upload",
         data={
+            "creation_key": creation_key,
+            "card_pool": "player",
             "template_id": "unknown-template",
             "content_version_base": "14.1",
             "content_version_description": "Test import version.",
             "options_json": "{}",
-            "files": SimpleUploadedFile("card.png", b"fake-image-content", content_type="image/png"),
+            "files": SimpleUploadedFile(
+                "card.png", b"fake-image-content", content_type="image/png"
+            ),
         },
     )
     assert response.status_code == 400
     assert response.json()["detail"] == "Unknown template_id 'unknown-template'"
+    creation_dir = resolve_storage_path(build_storage_relative_path("uploads", creation_key))
+    assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
+
+
+@pytest.mark.parametrize("omitted_field", ["template_id", "card_pool"])
+def test_create_import_upload_requires_explicit_card_setup(omitted_field: str) -> None:
+    existing_job_count = ImportJob.objects.count()
+    payload: dict[str, object] = {
+        "creation_key": str(uuid4()),
+        "card_pool": "player",
+        "template_id": "mtg-like-v1",
+        "content_version_base": "14.1",
+        "content_version_description": "Required card setup.",
+        "options_json": "{}",
+        "files": SimpleUploadedFile(
+            "card.png", b"fake-image-content", content_type="image/png"
+        ),
+    }
+    payload.pop(omitted_field)
+
+    response = _staff_client(f"import-missing-{omitted_field}-user").post(
+        "/imports/upload",
+        data=payload,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "This field is required."
+    assert ImportJob.objects.count() == existing_job_count
 
 
 def test_create_import_upload_rejects_unsupported_files() -> None:
     response = _staff_client("import-unsupported-files-user").post(
         "/imports/upload",
         data={
+            "creation_key": str(uuid4()),
+            "card_pool": "player",
             "template_id": "mtg-like-v1",
             "content_version_base": "14.1",
             "content_version_description": "Test import version.",
@@ -93,11 +171,15 @@ def test_create_import_upload_stores_relative_paths() -> None:
     response = _staff_client("import-relative-paths-user").post(
         "/imports/upload",
         data={
+            "creation_key": str(uuid4()),
+            "card_pool": "player",
             "template_id": "mtg-like-v1",
             "content_version_base": "14.1",
             "content_version_description": "Test import version.",
             "options_json": "{}",
-            "files": SimpleUploadedFile("card.png", b"fake-image-content", content_type="image/png"),
+            "files": SimpleUploadedFile(
+                "card.png", b"fake-image-content", content_type="image/png"
+            ),
         },
     )
 
@@ -111,17 +193,257 @@ def test_create_import_upload_stores_relative_paths() -> None:
     assert item.source_file.startswith(f"{job.source_path}/")
 
 
+def test_interrupted_upload_is_not_published_and_same_key_can_retry() -> None:
+    creation_key = str(uuid4())
+    fingerprint = "a" * 64
+    content = b"complete-image-content"
+    checksum = hashlib.sha256(content).hexdigest()
+
+    class InterruptedUpload(SimpleUploadedFile):
+        def chunks(self, chunk_size: int | None = None) -> Iterator[bytes]:
+            del chunk_size
+            yield b"partial-image"
+            raise OSError("connection interrupted")
+
+    with pytest.raises(OSError, match="connection interrupted"):
+        StagedImportUpload.publish(
+            [(InterruptedUpload("card.png", content, content_type="image/png"), checksum)],
+            creation_key=creation_key,
+            fingerprint=fingerprint,
+        )
+
+    upload_dir = resolve_storage_path(
+        build_storage_relative_path("uploads", creation_key, fingerprint)
+    )
+    target_file = upload_dir / "0000-card.png"
+    assert not target_file.exists()
+    assert not upload_dir.exists()
+
+    staged = StagedImportUpload.publish(
+        [(SimpleUploadedFile("card.png", content, content_type="image/png"), checksum)],
+        creation_key=creation_key,
+        fingerprint=fingerprint,
+    )
+
+    assert staged.relative_path == build_storage_relative_path("uploads", creation_key, fingerprint)
+    assert target_file.read_bytes() == content
+
+
+def test_conflicting_import_payloads_use_isolated_fingerprint_directories() -> None:
+    creation_key = str(uuid4())
+    first_content = b"first-payload"
+    second_content = b"second-payload"
+
+    first = StagedImportUpload.publish(
+        [
+            (
+                SimpleUploadedFile("first.png", first_content, content_type="image/png"),
+                hashlib.sha256(first_content).hexdigest(),
+            )
+        ],
+        creation_key=creation_key,
+        fingerprint="a" * 64,
+    )
+    second = StagedImportUpload.publish(
+        [
+            (
+                SimpleUploadedFile("second.png", second_content, content_type="image/png"),
+                hashlib.sha256(second_content).hexdigest(),
+            )
+        ],
+        creation_key=creation_key,
+        fingerprint="b" * 64,
+    )
+
+    assert first.relative_path != second.relative_path
+    assert [path.name for path in resolve_storage_path(first.relative_path).iterdir()] == [
+        "0000-first.png"
+    ]
+    assert [path.name for path in resolve_storage_path(second.relative_path).iterdir()] == [
+        "0000-second.png"
+    ]
+
+
+def test_create_import_upload_replays_same_creation_key_without_duplicate_work() -> None:
+    creation_key = str(uuid4())
+    client = _staff_client("import-idempotent-replay-user")
+
+    def submit() -> object:
+        return client.post(
+            "/imports/upload",
+            data={
+                "creation_key": creation_key,
+                "card_pool": "evil",
+                "card_role_mode": "override",
+                "card_role_override": json.dumps(["boon", "event"]),
+                "card_faction_mode": "override",
+                "card_faction_override": json.dumps(["dark", "metal"]),
+                "template_id": "mtg-like-v1",
+                "content_version_base": "97.1",
+                "content_version_description": "Idempotent import.",
+                "options_json": "{}",
+                "files": SimpleUploadedFile(
+                    "card.png",
+                    b"idempotent-image-content",
+                    content_type="image/png",
+                ),
+            },
+        )
+
+    first = submit()
+    second = submit()
+
+    assert first.status_code == 201
+    assert second.status_code == 200
+    assert second.json()["job_id"] == first.json()["job_id"]
+    assert second.json()["idempotent_replay"] is True
+    assert ImportJob.objects.filter(creation_key=creation_key).count() == 1
+    assert ImportJobItem.objects.filter(job_id=first.json()["job_id"]).count() == 1
+    assert ContentVersion.objects.filter(base_version="97.1").count() == 1
+    job = ImportJob.objects.get(id=first.json()["job_id"])
+    assert job.card_pool == "evil"
+    assert job.card_role_mode == "override"
+    assert job.card_role_override_json == ["boon", "event"]
+    assert job.card_faction_mode == "override"
+    assert job.card_faction_override_json == ["dark", "metal"]
+
+
+def test_import_creation_fingerprint_distinguishes_faction_override() -> None:
+    creation_key = str(uuid4())
+    client = _staff_client("import-faction-fingerprint-user")
+    common = {
+        "creation_key": creation_key,
+        "card_pool": "evil",
+        "card_role_mode": "automatic",
+        "template_id": "mtg-like-v1",
+        "content_version_base": "97.15",
+        "content_version_description": "Faction fingerprint.",
+        "options_json": "{}",
+    }
+    first = client.post(
+        "/imports/upload",
+        data={
+            **common,
+            "card_faction_mode": "override",
+            "card_faction_override": json.dumps(["order"]),
+            "files": SimpleUploadedFile("card.png", b"same-image", content_type="image/png"),
+        },
+    )
+    conflict = client.post(
+        "/imports/upload",
+        data={
+            **common,
+            "card_faction_mode": "override",
+            "card_faction_override": json.dumps(["blood"]),
+            "files": SimpleUploadedFile("card.png", b"same-image", content_type="image/png"),
+        },
+    )
+
+    assert first.status_code == 201
+    assert conflict.status_code == 409
+    assert ImportJob.objects.filter(creation_key=creation_key).count() == 1
+
+
+def test_create_import_upload_rejects_conflicting_creation_key_and_supports_lookup() -> None:
+    creation_key = str(uuid4())
+    client = _staff_client("import-idempotent-conflict-user")
+    common = {
+        "creation_key": creation_key,
+        "card_pool": "player",
+        "template_id": "mtg-like-v1",
+        "content_version_base": "97.2",
+        "content_version_description": "Creation lookup.",
+        "options_json": "{}",
+    }
+    first = client.post(
+        "/imports/upload",
+        data={
+            **common,
+            "files": SimpleUploadedFile("card.png", b"first", content_type="image/png"),
+        },
+    )
+    conflict = client.post(
+        "/imports/upload",
+        data={
+            **common,
+            "files": SimpleUploadedFile("card.png", b"different", content_type="image/png"),
+        },
+    )
+    lookup = client.get(f"/imports/by-creation-key/{creation_key}")
+
+    assert first.status_code == 201
+    assert conflict.status_code == 409
+    assert lookup.status_code == 200
+    assert lookup.json()["job_id"] == first.json()["job_id"]
+    assert ImportJob.objects.filter(creation_key=creation_key).count() == 1
+
+
+def test_import_upload_snapshots_rules_and_defaults_to_automatic() -> None:
+    template = Template.objects.get(key="mtg-like-v1")
+    hero_tag = Tag.objects.create(key="hero-snapshot", label="Hero Snapshot")
+    rule = ClassificationRuleService().create_rule(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="tag",
+        source_id=hero_tag.id,
+    )
+
+    response = _staff_client("import-template-snapshot-user").post(
+        "/imports/upload",
+        data={
+            "creation_key": str(uuid4()),
+            "card_pool": "player",
+            "template_id": template.key,
+            "content_version_base": "97.3",
+            "content_version_description": "Template snapshot.",
+            "options_json": "{}",
+            "files": SimpleUploadedFile("card.png", b"snapshot", content_type="image/png"),
+        },
+    )
+
+    assert response.status_code == 201
+    job = ImportJob.objects.get(id=response.json()["job_id"])
+    assert job.card_role_mode == "automatic"
+    assert job.card_role_override_json == []
+    assert job.card_faction_mode == "automatic"
+    assert job.card_faction_override_json == []
+    snapshot = job.classification_rule_snapshot_json
+    assert snapshot["card_pool"] == "player"
+    assert snapshot["rules"] == [
+        {
+            "rule_id": rule.id,
+            "card_pool": "player",
+            "source_kind": "tag",
+            "source_id": hero_tag.id,
+            "source_key": "hero-snapshot",
+            "source_label": "Hero Snapshot",
+            "source_identifiers": [],
+            "target_kind": "role",
+            "target_key": "hero",
+        }
+    ]
+    original_digest = snapshot["digest"]
+    ClassificationRuleService().update_rule(rule_id=rule.id, enabled=False)
+    job.refresh_from_db()
+    assert job.classification_rule_snapshot_json["digest"] == original_digest
+
+
 @pytest.mark.parametrize("base_version", ["", "14", "14.1.2", "v14.1", "14.a"])
 def test_create_import_upload_rejects_invalid_content_version_base(base_version: str) -> None:
     existing_count = ContentVersion.objects.count()
     response = _staff_client("import-invalid-version-user").post(
         "/imports/upload",
         data={
+            "creation_key": str(uuid4()),
+            "card_pool": "player",
             "template_id": "mtg-like-v1",
             "content_version_base": base_version,
             "content_version_description": "Test import version.",
             "options_json": "{}",
-            "files": SimpleUploadedFile("card.png", b"fake-image-content", content_type="image/png"),
+            "files": SimpleUploadedFile(
+                "card.png", b"fake-image-content", content_type="image/png"
+            ),
         },
     )
 
@@ -134,11 +456,15 @@ def test_create_import_upload_rejects_blank_content_version_description() -> Non
     response = _staff_client("import-blank-description-user").post(
         "/imports/upload",
         data={
+            "creation_key": str(uuid4()),
+            "card_pool": "player",
             "template_id": "mtg-like-v1",
             "content_version_base": "14.1",
             "content_version_description": "   ",
             "options_json": "{}",
-            "files": SimpleUploadedFile("card.png", b"fake-image-content", content_type="image/png"),
+            "files": SimpleUploadedFile(
+                "card.png", b"fake-image-content", content_type="image/png"
+            ),
         },
     )
 
@@ -152,17 +478,23 @@ def test_create_import_upload_increments_content_version_patch() -> None:
         response = client.post(
             "/imports/upload",
             data={
+                "creation_key": str(uuid4()),
+                "card_pool": "player",
                 "template_id": "mtg-like-v1",
                 "content_version_base": "98.7",
                 "content_version_description": "Test import version.",
                 "options_json": "{}",
-                "files": SimpleUploadedFile(filename, b"fake-image-content", content_type="image/png"),
+                "files": SimpleUploadedFile(
+                    filename, b"fake-image-content", content_type="image/png"
+                ),
             },
         )
         assert response.status_code == 201
 
     versions = list(
-        ContentVersion.objects.filter(base_version="98.7").order_by("patch").values_list("version_number", flat=True)
+        ContentVersion.objects.filter(base_version="98.7")
+        .order_by("patch")
+        .values_list("version_number", flat=True)
     )
     assert versions == ["98.7.0", "98.7.1"]
 
@@ -230,6 +562,11 @@ def test_processor_honors_running_job_cancellation_after_current_item() -> None:
         template_id="mtg-like-v1",
         options={},
         files=[image_one, image_two],
+        classification_rule_snapshot=ClassificationRuleService().build_snapshot(
+            card_pool="player",
+            include_roles=True,
+            include_factions=True,
+        ),
     )
 
     class InterruptingParser:
@@ -268,6 +605,343 @@ def test_processor_honors_running_job_cancellation_after_current_item() -> None:
     assert job.status == "cancelled"
     assert job.processed_items == 2
     assert [item.status for item in items] == ["completed", "cancelled"]
+
+
+def test_processor_uses_frozen_classification_detector_inputs() -> None:
+    tag = Tag.objects.create(
+        key="frozen-parser-source",
+        label="Original Hero Source",
+        identifiers_json=["original hero term"],
+    )
+    classification_rules = ClassificationRuleService()
+    classification_rules.create_rule(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="tag",
+        source_id=tag.id,
+    )
+    symbol = Symbol.objects.create(
+        key="frozen-mana-source",
+        label="Original Mana Source",
+        symbol_type="mana",
+        detector_type="template",
+        detection_config_json={"threshold": 0.81},
+        text_enrichment_json={"aliases": ["original"]},
+        reference_assets_json=["symbols/original.webp"],
+        text_token="{F}",
+        enabled=True,
+    )
+    symbol_rule = classification_rules.create_rule(
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="arcane",
+        source_kind="symbol",
+        source_id=symbol.id,
+    )
+    inactive_symbol = Symbol.objects.create(
+        key="frozen-inactive-mana-source",
+        label="Inactive Mana Source",
+        symbol_type="mana",
+        detector_type="template",
+        detection_config_json={"threshold": 0.7},
+        enabled=False,
+    )
+    classification_rules.create_rule(
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="dark",
+        source_kind="symbol",
+        source_id=inactive_symbol.id,
+    )
+    image = settings.storage_root_dir / "uploads" / "frozen-parser-job" / "0001.png"
+    image.parent.mkdir(parents=True, exist_ok=True)
+    image.write_bytes(b"frozen-parser-image")
+    job = create_import_job_with_files(
+        source_path=image.parent,
+        template_id="mtg-like-v1",
+        options={},
+        files=[image],
+        classification_rule_snapshot=classification_rules.build_snapshot(
+            card_pool="player",
+            include_roles=True,
+            include_factions=True,
+            include_mana_families=True,
+        ),
+    )
+    frozen_symbol_id = symbol.id
+
+    tag.label = "Edited Hero Source"
+    tag.identifiers_json = ["edited hero term"]
+    tag.save(update_fields=["label", "identifiers_json", "updated_at"])
+    symbol.label = "Edited Mana Source"
+    symbol.detection_config_json = {"threshold": 0.2}
+    symbol.text_enrichment_json = {"aliases": ["edited"]}
+    symbol.reference_assets_json = ["symbols/edited.webp"]
+    symbol.text_token = "{EDITED}"
+    symbol.enabled = False
+    symbol.save(
+        update_fields=[
+            "label",
+            "detection_config_json",
+            "text_enrichment_json",
+            "reference_assets_json",
+            "text_token",
+            "enabled",
+            "updated_at",
+        ]
+    )
+    classification_rules.delete_rule(rule_id=symbol_rule.id)
+    symbol.delete()
+    replacement_symbol = Symbol.objects.create(
+        key="frozen-mana-source",
+        label="Replacement Mana Source",
+        symbol_type="mana",
+        detector_type="template",
+        detection_config_json={"threshold": 0.1},
+        enabled=True,
+    )
+    inactive_symbol.enabled = True
+    inactive_symbol.save(update_fields=["enabled", "updated_at"])
+
+    class SnapshotInspectingParser:
+        def parse(
+            self,
+            image_path: Path,
+            template_id: str,
+            **resources: object,
+        ) -> SimpleNamespace:
+            known_tags = resources["known_tags"]
+            assert isinstance(known_tags, list)
+            frozen_tag = next(
+                row for row in known_tags if isinstance(row, Tag) and row.id == tag.id
+            )
+            assert frozen_tag.label == "Original Hero Source"
+            assert frozen_tag.identifiers_json == ["original hero term"]
+            symbols = resources["symbols"]
+            assert isinstance(symbols, list)
+            assert [
+                row.id
+                for row in symbols
+                if isinstance(row, Symbol) and row.key == "frozen-mana-source"
+            ] == [frozen_symbol_id]
+            assert all(
+                not isinstance(row, Symbol)
+                or row.id not in {inactive_symbol.id, replacement_symbol.id}
+                for row in symbols
+            )
+            frozen_symbol = next(
+                row
+                for row in symbols
+                if isinstance(row, Symbol) and row.id == frozen_symbol_id
+            )
+            assert frozen_symbol.label == "Original Mana Source"
+            assert frozen_symbol.detection_config_json == {"threshold": 0.81}
+            assert frozen_symbol.text_enrichment_json == {"aliases": ["original"]}
+            assert frozen_symbol.reference_assets_json == ["symbols/original.webp"]
+            assert frozen_symbol.text_token == "{F}"
+            assert frozen_symbol.enabled is True
+            return SimpleNamespace(
+                checksum="frozen-parser-checksum",
+                normalized_fields={
+                    "name": "Frozen Snapshot Card",
+                    "type_line": "Type",
+                    "mana_cost": "",
+                    "attack": "",
+                    "health": "",
+                    "rules_text": "",
+                },
+                confidence={"overall": 0.9},
+                raw_ocr={"source": str(image_path), "template_id": template_id},
+                keyword_ids=[],
+                tag_ids=[tag.id],
+                type_ids=[],
+                symbol_ids=[frozen_symbol_id],
+                tag_suggestions=[],
+                type_suggestions=[],
+            )
+
+    ImportProcessorService(SnapshotInspectingParser()).process_job(job.id)
+
+    card = Card.objects.get(key="frozen-snapshot-card")
+    assert CardRoleAssignment.objects.filter(card=card, role="hero").exists()
+    assert list(
+        card.mana_family_assignments.values_list("mana_family", flat=True)
+    ) == ["arcane"]
+    assert card.latest_version is not None
+    assert not card.latest_version.card_version_symbols.exists()
+
+
+def test_processor_rejects_a_queued_reparse_after_the_target_pool_changes() -> None:
+    card, target_version = _create_editable_card_version(name="Queued Pool Drift")
+    source_file = build_storage_relative_path("uploads", "queued-pool-drift.png")
+    source_path = resolve_storage_path(source_file)
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_bytes(b"queued-pool-drift")
+    job = ImportJob.objects.create(
+        source_path=source_file,
+        template=target_version.template,
+        options_json={"reparse_existing": True},
+        card_pool="player",
+        classification_rule_snapshot_json=ClassificationRuleService().build_snapshot(
+            card_pool="player",
+            include_roles=True,
+            include_factions=True,
+            include_mana_families=True,
+        ),
+        total_items=1,
+    )
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=source_file,
+        target_card=card,
+        target_card_version=target_version,
+        target_card_pool_snapshot="player",
+    )
+    change_card_identity(card=card, card_pool="evil", card_factions=())
+
+    class UnexpectedParser:
+        called = False
+
+        def parse(self, *_args: object, **_kwargs: object) -> SimpleNamespace:
+            self.called = True
+            pytest.fail("pool drift must be rejected before OCR starts")
+
+    parser = UnexpectedParser()
+    ImportProcessorService(parser).process_job(job.id)
+
+    job.refresh_from_db()
+    item.refresh_from_db()
+    assert parser.called is False
+    assert job.status == "failed"
+    assert item.status == "failed"
+    assert item.error_message == (
+        "The target Card pool changed while this reparse was queued; "
+        "queue a new reparse for its current pool."
+    )
+
+
+def test_processor_revalidates_target_pool_after_ocr_before_persisting() -> None:
+    card, target_version = _create_editable_card_version(name="In-flight Pool Drift")
+    source_file = build_storage_relative_path("uploads", "in-flight-pool-drift.png")
+    source_path = resolve_storage_path(source_file)
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_bytes(b"in-flight-pool-drift")
+    job = ImportJob.objects.create(
+        source_path=source_file,
+        template=target_version.template,
+        options_json={"reparse_existing": True},
+        card_pool="player",
+        classification_rule_snapshot_json=ClassificationRuleService().build_snapshot(
+            card_pool="player",
+            include_roles=True,
+            include_factions=True,
+            include_mana_families=True,
+        ),
+        total_items=1,
+    )
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=source_file,
+        target_card=card,
+        target_card_version=target_version,
+        target_card_pool_snapshot="player",
+    )
+
+    class PoolChangingParser:
+        def parse(self, *_args: object, **_kwargs: object) -> SimpleNamespace:
+            change_card_identity(card=card, card_pool="evil", card_factions=())
+            return SimpleNamespace(
+                checksum="in-flight-pool-drift",
+                normalized_fields={
+                    "name": "Must Not Persist",
+                    "type_line": "Type",
+                    "mana_cost": "",
+                    "attack": "",
+                    "health": "",
+                    "rules_text": "",
+                },
+                confidence={"overall": 0.9},
+                raw_ocr={},
+                keyword_ids=[],
+                tag_ids=[],
+                type_ids=[],
+                symbol_ids=[],
+                tag_suggestions=[],
+                type_suggestions=[],
+            )
+
+    ImportProcessorService(PoolChangingParser()).process_job(job.id)
+
+    job.refresh_from_db()
+    item.refresh_from_db()
+    target_version.refresh_from_db()
+    assert job.status == "failed"
+    assert item.status == "failed"
+    assert item.error_message == (
+        "The target Card pool changed while this reparse was queued; "
+        "queue a new reparse for its current pool."
+    )
+    assert target_version.name == "In-flight Pool Drift"
+
+
+def test_processor_rejects_a_legacy_target_deleted_during_ocr() -> None:
+    card, target_version = _create_editable_card_version(name="In-flight Target Delete")
+    source_file = build_storage_relative_path("uploads", "in-flight-target-delete.png")
+    source_path = resolve_storage_path(source_file)
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_bytes(b"in-flight-target-delete")
+    job = ImportJob.objects.create(
+        source_path=source_file,
+        template=target_version.template,
+        options_json={"reparse_existing": True},
+        card_pool="player",
+        classification_rule_snapshot_json=ClassificationRuleService().build_snapshot(
+            card_pool="player",
+            include_roles=True,
+            include_factions=True,
+            include_mana_families=True,
+        ),
+        total_items=1,
+    )
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=source_file,
+        target_card=card,
+        target_card_version=target_version,
+    )
+
+    class TargetDeletingParser:
+        def parse(self, *_args: object, **_kwargs: object) -> SimpleNamespace:
+            card.delete()
+            return SimpleNamespace(
+                checksum="in-flight-target-delete",
+                normalized_fields={
+                    "name": "Must Not Become A New Card",
+                    "type_line": "Type",
+                    "mana_cost": "",
+                    "attack": "",
+                    "health": "",
+                    "rules_text": "",
+                },
+                confidence={"overall": 0.9},
+                raw_ocr={},
+                keyword_ids=[],
+                tag_ids=[],
+                type_ids=[],
+                symbol_ids=[],
+                tag_suggestions=[],
+                type_suggestions=[],
+            )
+
+    ImportProcessorService(TargetDeletingParser()).process_job(job.id)
+
+    job.refresh_from_db()
+    item.refresh_from_db()
+    assert job.status == "failed"
+    assert item.status == "failed"
+    assert item.error_message == "The target Card no longer exists; queue a new reparse."
+    assert not Card.objects.filter(key="must-not-become-a-new-card").exists()
 
 
 def test_card_gallery_routes_are_public() -> None:
@@ -348,6 +1022,20 @@ def test_catalog_response_groups_known_and_suggested_entries() -> None:
     _login_and_get_csrf_token(client, username, password)
 
     card, version = _create_editable_card_version(name="Suggested Catalog Card")
+    card.card_pool = "evil"
+    card.save(update_fields=["card_pool"])
+    CardRoleAssignment.objects.bulk_create(
+        [
+            CardRoleAssignment(card=card, role="boon"),
+            CardRoleAssignment(card=card, role="event"),
+        ]
+    )
+    keyword = Keyword.objects.create(
+        key="classified-catalog-keyword",
+        label="Classified Catalog Keyword",
+        identifiers_json=[],
+    )
+    replace_card_version_keywords(card_version_id=version.id, keyword_ids=[keyword.id])
     suggestion = MetadataSuggestion.objects.create(
         kind="tag",
         normalized_value="mystic relic accept auto manual",
@@ -362,15 +1050,24 @@ def test_catalog_response_groups_known_and_suggested_entries() -> None:
     )
 
     response = client.get("/admin/catalog")
+    keyword_detail_response = client.get(f"/admin/keywords/{keyword.id}")
+    suggestion_detail_response = client.get(f"/admin/suggestions/tag/{suggestion.id}")
 
     assert response.status_code == 200
+    assert keyword_detail_response.status_code == 200
+    assert suggestion_detail_response.status_code == 200
     payload = response.json()
     assert "known" in payload
     assert "suggested" in payload
     assert isinstance(payload["known"]["tags"], list)
     suggested_ids = {row["id"] for row in payload["suggested"]["tags"]}
     assert suggestion.id in suggested_ids
-    assert card.id
+    linked_card = keyword_detail_response.json()["linked_cards"][0]
+    occurrence = suggestion_detail_response.json()["occurrences"][0]
+    assert linked_card["card_pool"] == "evil"
+    assert linked_card["card_roles"] == ["boon", "event"]
+    assert occurrence["card_pool"] == "evil"
+    assert occurrence["card_roles"] == ["boon", "event"]
 
 
 def test_catalog_detail_linked_cards_exclude_deprecated_cards() -> None:
@@ -385,7 +1082,9 @@ def test_catalog_detail_linked_cards_exclude_deprecated_cards() -> None:
         label="Deprecated Only Keyword",
         identifiers_json=[],
     )
-    deprecated_card, deprecated_version = _create_editable_card_version(name="Deprecated Catalog Link Card")
+    deprecated_card, deprecated_version = _create_editable_card_version(
+        name="Deprecated Catalog Link Card"
+    )
     deprecated_card.lifecycle_status = "deprecated"
     deprecated_card.save(update_fields=["lifecycle_status"])
     replace_card_version_keywords(card_version_id=deprecated_version.id, keyword_ids=[keyword.id])
@@ -395,7 +1094,9 @@ def test_catalog_detail_linked_cards_exclude_deprecated_cards() -> None:
 
     assert list_response.status_code == 200
     assert detail_response.status_code == 200
-    list_keyword = next(row for row in list_response.json()["known"]["keywords"] if row["id"] == keyword.id)
+    list_keyword = next(
+        row for row in list_response.json()["known"]["keywords"] if row["id"] == keyword.id
+    )
     detail_payload = detail_response.json()
     assert list_keyword["linked_card_count"] == 0
     assert detail_payload["linked_card_count"] == 0
@@ -584,6 +1285,136 @@ def test_staff_can_manage_templates() -> None:
 
     assert list_response.status_code == 200
     assert create_response.status_code == 200
+    assert "inferred_card_roles" not in create_response.json()
+    assert "inferred_card_factions" not in create_response.json()
+    created_template = Template.objects.get(key="staff-template")
+    assert created_template.label == "Staff Template"
+
+
+def test_staff_can_create_name_only_template() -> None:
+    client = _staff_client("staff-name-only-template-user")
+
+    response = client.post(
+        "/admin/templates",
+        data={
+            "label": "Name Only Template",
+            "key": "name-only-template",
+            "definition_json": _valid_template_definition(parser_type="name"),
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["definition_json"]["regions"][0]["parser_type"] == "name"
+    assert (
+        Template.objects.get(key="name-only-template").definition_json["regions"][0]["parser_type"]
+        == "name"
+    )
+
+
+def test_staff_can_update_template_to_name_only() -> None:
+    client = _staff_client("staff-update-name-only-template-user")
+    template = Template.objects.create(
+        key="update-name-only-template",
+        label="Update Name Only Template",
+        definition_json=_valid_template_definition(),
+    )
+
+    response = client.patch(
+        f"/admin/templates/{template.id}",
+        data={"definition_json": _valid_template_definition(parser_type="name")},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["definition_json"]["regions"][0]["parser_type"] == "name"
+    template.refresh_from_db()
+    assert template.definition_json["regions"][0]["parser_type"] == "name"
+
+
+@pytest.mark.parametrize(
+    ("first_parser_type", "second_parser_type"),
+    [
+        ("name", "name"),
+        ("name_mana_cost", "name_mana_cost"),
+        ("name", "name_mana_cost"),
+    ],
+)
+def test_template_create_rejects_multiple_name_producers(
+    first_parser_type: str,
+    second_parser_type: str,
+) -> None:
+    client = _staff_client(f"staff-name-conflict-{first_parser_type}-{second_parser_type}")
+    definition = _valid_template_definition(parser_type=first_parser_type)
+    definition["regions"].append(  # type: ignore[union-attr]
+        {
+            "region_id": "second_name_bar",
+            "parser_type": second_parser_type,
+            "cut_region": {
+                "unit": "relative",
+                "x": 0.04,
+                "y": 0.12,
+                "w": 0.92,
+                "h": 0.07,
+            },
+            "ocr_config": {},
+        }
+    )
+
+    response = client.post(
+        "/admin/templates",
+        data={
+            "label": "Conflicting Name Template",
+            "key": f"conflicting-{first_parser_type}-{second_parser_type}",
+            "definition_json": definition,
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    assert "only one of name or name_mana_cost may be configured" in response.json()["detail"]
+
+
+def test_template_preview_cards_are_global_across_authorized_pools() -> None:
+    client = _staff_client("global-template-preview-user")
+    _create_editable_card_version(name="Player Global Preview", card_pool="player")
+    _create_editable_card_version(name="Evil Global Preview", card_pool="evil")
+    _create_editable_card_version(name="Neutral Global Preview", card_pool="neutral")
+
+    response = client.get(
+        "/admin/templates/preview-cards?q=Global%20Preview&template_id=mtg-like-v1"
+    )
+
+    assert response.status_code == 200
+    assert {(row["name"], row["card_pool"]) for row in response.json()["results"]} == {
+        ("Player Global Preview", "player"),
+        ("Evil Global Preview", "evil"),
+        ("Neutral Global Preview", "neutral"),
+    }
+
+
+def test_template_preview_cards_require_staff_access() -> None:
+    user = _create_user("non-staff-template-preview-user", "password", is_staff=False)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(user)
+
+    assert client.get("/admin/templates/preview-cards").status_code == 403
+
+
+def test_template_payload_does_not_expose_removed_classification_hints() -> None:
+    response = _staff_client("staff-template-role-validation-user").post(
+        "/admin/templates",
+        data={
+            "label": "Parser Only Template",
+            "key": "parser-only-template",
+            "definition_json": _valid_template_definition(),
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert "inferred_card_roles" not in response.json()
+    assert "inferred_card_factions" not in response.json()
 
 
 def test_template_key_cannot_be_updated() -> None:
@@ -691,6 +1522,21 @@ def test_current_user_reports_unauthenticated_when_no_session() -> None:
     assert response.status_code == 200
     assert payload["authenticated"] is False
     assert isinstance(payload["csrf_token"], str)
+
+
+def test_current_user_treats_an_inactive_session_as_unauthenticated() -> None:
+    user = _create_user("inactive-session-user", "password", is_staff=True)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(user)
+    user.is_active = False
+    user.save(update_fields=["is_active"])
+
+    response = client.get("/auth/me")
+
+    assert response.status_code == 200
+    assert response.json()["authenticated"] is False
+    assert response.json()["can_access_admin"] is False
+    assert "accessible_card_pools" not in response.json()
 
 
 def test_cards_list_returns_paginated_payload() -> None:
@@ -809,9 +1655,11 @@ def test_card_gallery_stable_image_url_changes_freshness_headers_with_latest_ver
     assert redirect_response["Last-Modified"] == second_response["Last-Modified"]
 
 
-def test_card_image_asset_endpoint_serves_immutable_image_path() -> None:
+def test_card_image_asset_endpoint_serves_non_checksum_immutable_image_path() -> None:
     card, version = _create_editable_card_version(name="Immutable Image Card")
     image = _create_card_image(version)
+    image.checksum = "different-from-stored-filename"
+    image.save(update_fields=["checksum"])
 
     response = Client(HTTP_HOST="localhost").get(f"/card-images/{image.stored_path}")
 
@@ -820,6 +1668,135 @@ def test_card_image_asset_endpoint_serves_immutable_image_path() -> None:
     response.close()
     assert response_body == b"gallery-image"
     assert card.id
+
+
+@pytest.mark.parametrize("card_pool", ["evil", "neutral"])
+def test_non_player_card_images_are_public_across_all_routes(
+    card_pool: str,
+) -> None:
+    card, version = _create_editable_card_version(
+        name=f"Public {card_pool.title()} Image"
+    )
+    image = _create_card_image(version)
+    card.card_pool = card_pool
+    card.save(update_fields=["card_pool"])
+    anonymous = Client(HTTP_HOST="localhost")
+    paths = [
+        f"/cards/{card.id}/image",
+        f"/cards/{card.id}/versions/{version.id}/image",
+        f"/card-images/{image.stored_path}",
+    ]
+    ordinary = Client(HTTP_HOST="localhost")
+    ordinary.force_login(
+        _create_user(
+            f"public-{card_pool}-image-user",
+            "password",
+            is_staff=False,
+        )
+    )
+    inactive_user = _create_user(f"public-{card_pool}-image-inactive", "password", is_staff=True)
+    inactive = Client(HTTP_HOST="localhost")
+    inactive.force_login(inactive_user)
+    inactive_user.is_active = False
+    inactive_user.save(update_fields=["is_active"])
+    staff = _staff_client(f"public-{card_pool}-image-staff")
+
+    responses = [client.get(path) for client in (anonymous, ordinary, inactive, staff) for path in paths]
+    try:
+        assert [response.status_code for response in responses] == [200] * 12
+    finally:
+        for response in responses:
+            response.close()
+
+@pytest.mark.parametrize("card_pool", ["evil", "neutral"])
+def test_non_player_card_collections_and_objects_are_public(
+    card_pool: str,
+) -> None:
+    card, _version = _create_editable_card_version(
+        name=f"Public {card_pool.title()} Collection Card"
+    )
+    card.card_pool = card_pool
+    card.save(update_fields=["card_pool"])
+    anonymous = Client(HTTP_HOST="localhost")
+    ordinary = Client(HTTP_HOST="localhost")
+    ordinary.force_login(
+        _create_user(
+            f"public-{card_pool}-collection-user",
+            "password",
+            is_staff=False,
+        )
+    )
+    inactive_user = _create_user(
+        f"public-{card_pool}-collection-inactive",
+        "password",
+        is_staff=True,
+    )
+    inactive = Client(HTTP_HOST="localhost")
+    inactive.force_login(inactive_user)
+    inactive_user.is_active = False
+    inactive_user.save(update_fields=["is_active"])
+    staff = _staff_client(f"public-{card_pool}-collection-staff")
+
+    payloads = []
+    for client in (anonymous, ordinary, inactive, staff):
+        list_response = client.get("/cards", {"card_pool": card_pool})
+        detail_response = client.get(f"/cards/{card.id}")
+        generations_response = client.get(f"/cards/{card.id}/generations")
+        assert list_response.status_code == 200
+        assert detail_response.status_code == 200
+        assert generations_response.status_code == 200
+        assert [row["id"] for row in list_response.json()["results"]] == [card.id]
+        payloads.append(
+            (list_response.json(), detail_response.json(), generations_response.json())
+        )
+
+    assert payloads[1:] == [payloads[0]] * 3
+
+
+def test_inactive_staff_session_retains_public_non_player_card_access() -> None:
+    card, _version = _create_editable_card_version(name="Inactive Staff Public Card")
+    card.card_pool = "evil"
+    card.save(update_fields=["card_pool"])
+    user = _create_user("inactive-public-staff", "password", is_staff=True)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(user)
+    user.is_active = False
+    user.save(update_fields=["is_active"])
+
+    assert client.get("/cards", {"card_pool": "evil"}).status_code == 200
+    assert client.get(f"/cards/{card.id}").status_code == 200
+
+
+def test_card_version_image_route_rejects_a_version_owned_by_another_card() -> None:
+    player_card, _player_version = _create_editable_card_version(name="Visible Player Card")
+    evil_card, evil_version = _create_editable_card_version(name="Restricted Evil Version")
+    _create_card_image(evil_version)
+    evil_card.card_pool = "evil"
+    evil_card.save(update_fields=["card_pool"])
+    mismatched_path = f"/cards/{player_card.id}/versions/{evil_version.id}/image"
+
+    assert Client(HTTP_HOST="localhost").get(mismatched_path).status_code == 404
+    assert _staff_client("mismatched-version-image-staff").get(mismatched_path).status_code == 404
+
+
+def test_shared_immutable_image_remains_public_when_any_owning_card_is_player() -> None:
+    player_card, player_version = _create_editable_card_version(name="Shared Player Image")
+    player_image = _create_card_image(player_version)
+    evil_card, evil_version = _create_editable_card_version(name="Shared Evil Image")
+    evil_card.card_pool = "evil"
+    evil_card.save(update_fields=["card_pool"])
+    CardVersionImage.objects.create(
+        card_version=evil_version,
+        source_file=player_image.source_file,
+        stored_path=player_image.stored_path,
+        checksum=player_image.checksum,
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/card-images/{player_image.stored_path}")
+
+    assert response.status_code == 200
+    assert player_card.id
+    response.close()
 
 
 def test_card_payloads_use_immutable_image_urls() -> None:
@@ -923,12 +1900,44 @@ def test_admin_content_version_cards_returns_cards_for_selected_version() -> Non
     other_version.content_version = other_content_version
     other_version.save(update_fields=["content_version"])
 
-    response = _staff_client("content-version-cards-user").get(f"/admin/content-versions/{content_version.id}/cards")
+    response = _staff_client("content-version-cards-user").get(
+        f"/admin/content-versions/{content_version.id}/cards"
+    )
 
     assert response.status_code == 200
     payload = response.json()
     assert [row["id"] for row in payload] == [matching_card.id]
     assert payload[0]["content_version"]["version_number"] == "74.1.0"
+
+
+def test_admin_content_version_cards_prefetches_card_roles() -> None:
+    content_version = ContentVersion.objects.create(
+        version_number="74.3.0",
+        base_version="74.3",
+        major=74,
+        minor=3,
+        patch=0,
+        description="Role query budget.",
+    )
+    expected_roles: dict[str, list[str]] = {}
+    for index, role in enumerate(["hero", "boon", "event", None]):
+        card, version = _create_editable_card_version(name=f"Role Query Budget {index}")
+        version.content_version = content_version
+        version.save(update_fields=["content_version"])
+        if role is not None:
+            CardRoleAssignment.objects.create(card=card, role=role)
+            expected_roles[card.id] = [role]
+        else:
+            expected_roles[card.id] = []
+
+    client = _staff_client("content-version-card-role-query-user")
+    with CaptureQueriesContext(connection) as queries:
+        response = client.get(f"/admin/content-versions/{content_version.id}/cards")
+
+    assert response.status_code == 200
+    assert {row["id"]: row["card_roles"] for row in response.json()} == expected_roles
+    role_queries = [query for query in queries if "card_role_assignment" in query["sql"]]
+    assert len(role_queries) == 1
 
 
 def test_admin_content_version_patch_updates_version_and_description() -> None:
@@ -1014,7 +2023,9 @@ def test_card_group_payloads_use_immutable_preview_image_urls() -> None:
     member_card, member_version = _create_editable_card_version(name="Immutable Group Member")
     anchor_image = _create_card_image(anchor_version)
     member_image = _create_card_image(member_version)
-    group = _create_card_group("immutable-group", anchor_card=anchor_card, members=[anchor_card, member_card])
+    group = _create_card_group(
+        "immutable-group", anchor_card=anchor_card, members=[anchor_card, member_card]
+    )
 
     response = Client(HTTP_HOST="localhost").get(f"/card-groups/{group.id}")
 
@@ -1078,9 +2089,35 @@ def test_filters_payload_keeps_symbol_asset_urls_public() -> None:
     assert returned["asset_url"] == "/symbols/assets/mana/test-symbol.svg"
 
 
+def test_filters_payload_uses_the_canonical_card_role_registry() -> None:
+    response = Client(HTTP_HOST="localhost").get("/cards/filters")
+
+    assert response.status_code == 200
+    assert response.json()["card_roles"] == [
+        {"key": "standard", "label": "Normal", "rank": 0, "derived": True},
+        {"key": "hero", "label": "Hero", "rank": 1, "derived": False},
+        {"key": "boss", "label": "Boss", "rank": 2, "derived": False},
+        {"key": "location", "label": "Location", "rank": 3, "derived": False},
+        {"key": "boon", "label": "Boon", "rank": 4, "derived": False},
+        {"key": "event", "label": "Event", "rank": 5, "derived": False},
+        {"key": "shop_item", "label": "Shop Item", "rank": 6, "derived": False},
+        {"key": "directive", "label": "Directive", "rank": 7, "derived": False},
+        {"key": "reminder", "label": "Reminder", "rank": 8, "derived": False},
+        {"key": "mana", "label": "Mana", "rank": 9, "derived": False},
+    ]
+    assert response.json()["card_factions"] == [
+        {"key": "order", "label": "Order", "rank": 1},
+        {"key": "blood", "label": "Blood", "rank": 2},
+        {"key": "dark", "label": "Dark", "rank": 3},
+        {"key": "metal", "label": "Metal", "rank": 4},
+    ]
+
+
 def test_filters_payload_includes_the_ordered_mana_family_catalog() -> None:
     arcane_mana = _get_or_create_symbol(key="arcane-mana", label="Arcane Mana", symbol_type="mana")
-    arcane_affinity = _get_or_create_symbol(key="arcane-affinity", label="Arcane Affinity", symbol_type="affinity")
+    arcane_affinity = _get_or_create_symbol(
+        key="arcane-affinity", label="Arcane Affinity", symbol_type="affinity"
+    )
 
     response = Client(HTTP_HOST="localhost").get("/cards/filters")
 
@@ -1108,6 +2145,140 @@ def test_filters_payload_includes_type_linked_card_counts() -> None:
     assert response.status_code == 200
     returned = next(row for row in response.json()["types"] if row["id"] == counted_type.id)
     assert returned["linked_card_count"] == 1
+
+
+def test_filters_payload_counts_all_card_pools_for_every_viewer() -> None:
+    counted_type = _create_type(key="filters-pool-counted-type", label="Filters Pool Counted Type")
+    _player_card, player_version = _create_editable_card_version(name="Filters Player Counted Card")
+    evil_card, evil_version = _create_editable_card_version(name="Filters Evil Counted Card")
+    evil_card.card_pool = "evil"
+    evil_card.save(update_fields=["card_pool"])
+    replace_card_version_types(card_version_id=player_version.id, type_ids=[counted_type.id])
+    replace_card_version_types(card_version_id=evil_version.id, type_ids=[counted_type.id])
+
+    public_response = Client(HTTP_HOST="localhost").get("/cards/filters")
+    staff_response = _staff_client("filters-pool-count-staff").get("/cards/filters")
+
+    assert public_response.status_code == 200
+    assert staff_response.status_code == 200
+    public_type = next(
+        row for row in public_response.json()["types"] if row["id"] == counted_type.id
+    )
+    staff_type = next(row for row in staff_response.json()["types"] if row["id"] == counted_type.id)
+    assert public_type["linked_card_count"] == 2
+    assert staff_type["linked_card_count"] == 2
+
+
+def test_card_list_and_csv_without_card_pool_cover_every_pool() -> None:
+    player_card, player_version = _create_editable_card_version(
+        name="Global Pool Query Player"
+    )
+    evil_card, evil_version = _create_editable_card_version(
+        name="Global Pool Query Evil"
+    )
+    neutral_card, neutral_version = _create_editable_card_version(
+        name="Global Pool Query Neutral"
+    )
+    evil_card.card_pool = "evil"
+    evil_card.save(update_fields=["card_pool"])
+    neutral_card.card_pool = "neutral"
+    neutral_card.save(update_fields=["card_pool"])
+    for version in (player_version, evil_version, neutral_version):
+        _create_card_image(version)
+
+    list_response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {"q": "Global Pool Query"},
+    )
+    csv_response = _staff_client("global-pool-csv-user").get(
+        "/exports/csv",
+        {"q": "Global Pool Query"},
+    )
+
+    assert list_response.status_code == 200
+    assert {row["id"] for row in list_response.json()["results"]} == {
+        player_card.id,
+        evil_card.id,
+        neutral_card.id,
+    }
+    assert csv_response.status_code == 200
+    csv_text = csv_response.content.decode("utf-8")
+    assert "Global Pool Query Player" in csv_text
+    assert "Global Pool Query Evil" in csv_text
+    assert "Global Pool Query Neutral" in csv_text
+
+
+def test_global_csv_rows_include_the_exact_card_identity_namespace() -> None:
+    shared_name = "Global CSV Shared Identity"
+    player_card, _player_version = _create_editable_card_version(
+        name=shared_name,
+        card_pool="player",
+    )
+    evil_card, _evil_version = _create_editable_card_version(
+        name=shared_name,
+        card_pool="evil",
+    )
+    assert player_card.key == evil_card.key
+    CardFactionAssignment.objects.bulk_create(
+        [
+            CardFactionAssignment(card=evil_card, faction="dark"),
+            CardFactionAssignment(card=evil_card, faction="metal"),
+        ]
+    )
+
+    response = _staff_client("global-csv-identity-user").get(
+        "/exports/csv",
+        {"q": shared_name, "sort": "name_asc"},
+    )
+
+    assert response.status_code == 200
+    csv_lines = response.content.decode("utf-8").splitlines()
+    assert csv_lines[0].split(",") == [
+        "card_key",
+        "name",
+        "mana_cost",
+        "mana_symbols",
+        "attack",
+        "health",
+        "rules_text",
+        "types",
+        "tags",
+        "symbols",
+        "keywords",
+        "confidence",
+        "card_id",
+        "card_pool",
+        "card_factions",
+    ]
+    rows = list(csv.DictReader(csv_lines))
+    assert len(rows) == 2
+    rows_by_pool = {row["card_pool"]: row for row in rows}
+    assert rows_by_pool["player"]["card_id"] == player_card.id
+    assert rows_by_pool["player"]["card_factions"] == ""
+    assert rows_by_pool["evil"]["card_id"] == evil_card.id
+    assert rows_by_pool["evil"]["card_factions"] == "dark;metal"
+
+
+def test_filters_payload_returns_public_pool_registry_in_canonical_order() -> None:
+    public_response = Client(HTTP_HOST="localhost").get("/cards/filters")
+    staff_response = _staff_client("filters-pool-registry-staff").get("/cards/filters")
+
+    assert public_response.json()["card_pools"] == [
+        {"key": "player", "label": "Player", "rank": 0},
+        {"key": "evil", "label": "Evil", "rank": 1},
+        {"key": "neutral", "label": "Neutral", "rank": 2},
+    ]
+    assert staff_response.json()["card_pools"] == [
+        {"key": "player", "label": "Player", "rank": 0},
+        {"key": "evil", "label": "Evil", "rank": 1},
+        {"key": "neutral", "label": "Neutral", "rank": 2},
+    ]
+
+    invalid_response = _staff_client("invalid-pool-staff").get(
+        "/cards",
+        {"card_pool": "unsupported"},
+    )
+    assert invalid_response.status_code == 400
 
 
 def test_filters_payload_orders_types_by_linked_card_count_without_pinning_mana() -> None:
@@ -1139,7 +2310,9 @@ def test_storage_paths_resolve_relative_to_storage_root(tmp_path: Path, monkeypa
 
     resolved = resolve_storage_path("images/example-card.png")
     from_dev_absolute = relativize_image_storage_path(str(tmp_path / "images" / "example-card.png"))
-    from_prd_absolute = relativize_image_storage_path("/var/lib/card-reader/images/example-card.png")
+    from_prd_absolute = relativize_image_storage_path(
+        "/var/lib/card-reader/images/example-card.png"
+    )
 
     assert resolved == tmp_path / "images" / "example-card.png"
     assert from_dev_absolute == "images/example-card.png"
@@ -1166,7 +2339,9 @@ def test_cards_list_pagination_honors_page_and_page_size() -> None:
     assert second_response.json()["page"] == 2
     assert second_response.json()["previous_page"] == 1
     assert capped_response.json()["page_size"] == 100
-    returned_ids = {row["id"] for row in first_response.json()["results"] + second_response.json()["results"]}
+    returned_ids = {
+        row["id"] for row in first_response.json()["results"] + second_response.json()["results"]
+    }
     assert set(created).issubset(returned_ids)
 
 
@@ -1195,7 +2370,9 @@ def test_cards_list_filters_preserve_count() -> None:
     replace_card_version_keywords(card_version_id=version_b.id, keyword_ids=[keyword.id])
     replace_card_version_keywords(card_version_id=version_c.id, keyword_ids=[other_keyword.id])
 
-    response = Client(HTTP_HOST="localhost").get("/cards", {"keyword_ids": [keyword.id], "page_size": 1})
+    response = Client(HTTP_HOST="localhost").get(
+        "/cards", {"keyword_ids": [keyword.id], "page_size": 1}
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -1238,7 +2415,9 @@ def test_cards_list_metadata_match_modes() -> None:
     _create_card_image(version_none)
 
     replace_card_version_keywords(card_version_id=version_any.id, keyword_ids=[keywords[0].id])
-    replace_card_version_keywords(card_version_id=version_all.id, keyword_ids=[keywords[0].id, keywords[1].id])
+    replace_card_version_keywords(
+        card_version_id=version_all.id, keyword_ids=[keywords[0].id, keywords[1].id]
+    )
     replace_card_version_keywords(card_version_id=version_none.id, keyword_ids=[keywords[1].id])
 
     replace_card_version_tags(card_version_id=version_any.id, tag_ids=[tags[0].id])
@@ -1306,7 +2485,9 @@ def test_cards_list_type_exclusions_combine_with_any_and_all_inclusions() -> Non
 
     replace_card_version_types(card_version_id=version_allowed.id, type_ids=[types[0].id])
     replace_card_version_types(card_version_id=version_excluded.id, type_ids=[types[1].id])
-    replace_card_version_types(card_version_id=version_mixed.id, type_ids=[types[0].id, types[1].id])
+    replace_card_version_types(
+        card_version_id=version_mixed.id, type_ids=[types[0].id, types[1].id]
+    )
     replace_card_version_types(card_version_id=version_all.id, type_ids=[types[0].id, types[2].id])
 
     client = Client(HTTP_HOST="localhost")
@@ -1362,12 +2543,21 @@ def test_cards_list_symbol_group_match_modes() -> None:
     _create_card_image(version_any)
     _create_card_image(version_all)
     _create_card_image(version_none)
-    replace_card_version_symbols(card_version_id=version_any.id, symbol_ids=[mana_symbols[0].id, affinity_symbols[0].id])
+    replace_card_version_symbols(
+        card_version_id=version_any.id, symbol_ids=[mana_symbols[0].id, affinity_symbols[0].id]
+    )
     replace_card_version_symbols(
         card_version_id=version_all.id,
-        symbol_ids=[mana_symbols[0].id, mana_symbols[1].id, affinity_symbols[0].id, affinity_symbols[1].id],
+        symbol_ids=[
+            mana_symbols[0].id,
+            mana_symbols[1].id,
+            affinity_symbols[0].id,
+            affinity_symbols[1].id,
+        ],
     )
-    replace_card_version_symbols(card_version_id=version_none.id, symbol_ids=[affinity_symbols[1].id])
+    replace_card_version_symbols(
+        card_version_id=version_none.id, symbol_ids=[affinity_symbols[1].id]
+    )
 
     client = Client(HTTP_HOST="localhost")
 
@@ -1433,8 +2623,12 @@ def test_cards_list_symbol_group_exclude_modes() -> None:
     _create_card_image(version_red_green)
 
     replace_card_version_symbols(card_version_id=version_red.id, symbol_ids=[mana_symbols[0].id])
-    replace_card_version_symbols(card_version_id=version_blue_white.id, symbol_ids=[mana_symbols[1].id, mana_symbols[2].id])
-    replace_card_version_symbols(card_version_id=version_red_green.id, symbol_ids=[mana_symbols[0].id, mana_symbols[2].id])
+    replace_card_version_symbols(
+        card_version_id=version_blue_white.id, symbol_ids=[mana_symbols[1].id, mana_symbols[2].id]
+    )
+    replace_card_version_symbols(
+        card_version_id=version_red_green.id, symbol_ids=[mana_symbols[0].id, mana_symbols[2].id]
+    )
 
     client = Client(HTTP_HOST="localhost")
 
@@ -1547,7 +2741,9 @@ def test_cards_list_can_return_card_groups() -> None:
     _create_card_image(member_version)
     _create_card_image(extra_version)
     _create_card_image(standalone_version)
-    _create_card_group("transform-group", anchor_card=anchor_card, members=[anchor_card, member_card, extra_card])
+    _create_card_group(
+        "transform-group", anchor_card=anchor_card, members=[anchor_card, member_card, extra_card]
+    )
 
     response = Client(HTTP_HOST="localhost").get("/cards", {"show_groups": "true"})
 
@@ -1579,7 +2775,9 @@ def test_grouped_gallery_preview_images_do_not_query_per_member() -> None:
 
     client = Client(HTTP_HOST="localhost")
     with CaptureQueriesContext(connection) as queries:
-        response = client.get("/cards", {"show_groups": "true", "q": "Grouped Query Member", "page_size": 100})
+        response = client.get(
+            "/cards", {"show_groups": "true", "q": "Grouped Query Member", "page_size": 100}
+        )
 
     assert response.status_code == 200
     group = next(row for row in response.json()["results"] if row["result_type"] == "card_group")
@@ -1589,29 +2787,47 @@ def test_grouped_gallery_preview_images_do_not_query_per_member() -> None:
 
 def test_grouped_gallery_hides_deprecated_linked_cards_by_default() -> None:
     anchor_card, anchor_version = _create_editable_card_version(name="Lifecycle Group Anchor")
-    deprecated_card, deprecated_version = _create_editable_card_version(name="Lifecycle Group Deprecated")
+    deprecated_card, deprecated_version = _create_editable_card_version(
+        name="Lifecycle Group Deprecated"
+    )
     _create_card_image(anchor_version)
     _create_card_image(deprecated_version)
     deprecated_card.lifecycle_status = "deprecated"
     deprecated_card.save(update_fields=["lifecycle_status"])
-    _create_card_group("lifecycle-group", anchor_card=anchor_card, members=[anchor_card, deprecated_card])
+    _create_card_group(
+        "lifecycle-group", anchor_card=anchor_card, members=[anchor_card, deprecated_card]
+    )
 
     client = Client(HTTP_HOST="localhost")
-    default_response = client.get("/cards", {"show_groups": "true", "q": "Lifecycle Group", "page_size": 100})
+    default_response = client.get(
+        "/cards", {"show_groups": "true", "q": "Lifecycle Group", "page_size": 100}
+    )
     all_response = client.get(
         "/cards",
-        {"show_groups": "true", "q": "Lifecycle Group", "lifecycle_status": "all", "page_size": 100},
+        {
+            "show_groups": "true",
+            "q": "Lifecycle Group",
+            "lifecycle_status": "all",
+            "page_size": 100,
+        },
     )
 
     assert default_response.status_code == 200
     assert all_response.status_code == 200
-    default_group = next(row for row in default_response.json()["results"] if row["result_type"] == "card_group")
-    all_group = next(row for row in all_response.json()["results"] if row["result_type"] == "card_group")
+    default_group = next(
+        row for row in default_response.json()["results"] if row["result_type"] == "card_group"
+    )
+    all_group = next(
+        row for row in all_response.json()["results"] if row["result_type"] == "card_group"
+    )
     assert default_group["anchor_card_id"] == anchor_card.id
     assert default_group["member_count"] == 1
     assert [row["card_id"] for row in default_group["preview_cards"]] == [anchor_card.id]
     assert all_group["member_count"] == 2
-    assert [row["card_id"] for row in all_group["preview_cards"]] == [anchor_card.id, deprecated_card.id]
+    assert [row["card_id"] for row in all_group["preview_cards"]] == [
+        anchor_card.id,
+        deprecated_card.id,
+    ]
 
 
 def test_cards_list_rejects_unknown_sort() -> None:
@@ -1658,8 +2874,6 @@ def test_cards_list_supports_name_and_mana_sorting() -> None:
 
 
 def test_cards_list_supports_indexed_mana_family_sorting_and_pagination() -> None:
-    arcane_mana = _get_or_create_symbol(key="arcane-mana", label="Arcane Mana", symbol_type="mana")
-    dark_affinity = _get_or_create_symbol(key="dark-affinity", label="Dark Affinity", symbol_type="affinity")
     cards_and_versions = [
         _create_editable_card_version(name="Family Sort Zeta Arcane"),
         _create_editable_card_version(name="Family Sort Alpha Dark"),
@@ -1668,11 +2882,10 @@ def test_cards_list_supports_indexed_mana_family_sorting_and_pagination() -> Non
     ]
     for _card, version in cards_and_versions:
         _create_card_image(version)
-    replace_card_version_symbols(card_version_id=cards_and_versions[0][1].id, symbol_ids=[arcane_mana.id])
-    replace_card_version_symbols(card_version_id=cards_and_versions[1][1].id, symbol_ids=[dark_affinity.id])
-    replace_card_version_symbols(
-        card_version_id=cards_and_versions[2][1].id,
-        symbol_ids=[arcane_mana.id, dark_affinity.id],
+    set_card_mana_families(card=cards_and_versions[0][0], mana_families=("arcane",))
+    set_card_mana_families(card=cards_and_versions[1][0], mana_families=("dark",))
+    set_card_mana_families(
+        card=cards_and_versions[2][0], mana_families=("arcane", "dark")
     )
 
     client = Client(HTTP_HOST="localhost")
@@ -1689,13 +2902,17 @@ def test_cards_list_supports_indexed_mana_family_sorting_and_pagination() -> Non
     assert second_response.status_code == 200
     assert [row["id"] for row in first_response.json()["results"]] == [
         cards_and_versions[0][0].id,
-        cards_and_versions[1][0].id,
+        cards_and_versions[2][0].id,
     ]
     assert [row["id"] for row in second_response.json()["results"]] == [
-        cards_and_versions[2][0].id,
+        cards_and_versions[1][0].id,
         cards_and_versions[3][0].id,
     ]
     assert [row["mana_family_sort_key"] for row in first_response.json()["results"]] == [0, 1]
+    assert [row["mana_family_sort_key"] for row in second_response.json()["results"]] == [
+        32,
+        63,
+    ]
     from card_reader_core.repositories.cards.queries import _apply_sql_card_sort
 
     paginated_query = _apply_sql_card_sort(
@@ -1708,10 +2925,7 @@ def test_cards_list_supports_indexed_mana_family_sorting_and_pagination() -> Non
     assert "LIMIT 2" in sql
 
 
-def test_cards_list_filters_mana_families_across_mana_and_affinity_aliases() -> None:
-    arcane_mana = _get_or_create_symbol(key="arcane-mana", label="Arcane Mana", symbol_type="mana")
-    arcane_affinity = _get_or_create_symbol(key="arcane-affinity", label="Arcane Affinity", symbol_type="affinity")
-    dark_mana = _get_or_create_symbol(key="dark-mana", label="Dark Mana", symbol_type="mana")
+def test_cards_list_filters_stored_mana_family_assignments() -> None:
     rows = [
         _create_editable_card_version(name="Family Filter Mana"),
         _create_editable_card_version(name="Family Filter Affinity"),
@@ -1720,10 +2934,10 @@ def test_cards_list_filters_mana_families_across_mana_and_affinity_aliases() -> 
     ]
     for _card, version in rows:
         _create_card_image(version)
-    replace_card_version_symbols(card_version_id=rows[0][1].id, symbol_ids=[arcane_mana.id])
-    replace_card_version_symbols(card_version_id=rows[1][1].id, symbol_ids=[arcane_affinity.id])
-    replace_card_version_symbols(card_version_id=rows[2][1].id, symbol_ids=[arcane_affinity.id, dark_mana.id])
-    replace_card_version_symbols(card_version_id=rows[3][1].id, symbol_ids=[dark_mana.id])
+    set_card_mana_families(card=rows[0][0], mana_families=("arcane",))
+    set_card_mana_families(card=rows[1][0], mana_families=("arcane",))
+    set_card_mana_families(card=rows[2][0], mana_families=("arcane", "dark"))
+    set_card_mana_families(card=rows[3][0], mana_families=("dark",))
 
     client = Client(HTTP_HOST="localhost")
     any_response = client.get("/cards", {"q": "Family Filter", "mana_family_keys": ["arcane"]})
@@ -1754,27 +2968,321 @@ def test_cards_list_filters_mana_families_across_mana_and_affinity_aliases() -> 
     }
 
 
-def test_mana_family_sort_key_backfill_and_symbol_mutations_stay_synchronized() -> None:
-    symbol = _get_or_create_symbol(key="family-sync-unmatched", label="Family Sync", symbol_type="affinity")
-    _card, version = _create_editable_card_version(name="Family Synchronization")
+def test_symbol_mutations_do_not_change_stored_mana_families() -> None:
+    symbol = _get_or_create_symbol(
+        key="family-sync-unmatched", label="Family Sync", symbol_type="affinity"
+    )
+    card, version = _create_editable_card_version(name="Family Synchronization")
+    set_card_mana_families(card=card, mana_families=("arcane",))
     replace_card_version_symbols(card_version_id=version.id, symbol_ids=[symbol.id])
-    version.refresh_from_db()
-    assert version.mana_family_sort_key == 63
+    card.refresh_from_db()
+    assert card.mana_family_sort_key == 0
 
     update_symbol(entry_id=str(symbol.id), updates={"key": "primal-affinity"})
-    version.refresh_from_db()
-    assert version.mana_family_sort_key == 5
-
-    version.mana_family_sort_key = 63
-    version.save(update_fields=["mana_family_sort_key"])
-    migration = import_module("card_reader_core.migrations.0051_card_version_mana_family_sort_key")
-    migration.backfill_mana_family_sort_keys(apps, None)
-    version.refresh_from_db()
-    assert version.mana_family_sort_key == 5
+    card.refresh_from_db()
+    assert card.mana_family_sort_key == 0
 
     assert delete_symbol(entry_id=str(symbol.id)) is True
-    version.refresh_from_db()
-    assert version.mana_family_sort_key == 63
+    card.refresh_from_db()
+    assert card.mana_family_sort_key == 0
+
+    arcane_symbol = _get_or_create_symbol(
+        key="arcane-mana",
+        label="Arcane Mana",
+        symbol_type="mana",
+    )
+    updated = update_latest_card_version(
+        card_id=card.id,
+        updates={"symbol_ids": [arcane_symbol.id]},
+        restore_fields=[],
+        restore_metadata_groups=[],
+        unlock_fields=[],
+        unlock_metadata_groups=[],
+    )
+    assert updated is not None
+    updated_card, _updated_version = updated
+    updated_card.refresh_from_db()
+    assert updated_card.mana_family_sort_key == 0
+
+
+def test_cards_list_uses_pool_aware_player_default_before_pagination() -> None:
+    arcane_hero, arcane_hero_version = _create_editable_card_version(
+        name="Default Player Arcane Hero"
+    )
+    arcane_normal_low, arcane_normal_low_version = _create_editable_card_version(
+        name="Default Player Arcane Normal Low"
+    )
+    arcane_normal_high, arcane_normal_high_version = _create_editable_card_version(
+        name="Default Player Arcane Normal High"
+    )
+    arcane_normal_null, arcane_normal_null_version = _create_editable_card_version(
+        name="Default Player Arcane Normal Null"
+    )
+    arcane_boss, arcane_boss_version = _create_editable_card_version(
+        name="Default Player Arcane Boss"
+    )
+    arcane_shop, arcane_shop_version = _create_editable_card_version(
+        name="Default Player Arcane Shop"
+    )
+    arcane_directive, arcane_directive_version = _create_editable_card_version(
+        name="Default Player Arcane Directive"
+    )
+    arcane_reminder, arcane_reminder_version = _create_editable_card_version(
+        name="Default Player Arcane Reminder"
+    )
+    arcane_mana, arcane_mana_version = _create_editable_card_version(
+        name="Default Player Arcane Mana"
+    )
+    dark_hero, dark_hero_version = _create_editable_card_version(name="Default Player Dark Hero")
+
+    for version in (
+        arcane_hero_version,
+        arcane_normal_low_version,
+        arcane_normal_high_version,
+        arcane_normal_null_version,
+        arcane_boss_version,
+        arcane_shop_version,
+        arcane_directive_version,
+        arcane_reminder_version,
+        arcane_mana_version,
+        dark_hero_version,
+    ):
+        _create_card_image(version)
+    for card, version, mana_value in (
+        (arcane_hero, arcane_hero_version, 6),
+        (arcane_normal_low, arcane_normal_low_version, 1),
+        (arcane_normal_high, arcane_normal_high_version, 4),
+        (arcane_boss, arcane_boss_version, 0),
+        (arcane_shop, arcane_shop_version, 2),
+        (arcane_directive, arcane_directive_version, 2),
+        (arcane_reminder, arcane_reminder_version, 2),
+        (arcane_mana, arcane_mana_version, 0),
+    ):
+        set_card_mana_families(card=card, mana_families=("arcane",))
+        version.mana_value = mana_value
+        version.save(update_fields=["mana_value"])
+    set_card_mana_families(card=arcane_normal_null, mana_families=("arcane",))
+    arcane_normal_null_version.mana_value = None
+    arcane_normal_null_version.save(update_fields=["mana_value"])
+    set_card_mana_families(card=dark_hero, mana_families=("dark",))
+    dark_hero_version.mana_value = 0
+    dark_hero_version.save(update_fields=["mana_value"])
+    CardRoleAssignment.objects.bulk_create(
+        [
+            CardRoleAssignment(card=arcane_hero, role="hero"),
+            CardRoleAssignment(card=arcane_boss, role="boss"),
+            CardRoleAssignment(card=arcane_shop, role="shop_item"),
+            CardRoleAssignment(card=arcane_directive, role="directive"),
+            CardRoleAssignment(card=arcane_reminder, role="reminder"),
+            CardRoleAssignment(card=arcane_mana, role="mana"),
+            CardRoleAssignment(card=dark_hero, role="hero"),
+        ]
+    )
+
+    client = Client(HTTP_HOST="localhost")
+    query = {"q": "Default Player", "card_pool": "player", "page_size": 2}
+    first_response = client.get("/cards", {**query, "page": 1})
+    second_response = client.get("/cards", {**query, "page": 2})
+    third_response = client.get("/cards", {**query, "page": 3})
+    fourth_response = client.get("/cards", {**query, "page": 4})
+    fifth_response = client.get("/cards", {**query, "page": 5})
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert third_response.status_code == 200
+    assert fourth_response.status_code == 200
+    assert fifth_response.status_code == 200
+    assert [row["id"] for row in first_response.json()["results"]] == [
+        arcane_hero.id,
+        arcane_normal_low.id,
+    ]
+    assert [row["id"] for row in second_response.json()["results"]] == [
+        arcane_normal_high.id,
+        arcane_normal_null.id,
+    ]
+    assert [row["id"] for row in third_response.json()["results"]] == [
+        arcane_boss.id,
+        arcane_shop.id,
+    ]
+    assert [row["id"] for row in fourth_response.json()["results"]] == [
+        arcane_directive.id,
+        arcane_reminder.id,
+    ]
+    assert [row["id"] for row in fifth_response.json()["results"]] == [
+        arcane_mana.id,
+        dark_hero.id,
+    ]
+
+
+def test_cards_list_uses_evil_faction_default_order() -> None:
+    order_boss, order_boss_version = _create_editable_card_version(
+        name="Default Evil Order Boss", card_pool="evil"
+    )
+    order_location, order_location_version = _create_editable_card_version(
+        name="Default Evil Order Location", card_pool="evil"
+    )
+    order_normal_low, order_normal_low_version = _create_editable_card_version(
+        name="Default Evil Order Normal Low", card_pool="evil"
+    )
+    order_normal_high, order_normal_high_version = _create_editable_card_version(
+        name="Default Evil Order Normal High", card_pool="evil"
+    )
+    order_shop, order_shop_version = _create_editable_card_version(
+        name="Default Evil Order Shop", card_pool="evil"
+    )
+    order_directive, order_directive_version = _create_editable_card_version(
+        name="Default Evil Order Directive", card_pool="evil"
+    )
+    order_reminder, order_reminder_version = _create_editable_card_version(
+        name="Default Evil Order Reminder", card_pool="evil"
+    )
+    order_mana, order_mana_version = _create_editable_card_version(
+        name="Default Evil Order Mana", card_pool="evil"
+    )
+    blood_boss, blood_boss_version = _create_editable_card_version(
+        name="Default Evil Blood Boss", card_pool="evil"
+    )
+    dark_boss, dark_boss_version = _create_editable_card_version(
+        name="Default Evil Dark Boss", card_pool="evil"
+    )
+    metal_boss, metal_boss_version = _create_editable_card_version(
+        name="Default Evil Metal Boss", card_pool="evil"
+    )
+    no_faction_boss, no_faction_boss_version = _create_editable_card_version(
+        name="Default Evil No Faction Boss", card_pool="evil"
+    )
+    for version, mana_value in (
+        (order_boss_version, 9),
+        (order_location_version, 0),
+        (order_normal_low_version, 1),
+        (order_normal_high_version, 5),
+        (order_shop_version, 2),
+        (order_directive_version, 2),
+        (order_reminder_version, 2),
+        (order_mana_version, 0),
+        (blood_boss_version, 0),
+        (dark_boss_version, 0),
+        (metal_boss_version, 0),
+        (no_faction_boss_version, 0),
+    ):
+        _create_card_image(version)
+        version.mana_value = mana_value
+        version.save(update_fields=["mana_value"])
+    CardFactionAssignment.objects.bulk_create(
+        [
+            CardFactionAssignment(card=order_boss, faction="order"),
+            CardFactionAssignment(card=order_location, faction="order"),
+            CardFactionAssignment(card=order_normal_low, faction="order"),
+            CardFactionAssignment(card=order_normal_high, faction="order"),
+            CardFactionAssignment(card=order_shop, faction="order"),
+            CardFactionAssignment(card=order_directive, faction="order"),
+            CardFactionAssignment(card=order_reminder, faction="order"),
+            CardFactionAssignment(card=order_mana, faction="order"),
+            CardFactionAssignment(card=blood_boss, faction="blood"),
+            CardFactionAssignment(card=dark_boss, faction="dark"),
+            CardFactionAssignment(card=metal_boss, faction="metal"),
+        ]
+    )
+    CardRoleAssignment.objects.bulk_create(
+        [
+            CardRoleAssignment(card=order_boss, role="boss"),
+            CardRoleAssignment(card=order_location, role="location"),
+            CardRoleAssignment(card=order_shop, role="shop_item"),
+            CardRoleAssignment(card=order_directive, role="directive"),
+            CardRoleAssignment(card=order_reminder, role="reminder"),
+            CardRoleAssignment(card=order_mana, role="mana"),
+            CardRoleAssignment(card=blood_boss, role="boss"),
+            CardRoleAssignment(card=dark_boss, role="boss"),
+            CardRoleAssignment(card=metal_boss, role="boss"),
+            CardRoleAssignment(card=no_faction_boss, role="boss"),
+        ]
+    )
+
+    response = _staff_client("evil-default-sort-user").get(
+        "/cards", {"card_pool": "evil", "q": "Default Evil"}
+    )
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()["results"]] == [
+        order_boss.id,
+        order_location.id,
+        order_normal_low.id,
+        order_normal_high.id,
+        order_shop.id,
+        order_directive.id,
+        order_reminder.id,
+        order_mana.id,
+        blood_boss.id,
+        dark_boss.id,
+        metal_boss.id,
+        no_faction_boss.id,
+    ]
+
+
+def test_cards_list_uses_neutral_role_default_order() -> None:
+    normal_card, normal_version = _create_editable_card_version(
+        name="Default Neutral Normal", card_pool="neutral"
+    )
+    boon_card, boon_version = _create_editable_card_version(
+        name="Default Neutral Boon", card_pool="neutral"
+    )
+    boon_event_card, boon_event_version = _create_editable_card_version(
+        name="Default Neutral Boon Event", card_pool="neutral"
+    )
+    event_card, event_version = _create_editable_card_version(
+        name="Default Neutral Event", card_pool="neutral"
+    )
+    shop_card, shop_version = _create_editable_card_version(
+        name="Default Neutral Shop", card_pool="neutral"
+    )
+    hero_card, hero_version = _create_editable_card_version(
+        name="Default Neutral Hero", card_pool="neutral"
+    )
+    boss_card, boss_version = _create_editable_card_version(
+        name="Default Neutral Boss", card_pool="neutral"
+    )
+    location_card, location_version = _create_editable_card_version(
+        name="Default Neutral Location", card_pool="neutral"
+    )
+    for version in (
+        normal_version,
+        boon_version,
+        boon_event_version,
+        event_version,
+        shop_version,
+        hero_version,
+        boss_version,
+        location_version,
+    ):
+        _create_card_image(version)
+    CardRoleAssignment.objects.bulk_create(
+        [
+            CardRoleAssignment(card=boon_card, role="boon"),
+            CardRoleAssignment(card=boon_event_card, role="boon"),
+            CardRoleAssignment(card=boon_event_card, role="event"),
+            CardRoleAssignment(card=event_card, role="event"),
+            CardRoleAssignment(card=shop_card, role="shop_item"),
+            CardRoleAssignment(card=hero_card, role="hero"),
+            CardRoleAssignment(card=boss_card, role="boss"),
+            CardRoleAssignment(card=location_card, role="location"),
+        ]
+    )
+
+    response = _staff_client("neutral-default-sort-user").get(
+        "/cards", {"card_pool": "neutral", "q": "Default Neutral"}
+    )
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()["results"]] == [
+        normal_card.id,
+        hero_card.id,
+        boss_card.id,
+        location_card.id,
+        boon_card.id,
+        boon_event_card.id,
+        event_card.id,
+        shop_card.id,
+    ]
 
 
 def test_cards_list_supports_type_sorting() -> None:
@@ -1791,10 +3299,18 @@ def test_cards_list_supports_type_sorting() -> None:
     zeta_card, zeta_version = _create_editable_card_version(name="Sort Type Zeta Solo")
     untyped_card, untyped_version = _create_editable_card_version(name="Sort Type Untyped")
     mana_card, mana_version = _create_editable_card_version(name="Sort Type Mana Solo")
-    _filler_spell_card, filler_spell_version = _create_editable_card_version(name="Priority Spell Filler")
-    _filler_mana_one_card, filler_mana_one_version = _create_editable_card_version(name="Priority Mana Filler One")
-    _filler_mana_two_card, filler_mana_two_version = _create_editable_card_version(name="Priority Mana Filler Two")
-    _filler_mana_three_card, filler_mana_three_version = _create_editable_card_version(name="Priority Mana Filler Three")
+    _filler_spell_card, filler_spell_version = _create_editable_card_version(
+        name="Priority Spell Filler"
+    )
+    _filler_mana_one_card, filler_mana_one_version = _create_editable_card_version(
+        name="Priority Mana Filler One"
+    )
+    _filler_mana_two_card, filler_mana_two_version = _create_editable_card_version(
+        name="Priority Mana Filler Two"
+    )
+    _filler_mana_three_card, filler_mana_three_version = _create_editable_card_version(
+        name="Priority Mana Filler Three"
+    )
 
     for version in (
         arcane_version,
@@ -1811,8 +3327,12 @@ def test_cards_list_supports_type_sorting() -> None:
     ):
         _create_card_image(version)
 
-    replace_card_version_types(card_version_id=arcane_version.id, type_ids=[creature_type.id, spell_type.id])
-    replace_card_version_types(card_version_id=hybrid_version.id, type_ids=[spell_type.id, mana_type.id])
+    replace_card_version_types(
+        card_version_id=arcane_version.id, type_ids=[creature_type.id, spell_type.id]
+    )
+    replace_card_version_types(
+        card_version_id=hybrid_version.id, type_ids=[spell_type.id, mana_type.id]
+    )
     replace_card_version_types(card_version_id=blade_version.id, type_ids=[creature_type.id])
     replace_card_version_types(card_version_id=alpha_version.id, type_ids=[alpha_type.id])
     replace_card_version_types(card_version_id=zeta_version.id, type_ids=[zeta_type.id])
@@ -1820,9 +3340,14 @@ def test_cards_list_supports_type_sorting() -> None:
     replace_card_version_types(card_version_id=filler_spell_version.id, type_ids=[spell_type.id])
     replace_card_version_types(card_version_id=filler_mana_one_version.id, type_ids=[mana_type.id])
     replace_card_version_types(card_version_id=filler_mana_two_version.id, type_ids=[mana_type.id])
-    replace_card_version_types(card_version_id=filler_mana_three_version.id, type_ids=[mana_type.id])
+    replace_card_version_types(
+        card_version_id=filler_mana_three_version.id, type_ids=[mana_type.id]
+    )
 
-    response = Client(HTTP_HOST="localhost").get("/cards", {"sort": "types_asc", "q": "Sort Type"})
+    response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {"sort": "types_asc", "card_pool": "player", "q": "Sort Type"},
+    )
 
     assert response.status_code == 200
     result_ids = [row["id"] for row in response.json()["results"][:7]]
@@ -1843,12 +3368,20 @@ def test_cards_list_type_sorting_happens_before_pagination() -> None:
     mana_type = _create_type(key="mana", label="Mana")
 
     priority_card, priority_version = _create_editable_card_version(name="Sort Page Type Priority")
-    secondary_card, secondary_version = _create_editable_card_version(name="Sort Page Type Secondary")
+    secondary_card, secondary_version = _create_editable_card_version(
+        name="Sort Page Type Secondary"
+    )
     untyped_card, untyped_version = _create_editable_card_version(name="Sort Page Type Untyped")
     mana_card, mana_version = _create_editable_card_version(name="Sort Page Type Mana")
     filler_card, filler_version = _create_editable_card_version(name="Sort Page Filler Priority")
 
-    for version in (priority_version, secondary_version, untyped_version, mana_version, filler_version):
+    for version in (
+        priority_version,
+        secondary_version,
+        untyped_version,
+        mana_version,
+        filler_version,
+    ):
         _create_card_image(version)
 
     replace_card_version_types(card_version_id=priority_version.id, type_ids=[priority_type.id])
@@ -1859,11 +3392,23 @@ def test_cards_list_type_sorting_happens_before_pagination() -> None:
     client = Client(HTTP_HOST="localhost")
     first_response = client.get(
         "/cards",
-        {"sort": "types_asc", "q": "Sort Page Type", "page": 1, "page_size": 2},
+        {
+            "sort": "types_asc",
+            "card_pool": "player",
+            "q": "Sort Page Type",
+            "page": 1,
+            "page_size": 2,
+        },
     )
     second_response = client.get(
         "/cards",
-        {"sort": "types_asc", "q": "Sort Page Type", "page": 2, "page_size": 2},
+        {
+            "sort": "types_asc",
+            "card_pool": "player",
+            "q": "Sort Page Type",
+            "page": 2,
+            "page_size": 2,
+        },
     )
 
     assert first_response.status_code == 200
@@ -1879,10 +3424,38 @@ def test_cards_list_type_sorting_happens_before_pagination() -> None:
     ]
 
 
+def test_cards_list_type_sort_uses_type_key_when_counts_and_labels_tie() -> None:
+    alpha_type = _create_type(key="sort-type-tie-alpha", label="Sort Type Tie")
+    zeta_type = _create_type(key="sort-type-tie-zeta", label="Sort Type Tie")
+    alpha_card, alpha_version = _create_editable_card_version(
+        name="Sort Type Tie Zulu Card"
+    )
+    zeta_card, zeta_version = _create_editable_card_version(
+        name="Sort Type Tie Alpha Card"
+    )
+    for version in (alpha_version, zeta_version):
+        _create_card_image(version)
+    replace_card_version_types(card_version_id=alpha_version.id, type_ids=[alpha_type.id])
+    replace_card_version_types(card_version_id=zeta_version.id, type_ids=[zeta_type.id])
+
+    response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {"sort": "types_asc", "card_pool": "player", "q": "Sort Type Tie"},
+    )
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()["results"][:2]] == [
+        alpha_card.id,
+        zeta_card.id,
+    ]
+
+
 def test_grouped_gallery_sort_uses_anchor_card_values() -> None:
     anchor_card, anchor_version = _create_editable_card_version(name="Sort Group Zephyr Group")
     member_card, member_version = _create_editable_card_version(name="Sort Group Zephyr Member")
-    standalone_card, standalone_version = _create_editable_card_version(name="Sort Group Amber Solo")
+    standalone_card, standalone_version = _create_editable_card_version(
+        name="Sort Group Amber Solo"
+    )
     _create_card_image(anchor_version)
     _create_card_image(member_version)
     _create_card_image(standalone_version)
@@ -1907,17 +3480,26 @@ def test_grouped_gallery_sort_uses_anchor_card_values() -> None:
     assert results[1]["anchor_card_id"] == anchor_card.id
 
 
-def test_grouped_gallery_mana_family_sort_uses_the_anchor_version() -> None:
+def test_grouped_gallery_mana_family_sort_uses_the_anchor_card() -> None:
     arcane_mana = _get_or_create_symbol(key="arcane-mana", label="Arcane Mana", symbol_type="mana")
-    dark_affinity = _get_or_create_symbol(key="dark-affinity", label="Dark Affinity", symbol_type="affinity")
+    dark_affinity = _get_or_create_symbol(
+        key="dark-affinity", label="Dark Affinity", symbol_type="affinity"
+    )
     group_anchor, anchor_version = _create_editable_card_version(name="Family Group Zeta Anchor")
     group_member, member_version = _create_editable_card_version(name="Family Group Alpha Member")
-    standalone, standalone_version = _create_editable_card_version(name="Family Group Beta Standalone")
+    standalone, standalone_version = _create_editable_card_version(
+        name="Family Group Beta Standalone"
+    )
     for version in (anchor_version, member_version, standalone_version):
         _create_card_image(version)
     replace_card_version_symbols(card_version_id=anchor_version.id, symbol_ids=[arcane_mana.id])
     replace_card_version_symbols(card_version_id=member_version.id, symbol_ids=[dark_affinity.id])
-    replace_card_version_symbols(card_version_id=standalone_version.id, symbol_ids=[dark_affinity.id])
+    replace_card_version_symbols(
+        card_version_id=standalone_version.id, symbol_ids=[dark_affinity.id]
+    )
+    set_card_mana_families(card=group_anchor, mana_families=("arcane",))
+    set_card_mana_families(card=group_member, mana_families=("dark",))
+    set_card_mana_families(card=standalone, mana_families=("dark",))
     _create_card_group(
         "mana-family-sorted-group",
         anchor_card=group_anchor,
@@ -1944,7 +3526,9 @@ def test_grouped_gallery_paginates_before_hydrating_payloads() -> None:
     zeta_card, zeta_version = _create_editable_card_version(name="Paged Group Zeta Solo")
     for version in (anchor_version, member_version, alpha_version, zeta_version):
         _create_card_image(version)
-    _create_card_group("paged-group-beta", anchor_card=anchor_card, members=[anchor_card, member_card])
+    _create_card_group(
+        "paged-group-beta", anchor_card=anchor_card, members=[anchor_card, member_card]
+    )
 
     client = Client(HTTP_HOST="localhost")
     first_response = client.get(
@@ -1967,6 +3551,75 @@ def test_grouped_gallery_paginates_before_hydrating_payloads() -> None:
     assert zeta_card.id
 
 
+def test_grouped_gallery_default_sort_bounds_candidates_before_hydration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import card_reader_core.repositories.cards.queries as card_queries
+
+    anchor_card, anchor_version = _create_editable_card_version(
+        name="Bounded Default Group Anchor"
+    )
+    member_card, member_version = _create_editable_card_version(
+        name="Bounded Default Group Member"
+    )
+    _create_card_image(anchor_version)
+    _create_card_image(member_version)
+    _create_card_group(
+        "bounded-default-group",
+        anchor_card=anchor_card,
+        members=[anchor_card, member_card],
+    )
+    for index in range(6):
+        _card, version = _create_editable_card_version(
+            name=f"Bounded Default Standalone {index}"
+        )
+        _create_card_image(version)
+
+    original_sort_key = card_queries.card_default_sort_key
+    evaluated_candidates = 0
+
+    def counting_sort_key(**kwargs: Any) -> tuple[object, ...]:
+        nonlocal evaluated_candidates
+        evaluated_candidates += 1
+        return original_sort_key(**kwargs)
+
+    monkeypatch.setattr(card_queries, "card_default_sort_key", counting_sort_key)
+
+    response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {
+            "show_groups": "true",
+            "sort": "default",
+            "card_pool": "player",
+            "q": "Bounded Default",
+            "page": 1,
+            "page_size": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["count"] == 7
+    assert len(response.json()["results"]) == 1
+    assert evaluated_candidates == 2
+
+    evaluated_candidates = 0
+    later_response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {
+            "show_groups": "true",
+            "sort": "default",
+            "card_pool": "player",
+            "q": "Bounded Default",
+            "page": 6,
+            "page_size": 1,
+        },
+    )
+
+    assert later_response.status_code == 200
+    assert len(later_response.json()["results"]) == 1
+    assert evaluated_candidates <= 4
+
+
 def test_grouped_gallery_type_sort_uses_anchor_card_types() -> None:
     spell_type = _create_type(key="sort-group-spell", label="Spell")
     creature_type = _create_type(key="sort-group-creature", label="Creature")
@@ -1974,8 +3627,12 @@ def test_grouped_gallery_type_sort_uses_anchor_card_types() -> None:
 
     anchor_card, anchor_version = _create_editable_card_version(name="Sort Type Group Mana Anchor")
     member_card, member_version = _create_editable_card_version(name="Sort Type Group Spell Member")
-    standalone_card, standalone_version = _create_editable_card_version(name="Sort Type Group Creature Solo")
-    _filler_spell_card, filler_spell_version = _create_editable_card_version(name="Grouped Priority Spell Filler")
+    standalone_card, standalone_version = _create_editable_card_version(
+        name="Sort Type Group Creature Solo"
+    )
+    _filler_spell_card, filler_spell_version = _create_editable_card_version(
+        name="Grouped Priority Spell Filler"
+    )
 
     for version in (anchor_version, member_version, standalone_version, filler_spell_version):
         _create_card_image(version)
@@ -1984,11 +3641,18 @@ def test_grouped_gallery_type_sort_uses_anchor_card_types() -> None:
     replace_card_version_types(card_version_id=member_version.id, type_ids=[spell_type.id])
     replace_card_version_types(card_version_id=standalone_version.id, type_ids=[creature_type.id])
     replace_card_version_types(card_version_id=filler_spell_version.id, type_ids=[spell_type.id])
-    _create_card_group("sorted-type-group", anchor_card=anchor_card, members=[anchor_card, member_card])
+    _create_card_group(
+        "sorted-type-group", anchor_card=anchor_card, members=[anchor_card, member_card]
+    )
 
     response = Client(HTTP_HOST="localhost").get(
         "/cards",
-        {"show_groups": "true", "sort": "types_asc", "q": "Sort Type Group"},
+        {
+            "show_groups": "true",
+            "sort": "types_asc",
+            "card_pool": "player",
+            "q": "Sort Type Group",
+        },
     )
 
     assert response.status_code == 200
@@ -1997,6 +3661,107 @@ def test_grouped_gallery_type_sort_uses_anchor_card_types() -> None:
     assert results[0]["id"] == standalone_card.id
     assert results[1]["result_type"] == "card_group"
     assert results[1]["anchor_card_id"] == anchor_card.id
+
+
+def test_grouped_gallery_default_sort_uses_anchor_card_values() -> None:
+    anchor_card, anchor_version = _create_editable_card_version(
+        name="Unmatched Default Group Anchor"
+    )
+    member_card, member_version = _create_editable_card_version(
+        name="Default Group Matching Member"
+    )
+    standalone_card, standalone_version = _create_editable_card_version(
+        name="Default Group Matching Standalone"
+    )
+    for version in (anchor_version, member_version, standalone_version):
+        _create_card_image(version)
+    set_card_mana_families(card=anchor_card, mana_families=("arcane",))
+    set_card_mana_families(card=member_card, mana_families=("arcane",))
+    set_card_mana_families(card=standalone_card, mana_families=("arcane",))
+    anchor_version.mana_value = 0
+    member_version.mana_value = 0
+    standalone_version.mana_value = 9
+    anchor_version.save(update_fields=["mana_value"])
+    member_version.save(update_fields=["mana_value"])
+    standalone_version.save(update_fields=["mana_value"])
+    CardRoleAssignment.objects.bulk_create(
+        [
+            CardRoleAssignment(card=anchor_card, role="boss"),
+            CardRoleAssignment(card=member_card, role="hero"),
+        ]
+    )
+    _create_card_group(
+        "default-anchor-sort-group",
+        anchor_card=anchor_card,
+        members=[anchor_card, member_card],
+    )
+
+    response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {
+            "show_groups": "true",
+            "sort": "default",
+            "card_pool": "player",
+            "q": "Default Group Matching",
+        },
+    )
+
+    assert response.status_code == 200
+    results = response.json()["results"]
+    assert results[0]["result_type"] == "card"
+    assert results[0]["id"] == standalone_card.id
+    assert results[1]["result_type"] == "card_group"
+    assert results[1]["anchor_card_id"] == anchor_card.id
+
+
+def test_grouped_gallery_default_sort_uses_group_identity_for_shared_anchors() -> None:
+    anchor_card, anchor_version = _create_editable_card_version(
+        name="Duplicate Anchor Default Card"
+    )
+    _create_card_image(anchor_version)
+    alpha_group = _create_card_group(
+        "duplicate-anchor-alpha",
+        anchor_card=anchor_card,
+        members=[anchor_card],
+    )
+    zeta_group = _create_card_group(
+        "duplicate-anchor-zeta",
+        anchor_card=anchor_card,
+        members=[anchor_card],
+    )
+    expected_ids = sorted([alpha_group.id, zeta_group.id])
+    client = Client(HTTP_HOST="localhost")
+
+    first_response = client.get(
+        "/cards",
+        {
+            "show_groups": "true",
+            "sort": "default",
+            "card_pool": "player",
+            "q": "Duplicate Anchor Default",
+            "page": 1,
+            "page_size": 1,
+        },
+    )
+    second_response = client.get(
+        "/cards",
+        {
+            "show_groups": "true",
+            "sort": "default",
+            "card_pool": "player",
+            "q": "Duplicate Anchor Default",
+            "page": 2,
+            "page_size": 1,
+        },
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert first_response.json()["count"] == 2
+    assert [
+        first_response.json()["results"][0]["id"],
+        second_response.json()["results"][0]["id"],
+    ] == expected_ids
 
 
 def test_export_cards_csv_honors_selected_sort() -> None:
@@ -2009,16 +3774,22 @@ def test_export_cards_csv_honors_selected_sort() -> None:
     zebra_version.save(update_fields=["updated_at"])
     alpha_version.save(update_fields=["updated_at"])
 
-    response = _staff_client("csv-export-sort-user").get("/exports/csv", {"sort": "name_asc", "q": "Sort Export"})
+    response = _staff_client("csv-export-sort-user").get(
+        "/exports/csv", {"sort": "name_asc", "q": "Sort Export"}
+    )
 
     assert response.status_code == 200
-    rows = response.content.decode("utf-8").splitlines()
-    assert rows[1].split(",")[1] == "Sort Export Alpha Export"
-    assert rows[2].split(",")[1] == "Sort Export Zebra Export"
+    rows = list(csv.DictReader(response.content.decode("utf-8").splitlines()))
+    assert [row["name"] for row in rows] == [
+        "Sort Export Alpha Export",
+        "Sort Export Zebra Export",
+    ]
 
 
 def test_export_cards_csv_honors_mana_family_sort() -> None:
-    arcane_affinity = _get_or_create_symbol(key="arcane-affinity", label="Arcane Affinity", symbol_type="affinity")
+    arcane_affinity = _get_or_create_symbol(
+        key="arcane-affinity", label="Arcane Affinity", symbol_type="affinity"
+    )
     dark_mana = _get_or_create_symbol(key="dark-mana", label="Dark Mana", symbol_type="mana")
     _dark_card, dark_version = _create_editable_card_version(name="Family Export Alpha Dark")
     _arcane_card, arcane_version = _create_editable_card_version(name="Family Export Zeta Arcane")
@@ -2026,6 +3797,8 @@ def test_export_cards_csv_honors_mana_family_sort() -> None:
     _create_card_image(arcane_version)
     replace_card_version_symbols(card_version_id=dark_version.id, symbol_ids=[dark_mana.id])
     replace_card_version_symbols(card_version_id=arcane_version.id, symbol_ids=[arcane_affinity.id])
+    set_card_mana_families(card=_dark_card, mana_families=("dark",))
+    set_card_mana_families(card=_arcane_card, mana_families=("arcane",))
 
     response = _staff_client("csv-export-family-sort-user").get(
         "/exports/csv",
@@ -2033,9 +3806,11 @@ def test_export_cards_csv_honors_mana_family_sort() -> None:
     )
 
     assert response.status_code == 200
-    rows = response.content.decode("utf-8").splitlines()
-    assert rows[1].split(",")[1] == "Family Export Zeta Arcane"
-    assert rows[2].split(",")[1] == "Family Export Alpha Dark"
+    rows = list(csv.DictReader(response.content.decode("utf-8").splitlines()))
+    assert [row["name"] for row in rows] == [
+        "Family Export Zeta Arcane",
+        "Family Export Alpha Dark",
+    ]
 
 
 def test_card_detail_and_group_detail_include_card_group_membership() -> None:
@@ -2043,7 +3818,9 @@ def test_card_detail_and_group_detail_include_card_group_membership() -> None:
     member_card, member_version = _create_editable_card_version(name="Detail Member")
     _create_card_image(anchor_version)
     _create_card_image(member_version)
-    group = _create_card_group("detail-group", anchor_card=anchor_card, members=[anchor_card, member_card])
+    group = _create_card_group(
+        "detail-group", anchor_card=anchor_card, members=[anchor_card, member_card]
+    )
 
     client = Client(HTTP_HOST="localhost")
     card_response = client.get(f"/cards/{member_card.id}")
@@ -2054,10 +3831,119 @@ def test_card_detail_and_group_detail_include_card_group_membership() -> None:
     card_payload = card_response.json()
     group_payload = group_response.json()
     assert card_payload["card_groups"][0]["id"] == group.id
+    assert card_payload["card_groups"][0]["card_pool"] == "player"
     assert card_payload["card_groups"][0]["is_anchor"] is False
     assert group_payload["id"] == group.id
-    assert [member["card"]["id"] for member in group_payload["members"]] == [anchor_card.id, member_card.id]
+    assert [member["card"]["id"] for member in group_payload["members"]] == [
+        anchor_card.id,
+        member_card.id,
+    ]
     assert group_payload["members"][0]["is_anchor"] is True
+
+
+def test_cross_pool_group_relationships_expose_all_members_to_every_viewer() -> None:
+    player_card, player_version = _create_editable_card_version(name="Cross Pool Group Player")
+    evil_card, evil_version = _create_editable_card_version(name="Cross Pool Group Evil")
+    evil_card.card_pool = "evil"
+    evil_card.save(update_fields=["card_pool"])
+    _create_card_image(player_version)
+    _create_card_image(evil_version)
+    group = _create_card_group(
+        "cross-pool-detail-group",
+        anchor_card=player_card,
+        members=[player_card, evil_card],
+    )
+
+    anonymous = Client(HTTP_HOST="localhost")
+    ordinary = Client(HTTP_HOST="localhost")
+    ordinary.force_login(
+        _create_user("cross-pool-group-user", "password", is_staff=False)
+    )
+    inactive_user = _create_user("cross-pool-group-inactive", "password", is_staff=True)
+    inactive = Client(HTTP_HOST="localhost")
+    inactive.force_login(inactive_user)
+    inactive_user.is_active = False
+    inactive_user.save(update_fields=["is_active"])
+    staff_client = _staff_client("cross-pool-group-staff")
+    group_responses = [
+        client.get(f"/card-groups/{group.id}")
+        for client in (anonymous, ordinary, inactive, staff_client)
+    ]
+    card_responses = [
+        client.get(f"/cards/{player_card.id}")
+        for client in (anonymous, ordinary, inactive, staff_client)
+    ]
+    anonymous_group_response = group_responses[0]
+    anonymous_card_response = card_responses[0]
+    staff_group_response = group_responses[-1]
+    staff_evil_card_response = staff_client.get(f"/cards/{evil_card.id}")
+
+    assert anonymous_group_response.status_code == 200
+    assert [member["card"]["id"] for member in anonymous_group_response.json()["members"]] == [
+        player_card.id,
+        evil_card.id,
+    ]
+    assert anonymous_card_response.json()["card_groups"][0]["id"] == group.id
+    assert anonymous_card_response.json()["card_groups"][0]["member_count"] == 2
+    assert anonymous_card_response.json()["card_groups"][0]["card_ids"] == [
+        player_card.id,
+        evil_card.id,
+    ]
+    assert staff_group_response.status_code == 200
+    assert [member["card"]["id"] for member in staff_group_response.json()["members"]] == [
+        player_card.id,
+        evil_card.id,
+    ]
+    assert staff_group_response.json()["members"][1]["card"]["card_pool"] == "evil"
+    assert staff_evil_card_response.json()["card_groups"][0]["id"] == group.id
+    assert staff_evil_card_response.json()["card_groups"][0]["card_pool"] == "player"
+    assert staff_evil_card_response.json()["card_groups"][0]["member_count"] == 2
+    assert staff_evil_card_response.json()["card_groups"][0]["card_ids"] == [
+        player_card.id,
+        evil_card.id,
+    ]
+    assert staff_evil_card_response.json()["card_groups"][0]["position"] == 2
+    assert [response.json() for response in group_responses[1:]] == [
+        anonymous_group_response.json()
+    ] * 3
+    assert [response.json() for response in card_responses[1:]] == [
+        anonymous_card_response.json()
+    ] * 3
+
+
+def test_card_group_detail_without_card_pool_uses_global_identity() -> None:
+    anchor_card, anchor_version = _create_editable_card_version(
+        name="Global Evil Group Anchor"
+    )
+    member_card, member_version = _create_editable_card_version(
+        name="Global Evil Group Member"
+    )
+    for card in (anchor_card, member_card):
+        card.card_pool = "evil"
+        card.save(update_fields=["card_pool"])
+    _create_card_image(anchor_version)
+    _create_card_image(member_version)
+    group = _create_card_group(
+        "global-evil-group",
+        anchor_card=anchor_card,
+        members=[anchor_card, member_card],
+    )
+    client = Client(HTTP_HOST="localhost")
+
+    global_response = client.get(f"/card-groups/{group.id}")
+    evil_response = client.get(
+        f"/card-groups/{group.id}",
+        {"card_pool": "evil"},
+    )
+    player_response = client.get(
+        f"/card-groups/{group.id}",
+        {"card_pool": "player"},
+    )
+
+    assert global_response.status_code == 200
+    assert evil_response.status_code == 200
+    assert global_response.json() == evil_response.json()
+    assert player_response.status_code == 404
 
 
 def test_card_detail_includes_viewer_visible_deck_references() -> None:
@@ -2066,8 +3952,7 @@ def test_card_detail_includes_viewer_visible_deck_references() -> None:
     hero_card, _hero_version = _create_editable_card_version(name="Deck Reference Hero")
     card, version = _create_editable_card_version(name="Deck Reference Included")
     _create_card_image(version)
-    hero_card.is_hero = True
-    hero_card.save(update_fields=["is_hero"])
+    CardRoleAssignment.objects.create(card=hero_card, role="hero")
     owner_deck = Deck.objects.create(
         owner=owner,
         name="Owner Private Deck",
@@ -2095,7 +3980,7 @@ def test_card_detail_includes_viewer_visible_deck_references() -> None:
     assert references[0]["visibility"] == "private"
     assert references[0]["owner"]["id"] == str(owner.id)
     assert references[0]["hero_card"]["id"] == hero_card.id
-    assert references[0]["card_reference"]["is_hero"] is False
+    assert references[0]["card_reference"]["as_hero"] is False
     assert references[0]["card_reference"]["mainboard_quantity"] == 2
     assert references[0]["card_reference"]["sideboard_quantity"] == 0
     assert anonymous_response.status_code == 200
@@ -2107,8 +3992,7 @@ def test_card_detail_limits_deck_references_to_three_latest() -> None:
     hero_card, _hero_version = _create_editable_card_version(name="Deck Reference Limit Hero")
     card, version = _create_editable_card_version(name="Deck Reference Limit Included")
     _create_card_image(version)
-    hero_card.is_hero = True
-    hero_card.save(update_fields=["is_hero"])
+    CardRoleAssignment.objects.create(card=hero_card, role="hero")
     decks = []
     for index in range(4):
         deck = Deck.objects.create(
@@ -2127,7 +4011,9 @@ def test_card_detail_limits_deck_references_to_three_latest() -> None:
 
     assert response.status_code == 200
     references = response.json()["deck_references"]
-    assert [reference["id"] for reference in references] == [deck.id for deck in reversed(decks[-3:])]
+    assert [reference["id"] for reference in references] == [
+        deck.id for deck in reversed(decks[-3:])
+    ]
 
 
 def test_card_group_detail_includes_anchor_viewer_visible_deck_references() -> None:
@@ -2137,9 +4023,10 @@ def test_card_group_detail_includes_anchor_viewer_visible_deck_references() -> N
     member_card, member_version = _create_editable_card_version(name="Group Deck Reference Member")
     _create_card_image(anchor_version)
     _create_card_image(member_version)
-    anchor_card.is_hero = True
-    anchor_card.save(update_fields=["is_hero"])
-    group = _create_card_group("group-deck-reference", anchor_card=anchor_card, members=[anchor_card, member_card])
+    CardRoleAssignment.objects.create(card=anchor_card, role="hero")
+    group = _create_card_group(
+        "group-deck-reference", anchor_card=anchor_card, members=[anchor_card, member_card]
+    )
     owner_deck = Deck.objects.create(
         owner=owner,
         name="Owner Private Group Deck",
@@ -2163,7 +4050,7 @@ def test_card_group_detail_includes_anchor_viewer_visible_deck_references() -> N
     references = owner_response.json()["anchor_deck_references"]
     assert [reference["id"] for reference in references] == [owner_deck.id]
     assert references[0]["name"] == "Owner Private Group Deck"
-    assert references[0]["card_reference"]["is_hero"] is True
+    assert references[0]["card_reference"]["as_hero"] is True
     assert references[0]["card_reference"]["mainboard_quantity"] == 0
     assert references[0]["card_reference"]["sideboard_quantity"] == 0
     assert anonymous_response.status_code == 200
@@ -2172,13 +4059,18 @@ def test_card_group_detail_includes_anchor_viewer_visible_deck_references() -> N
 
 def test_card_group_detail_limits_anchor_deck_references_to_three_latest() -> None:
     owner = _create_user("group-deck-reference-limit-owner", "password", is_staff=False)
-    anchor_card, anchor_version = _create_editable_card_version(name="Group Deck Reference Limit Anchor")
-    member_card, member_version = _create_editable_card_version(name="Group Deck Reference Limit Member")
+    anchor_card, anchor_version = _create_editable_card_version(
+        name="Group Deck Reference Limit Anchor"
+    )
+    member_card, member_version = _create_editable_card_version(
+        name="Group Deck Reference Limit Member"
+    )
     _create_card_image(anchor_version)
     _create_card_image(member_version)
-    anchor_card.is_hero = True
-    anchor_card.save(update_fields=["is_hero"])
-    group = _create_card_group("group-deck-reference-limit", anchor_card=anchor_card, members=[anchor_card, member_card])
+    CardRoleAssignment.objects.create(card=anchor_card, role="hero")
+    group = _create_card_group(
+        "group-deck-reference-limit", anchor_card=anchor_card, members=[anchor_card, member_card]
+    )
     decks = []
     for index in range(4):
         deck = Deck.objects.create(
@@ -2196,17 +4088,23 @@ def test_card_group_detail_limits_anchor_deck_references_to_three_latest() -> No
 
     assert response.status_code == 200
     references = response.json()["anchor_deck_references"]
-    assert [reference["id"] for reference in references] == [deck.id for deck in reversed(decks[-3:])]
+    assert [reference["id"] for reference in references] == [
+        deck.id for deck in reversed(decks[-3:])
+    ]
 
 
 def test_public_card_group_detail_hides_deprecated_linked_cards_by_default() -> None:
     anchor_card, anchor_version = _create_editable_card_version(name="Detail Lifecycle Anchor")
-    deprecated_card, deprecated_version = _create_editable_card_version(name="Detail Lifecycle Deprecated")
+    deprecated_card, deprecated_version = _create_editable_card_version(
+        name="Detail Lifecycle Deprecated"
+    )
     _create_card_image(anchor_version)
     _create_card_image(deprecated_version)
     deprecated_card.lifecycle_status = "deprecated"
     deprecated_card.save(update_fields=["lifecycle_status"])
-    group = _create_card_group("detail-lifecycle-group", anchor_card=anchor_card, members=[anchor_card, deprecated_card])
+    group = _create_card_group(
+        "detail-lifecycle-group", anchor_card=anchor_card, members=[anchor_card, deprecated_card]
+    )
 
     client = Client(HTTP_HOST="localhost")
     default_response = client.get(f"/card-groups/{group.id}")
@@ -2215,7 +4113,9 @@ def test_public_card_group_detail_hides_deprecated_linked_cards_by_default() -> 
     assert default_response.status_code == 200
     assert all_response.status_code == 200
     assert default_response.json()["member_count"] == 1
-    assert [member["card"]["id"] for member in default_response.json()["members"]] == [anchor_card.id]
+    assert [member["card"]["id"] for member in default_response.json()["members"]] == [
+        anchor_card.id
+    ]
     assert all_response.json()["member_count"] == 2
     assert [member["card"]["id"] for member in all_response.json()["members"]] == [
         anchor_card.id,
@@ -2234,7 +4134,9 @@ def test_card_group_anchor_cannot_be_deprecated() -> None:
     member_card, member_version = _create_editable_card_version(name="Lifecycle Anchor Member")
     _create_card_image(anchor_version)
     _create_card_image(member_version)
-    _create_card_group("lifecycle-anchor-guard", anchor_card=anchor_card, members=[anchor_card, member_card])
+    _create_card_group(
+        "lifecycle-anchor-guard", anchor_card=anchor_card, members=[anchor_card, member_card]
+    )
 
     response = client.patch(
         f"/cards/{anchor_card.id}/latest-version",
@@ -2258,7 +4160,9 @@ def test_card_group_management_rejects_deprecated_anchor_but_allows_deprecated_m
 
     active_anchor, _active_version = _create_editable_card_version(name="Group Active Anchor")
     active_member, _member_version = _create_editable_card_version(name="Group Active Member")
-    deprecated_card, _deprecated_version = _create_editable_card_version(name="Group Deprecated Candidate")
+    deprecated_card, _deprecated_version = _create_editable_card_version(
+        name="Group Deprecated Candidate"
+    )
     deprecated_card.lifecycle_status = "deprecated"
     deprecated_card.save(update_fields=["lifecycle_status"])
 
@@ -2311,7 +4215,12 @@ def test_staff_can_manage_card_groups() -> None:
 
     anchor_card, _anchor_version = _create_editable_card_version(name="Staff Group Anchor")
     member_card, _member_version = _create_editable_card_version(name="Staff Group Member")
-    replacement_card, _replacement_version = _create_editable_card_version(name="Staff Group Replacement")
+    replacement_card, _replacement_version = _create_editable_card_version(
+        name="Staff Group Replacement"
+    )
+    member_card.card_pool = "evil"
+    member_card.save(update_fields=["card_pool"])
+    CardFactionAssignment.objects.create(card=member_card, faction="dark")
 
     create_response = client.post(
         "/admin/card-groups",
@@ -2352,13 +4261,53 @@ def test_staff_can_manage_card_groups() -> None:
     assert list_response.status_code == 200
     assert delete_response.status_code == 204
     assert patch_response.json()["anchor_card_id"] == replacement_card.id
-    assert [member["card_id"] for member in patch_response.json()["members"]] == [replacement_card.id, member_card.id]
+    assert [member["card_id"] for member in patch_response.json()["members"]] == [
+        replacement_card.id,
+        member_card.id,
+    ]
+    assert [member["card_pool"] for member in patch_response.json()["members"]] == [
+        "player",
+        "evil",
+    ]
+    assert [member["card_factions"] for member in patch_response.json()["members"]] == [
+        [],
+        ["dark"],
+    ]
     assert all(row["id"] != group_id for row in client.get("/admin/card-groups").json())
 
 
 def test_staff_can_preview_and_apply_card_merge() -> None:
     target_card, target_version = _create_editable_card_version(name="Renamed Card")
     source_card, source_version = _create_editable_card_version(name="Old Card Name")
+    review_job = ImportJob.objects.create(
+        source_path="uploads/merge-classification-review.png",
+        template=Template.objects.get(key="mtg-like-v1"),
+        card_pool="player",
+        total_items=1,
+    )
+    review_import_item = ImportJobItem.objects.create(
+        job=review_job,
+        source_file="uploads/merge-classification-review.png",
+    )
+    classification_review = CardClassificationReviewItem.objects.create(
+        import_item=review_import_item,
+        card=source_card,
+        card_version=source_version,
+        card_pool="player",
+        existing_classification_json={
+            "card_pool": "player",
+            "card_roles": [],
+            "card_factions": [],
+            "card_mana_families": [],
+        },
+        inferred_classification_json={
+            "card_pool": "player",
+            "card_roles": ["event"],
+            "card_factions": [],
+            "card_mana_families": [],
+        },
+        inference_evidence_json={},
+    )
     owner = _create_user("merge-deck-owner", "password", is_staff=True)
     deck = Deck.objects.create(owner=owner, name="Merge Deck", hero_card=source_card)
     DeckEntry.objects.create(deck=deck, card=target_card, quantity=1)
@@ -2391,13 +4340,35 @@ def test_staff_can_preview_and_apply_card_merge() -> None:
     assert apply_response.status_code == 200
 
     assert not Card.objects.filter(id=source_card.id).exists()
-    assert CardAlias.objects.filter(card_id=target_card.id, key=source_card.key).exists()
-    assert CardMergeRedirect.objects.filter(old_card_id=source_card.id, target_card_id=target_card.id).exists()
-    assert list(CardVersion.objects.filter(card_id=target_card.id).order_by("version_number").values_list("id", flat=True)) == [
+    assert CardAlias.objects.filter(
+        card_id=target_card.id,
+        card_pool="player",
+        key=source_card.key,
+    ).exists()
+    assert CardMergeRedirect.objects.filter(
+        old_card_id=source_card.id, target_card_id=target_card.id
+    ).exists()
+    assert list(
+        CardVersion.objects.filter(card_id=target_card.id)
+        .order_by("version_number")
+        .values_list("id", flat=True)
+    ) == [
         source_version.id,
         target_version.id,
     ]
     assert get_latest_card_version(target_card.id).id == target_version.id
+    classification_review.refresh_from_db()
+    assert classification_review.card_id == target_card.id
+    assert classification_review.card_version_id == source_version.id
+    review_response = client.get("/review/classification-items?status=open")
+    assert review_response.status_code == 200
+    review_payload = next(
+        row
+        for row in review_response.json()["results"]
+        if row["id"] == classification_review.id
+    )
+    assert review_payload["card"]["id"] == target_card.id
+    assert review_payload["version"]["id"] == source_version.id
     assert DeckEntry.objects.get(deck=deck, card=target_card).quantity == 3
     deck.refresh_from_db()
     assert deck.hero_card_id == target_card.id
@@ -2421,6 +4392,38 @@ def test_card_merge_endpoints_require_staff() -> None:
     )
 
     assert response.status_code == 403
+
+
+def test_card_merge_rejects_cross_pool_sources() -> None:
+    target_card, _target_version = _create_editable_card_version(name="Cross Pool Merge Target")
+    source_card, _source_version = _create_editable_card_version(name="Cross Pool Merge Source")
+    source_card.card_pool = "neutral"
+    source_card.save(update_fields=["card_pool"])
+    username = "staff-cross-pool-merge-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+    payload = {"target_card_id": target_card.id, "source_card_ids": [source_card.id]}
+
+    preview = client.post(
+        "/admin/card-merges/preview",
+        data=payload,
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    apply = client.post(
+        "/admin/card-merges/apply",
+        data=payload,
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert preview.status_code == 200
+    assert preview.json()["can_apply"] is False
+    assert "Cards from different pools cannot be merged." in preview.json()["blocking_conflicts"]
+    assert apply.status_code == 400
+    assert Card.objects.filter(id__in=[target_card.id, source_card.id]).count() == 2
 
 
 def test_card_merge_retargets_existing_redirect_chains() -> None:
@@ -2460,7 +4463,12 @@ def test_card_merge_retargets_existing_redirect_chains() -> None:
 
 def test_import_uses_card_alias_for_renamed_card() -> None:
     target_card, target_version = _create_editable_card_version(name="Canonical Import Card")
-    CardAlias.objects.create(card=target_card, key="old-import-card", label="Old Import Card")
+    CardAlias.objects.create(
+        card=target_card,
+        card_pool=target_card.card_pool,
+        key="old-import-card",
+        label="Old Import Card",
+    )
     source_file = settings.storage_root_dir / "uploads" / "old-import-card.png"
     source_file.parent.mkdir(parents=True, exist_ok=True)
     source_file.write_bytes(b"old-import-card")
@@ -2513,7 +4521,9 @@ def test_import_assigns_content_version_to_created_card_version() -> None:
         content_version=content_version,
         total_items=1,
     )
-    source_file = resolve_storage_path(build_storage_relative_path("uploads", "content-version-card.png"))
+    source_file = resolve_storage_path(
+        build_storage_relative_path("uploads", "content-version-card.png")
+    )
     source_file.parent.mkdir(parents=True, exist_ok=True)
     _write_test_png(source_file)
     item = ImportJobItem.objects.create(
@@ -2542,7 +4552,13 @@ def test_import_assigns_content_version_to_created_card_version() -> None:
 
 
 def test_targeted_reparse_preserves_existing_card_version_content_version() -> None:
-    _card, target_version = _create_editable_card_version(name="Content Version Reparse")
+    card, target_version = _create_editable_card_version(name="Content Version Reparse")
+    set_card_mana_families(card=card, mana_families=("arcane",))
+    primal_symbol = _get_or_create_symbol(
+        key="primal-affinity",
+        label="Primal Affinity",
+        symbol_type="affinity",
+    )
     original_content_version = ContentVersion.objects.create(
         version_number="171.1.0",
         base_version="171.1",
@@ -2588,11 +4604,14 @@ def test_targeted_reparse_preserves_existing_card_version_content_version() -> N
         },
         confidence={"overall": 0.8},
         raw_ocr={},
+        symbol_ids=[primal_symbol.id],
         reparse_existing=False,
     )
 
     assert version.id == target_version.id
     assert version.content_version == original_content_version
+    card.refresh_from_db()
+    assert card.mana_family_sort_key == 0
 
 
 def test_ordinary_import_matching_latest_checksum_creates_new_content_version_snapshot() -> None:
@@ -2634,7 +4653,9 @@ def test_ordinary_import_matching_latest_checksum_creates_new_content_version_sn
             "symbols": "auto",
         },
     }
-    target_version.save(update_fields=["content_version", "image_hash", "name", "field_sources_json"])
+    target_version.save(
+        update_fields=["content_version", "image_hash", "name", "field_sources_json"]
+    )
     replace_card_version_tags(card_version_id=target_version.id, tag_ids=[manual_tag.id])
     job = ImportJob.objects.create(
         source_path=build_storage_relative_path("uploads", "content-version-snapshot.png"),
@@ -2642,7 +4663,9 @@ def test_ordinary_import_matching_latest_checksum_creates_new_content_version_sn
         content_version=next_content_version,
         total_items=1,
     )
-    source_file = resolve_storage_path(build_storage_relative_path("uploads", "content-version-snapshot.png"))
+    source_file = resolve_storage_path(
+        build_storage_relative_path("uploads", "content-version-snapshot.png")
+    )
     source_file.parent.mkdir(parents=True, exist_ok=True)
     _write_test_png(source_file)
     item = ImportJobItem.objects.create(
@@ -2731,9 +4754,231 @@ def test_import_matching_deprecated_card_keeps_card_deprecated_and_warns() -> No
     assert item.warning_message is not None
 
 
+def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
+    source_file = settings.storage_root_dir / "uploads" / "classified-new-card.png"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_bytes(b"classified-new-card")
+    job = ImportJob.objects.create(
+        source_path=build_storage_relative_path("uploads", "classified-new-card.png"),
+        template=Template.objects.get(key="mtg-like-v1"),
+        card_pool="evil",
+        total_items=1,
+    )
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=build_storage_relative_path("uploads", "classified-new-card.png"),
+    )
+
+    version = save_parsed_card(
+        item=item,
+        template_id="mtg-like-v1",
+        checksum="classified-new-card-checksum",
+        normalized_fields={"name": "Classified New Card"},
+        confidence={"overall": 0.8},
+        raw_ocr={},
+        reparse_existing=False,
+        card_pool="evil",
+        resolved_card_roles=("hero", "event"),
+        resolved_card_factions=("order", "dark", "metal"),
+        resolved_card_mana_families=("arcane", "dark"),
+        classification_evidence={
+            "roles": {
+                "mode": "automatic",
+                "matched_tag_sources": [{"id": "tag-hero", "key": "hero"}],
+                "matched_type_sources": [],
+                "matched_symbol_sources": [],
+                "matched_rules": [],
+                "override_roles": [],
+                "resolved_roles": ["hero", "event"],
+                "snapshot_digest": "test-digest",
+            },
+            "factions": {
+                "mode": "automatic",
+                "matched_tag_sources": [
+                    {"id": "tag-order", "key": "order"},
+                    {"id": "tag-dark", "key": "dark"},
+                    {"id": "tag-metal", "key": "metal"},
+                ],
+                "matched_type_sources": [],
+                "matched_symbol_sources": [],
+                "matched_rules": [],
+                "override_factions": [],
+                "resolved_factions": ["order", "dark", "metal"],
+                "snapshot_digest": "test-digest",
+            },
+            "mana_families": {
+                "mode": "automatic",
+                "matched_tag_sources": [],
+                "matched_type_sources": [],
+                "matched_symbol_sources": [
+                    {"id": "symbol-arcane", "key": "arcane-mana"},
+                    {"id": "symbol-dark", "key": "dark-affinity"},
+                ],
+                "matched_rules": [],
+                "override_mana_families": [],
+                "resolved_mana_families": ["arcane", "dark"],
+                "snapshot_digest": "test-digest",
+            },
+        },
+    )
+
+    item.refresh_from_db()
+    assert version.card.card_pool == "evil"
+    assert list(version.card.role_assignments.order_by("role").values_list("role", flat=True)) == [
+        "event",
+        "hero",
+    ]
+    assert list(
+        version.card.faction_assignments.order_by("faction").values_list("faction", flat=True)
+    ) == ["dark", "metal", "order"]
+    assert item.status == "completed"
+    assert item.resolved_card_roles_json == ["hero", "event"]
+    assert item.resolved_card_factions_json == ["order", "dark", "metal"]
+    assert item.resolved_card_mana_families_json == ["arcane", "dark"]
+    assert set(
+        version.card.mana_family_assignments.values_list("mana_family", flat=True)
+    ) == {"arcane", "dark"}
+    assert item.classification_inference_json["roles"]["matched_tag_sources"] == [
+        {"id": "tag-hero", "key": "hero"}
+    ]
+    assert not CardClassificationReviewItem.objects.filter(import_item=item).exists()
+
+
+def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifecycle_warning() -> (
+    None
+):
+    card, target_version = _create_editable_card_version(name="Classification Mismatch Card")
+    card.lifecycle_status = "deprecated"
+    card.card_pool = "evil"
+    card.save(update_fields=["lifecycle_status", "card_pool"])
+    set_card_mana_families(card=card, mana_families=("arcane",))
+    source_file = settings.storage_root_dir / "uploads" / "classification-mismatch.png"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_bytes(b"classification-mismatch")
+    job = ImportJob.objects.create(
+        source_path=build_storage_relative_path("uploads", "classification-mismatch.png"),
+        template=Template.objects.get(key="mtg-like-v1"),
+        card_pool="evil",
+        total_items=1,
+    )
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=build_storage_relative_path("uploads", "classification-mismatch.png"),
+    )
+
+    version = save_parsed_card(
+        item=item,
+        template_id="mtg-like-v1",
+        checksum="classification-mismatch-checksum",
+        normalized_fields={"name": "Classification Mismatch Card"},
+        confidence={"overall": 0.8},
+        raw_ocr={},
+        reparse_existing=False,
+        card_pool="evil",
+        resolved_card_roles=("event",),
+        resolved_card_mana_families=("dark",),
+        classification_evidence={
+            "roles": {
+                "mode": "automatic",
+                "matched_tag_sources": [],
+                "matched_type_sources": [],
+                "matched_symbol_sources": [],
+                "matched_rules": [],
+                "override_roles": [],
+                "resolved_roles": ["event"],
+                "snapshot_digest": "test-digest",
+            },
+            "factions": {
+                "mode": "automatic",
+                "matched_tag_sources": [],
+                "matched_type_sources": [],
+                "matched_symbol_sources": [],
+                "matched_rules": [],
+                "override_factions": [],
+                "resolved_factions": [],
+                "snapshot_digest": "test-digest",
+            },
+            "mana_families": {
+                "mode": "automatic",
+                "matched_tag_sources": [],
+                "matched_type_sources": [],
+                "matched_symbol_sources": [
+                    {"id": "symbol-dark", "key": "dark-mana"}
+                ],
+                "matched_rules": [],
+                "override_mana_families": [],
+                "resolved_mana_families": ["dark"],
+                "snapshot_digest": "test-digest",
+            },
+        },
+    )
+
+    card.refresh_from_db()
+    item.refresh_from_db()
+    assert version.card == card
+    assert version.version_number == target_version.version_number + 1
+    assert card.card_pool == "evil"
+    assert not card.role_assignments.exists()
+    assert list(card.mana_family_assignments.values_list("mana_family", flat=True)) == [
+        "arcane"
+    ]
+    assert item.status == "completed"
+    assert [warning["code"] for warning in item.warnings_json] == [
+        "matched_deprecated_card",
+    ]
+    review_item = CardClassificationReviewItem.objects.get(import_item=item)
+    assert review_item.status == "open"
+    assert review_item.card == card
+    assert review_item.card_version == version
+    assert review_item.existing_classification_json["card_mana_families"] == ["arcane"]
+    assert review_item.inferred_classification_json["card_mana_families"] == ["dark"]
+    assert item.classification_inference_json["mana_families"][
+        "matched_symbol_sources"
+    ] == [{"id": "symbol-dark", "key": "dark-mana"}]
+
+
+def test_untargeted_import_does_not_match_same_name_or_image_hash_across_pools() -> None:
+    player_card, player_version = _create_editable_card_version(name="Cross Pool Twin")
+    player_version.image_hash = "cross-pool-shared-checksum"
+    player_version.save(update_fields=["image_hash"])
+    source_file = settings.storage_root_dir / "uploads" / "cross-pool-twin.png"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_bytes(b"cross-pool-twin")
+    job = ImportJob.objects.create(
+        source_path=build_storage_relative_path("uploads", "cross-pool-twin.png"),
+        template=Template.objects.get(key="mtg-like-v1"),
+        card_pool="neutral",
+        total_items=1,
+    )
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=build_storage_relative_path("uploads", "cross-pool-twin.png"),
+    )
+
+    version = save_parsed_card(
+        item=item,
+        template_id="mtg-like-v1",
+        checksum="cross-pool-shared-checksum",
+        normalized_fields={"name": "Cross Pool Twin"},
+        confidence={"overall": 0.8},
+        raw_ocr={},
+        card_pool="neutral",
+        resolved_card_roles=("location",),
+    )
+
+    item.refresh_from_db()
+    assert version.card_id != player_card.id
+    assert version.card.card_pool == "neutral"
+    assert version.card.key == player_card.key
+    assert list(version.card.role_assignments.values_list("role", flat=True)) == ["location"]
+    assert item.warnings_json == []
+
+
 def test_targeted_reparse_rolls_back_name_conflict() -> None:
     card, version = _create_editable_card_version(name="Rollback Target")
-    _conflicting_card, _conflicting_version = _create_editable_card_version(name="Rollback Conflict")
+    _conflicting_card, _conflicting_version = _create_editable_card_version(
+        name="Rollback Conflict"
+    )
     job = ImportJob.objects.create(
         source_path=build_storage_relative_path("uploads", "rollback-target.png"),
         template=Template.objects.get(key="mtg-like-v1"),
@@ -2955,7 +5200,9 @@ def test_latest_version_patch_can_restore_and_unlock() -> None:
             },
         }
     )
-    version.save(update_fields=["rules_text", "type_line", "field_sources_json", "parsed_snapshot_json"])
+    version.save(
+        update_fields=["rules_text", "type_line", "field_sources_json", "parsed_snapshot_json"]
+    )
 
     response = client.patch(
         f"/cards/{card.id}/latest-version",
@@ -3184,6 +5431,41 @@ def test_filtered_maintenance_reparse_queues_only_matching_latest_versions() -> 
     assert items[0].target_card_id != beta_card.id
 
 
+def test_filtered_maintenance_reparse_without_card_pool_covers_every_pool() -> None:
+    username = "superuser-global-filtered-reparse-user"
+    password = "password"
+    _create_user(username, password, is_staff=True, is_superuser=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+    cards_and_versions = [
+        _create_editable_card_version(name=f"Global Reparse {pool.title()}")
+        for pool in ("player", "evil", "neutral")
+    ]
+    for (card, version), pool in zip(
+        cards_and_versions,
+        ("player", "evil", "neutral"),
+        strict=True,
+    ):
+        card.card_pool = pool
+        card.save(update_fields=["card_pool"])
+        _create_card_image(version)
+
+    response = client.post(
+        "/admin/maintenance/queue-filtered-latest-reparse",
+        data={"q": "Global Reparse"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    target_card_ids = set(
+        ImportJobItem.objects.filter(
+            target_card_id__in=[card.id for card, _version in cards_and_versions]
+        ).values_list("target_card_id", flat=True)
+    )
+    assert target_card_ids == {card.id for card, _version in cards_and_versions}
+
+
 def _create_user(
     username: str,
     password: str,
@@ -3235,11 +5517,17 @@ def _get_or_create_symbol(*, key: str, label: str, symbol_type: str) -> Symbol:
     return symbol
 
 
-def _create_editable_card_version(*, name: str) -> tuple[Card, CardVersion]:
+def _create_editable_card_version(
+    *, name: str, card_pool: str = "player"
+) -> tuple[Card, CardVersion]:
     from card_reader_core.models import Template
 
     template = Template.objects.get(key="mtg-like-v1")
-    card = Card.objects.create(key=name.lower().replace(" ", "-"), label=name)
+    card = Card.objects.create(
+        key=name.lower().replace(" ", "-"),
+        label=name,
+        card_pool=card_pool,
+    )
     version = CardVersion.objects.create(
         card_id=card.id,
         version_number=1,

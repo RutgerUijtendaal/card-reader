@@ -2,6 +2,7 @@ import { useDebounceFn, useIntersectionObserver } from '@vueuse/core';
 import { computed, shallowRef, ref, watch } from 'vue';
 import type { Ref, WatchSource } from 'vue';
 import { fetchCards } from '@/domain/cards/api';
+import type { PaginatedCardsResponse } from '@/domain/cards/types';
 import { appendGalleryPage, createEmptyGalleryPageState, replaceGalleryPage } from '@/domain/cards/utils/gallery/galleryState';
 
 type IdentifiableCard = {
@@ -13,11 +14,13 @@ type UseCardCollectionOptions<TCard extends IdentifiableCard> = {
   filtersLoaded: Ref<boolean>;
   enabled?: Ref<boolean>;
   resultSetKey?: WatchSource<unknown>;
+  refreshOnResultSetChange?: boolean;
   pageSize: number | Ref<number>;
   debounceMs?: number;
   watchSource?: WatchSource<unknown> | WatchSource<unknown>[];
   onResults?: (results: TCard[]) => void;
   identity?: (card: TCard) => string;
+  fetchPage?: (params: URLSearchParams) => Promise<PaginatedCardsResponse<TCard>>;
 };
 
 const readPageSize = (value: number | Ref<number>): number =>
@@ -28,11 +31,13 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
   filtersLoaded,
   enabled,
   resultSetKey,
+  refreshOnResultSetChange = true,
   pageSize,
   debounceMs = 200,
   watchSource,
   onResults,
   identity,
+  fetchPage = fetchCards,
 }: UseCardCollectionOptions<TCard>) => {
   const galleryState = shallowRef(createEmptyGalleryPageState<TCard>());
   const isLoadingInitial = ref(false);
@@ -59,9 +64,9 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
     hasLoadedOnce.value = false;
   };
 
-  const loadCardsPage = async (page: number, mode: 'replace' | 'append'): Promise<void> => {
+  const loadCardsPage = async (page: number, mode: 'replace' | 'append'): Promise<boolean> => {
     if (enabled && !enabled.value) {
-      return;
+      return false;
     }
     const requestId = ++latestSearchRequestId;
     const params = buildSearchParams();
@@ -77,9 +82,9 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
     }
 
     try {
-      const response = await fetchCards<TCard>(params);
+      const response = await fetchPage(params);
       if (requestId !== latestSearchRequestId) {
-        return;
+        return false;
       }
       onResults?.(response.results);
       galleryState.value =
@@ -87,6 +92,12 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
           ? replaceGalleryPage(response)
           : appendGalleryPage(galleryState.value, response, identity);
       hasLoadedOnce.value = true;
+      return true;
+    } catch (error) {
+      if (requestId === latestSearchRequestId) {
+        throw error;
+      }
+      return false;
     } finally {
       if (requestId === latestSearchRequestId) {
         isLoadingInitial.value = false;
@@ -96,12 +107,10 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
     }
   };
 
-  const searchCards = async (): Promise<void> => {
-    await loadCardsPage(1, 'replace');
-  };
+  const searchCards = async (): Promise<boolean> => loadCardsPage(1, 'replace');
 
   const loadNextPage = async (): Promise<void> => {
-    if ((enabled && !enabled.value) || isLoadingInitial.value || isRefreshing.value || isLoadingPage.value || nextPage.value === null) {
+    if (!filtersLoaded.value || (enabled && !enabled.value) || isLoadingInitial.value || isRefreshing.value || isLoadingPage.value || nextPage.value === null) {
       return;
     }
     await loadCardsPage(nextPage.value, 'append');
@@ -122,6 +131,16 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
     watch(resultSetKey, resetCollection, { flush: 'sync' });
   }
 
+  watch(
+    filtersLoaded,
+    (areFiltersLoaded) => {
+      if (!areFiltersLoaded) {
+        resetCollection();
+      }
+    },
+    { flush: 'sync' },
+  );
+
   if (enabled) {
     watch(
       enabled,
@@ -136,7 +155,7 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
 
   const collectionWatchSource = [
     ...(Array.isArray(watchSource) ? watchSource : watchSource ? [watchSource] : []),
-    ...(resultSetKey ? [resultSetKey] : []),
+    ...(resultSetKey && refreshOnResultSetChange ? [resultSetKey] : []),
     ...(enabled ? [enabled] : []),
   ];
 
@@ -172,6 +191,7 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
     isRefreshing,
     isLoadingPage,
     hasLoadedOnce,
+    invalidatePendingLoads,
     searchCards,
     loadNextPage,
     setLoadMoreSentinel,

@@ -45,9 +45,124 @@
       {{ errorMessage }}
     </p>
 
-    <div
-      class="theme-divider mt-5 border-t"
+    <section
+      v-if="selectedJobDetail || detailLoading"
+      class="theme-divider mt-5 space-y-3 border-t pt-5"
+      aria-live="polite"
     >
+      <p
+        v-if="detailLoading"
+        class="theme-section-muted text-sm"
+      >
+        Loading import details…
+      </p>
+      <template v-else-if="selectedJobDetail">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h4 class="theme-section-title text-sm font-semibold">
+              Import details
+            </h4>
+            <p class="theme-section-muted mt-1 text-xs">
+              {{ cardPoolLabel(selectedJobDetail.card_pool) }} · roles
+              {{ selectedJobDetail.card_role_mode }} · factions
+              {{ selectedJobDetail.card_faction_mode }}
+              · Mana {{ selectedJobDetail.card_mana_family_mode }}
+            </p>
+          </div>
+          <button
+            class="btn-secondary rounded-full px-2.5 py-1 text-xs"
+            type="button"
+            @click="emit('close-detail')"
+          >
+            Close
+          </button>
+        </div>
+        <div class="space-y-3">
+          <article
+            v-for="item in selectedJobDetail.items"
+            :key="item.id"
+            class="theme-muted-panel space-y-2 p-3"
+          >
+            <p class="theme-section-title truncate text-sm font-medium">
+              {{ item.source_file }}
+            </p>
+            <template v-if="getImportEvidenceState(item).startsWith('resolved')">
+              <p class="theme-section-muted text-xs">
+                {{
+                  item.resolved_card_roles.length > 0
+                    ? formatImportRoles(item.resolved_card_roles)
+                    : 'Normal — no special roles'
+                }}
+              </p>
+              <p class="theme-section-muted text-xs">
+                Factions: {{ formatImportFactions(item.resolved_card_factions) }}
+              </p>
+              <p class="theme-section-muted text-xs">
+                Mana: {{ formatResolvedImportManaFamilies(item) }}
+              </p>
+              <dl class="theme-section-muted grid gap-1 text-xs">
+                <div
+                  v-for="entry in getInferenceEvidence(item)"
+                  :key="entry.label"
+                  class="flex flex-wrap gap-x-1"
+                >
+                  <dt class="font-semibold">
+                    {{ entry.label }}:
+                  </dt>
+                  <dd>{{ entry.value }}</dd>
+                </div>
+              </dl>
+            </template>
+            <p
+              v-else
+              class="theme-section-muted text-xs"
+            >
+              {{ getImportEvidencePlaceholder(getImportEvidenceState(item)) }}
+            </p>
+            <div
+              v-for="warning in item.warnings"
+              :key="warning.code"
+              class="theme-alert-warning text-xs"
+            >
+              <p>{{ warning.message }}</p>
+              <dl
+                v-if="getWarningEvidence(warning).length > 0"
+                class="mt-1 grid gap-1"
+              >
+                <div
+                  v-for="entry in getWarningEvidence(warning)"
+                  :key="entry.label"
+                  class="flex flex-wrap gap-x-1"
+                >
+                  <dt class="font-semibold">
+                    {{ entry.label }}:
+                  </dt>
+                  <dd>{{ entry.value }}</dd>
+                </div>
+              </dl>
+              <RouterLink
+                v-if="
+                  warning.code === 'evil_faction_unresolved' && item.card_tab_url
+                "
+                class="mt-1 inline-flex font-semibold underline"
+                :to="item.card_tab_url"
+              >
+                Review card classification
+              </RouterLink>
+            </div>
+            <RouterLink
+              v-if="item.classification_review"
+              class="theme-section-muted inline-flex text-xs font-semibold underline"
+              :to="item.classification_review.url"
+            >
+              Sent to Review · {{ item.classification_review.status }}
+            </RouterLink>
+          </article>
+        </div>
+      </template>
+    </section>
+
+    <div class="theme-divider mt-5 border-t">
       <section
         class="pt-5"
         aria-labelledby="active-imports-heading"
@@ -97,7 +212,38 @@
                   {{ job.status }}
                 </span>
                 <p class="theme-section-title text-sm font-semibold leading-5">
-                  {{ job.template_id }} · {{ job.content_version?.version_number ?? 'Unversioned' }}
+                  {{ templateLabel(job.template_id) }} ·
+                  {{ job.content_version?.version_number ?? 'Unversioned' }}
+                </p>
+                <p class="theme-section-muted text-xs">
+                  {{ cardPoolLabel(job.card_pool) }} ·
+                  {{
+                    job.card_role_mode === 'automatic'
+                      ? 'Automatic roles'
+                      : job.card_role_override.length > 0
+                        ? `Override: ${job.card_role_override.join(', ')}`
+                        : 'Override: Normal'
+                  }}
+                  ·
+                  {{
+                    job.card_mana_family_mode === 'automatic'
+                      ? 'Automatic Mana Families'
+                      : job.card_mana_family_override.length > 0
+                        ? `Mana override: ${job.card_mana_family_override.join(', ')}`
+                        : 'Mana override: Colorless'
+                  }}
+                  ·
+                  {{
+                    job.card_faction_mode === 'automatic'
+                      ? 'Automatic factions'
+                      : job.card_faction_override.length > 0
+                        ? `Faction override: ${job.card_faction_override.join(', ')}`
+                        : 'Faction override: No faction'
+                  }}
+                </p>
+                <p class="theme-section-muted font-mono text-[0.68rem]">
+                  {{ job.classification_rule_snapshot.rules.length }} snapshotted rules ·
+                  {{ job.classification_rule_snapshot.digest.slice(0, 12) }}
                 </p>
               </div>
               <span class="theme-section-muted shrink-0 text-xs">
@@ -123,15 +269,24 @@
               <span class="theme-section-muted text-xs">
                 Updated {{ formatImportJobTimestamp(job.updated_at) }}
               </span>
-              <button
-                v-if="canCancelImportJob(job)"
-                class="btn-danger-secondary shrink-0 rounded-full px-2.5 py-1 text-xs"
-                type="button"
-                :disabled="cancellingJobIds.has(job.id)"
-                @click="emit('cancel', job.id)"
-              >
-                {{ cancellingJobIds.has(job.id) ? 'Interrupting…' : 'Interrupt' }}
-              </button>
+              <div class="flex items-center gap-2">
+                <button
+                  class="btn-secondary shrink-0 rounded-full px-2.5 py-1 text-xs"
+                  type="button"
+                  @click="emit('view', job.id)"
+                >
+                  Details
+                </button>
+                <button
+                  v-if="canCancelImportJob(job)"
+                  class="btn-danger-secondary shrink-0 rounded-full px-2.5 py-1 text-xs"
+                  type="button"
+                  :disabled="cancellingJobIds.has(job.id)"
+                  @click="emit('cancel', job.id)"
+                >
+                  {{ cancellingJobIds.has(job.id) ? 'Interrupting…' : 'Interrupt' }}
+                </button>
+              </div>
             </div>
           </article>
         </div>
@@ -215,6 +370,13 @@
             <span class="theme-section-muted block text-xs">
               Updated {{ formatImportJobTimestamp(job.updated_at) }}
             </span>
+            <button
+              class="btn-secondary rounded-full px-2.5 py-1 text-xs"
+              type="button"
+              @click="emit('view', job.id)"
+            >
+              Details
+            </button>
           </article>
         </div>
       </section>
@@ -223,10 +385,20 @@
 </template>
 
 <script setup lang="ts">
+import { cardPoolLabel } from '@/domain/cards/cardPools';
 import { Activity, ExternalLink, RefreshCw } from 'lucide-vue-next';
 import { RouterLink } from 'vue-router';
 import type { OperationsQueueItem } from '@/domain/operations/types';
-import type { ImportJob } from '@/features/import-jobs/types';
+import type { ImportJob, ImportJobDetail } from '@/features/import-jobs/types';
+import {
+  formatImportRoles,
+  formatImportFactions,
+  formatResolvedImportManaFamilies,
+  getImportEvidencePlaceholder,
+  getImportEvidenceState,
+  getInferenceEvidence,
+  getWarningEvidence,
+} from '@/features/import-jobs/utils/importEvidence';
 import {
   canCancelImportJob,
   formatImportJobTimestamp,
@@ -236,9 +408,10 @@ import {
   getOperationsItemProgressPercent,
 } from '@/features/import-jobs/utils/importJobUtils';
 
-defineProps<{
+const props = defineProps<{
   activeJobs: ImportJob[];
   recentJobs: OperationsQueueItem[];
+  templateLabelByKey: Readonly<Record<string, string>>;
   activeLoaded: boolean;
   historyLoaded: boolean;
   refreshing: boolean;
@@ -248,10 +421,17 @@ defineProps<{
   cancelingCount: number;
   cancellingJobIds: Set<string>;
   lastRefreshedAt: string | null;
+  selectedJobDetail: ImportJobDetail | null;
+  detailLoading: boolean;
 }>();
+
+const templateLabel = (templateKey: string): string =>
+  props.templateLabelByKey[templateKey]?.trim() || templateKey;
 
 const emit = defineEmits<{
   refresh: [];
   cancel: [jobId: string];
+  view: [jobId: string];
+  'close-detail': [];
 }>();
 </script>

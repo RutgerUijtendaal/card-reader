@@ -27,12 +27,17 @@ const buildResponse = (results: TestCard[], nextPage: number | null = null) => (
   },
 });
 
+const buildPage = (results: TestCard[], nextPage: number | null = null) =>
+  buildResponse(results, nextPage).data;
+
 const createDeferred = <T,>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((innerResolve) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((innerResolve, innerReject) => {
     resolve = innerResolve;
+    reject = innerReject;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 };
 
 describe('useCardCollection', () => {
@@ -69,6 +74,27 @@ describe('useCardCollection', () => {
     expect(collection.isRefreshing.value).toBe(false);
     expect(collection.hasLoadedOnce.value).toBe(true);
     expect(collection.cards.value).toEqual([{ id: 'card-1', name: 'First Card' }]);
+  });
+
+  test('uses an injected page loader for focused card collections', async () => {
+    const fetchPage = vi
+      .fn()
+      .mockResolvedValue(buildPage([{ id: 'review-card', name: 'Review Card' }]));
+    const collection = useCardCollection<TestCard>({
+      buildSearchParams: () => new URLSearchParams('max_confidence=0.9'),
+      filtersLoaded: ref(true),
+      pageSize: 25,
+      fetchPage,
+    });
+
+    await collection.searchCards();
+
+    expect(fetchPage).toHaveBeenCalledOnce();
+    expect(fetchPage.mock.calls[0]?.[0].toString()).toBe(
+      'max_confidence=0.9&page=1&page_size=25',
+    );
+    expect(mockedGet).not.toHaveBeenCalled();
+    expect(collection.cards.value).toEqual([{ id: 'review-card', name: 'Review Card' }]);
   });
 
   test('preserves existing cards during refresh loads', async () => {
@@ -217,6 +243,27 @@ describe('useCardCollection', () => {
     expect(collection.hasLoadedOnce.value).toBe(false);
   });
 
+  test('clears results and blocks pagination when filter readiness is lost', async () => {
+    mockedGet.mockResolvedValueOnce(
+      buildResponse([{ id: 'card-1', name: 'First Card' }], 2),
+    );
+    const filtersLoaded = ref(true);
+    const collection = useCardCollection<TestCard>({
+      buildSearchParams: () => new URLSearchParams(),
+      filtersLoaded,
+      pageSize: 30,
+    });
+
+    await collection.searchCards();
+    filtersLoaded.value = false;
+
+    expect(collection.cards.value).toEqual([]);
+    expect(collection.nextPage.value).toBe(1);
+    expect(collection.hasLoadedOnce.value).toBe(false);
+    await collection.loadNextPage();
+    expect(mockedGet).toHaveBeenCalledTimes(1);
+  });
+
   test('loads the collection when it becomes enabled', async () => {
     vi.useFakeTimers();
     mockedGet.mockResolvedValueOnce(buildResponse([{ id: 'card-1', name: 'First Card' }]));
@@ -267,5 +314,48 @@ describe('useCardCollection', () => {
     await nextTick();
     await vi.runAllTimersAsync();
     expect(collection.cards.value).toEqual([{ id: 'card-1', name: 'Card' }]);
+  });
+
+  test('can invalidate a result set without refreshing before its route state changes', async () => {
+    vi.useFakeTimers();
+    mockedGet.mockResolvedValueOnce(buildResponse([{ id: 'player-1', name: 'Player Card' }]));
+    const resultSetKey = ref('player');
+    const collection = useCardCollection<TestCard>({
+      buildSearchParams: () => new URLSearchParams(),
+      filtersLoaded: ref(true),
+      resultSetKey,
+      refreshOnResultSetChange: false,
+      pageSize: 30,
+      debounceMs: 0,
+    });
+
+    await collection.searchCards();
+    resultSetKey.value = 'evil';
+    await nextTick();
+    await vi.runAllTimersAsync();
+
+    expect(collection.cards.value).toEqual([]);
+    expect(mockedGet).toHaveBeenCalledTimes(1);
+  });
+
+  test('suppresses errors from a request invalidated by a result-set change', async () => {
+    const pendingRequest = createDeferred<ReturnType<typeof buildResponse>>();
+    mockedGet.mockReturnValueOnce(pendingRequest.promise);
+    const resultSetKey = ref('player');
+    const collection = useCardCollection<TestCard>({
+      buildSearchParams: () => new URLSearchParams(),
+      filtersLoaded: ref(true),
+      resultSetKey,
+      refreshOnResultSetChange: false,
+      pageSize: 30,
+    });
+
+    const search = collection.searchCards();
+    resultSetKey.value = 'evil';
+    pendingRequest.reject(new Error('Outgoing workspace failed'));
+
+    await expect(search).resolves.toBe(false);
+    expect(collection.cards.value).toEqual([]);
+    expect(collection.hasLoadedOnce.value).toBe(false);
   });
 });

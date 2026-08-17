@@ -18,7 +18,7 @@ const buildCard = (): CardListItem => ({
   result_type: 'card',
   image_url: null,
   label: 'Card 1',
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   template_id: 'template-1',
   version_id: 'version-1',
   version_number: 1,
@@ -54,6 +54,11 @@ const buildCardGroup = (): CardGroupGalleryItem => ({
   group_name: 'Group 1',
   anchor_card_id: 'card-1',
   anchor_card_name: 'Card 1',
+  card_pool: 'player',
+  card_roles: [],
+  card_factions: [],
+  card_mana_families: ['arcane'],
+  mana_family_sort_key: 0,
   member_count: 3,
   preview_cards: [
     {

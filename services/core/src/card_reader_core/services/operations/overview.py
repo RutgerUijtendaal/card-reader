@@ -277,7 +277,9 @@ def _import_item_payload(job: ImportJob) -> dict[str, Any]:
         "progress_total": job.total_items,
         "error_message": None,
         "metadata": [
-            {"label": "Template", "value": job.template.key},
+            {"label": "Template", "value": job.template.label},
+            {"label": "Card pool", "value": job.card_pool},
+            {"label": "Role mode", "value": job.card_role_mode},
             {"label": "Source", "value": job.source_path},
         ],
         "links": [],

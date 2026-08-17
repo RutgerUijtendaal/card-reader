@@ -1,11 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from card_reader_core.imports import SUPPORTED_IMAGE_SUFFIXES, ImportJobItemTarget
 
-SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
-
-
-@dataclass(frozen=True)
-class ImportJobItemTarget:
-    card_id: str
-    card_version_id: str
+__all__ = ["SUPPORTED_IMAGE_SUFFIXES", "ImportJobItemTarget"]

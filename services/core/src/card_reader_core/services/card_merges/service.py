@@ -2,10 +2,29 @@ from __future__ import annotations
 
 from django.db import transaction
 
-from card_reader_core.models import Card, CardAlias, CardMergeRedirect, CardVersion, now_utc
+from card_reader_core.models import (
+    CARD_POOLS,
+    Card,
+    CardAlias,
+    CardMergeRedirect,
+    CardRoleAssignment,
+    CardVersion,
+    card_faction_keys,
+    card_mana_family_keys,
+    card_role_keys,
+    now_utc,
+)
+from card_reader_core.repositories.cards import (
+    CardIdentityConflict,
+    ensure_card_alias,
+    lock_card_identity_pools,
+)
+from card_reader_core.repositories.classification_reviews import (
+    retarget_classification_review_items,
+)
 from card_reader_core.services.tts_card_sheets import TtsCardSheetService
 
-from .aliases import build_alias_previews, ensure_card_alias
+from .aliases import build_alias_previews
 from .relations import merge_card_group_references, merge_deck_references, preview_relation_changes
 from .types import CardMergeCardSummary, CardMergeError, CardMergePreview
 from .versions import merge_card_versions
@@ -19,6 +38,18 @@ def preview_card_merge(*, target_card_id: str, source_card_ids: list[str]) -> Ca
         for alias in aliases
         if alias.conflict_card_id is not None and alias.conflict_card_id not in {source.id for source in sources}
     ]
+    if any(source.card_pool != target.card_pool for source in sources):
+        blocking_conflicts.append("Cards from different pools cannot be merged.")
+    if any(
+        source.faction_identity_key != target.faction_identity_key for source in sources
+    ):
+        blocking_conflicts.append("Cards from different faction namespaces cannot be merged.")
+    warnings = []
+    target_mana_families = card_mana_family_keys(target)
+    if any(card_mana_family_keys(source) != target_mana_families for source in sources):
+        warnings.append(
+            "Mana Families differ; the target Card's Mana Families will be preserved."
+        )
     source_ids = [source.id for source in sources]
     return CardMergePreview(
         target=_card_summary(target),
@@ -27,11 +58,13 @@ def preview_card_merge(*, target_card_id: str, source_card_ids: list[str]) -> Ca
         relations=preview_relation_changes(target_id=target.id, source_ids=source_ids),
         resulting_version_count=CardVersion.objects.filter(card_id__in=[target.id, *source_ids]).count(),
         blocking_conflicts=blocking_conflicts,
+        warnings=warnings,
     )
 
 
 @transaction.atomic
 def merge_cards(*, target_card_id: str, source_card_ids: list[str]) -> CardMergePreview:
+    lock_card_identity_pools(*CARD_POOLS)
     target, sources = _load_merge_cards(
         target_card_id=target_card_id,
         source_card_ids=source_card_ids,
@@ -45,11 +78,35 @@ def merge_cards(*, target_card_id: str, source_card_ids: list[str]) -> CardMerge
     merge_deck_references(target.id, source_ids)
     merge_card_group_references(target.id, source_ids)
     merge_card_versions(target.id, source_ids)
+    retarget_classification_review_items(
+        source_card_ids=source_ids,
+        target_card=target,
+    )
     TtsCardSheetService().sync_merge(target_card_id=target.id, source_card_ids=source_ids)
-    CardAlias.objects.filter(card_id__in=source_ids).update(card=target, updated_at=now_utc())
+    CardAlias.objects.filter(card_id__in=source_ids).update(
+        card=target,
+        card_pool=target.card_pool,
+        faction_identity_key=target.faction_identity_key,
+        updated_at=now_utc(),
+    )
+    roles = set(
+        CardRoleAssignment.objects.filter(card_id__in=[target.id, *source_ids]).values_list("role", flat=True)
+    )
+    CardRoleAssignment.objects.bulk_create(
+        [CardRoleAssignment(card=target, role=role) for role in roles],
+        ignore_conflicts=True,
+    )
 
-    for alias in preview.aliases:
-        ensure_card_alias(card=target, key=alias.key, label=alias.label, allowed_conflict_card_ids=set(source_ids))
+    try:
+        for alias in preview.aliases:
+            ensure_card_alias(
+                card=target,
+                key=alias.key,
+                label=alias.label,
+                allowed_conflict_card_ids=set(source_ids),
+            )
+    except CardIdentityConflict as exc:
+        raise CardMergeError(str(exc)) from exc
 
     for source in sources:
         CardMergeRedirect.objects.update_or_create(
@@ -76,7 +133,11 @@ def _load_merge_cards(
         raise CardMergeError("Target card is required.")
     if target_card_id in normalized_source_ids:
         raise CardMergeError("Target card cannot also be a source card.")
-    queryset = Card.objects.select_related("latest_version")
+    queryset = Card.objects.select_related("latest_version").prefetch_related(
+        "role_assignments",
+        "faction_assignments",
+        "mana_family_assignments",
+    )
     if for_update:
         queryset = queryset.select_for_update()
     cards = {card.id: card for card in queryset.filter(id__in=[target_card_id, *normalized_source_ids])}
@@ -97,4 +158,8 @@ def _card_summary(card: Card) -> CardMergeCardSummary:
         label=card.label,
         latest_name=latest.name if latest is not None else "",
         version_count=CardVersion.objects.filter(card_id=card.id).count(),
+        card_pool=card.card_pool,
+        card_roles=card_role_keys(card),
+        card_factions=card_faction_keys(card),
+        card_mana_families=card_mana_family_keys(card),
     )

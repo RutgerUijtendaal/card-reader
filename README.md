@@ -152,8 +152,11 @@ Important settings in `./.env.example`:
 
 Auth is always enabled.
 
-- Card gallery and card assets are public
+- Player, Evil, and Neutral card data, groups, generations, embedded payloads, and direct assets
+  are public. Pool-partitioned TTS sheet images are public derived artifacts.
 - Public deck detail and deck TTS export are available to any viewer who can access the deck
+- Deck building, Playtester, deck TTS eligibility, and developer-data publication remain
+  Player-only product contracts rather than card-visibility permissions
 - Import jobs, review, administrative settings APIs, catalog, templates, CSV exports, and gallery/content-version
   TTS exports require a staff user
 - Developer-data metadata, direct downloads, and bootstrap-code creation require an active staff

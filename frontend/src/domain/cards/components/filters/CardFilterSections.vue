@@ -1,13 +1,54 @@
 <template>
   <div class="space-y-3">
+    <label
+      v-if="showCardPool && state.cardPoolOptions.length > 1"
+      class="block space-y-1"
+    >
+      <span class="theme-section-title text-sm font-semibold">Card pool</span>
+      <select
+        v-model="cardPool"
+        class="input-base w-full"
+      >
+        <option
+          v-for="option in state.cardPoolOptions"
+          :key="option.key"
+          :value="option.key"
+        >
+          {{ option.label }}
+        </option>
+      </select>
+    </label>
+
+    <MetadataPillGroup
+      v-if="isSectionVisible('roles')"
+      v-model:included-value="selectedCardRoles"
+      v-model:excluded-value="excludedCardRoles"
+      v-model:match-mode="cardRoleMatch"
+      :default-open="isSectionOpenByDefault('roles', true)"
+      label="Card roles"
+      :options="state.cardRoleOptions"
+      @reset="state.resetCardRoleGroup"
+    />
+
+    <MetadataPillGroup
+      v-if="isSectionVisible('factions')"
+      v-model:included-value="selectedCardFactions"
+      v-model:excluded-value="excludedCardFactions"
+      v-model:match-mode="cardFactionMatch"
+      :default-open="isSectionOpenByDefault('factions', true)"
+      label="Factions"
+      :options="state.cardFactionOptions"
+      @reset="state.resetCardFactionGroup"
+    />
+
     <SymbolToggleGroup
       v-if="isSectionVisible('mana')"
-      v-model:included-value="selectedManaTypeSymbolIds"
-      v-model:excluded-value="excludedManaTypeSymbolIds"
-      v-model:match-mode="manaSymbolMatch"
+      v-model:included-value="selectedManaFamilyIds"
+      v-model:excluded-value="excludedManaFamilyIds"
+      v-model:match-mode="manaFamilyMatch"
       :default-open="isSectionOpenByDefault('mana', true)"
       label="Mana"
-      :options="state.manaTypeOptions"
+      :options="state.manaFamilyOptions"
       @reset="state.resetManaGroup"
     >
       <div class="theme-divider border-t pt-3">
@@ -157,12 +198,16 @@ import type {
   CardFilterSectionKey,
   CardFilterSectionsState,
 } from '@/domain/cards/utils/filters/cardFilterSectionsState';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 const props = defineProps<{
   state: CardFilterSectionsState;
-  visibleSections?: CardFilterSectionKey[];
-  defaultOpenSections?: CardFilterSectionKey[];
+  showCardPool?: boolean;
+  visibleSections?: readonly CardFilterSectionKey[];
+  defaultOpenSections?: readonly CardFilterSectionKey[];
 }>();
+
+const showCardPool = computed(() => props.showCardPool ?? true);
 
 const visibleSections = computed(() =>
   props.visibleSections ? new Set(props.visibleSections) : null,
@@ -176,17 +221,46 @@ const isSectionVisible = (section: CardFilterSectionKey): boolean =>
 const isSectionOpenByDefault = (section: CardFilterSectionKey, fallback = false): boolean =>
   defaultOpenSections.value?.has(section) ?? fallback;
 
-const selectedManaTypeSymbolIds = computed({
-  get: () => props.state.selectedManaTypeSymbolIds,
-  set: props.state.onUpdateSelectedManaTypeSymbolIds,
+const cardPool = computed({
+  get: () => props.state.cardPool,
+  set: (value: CardPool) => props.state.onUpdateCardPool(value),
 });
-const excludedManaTypeSymbolIds = computed({
-  get: () => props.state.excludedManaTypeSymbolIds,
-  set: props.state.onUpdateExcludedManaTypeSymbolIds,
+const selectedCardRoles = computed({
+  get: () => props.state.selectedCardRoles,
+  set: props.state.onUpdateSelectedCardRoles,
 });
-const manaSymbolMatch = computed({
-  get: () => props.state.manaSymbolMatch,
-  set: props.state.onUpdateManaSymbolMatch,
+const excludedCardRoles = computed({
+  get: () => props.state.excludedCardRoles,
+  set: props.state.onUpdateExcludedCardRoles,
+});
+const cardRoleMatch = computed({
+  get: () => props.state.cardRoleMatch,
+  set: props.state.onUpdateCardRoleMatch,
+});
+const selectedCardFactions = computed({
+  get: () => props.state.selectedCardFactions,
+  set: props.state.onUpdateSelectedCardFactions,
+});
+const excludedCardFactions = computed({
+  get: () => props.state.excludedCardFactions,
+  set: props.state.onUpdateExcludedCardFactions,
+});
+const cardFactionMatch = computed({
+  get: () => props.state.cardFactionMatch,
+  set: props.state.onUpdateCardFactionMatch,
+});
+
+const selectedManaFamilyIds = computed({
+  get: () => props.state.selectedManaFamilyIds,
+  set: props.state.onUpdateSelectedManaFamilyIds,
+});
+const excludedManaFamilyIds = computed({
+  get: () => props.state.excludedManaFamilyIds,
+  set: props.state.onUpdateExcludedManaFamilyIds,
+});
+const manaFamilyMatch = computed({
+  get: () => props.state.manaFamilyMatch,
+  set: props.state.onUpdateManaFamilyMatch,
 });
 const manaCostMin = computed({
   get: () => props.state.manaCostMin,

@@ -17,6 +17,7 @@ def test_reparse_preserves_manual_fields_and_metadata_groups(
     from card_reader_core.repositories.cards import get_latest_card_version, update_latest_card_version
     from card_reader_core.repositories.import_jobs import create_import_job
     from card_reader_core.repositories.metadata import get_tags_for_card_version
+    from card_reader_core.services.classification_rules import ClassificationRuleService
     from card_reader_core.services.parser_jobs import ImportProcessorService
 
     case = load_case(CASE_PATH)
@@ -28,6 +29,9 @@ def test_reparse_preserves_manual_fields_and_metadata_groups(
         source_path=image_path,
         template_id=str(case["input"]["template_key"]),
         options=case["input"]["job_options"],
+        classification_rule_snapshot=ClassificationRuleService().build_snapshot(
+            card_pool="player", include_roles=True, include_factions=True
+        ),
     )
     processor.process_job(first_job.id)
 
@@ -54,6 +58,9 @@ def test_reparse_preserves_manual_fields_and_metadata_groups(
         source_path=image_path,
         template_id=str(case["input"]["template_key"]),
         options=case["input"]["job_options"],
+        classification_rule_snapshot=ClassificationRuleService().build_snapshot(
+            card_pool="player", include_roles=True, include_factions=True
+        ),
     )
     processor.process_job(second_job.id)
 
@@ -81,6 +88,7 @@ def test_targeted_reparse_can_switch_template_without_creating_new_version(
         create_import_job_with_files,
     )
     from card_reader_core.services.parser_jobs import ImportProcessorService
+    from card_reader_core.services.classification_rules import ClassificationRuleService
 
     case = load_case(CASE_PATH)
     image_path = (FIXTURES_ROOT / case["input"]["image"]).resolve()
@@ -91,6 +99,9 @@ def test_targeted_reparse_can_switch_template_without_creating_new_version(
         source_path=image_path,
         template_id=str(case["input"]["template_key"]),
         options=case["input"]["job_options"],
+        classification_rule_snapshot=ClassificationRuleService().build_snapshot(
+            card_pool="player", include_roles=True, include_factions=True
+        ),
     )
     processor.process_job(first_job.id)
 
@@ -143,6 +154,9 @@ def test_targeted_reparse_can_switch_template_without_creating_new_version(
         options={"reparse_existing": True},
         files=[image_path],
         item_targets=[ImportJobItemTarget(card_id=latest.card.id, card_version_id=latest.id)],
+        classification_rule_snapshot=ClassificationRuleService().build_snapshot(
+            card_pool="player", include_roles=True, include_factions=True
+        ),
     )
     processor.process_job(second_job.id)
 

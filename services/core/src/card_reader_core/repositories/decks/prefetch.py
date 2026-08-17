@@ -25,6 +25,9 @@ def deck_queryset() -> QuerySet[Deck]:
         "hero_card__latest_version__template",
         "hero_card__latest_version__previous_version",
     ).prefetch_related(
+        "hero_card__role_assignments",
+        "hero_card__faction_assignments",
+        "hero_card__mana_family_assignments",
         *deck_metadata_prefetches(),
         *latest_version_metadata_prefetches("hero_card__latest_version"),
         Prefetch(
@@ -34,7 +37,12 @@ def deck_queryset() -> QuerySet[Deck]:
                 "card__latest_version",
                 "card__latest_version__template",
                 "card__latest_version__previous_version",
-            ).prefetch_related(*latest_version_metadata_prefetches("card__latest_version")).order_by("position", "card_id"),
+            ).prefetch_related(
+                "card__role_assignments",
+                "card__faction_assignments",
+                "card__mana_family_assignments",
+                *latest_version_metadata_prefetches("card__latest_version"),
+            ).order_by("position", "card_id"),
         ),
         Prefetch(
             "sideboards",
@@ -47,7 +55,12 @@ def deck_queryset() -> QuerySet[Deck]:
                         "card__latest_version__template",
                         "card__latest_version__previous_version",
                     )
-                    .prefetch_related(*latest_version_metadata_prefetches("card__latest_version"))
+                    .prefetch_related(
+                        "card__role_assignments",
+                        "card__faction_assignments",
+                        "card__mana_family_assignments",
+                        *latest_version_metadata_prefetches("card__latest_version"),
+                    )
                     .order_by("position", "card_id"),
                 )
             ).order_by("created_at", "id"),
@@ -61,6 +74,9 @@ def deck_summary_queryset() -> QuerySet[Deck]:
         "hero_card",
         "hero_card__latest_version",
     ).prefetch_related(
+        "hero_card__role_assignments",
+        "hero_card__faction_assignments",
+        "hero_card__mana_family_assignments",
         *deck_metadata_prefetches(),
         Prefetch(
             "hero_card__latest_version__images",
@@ -72,7 +88,14 @@ def deck_summary_queryset() -> QuerySet[Deck]:
             queryset=DeckEntry.objects.select_related(
                 "card",
                 "card__latest_version",
-            ).prefetch_related(*summary_version_type_prefetches("card__latest_version")).order_by("position", "card_id"),
+            )
+            .prefetch_related(
+                "card__role_assignments",
+                "card__faction_assignments",
+                "card__mana_family_assignments",
+                *summary_version_type_prefetches("card__latest_version"),
+            )
+            .order_by("position", "card_id"),
         ),
         Prefetch(
             "sideboards",
@@ -83,7 +106,12 @@ def deck_summary_queryset() -> QuerySet[Deck]:
                         "card",
                         "card__latest_version",
                     )
-                    .prefetch_related(*summary_version_type_prefetches("card__latest_version"))
+                    .prefetch_related(
+                        "card__role_assignments",
+                        "card__faction_assignments",
+                        "card__mana_family_assignments",
+                        *summary_version_type_prefetches("card__latest_version"),
+                    )
                     .order_by("position", "card_id"),
                 )
             ).order_by("created_at", "id"),
@@ -96,12 +124,20 @@ def deck_validation_queryset() -> QuerySet[Deck]:
         "hero_card",
         "hero_card__latest_version",
     ).prefetch_related(
+        "hero_card__role_assignments",
+        "hero_card__faction_assignments",
+        "hero_card__mana_family_assignments",
         Prefetch(
             "entries",
             queryset=DeckEntry.objects.select_related(
                 "card",
                 "card__latest_version",
-            ).prefetch_related(*summary_version_type_prefetches("card__latest_version")),
+            ).prefetch_related(
+                "card__role_assignments",
+                "card__faction_assignments",
+                "card__mana_family_assignments",
+                *summary_version_type_prefetches("card__latest_version"),
+            ),
         ),
         Prefetch(
             "sideboards",
@@ -111,7 +147,12 @@ def deck_validation_queryset() -> QuerySet[Deck]:
                     queryset=DeckSideboardEntry.objects.select_related(
                         "card",
                         "card__latest_version",
-                    ).prefetch_related(*summary_version_type_prefetches("card__latest_version")),
+                    ).prefetch_related(
+                        "card__role_assignments",
+                        "card__faction_assignments",
+                        "card__mana_family_assignments",
+                        *summary_version_type_prefetches("card__latest_version"),
+                    ),
                 )
             ),
         ),

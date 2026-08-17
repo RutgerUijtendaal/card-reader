@@ -23,7 +23,7 @@ const buildEntry = (quantity = 3): DeckEntrySummary => ({
     key: 'card-1',
     label: 'Card 1',
     result_type: 'card',
-    is_hero: false,
+    card_pool: 'player' as const, card_roles: [],
     template_id: 'template-1',
     version_id: 'version-1',
     version_number: 1,

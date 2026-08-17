@@ -37,13 +37,36 @@ const compareEntriesByCardIdentity = <TEntry extends { card: DeckTypeGroupCardLi
 const hasEntries = <TEntry>(group: DeckTypeGroup<TEntry> | undefined): group is DeckTypeGroup<TEntry> =>
   group !== undefined && group.entries.length > 0;
 
+const includeEntryTypes = <TEntry extends { card: DeckTypeGroupCardLike }>(
+  types: TypeSortMetadata[],
+  entries: TEntry[],
+): TypeSortMetadata[] => {
+  const mergedTypes = [...types];
+  const knownTypeKeys = new Set(types.map((type) => normalizeTypeKey(type.key)));
+  for (const entry of entries) {
+    for (const type of entry.card.types ?? []) {
+      const normalizedKey = normalizeTypeKey(type.key);
+      if (!normalizedKey || knownTypeKeys.has(normalizedKey)) {
+        continue;
+      }
+      knownTypeKeys.add(normalizedKey);
+      mergedTypes.push({
+        key: type.key,
+        label: type.label?.trim() || type.key,
+        linked_card_count: 0,
+      });
+    }
+  }
+  return mergedTypes;
+};
+
 export const groupDeckEntriesByType = <TEntry extends { card: DeckTypeGroupCardLike }>(
   entries: TEntry[],
   types: TypeSortMetadata[],
   options: DeckTypeGroupOptions<TEntry> = {},
 ): DeckTypeGroup<TEntry>[] => {
   const compareEntries = options.compareEntries ?? compareEntriesByCardIdentity;
-  const orderedTypeBuckets = buildTypeSortBuckets(types);
+  const orderedTypeBuckets = buildTypeSortBuckets(includeEntryTypes(types, entries));
   const groups = new Map<string, DeckTypeGroup<TEntry>>(
     orderedTypeBuckets.map((type) => [
       type.normalizedKey,

@@ -3,11 +3,14 @@ from __future__ import annotations
 from typing import Any
 
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Q
+from django.db.models.functions import Lower
 
 from card_reader_core.models import (
+    CardPool,
     CardVersion,
-    CardVersionSymbol,
+    CardVersionKeyword,
+    CardVersionTag,
     Keyword,
     Symbol,
     Tag,
@@ -16,7 +19,6 @@ from card_reader_core.models import (
     now_utc,
 )
 
-from .links import refresh_card_version_mana_family_sort_keys
 from .types import MetadataRow
 
 
@@ -41,6 +43,10 @@ def list_symbols(*, keys: set[str] | None = None) -> list[Symbol]:
     return _list(Symbol, keys=keys)
 
 
+def list_symbol_ids() -> set[str]:
+    return set(Symbol.objects.values_list("id", flat=True))
+
+
 def list_detectable_symbols() -> list[Symbol]:
     return list(Symbol.objects.filter(enabled=True, detector_type="template").order_by("label"))
 
@@ -49,22 +55,81 @@ def list_types(*, keys: set[str] | None = None) -> list[Type]:
     return _list(Type, keys=keys)
 
 
-def list_types_for_card_sort() -> list[Type]:
+def list_types_for_card_sort(
+    *,
+    card_pool: CardPool | None = None,
+    available_only: bool = False,
+) -> list[Type]:
+    linked_card_filter = Q(card_version_types__card_version__is_latest=True) & active_card_lifecycle_q(
+        field_path="card_version_types__card_version__card__lifecycle_status",
+    )
+    if card_pool is not None:
+        linked_card_filter &= Q(card_version_types__card_version__card__card_pool=card_pool)
+    query = Type.objects.annotate(
+        linked_card_count=Count(
+            "card_version_types",
+            filter=linked_card_filter,
+            distinct=True,
+        ),
+    )
+    if available_only:
+        query = query.filter(linked_card_count__gt=0)
     return list(
-        Type.objects.annotate(
-            linked_card_count=Count(
-                "card_version_types",
-                filter=Q(card_version_types__card_version__is_latest=True)
-                & active_card_lifecycle_q(
-                    field_path="card_version_types__card_version__card__lifecycle_status",
-                ),
-                distinct=True,
-            ),
-        ).order_by(
+        query.order_by(
             "-linked_card_count",
-            "label",
+            Lower("label"),
+            Lower("key"),
             "id",
         )
+    )
+
+
+def _available_metadata_exists(
+    link_model: Any,
+    *,
+    metadata_field: str,
+    card_pool: CardPool,
+) -> Exists:
+    return Exists(
+        link_model.objects.filter(
+            **{
+                f"{metadata_field}_id": OuterRef("pk"),
+                "card_version__is_latest": True,
+                "card_version__card__card_pool": card_pool,
+            }
+        ).filter(
+            active_card_lifecycle_q(
+                field_path="card_version__card__lifecycle_status",
+            )
+        )
+    )
+
+
+def list_available_keywords(*, card_pool: CardPool) -> list[Keyword]:
+    return list(
+        Keyword.objects.annotate(
+            has_available_card=_available_metadata_exists(
+                CardVersionKeyword,
+                metadata_field="keyword",
+                card_pool=card_pool,
+            )
+        )
+        .filter(has_available_card=True)
+        .order_by("label")
+    )
+
+
+def list_available_tags(*, card_pool: CardPool) -> list[Tag]:
+    return list(
+        Tag.objects.annotate(
+            has_available_card=_available_metadata_exists(
+                CardVersionTag,
+                metadata_field="tag",
+                card_pool=card_pool,
+            )
+        )
+        .filter(has_available_card=True)
+        .order_by("label")
     )
 
 
@@ -172,11 +237,7 @@ def update_symbol(*, entry_id: str, updates: dict[str, object]) -> Symbol | None
     row = get_symbol(entry_id)
     if row is None:
         return None
-    linked_version_ids = list(
-        CardVersionSymbol.objects.filter(symbol_id=row.id).values_list("card_version_id", flat=True)
-    )
     updated = _update(row, updates)
-    refresh_card_version_mana_family_sort_keys([str(version_id) for version_id in linked_version_ids])
     return updated
 
 
@@ -200,11 +261,7 @@ def delete_symbol(*, entry_id: str) -> bool:
     row = get_symbol(entry_id)
     if row is None:
         return False
-    linked_version_ids = list(
-        CardVersionSymbol.objects.filter(symbol_id=row.id).values_list("card_version_id", flat=True)
-    )
     deleted, _ = row.delete()
-    refresh_card_version_mana_family_sort_keys([str(version_id) for version_id in linked_version_ids])
     return deleted > 0
 
 
@@ -279,7 +336,9 @@ def list_symbols_with_linked_card_counts() -> list[Symbol]:
     )
 
 
-def list_latest_versions_for_keyword_detail(*, entry_id: str, limit: int = 12) -> tuple[list[CardVersion], int]:
+def list_latest_versions_for_keyword_detail(
+    *, entry_id: str, limit: int = 12
+) -> tuple[list[CardVersion], int]:
     return _list_latest_versions_for_detail(
         relation_filter="card_version_keywords__keyword_id",
         entry_id=entry_id,
@@ -287,7 +346,9 @@ def list_latest_versions_for_keyword_detail(*, entry_id: str, limit: int = 12) -
     )
 
 
-def list_latest_versions_for_tag_detail(*, entry_id: str, limit: int = 12) -> tuple[list[CardVersion], int]:
+def list_latest_versions_for_tag_detail(
+    *, entry_id: str, limit: int = 12
+) -> tuple[list[CardVersion], int]:
     return _list_latest_versions_for_detail(
         relation_filter="card_version_tags__tag_id",
         entry_id=entry_id,
@@ -295,7 +356,9 @@ def list_latest_versions_for_tag_detail(*, entry_id: str, limit: int = 12) -> tu
     )
 
 
-def list_latest_versions_for_type_detail(*, entry_id: str, limit: int = 12) -> tuple[list[CardVersion], int]:
+def list_latest_versions_for_type_detail(
+    *, entry_id: str, limit: int = 12
+) -> tuple[list[CardVersion], int]:
     return _list_latest_versions_for_detail(
         relation_filter="card_version_types__type_id",
         entry_id=entry_id,
@@ -303,7 +366,9 @@ def list_latest_versions_for_type_detail(*, entry_id: str, limit: int = 12) -> t
     )
 
 
-def list_latest_versions_for_symbol_detail(*, entry_id: str, limit: int = 12) -> tuple[list[CardVersion], int]:
+def list_latest_versions_for_symbol_detail(
+    *, entry_id: str, limit: int = 12
+) -> tuple[list[CardVersion], int]:
     return _list_latest_versions_for_detail(
         relation_filter="card_version_symbols__symbol_id",
         entry_id=entry_id,
@@ -318,10 +383,18 @@ def _list_latest_versions_for_detail(
     limit: int,
 ) -> tuple[list[CardVersion], int]:
     versions = (
-        CardVersion.objects.filter(is_latest=True, **{relation_filter: entry_id})
+        CardVersion.objects.filter(
+            is_latest=True,
+            **{relation_filter: entry_id},
+        )
         .filter(active_card_lifecycle_q())
         .select_related("card")
-        .prefetch_related("images")
+        .prefetch_related(
+            "images",
+            "card__role_assignments",
+            "card__faction_assignments",
+            "card__mana_family_assignments",
+        )
         .order_by("-updated_at")
         .distinct()
     )

@@ -7,6 +7,10 @@ from typing import Literal, TypedDict
 from card_reader_core.models import (
     DEFAULT_CARD_LIFECYCLE_FILTER as CORE_DEFAULT_CARD_LIFECYCLE_FILTER,
     CardLifecycleFilter as CoreCardLifecycleFilter,
+    CardFaction,
+    CardPool,
+    CardRole,
+    CardRoleFilter,
     CardVersion,
     CardVersionImage,
     Keyword,
@@ -14,9 +18,20 @@ from card_reader_core.models import (
     Tag,
     Type,
 )
+from card_reader_core.metadata import ManaFamily
 
-CardSort = Literal["updated_desc", "name_asc", "mana_asc", "mana_desc", "mana_type_asc", "types_asc"]
+CardSort = Literal[
+    "default",
+    "updated_desc",
+    "name_asc",
+    "mana_asc",
+    "mana_desc",
+    "mana_type_asc",
+    "types_asc",
+]
 CardLifecycleFilter = CoreCardLifecycleFilter
+CardRoleMatch = Literal["any", "all"]
+CARD_SORT_DEFAULT: CardSort = "default"
 CARD_SORT_UPDATED_DESC: CardSort = "updated_desc"
 CARD_SORT_NAME_ASC: CardSort = "name_asc"
 CARD_SORT_MANA_ASC: CardSort = "mana_asc"
@@ -24,6 +39,7 @@ CARD_SORT_MANA_DESC: CardSort = "mana_desc"
 CARD_SORT_MANA_TYPE_ASC: CardSort = "mana_type_asc"
 CARD_SORT_TYPES_ASC: CardSort = "types_asc"
 CARD_SORT_VALUES: tuple[CardSort, ...] = (
+    CARD_SORT_DEFAULT,
     CARD_SORT_UPDATED_DESC,
     CARD_SORT_NAME_ASC,
     CARD_SORT_MANA_ASC,
@@ -41,6 +57,10 @@ class LatestCardVersionReparseSource:
     card_version_id: str
     template_id: str
     image_path: Path
+    card_pool: CardPool
+    card_roles: tuple[CardRole, ...]
+    card_factions: tuple[CardFaction, ...]
+    card_mana_families: tuple[ManaFamily, ...]
 
 
 @dataclass(frozen=True)
@@ -105,7 +125,13 @@ class CardFilterParams(TypedDict):
     mana_cost_min: int | None
     mana_cost_max: int | None
     template_id: str | None
-    is_hero: bool | None
+    card_pool: CardPool | None
+    card_roles: list[CardRoleFilter] | None
+    card_role_exclude: list[CardRoleFilter] | None
+    card_role_match: CardRoleMatch
+    card_factions: list[CardFaction] | None
+    card_faction_exclude: list[CardFaction] | None
+    card_faction_match: CardRoleMatch
     attack_min: int | None
     attack_max: int | None
     health_min: int | None
@@ -120,6 +146,21 @@ class ParsedCardSaveResult:
     created_new_version: bool
 
 
+class GroupedCardListReference(TypedDict):
+    result_type: Literal["card", "card_group"]
+    item_id: str
+    card_version_id: str | None
+    group_id: str | None
+
+
+@dataclass(frozen=True)
+class PaginatedGroupedCardList:
+    count: int
+    page: int
+    page_size: int
+    results: list[GroupedCardListReference]
+
+
 class FieldSourcesPayload(TypedDict):
     fields: dict[str, str]
     metadata: dict[str, str]
@@ -128,3 +169,7 @@ class FieldSourcesPayload(TypedDict):
 class ParsedSnapshotPayload(TypedDict):
     fields: dict[str, object]
     metadata: dict[str, list[str]]
+
+
+class CardIdentityConflict(ValueError):
+    """A primary name or alias collides inside one pool/faction namespace."""

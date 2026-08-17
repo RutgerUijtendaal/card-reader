@@ -4,6 +4,7 @@ import { createPinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import CardGroupDetailPage from '@/features/card-groups/CardGroupDetailPage.vue';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import type { CardDeckReferenceSummary } from '@/domain/card-deck-references/types';
 import type { CardFiltersResponse, CardVersionDetail } from '@/domain/cards/types';
 import type { CardGroupDetail } from '@/features/card-groups/types';
@@ -70,7 +71,7 @@ const buildCard = (id: string, name: string): CardVersionDetail => ({
   id,
   key: id,
   label: name,
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   deck_building_config: {},
   lifecycle_status: 'active',
   template_id: 'template-1',
@@ -139,7 +140,7 @@ const buildCard = (id: string, name: string): CardVersionDetail => ({
 const deckReference = {
   id: 'deck-1',
   card_reference: {
-    is_hero: true,
+      as_hero: true,
     mainboard_quantity: 0,
     sideboard_quantity: 0,
   },
@@ -193,8 +194,9 @@ const mountView = async (path: string, options: { flush?: boolean } = {}) => {
   await router.isReady();
 
   const app = createApp(CardGroupDetailPage);
+  const pinia = createPinia();
   app.use(router);
-  app.use(createPinia());
+  app.use(pinia);
   app.mount(container);
   if (options.flush ?? true) {
     await flushPromises();
@@ -203,6 +205,7 @@ const mountView = async (path: string, options: { flush?: boolean } = {}) => {
 
   return {
     container,
+    workspace: useCardPoolWorkspaceStore(pinia),
     unmount: () => {
       app.unmount();
       container.remove();
@@ -231,6 +234,26 @@ describe('CardGroupDetailPage', () => {
 
     expect(apiGet).toHaveBeenCalledWith('/card-groups/group-1', {
       params: { lifecycle_status: 'all' },
+    });
+
+    mounted.unmount();
+  });
+
+  test('passes the Evil pool through to group detail request', async () => {
+    apiGet.mockImplementation((url: string) => {
+      if (url === '/card-groups/group-1') {
+        return Promise.resolve({ data: buildGroup() });
+      }
+      if (url === '/cards/filters') {
+        return Promise.resolve({ data: filters });
+      }
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+
+    const mounted = await mountView('/card-groups/group-1?card_pool=evil');
+
+    expect(apiGet).toHaveBeenCalledWith('/card-groups/group-1', {
+      params: { card_pool: 'evil' },
     });
 
     mounted.unmount();
@@ -300,6 +323,33 @@ describe('CardGroupDetailPage', () => {
     expect(deckPanel?.textContent).toBe('Deck references: 1');
     expect(deckPanel?.getAttribute('data-source-card-id')).toBe('card-1');
 
+    mounted.unmount();
+  });
+
+  test('labels cross-pool members and keeps the originating workspace in their links', async () => {
+    const group = buildGroup();
+    group.members[1] = {
+      ...group.members[1],
+      card: { ...group.members[1].card, card_pool: 'evil' },
+    };
+    apiGet.mockImplementation((url: string) => {
+      if (url === '/card-groups/group-1') {
+        return Promise.resolve({ data: group });
+      }
+      if (url === '/cards/filters') {
+        return Promise.resolve({ data: filters });
+      }
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+
+    const mounted = await mountView('/card-groups/group-1');
+    const openLinks = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a'))
+      .filter((link) => link.textContent?.trim() === 'Open card');
+
+    expect(mounted.container.textContent).toContain('Evil');
+    expect(openLinks[1]?.getAttribute('href')).toBe(
+      '/cards/card-2?return_card_pool=player&card_pool=evil',
+    );
     mounted.unmount();
   });
 });

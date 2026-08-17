@@ -2,6 +2,8 @@
 
 Card Reader currently delivers notifications through one durable channel: the authenticated in-app inbox. `UserNotification` rows are the source of truth for inbox history and the unread badge.
 
+Card-linked inbox history remains visible to its recipient regardless of the referenced card's current pool. Card-pool transitions do not destroy, archive, or hide durable notifications, and merged source redirects continue resolving to the surviving card. Deck-version notification creation remains Player-only because decks are still a Player workflow, so moving a referenced card into Evil or Neutral stops future deck delivery without hiding earlier notifications.
+
 The inbox is one chronological feed. New rows retain an unread indicator until opened, event-type filters are applied server-side, and older results append through the shared load-more pattern.
 
 ## Event catalog

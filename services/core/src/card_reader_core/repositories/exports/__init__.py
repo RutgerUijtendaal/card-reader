@@ -5,9 +5,14 @@ import io
 from typing import TYPE_CHECKING
 
 from card_reader_core.models import (
+    DEFAULT_CARD_POOL,
+    CardFaction,
+    CardPool,
+    CardRoleFilter,
     Symbol,
+    card_faction_keys,
 )
-from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC
+from card_reader_core.repositories.cards import CARD_SORT_DEFAULT
 from card_reader_core.rules import render_enriched_rule_text
 
 from ..cards import DEFAULT_CARD_LIFECYCLE_FILTER, CardLifecycleFilter, list_cards
@@ -49,12 +54,19 @@ def export_cards_csv(
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
     template_id: str | None = None,
+    card_pool: CardPool | None = DEFAULT_CARD_POOL,
+    card_roles: list[CardRoleFilter] | None = None,
+    card_role_exclude: list[CardRoleFilter] | None = None,
+    card_role_match: str = "any",
+    card_factions: list[CardFaction] | None = None,
+    card_faction_exclude: list[CardFaction] | None = None,
+    card_faction_match: str = "any",
     attack_min: int | None = None,
     attack_max: int | None = None,
     health_min: int | None = None,
     health_max: int | None = None,
     lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
-    sort: CardSort = CARD_SORT_UPDATED_DESC,
+    sort: CardSort = CARD_SORT_DEFAULT,
 ) -> str:
     stream = io.StringIO()
     writer = csv.DictWriter(
@@ -72,6 +84,9 @@ def export_cards_csv(
             "symbols",
             "keywords",
             "confidence",
+            "card_id",
+            "card_pool",
+            "card_factions",
         ],
     )
     writer.writeheader()
@@ -109,6 +124,13 @@ def export_cards_csv(
             mana_cost_min=mana_cost_min,
             mana_cost_max=mana_cost_max,
             template_id=template_id,
+            card_pool=card_pool,
+            card_roles=card_roles,
+            card_role_exclude=card_role_exclude,
+            card_role_match=card_role_match,
+            card_factions=card_factions,
+            card_faction_exclude=card_faction_exclude,
+            card_faction_match=card_faction_match,
             attack_min=attack_min,
             attack_max=attack_max,
             health_min=health_min,
@@ -125,8 +147,11 @@ def export_cards_csv(
             ]
             writer.writerow(
                 {
+                    "card_id": row.version.card.id,
                     "card_key": _sanitize_csv_text(row.version.card.key),
                     "name": _sanitize_csv_text(row.version.name),
+                    "card_pool": row.version.card.card_pool,
+                    "card_factions": _join_labels(list(card_faction_keys(row.version.card))),
                     "mana_cost": _sanitize_csv_text(row.version.mana_cost),
                     "mana_symbols": _replace_symbol_keys(_join_labels(mana_symbols)),
                     "attack": row.version.attack,

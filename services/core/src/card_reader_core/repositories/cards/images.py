@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 
 from card_reader_core.models import CardVersion, CardVersionImage, active_card_lifecycle_q, now_utc
@@ -23,6 +24,18 @@ def resolve_image_file_path(image: CardVersionImage) -> Path | None:
     return None
 
 
+def select_usable_card_image(
+    images: Iterable[CardVersionImage],
+) -> CardVersionImage | None:
+    first_image: CardVersionImage | None = None
+    for image in images:
+        if first_image is None:
+            first_image = image
+        if resolve_image_file_path(image) is not None:
+            return image
+    return first_image
+
+
 def list_latest_active_card_image_sources(
     *,
     limit: int,
@@ -32,9 +45,7 @@ def list_latest_active_card_image_sources(
     if normalized_limit == 0:
         return []
 
-    images = CardVersionImage.objects.filter(
-        card_version__is_latest=True,
-    ).filter(
+    images = CardVersionImage.objects.filter(card_version__is_latest=True).filter(
         active_card_lifecycle_q(field_path="card_version__card__lifecycle_status")
     )
     if card_ids is not None:

@@ -934,7 +934,6 @@
 
   .theme-hotkeys-panel {
     @apply flex w-full flex-col gap-3 rounded-2xl border px-3 py-3 text-left;
-    min-height: 11.5rem;
     border-color: var(--color-border);
     background: var(--color-surface-soft);
     color: var(--color-text);

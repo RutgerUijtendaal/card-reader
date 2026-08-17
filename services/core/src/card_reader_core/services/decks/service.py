@@ -287,8 +287,12 @@ class DeckService:
     def get_deck(self, deck_id: str) -> Deck | None:
         return get_deck(deck_id)
 
+    def get_visible_deck_for_viewer(self, deck_id: str, *, viewer_id: str | None) -> Deck | None:
+        """Return a deck allowed by ownership/visibility without applying whole-deck validity."""
+        return get_deck_for_viewer(deck_id, viewer_id=viewer_id)
+
     def get_deck_for_viewer(self, deck_id: str, *, viewer_id: str | None) -> Deck | None:
-        deck = get_deck_for_viewer(deck_id, viewer_id=viewer_id)
+        deck = self.get_visible_deck_for_viewer(deck_id, viewer_id=viewer_id)
         if deck is None:
             return None
         if viewer_id and str(getattr(deck.owner, "pk", "")) == viewer_id:
@@ -498,11 +502,23 @@ class DeckService:
         normalized_name = self._normalizer.normalize_name(effective_name)
         normalized_description = self._normalizer.normalize_description(effective_description)
         normalized_long_description = self._normalizer.normalize_long_description(effective_long_description)
-        hero_card, normalized_entries, normalized_sideboards = self._normalizer.normalize_deck_payload(
-            hero_card_id=effective_hero_card_id,
-            entries=effective_entries,
-            sideboards=effective_sideboards,
+        updates_card_references = (
+            updates.update_hero_card_id or updates.update_entries or updates.update_sideboards
         )
+        if updates_card_references:
+            hero_card, normalized_entries, normalized_sideboards = self._normalizer.normalize_deck_update(
+                existing_deck=existing_deck,
+                hero_card_id=effective_hero_card_id,
+                entries=effective_entries,
+                sideboards=effective_sideboards,
+                update_hero_card_id=updates.update_hero_card_id,
+                update_entries=updates.update_entries,
+                update_sideboards=updates.update_sideboards,
+            )
+        else:
+            hero_card = existing_deck.hero_card
+            normalized_entries = []
+            normalized_sideboards = []
         updated = update_deck(
             deck_id=deck_id,
             updates={

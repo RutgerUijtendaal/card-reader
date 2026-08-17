@@ -49,9 +49,15 @@
                   >
                     Anchor
                   </span>
+                  <span
+                    v-if="member.card.card_pool !== workspace.activePool"
+                    class="theme-pill theme-pill-neutral px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
+                  >
+                    {{ cardPoolLabel(member.card.card_pool) }}
+                  </span>
                 </div>
                 <RouterLink
-                  :to="`/cards/${member.card.id}`"
+                  :to="buildCardDetailLocation(member.card.id, route.query, 'detail', member.card.card_pool)"
                   class="theme-link text-sm font-medium transition"
                 >
                   Open card
@@ -102,7 +108,14 @@ import {
   buildCardLifecycleApiParams,
   normalizeCardLifecycleFilterValue,
 } from '@/domain/cards/utils/filters/cardLifecycle';
-import { buildGalleryLocation, useGalleryCardNavigation } from '@/domain/cards/utils/gallery/galleryNavigation';
+import { parseCardFilterRouteQuery } from '@/domain/cards/utils/filters/cardFilterRouteState';
+import {
+  buildCardDetailLocation,
+  buildGalleryLocation,
+  useGalleryCardNavigation,
+} from '@/domain/cards/utils/gallery/galleryNavigation';
+import { cardPoolLabel } from '@/domain/cards/cardPools';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import { useAuthStore } from '@/domain/session/store';
 import CardGroupDetailLoadingSkeleton from '@/features/card-groups/components/CardGroupDetailLoadingSkeleton.vue';
 import type { SymbolLookupMap } from '@/domain/cards/types';
@@ -112,38 +125,51 @@ import { fetchCardGroupDetail } from '@/features/card-groups/api';
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const workspace = useCardPoolWorkspaceStore();
 const group = ref<CardGroupDetail | null>(null);
 const symbolByKey = ref<SymbolLookupMap>({});
 const isLoadingInitial = ref(true);
 const galleryNavigation = useGalleryCardNavigation(route, router, 'detail');
 const groupLifecycleStatus = computed(() => normalizeCardLifecycleFilterValue(route.query.lifecycle_status));
-const groupRequestParams = computed(() => buildCardLifecycleApiParams(groupLifecycleStatus.value));
+const groupCardPool = computed(() => parseCardFilterRouteQuery(route.query).cardPool);
+const groupRequestParams = computed(() => {
+  const lifecycleParams = buildCardLifecycleApiParams(groupLifecycleStatus.value);
+  const poolParams = groupCardPool.value !== 'player'
+    ? { card_pool: groupCardPool.value }
+    : undefined;
+  if (!lifecycleParams && !poolParams) return undefined;
+  return { ...lifecycleParams, ...poolParams };
+});
 const galleryBackLocation = computed(() => buildGalleryLocation(route.query));
 let groupRequestId = 0;
 
 const loadGroup = async (): Promise<void> => {
   const requestId = groupRequestId + 1;
   groupRequestId = requestId;
+  const workspaceGeneration = workspace.generation;
   isLoadingInitial.value = true;
+  group.value = null;
+  symbolByKey.value = {};
   const groupId = String(route.params.id);
   try {
     const [groupResponse, filtersResponse] = await Promise.all([
       fetchCardGroupDetail(groupId, groupRequestParams.value),
       fetchCardFilters(),
     ]);
-    if (requestId !== groupRequestId) return;
+    if (requestId !== groupRequestId || workspaceGeneration !== workspace.generation) return;
     group.value = groupResponse;
     symbolByKey.value = Object.fromEntries(
       (filtersResponse.symbols ?? []).map((row) => [row.key, row]),
     );
   } finally {
-    if (requestId === groupRequestId) {
+    if (requestId === groupRequestId && workspaceGeneration === workspace.generation) {
       isLoadingInitial.value = false;
     }
   }
 };
 
-watch(() => [route.params.id, route.query.lifecycle_status], loadGroup);
+watch(() => [route.params.id, route.query.lifecycle_status, route.query.card_pool], loadGroup);
+watch(() => workspace.generation, loadGroup, { flush: 'sync' });
 onMounted(loadGroup);
 
 const {

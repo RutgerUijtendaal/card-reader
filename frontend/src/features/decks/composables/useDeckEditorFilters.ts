@@ -13,8 +13,9 @@ import { useCardFilterController } from '@/domain/cards/composables/filters/useC
 import { useGalleryOptions } from '@/domain/cards/composables/useGalleryOptions';
 import { useHoverModeSurface } from '@/domain/cards/composables/useHoverModePreferences';
 import { useCardSortSurface } from '@/domain/cards/composables/useCardSortPreferences';
-import { buildHeroAffinityManaPreset } from '@/domain/decks/utils/affinityMana';
+import { buildHeroManaFamilyPreset } from '@/domain/decks/utils/heroManaFamilies';
 import type { DeckCardSummary } from '@/domain/decks/types';
+import { sanitizeDeckBuilderFilterSelection } from '@/features/decks/utils/deckBuilderFilterPolicy';
 
 type UseDeckEditorFiltersOptions = {
   deckCardIds: Ref<string[]>;
@@ -89,23 +90,23 @@ export const useDeckEditorFilters = ({ deckCardIds, editorMode }: UseDeckEditorF
     currentDeckOnly.value = false;
   };
 
-  const applyHeroAffinityManaPreset = (hero: DeckCardSummary | null): void => {
+  const applyHeroManaFamilyPreset = (hero: DeckCardSummary | null): void => {
     resetFilters();
     const catalog = filterController.filterCatalog.value;
-    const preset = buildHeroAffinityManaPreset(hero, catalog.manaSymbols, catalog.manaFamilyBySymbolKey);
+    const preset = buildHeroManaFamilyPreset(hero, catalog.manaFamilies);
     if (!preset) {
       return;
     }
 
     filterController.applyRouteFilterState({
       ...createEmptyCardFilterState(),
-      manaSymbolKeys: preset.includedManaSymbolKeys,
-      manaSymbolExcludeKeys: preset.excludedManaSymbolKeys,
+      manaFamilyKeys: preset.includedManaFamilyKeys,
+      manaFamilyExcludeKeys: preset.excludedManaFamilyKeys,
     });
   };
 
   const buildDeckEditorSelectionState = (): CardFilterSelectionState => {
-    const selection = filterController.selectionState.value;
+    const selection = sanitizeDeckBuilderFilterSelection(filterController.selectionState.value);
     if (editorMode.value === 'cards') {
       return selection;
     }
@@ -113,9 +114,9 @@ export const useDeckEditorFilters = ({ deckCardIds, editorMode }: UseDeckEditorF
     return {
       ...createEmptyCardFilterSelectionState(),
       query: selection.query,
-      manaSymbolMatch: selection.manaSymbolMatch,
-      manaTypeSymbolIds: selection.manaTypeSymbolIds,
-      manaTypeSymbolExcludeIds: selection.manaTypeSymbolExcludeIds,
+      manaFamilyMatch: selection.manaFamilyMatch,
+      manaFamilyIds: selection.manaFamilyIds,
+      manaFamilyExcludeIds: selection.manaFamilyExcludeIds,
       affinitySymbolMatch: selection.affinitySymbolMatch,
       affinitySymbolIds: selection.affinitySymbolIds,
       affinitySymbolExcludeIds: selection.affinitySymbolExcludeIds,
@@ -129,7 +130,7 @@ export const useDeckEditorFilters = ({ deckCardIds, editorMode }: UseDeckEditorF
     query: filterController.query,
     selectionState: filterController.selectionState,
     resetFilters,
-    applyHeroAffinityManaPreset,
+    applyHeroManaFamilyPreset,
     updateQuery: filterController.updateQuery,
     currentDeckOnly,
     setCurrentDeckOnly,

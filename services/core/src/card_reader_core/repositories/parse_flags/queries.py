@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from django.db.models import Max, Prefetch, Q
 
-from card_reader_core.models import PARSE_FLAG_ITEM_OPEN, CardVersionParseFlag, CardVersionParseFlagItem
+from card_reader_core.models import (
+    PARSE_FLAG_ITEM_OPEN,
+    CardVersionParseFlag,
+    CardVersionParseFlagItem,
+)
 
 from .types import PARSE_FLAG_OPEN_STATUS, PaginatedParseFlags, ParseFlagStatusFilter
 from .validation import is_parse_flag_item_status
@@ -16,14 +20,21 @@ def get_parse_flag(flag_id: str) -> CardVersionParseFlag | None:
             "card_version__content_version",
             "submitted_by",
         )
-        .prefetch_related("items")
+        .prefetch_related(
+            "items",
+            "card_version__card__role_assignments",
+            "card_version__card__faction_assignments",
+            "card_version__card__mana_family_assignments",
+        )
         .filter(id=flag_id)
         .first()
     )
 
 
 def count_open_parse_flag_items() -> int:
-    return CardVersionParseFlagItem.objects.filter(status=PARSE_FLAG_ITEM_OPEN).count()
+    return CardVersionParseFlagItem.objects.filter(
+        status=PARSE_FLAG_ITEM_OPEN,
+    ).count()
 
 
 def list_parse_flags(
@@ -55,6 +66,9 @@ def list_parse_flags(
         .prefetch_related(
             Prefetch("items", queryset=item_queryset),
             Prefetch("card_version__images"),
+            "card_version__card__role_assignments",
+            "card_version__card__faction_assignments",
+            "card_version__card__mana_family_assignments",
         )
         .annotate(latest_item_created_at=latest_item_created_at)
         .order_by("-latest_item_created_at", "-created_at", "id")

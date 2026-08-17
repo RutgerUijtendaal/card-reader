@@ -5,7 +5,7 @@ description: Work on the Card Reader parser and OCR pipeline. Use when changing 
 
 # Card Reader Parser
 
-Follow `AGENTS.md` first. Use this skill both when implementing parser changes and when reviewing them. It should help preserve the import pipeline, keep OCR concerns isolated, and route persistence through shared domain layers.
+Follow `AGENTS.md` first. Use this skill both when implementing parser changes and when reviewing them. Use `card-reader-core` for shared persistence and `card-reader-classification` when OCR or import evidence affects pools, roles, factions, mana families, identity matching, or classification review.
 
 ## Core Rules
 
@@ -14,6 +14,11 @@ Follow `AGENTS.md` first. Use this skill both when implementing parser changes a
 - Keep parser provider-agnostic; PaddleOCR remains an adapter behind parser-owned boundaries.
 - Persist results through core repositories and services instead of parser-local data shortcuts.
 - Preserve the async import flow: API creates work, parser claims queued work, parser writes results back through core.
+- Treat the import item's explicit card pool and frozen parser inputs as authoritative for a queued parse. Do not derive them from mutable shell, template, catalog, or current-version state later in processing.
+- Preserve raw OCR evidence and field provenance when normalization or pool-specific parsing changes the interpreted value.
+- Keep pool-aware extraction explicit. Player and Evil mana layouts may differ; do not apply one pool's badge/row heuristics to another implicitly.
+- Keep parsed version evidence separate from stable Card classification. Persist classification and identity decisions through core import/card services, including ambiguous Evil fallback and review-item creation.
+- Symbol persistence must respect the frozen parse snapshot; catalog entries deleted after queueing must not be recreated accidentally.
 
 ## Implementation Workflow
 
@@ -22,8 +27,10 @@ Follow `AGENTS.md` first. Use this skill both when implementing parser changes a
 3. Keep OCR/vendor-specific behavior isolated behind parser adapter boundaries.
 4. Put shared persistence or domain behavior in `services/core` when appropriate, using feature packages under `card_reader_core.repositories` and `card_reader_core.services`.
 5. Preserve idempotence and claim/process flow behavior when changing parser execution.
-6. Treat data writes as domain operations; route them through existing repositories/services unless the task explicitly requires a new shared abstraction.
-7. Run lint, typecheck, and relevant tests before finishing.
+6. Trace claim-time and process-time inputs separately when a task can outlive configuration, template, or catalog changes.
+7. Treat data writes as domain operations; route them through existing repositories/services unless the task explicitly requires a new shared abstraction.
+8. Add fixtures for raw OCR ambiguity and the affected card pool instead of covering only normalized happy paths.
+9. Run lint, typecheck, and relevant tests before finishing.
 
 ## Review Focus
 
@@ -32,6 +39,10 @@ Follow `AGENTS.md` first. Use this skill both when implementing parser changes a
 - Claim/process flow regressions, especially around idempotence or repeated work
 - Persistence shortcuts that bypass shared repositories/services
 - Coupling parser behavior to one OCR implementation in places that should remain adapter-based
+- Pool-specific OCR heuristics applied without an explicit pool branch or regression fixture
+- Mutable catalog/template state replacing the frozen evidence captured for queued work
+- Parser-side writes that silently mutate stable Card classification or bypass classification review
+- Normalization that discards ambiguous title, mana, or provenance evidence needed for review
 - Missing tests around parsing flow, extraction behavior, or persistence boundaries
 
 ## File Hotspots
@@ -41,6 +52,8 @@ Follow `AGENTS.md` first. Use this skill both when implementing parser changes a
 - `services/core/src/card_reader_core/repositories/cards`
 - `services/core/src/card_reader_core/repositories/metadata`
 - `services/core/src/card_reader_core/services/parser_jobs`
+- `services/core/src/card_reader_core/services/imports`
+- `services/core/src/card_reader_core/services/cards`
 - `services/core/src/card_reader_core/django_settings.py`
 
 ## Avoid

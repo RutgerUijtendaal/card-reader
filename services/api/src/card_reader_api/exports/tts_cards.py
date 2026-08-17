@@ -52,7 +52,10 @@ def build_tts_card_export_payload(
         "sheets": [
             {
                 "sheet_id": sheet.sheet_id,
-                "face_url": absolute_url(f"/tts/card-sheets/{sheet.sheet_id}/image.webp"),
+                "face_url": absolute_url(
+                    f"/tts/card-sheets/{sheet.sheet_id}/image.webp"
+                ),
+                "card_pool": sheet.card_pool,
                 "columns": sheet.columns,
                 "rows": sheet.rows,
                 "revision": sheet.revision,

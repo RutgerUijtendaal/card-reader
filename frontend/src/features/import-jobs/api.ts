@@ -1,5 +1,14 @@
 import { api } from '@/shared/api/client';
-import type { ContentVersion, ImportJob } from '@/features/import-jobs/types';
+import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardFaction } from '@/domain/cards/cardFactions';
+import type { CardPool } from '@/domain/cards/cardPools';
+import type { ManaFamily } from '@/domain/cards/manaFamilies';
+import type {
+  ContentVersion,
+  CreateImportJobResponse,
+  ImportJob,
+  ImportJobDetail,
+} from '@/features/import-jobs/types';
 
 export const fetchImportJobs = async (): Promise<ImportJob[]> => {
   const response = await api.get<ImportJob[]>('/imports', { params: { status: 'active' } });
@@ -12,25 +21,70 @@ export const fetchCurrentContentVersion = async (): Promise<ContentVersion | nul
 };
 
 export type CreateImportJobInput = {
+  creationKey: string;
   templateId: string;
   contentVersionBase: string;
   contentVersionDescription: string;
   files: File[];
+  cardPool: CardPool;
+  cardRoleMode: 'automatic' | 'override';
+  cardRoleOverride: CardRole[];
+  cardFactionMode: 'automatic' | 'override';
+  cardFactionOverride: CardFaction[];
+  cardManaFamilyMode: 'automatic' | 'override';
+  cardManaFamilyOverride: ManaFamily[];
 };
 
-export const createImportJob = async (input: CreateImportJobInput): Promise<void> => {
+export const createImportJob = async (
+  input: CreateImportJobInput,
+): Promise<CreateImportJobResponse> => {
   const formData = new FormData();
+  formData.append('creation_key', input.creationKey);
   formData.append('template_id', input.templateId);
   formData.append('content_version_base', input.contentVersionBase);
   formData.append('content_version_description', input.contentVersionDescription);
   formData.append('options_json', JSON.stringify({}));
+  formData.append('card_pool', input.cardPool);
+  formData.append('card_role_mode', input.cardRoleMode);
+  formData.append('card_role_override', JSON.stringify(input.cardRoleOverride));
+  formData.append('card_faction_mode', input.cardFactionMode);
+  formData.append('card_faction_override', JSON.stringify(input.cardFactionOverride));
+  formData.append('card_mana_family_mode', input.cardManaFamilyMode);
+  formData.append(
+    'card_mana_family_override',
+    JSON.stringify(input.cardManaFamilyOverride),
+  );
   input.files.forEach((file) => formData.append('files', file));
 
-  await api.post('/imports/upload', formData, {
+  const response = await api.post<CreateImportJobResponse>('/imports/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+  return response.data;
 };
 
-export const cancelImportJob = async (jobId: string): Promise<void> => {
-  await api.post(`/imports/${jobId}/cancel`);
+export const fetchImportJobByCreationKey = async (
+  creationKey: string,
+): Promise<CreateImportJobResponse | null> => {
+  try {
+    const response = await api.get<CreateImportJobResponse>(
+      `/imports/by-creation-key/${creationKey}`,
+    );
+    return response.data;
+  } catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'response' in error) {
+      const response = (error as { response?: { status?: number } }).response;
+      if (response?.status === 404) return null;
+    }
+    throw error;
+  }
+};
+
+export const fetchImportJobDetail = async (jobId: string): Promise<ImportJobDetail> => {
+  const response = await api.get<ImportJobDetail>(`/imports/${jobId}`);
+  return response.data;
+};
+
+export const cancelImportJob = async (jobId: string): Promise<ImportJob> => {
+  const response = await api.post<ImportJob>(`/imports/${jobId}/cancel`);
+  return response.data;
 };

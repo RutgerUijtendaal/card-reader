@@ -1,4 +1,15 @@
-export type ImportJobStatus = 'queued' | 'running' | 'canceling' | 'cancelled' | 'completed' | 'failed';
+import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardFaction } from '@/domain/cards/cardFactions';
+import type { CardPool } from '@/domain/cards/cardPools';
+import type { ManaFamily } from '@/domain/cards/manaFamilies';
+
+export type ImportJobStatus =
+  | 'queued'
+  | 'running'
+  | 'canceling'
+  | 'cancelled'
+  | 'completed'
+  | 'failed';
 
 export type ContentVersion = {
   id: string;
@@ -17,6 +28,25 @@ export type ImportJob = {
   processed_items: number;
   created_at: string;
   updated_at: string;
+  card_pool: CardPool;
+  card_role_mode: 'automatic' | 'override';
+  card_role_override: CardRole[];
+  card_faction_mode: 'automatic' | 'override';
+  card_faction_override: CardFaction[];
+  card_mana_family_mode: 'automatic' | 'override';
+  card_mana_family_override: ManaFamily[];
+  classification_rule_snapshot: {
+    schema_version: number;
+    card_pool: CardPool;
+    rules: Array<Record<string, unknown>>;
+    digest: string;
+  };
+};
+
+export type ImportWarning = {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
 };
 
 export type ImportJobItem = {
@@ -26,8 +56,30 @@ export type ImportJobItem = {
   error_message: string | null;
   warning_code: string | null;
   warning_message: string | null;
+  warnings: ImportWarning[];
+  resolved_card_roles: CardRole[];
+  resolved_card_factions: CardFaction[];
+  resolved_card_mana_families: ManaFamily[];
+  classification_inference: Record<string, unknown>;
+  target_card_id: string | null;
+  target_card_version_id: string | null;
+  target_card_pool_snapshot: CardPool | null;
+  target_card_roles_snapshot: CardRole[];
+  target_card_factions_snapshot: CardFaction[];
+  target_card_mana_families_snapshot: ManaFamily[];
+  card_tab_url: string | null;
+  classification_review?: {
+    id: string;
+    status: 'open' | 'resolved' | 'dismissed';
+    url: string;
+  } | null;
 };
 
 export type ImportJobDetail = ImportJob & {
   items: ImportJobItem[];
+};
+
+export type CreateImportJobResponse = ImportJob & {
+  job_id: string;
+  idempotent_replay: boolean;
 };

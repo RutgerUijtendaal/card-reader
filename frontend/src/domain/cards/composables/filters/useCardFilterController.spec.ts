@@ -1,14 +1,31 @@
-import { describe, expect, test } from 'vitest';
+import { nextTick, ref } from 'vue';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { fetchCardFilters } from '@/domain/cards/api';
 import { useCardFilterController } from '@/domain/cards/composables/filters/useCardFilterController';
+
+vi.mock('@/domain/cards/api', () => ({
+  fetchCardFilters: vi.fn(),
+}));
+
+const emptyFilters = {
+  keywords: [],
+  tags: [],
+  symbols: [],
+  types: [],
+};
+
+afterEach(() => {
+  vi.mocked(fetchCardFilters).mockReset();
+});
 
 describe('useCardFilterController', () => {
   test('resets grouped filter values through the shared sections adapter', () => {
     const controller = useCardFilterController();
     const state = controller.filterSectionsState.value;
 
-    state.onUpdateSelectedManaTypeSymbolIds(['mana-1']);
-    state.onUpdateExcludedManaTypeSymbolIds(['mana-2']);
-    state.onUpdateManaSymbolMatch('all');
+    state.onUpdateSelectedManaFamilyIds(['mana-1']);
+    state.onUpdateExcludedManaFamilyIds(['mana-2']);
+    state.onUpdateManaFamilyMatch('all');
     state.onUpdateManaCostMin('1');
     state.onUpdateManaCostMax('4');
     state.onUpdateSelectedKeywordIds(['keyword-1']);
@@ -16,14 +33,32 @@ describe('useCardFilterController', () => {
     state.onUpdateSelectedTypeIds(['type-1']);
     state.onUpdateExcludedTypeIds(['type-2']);
     state.onUpdateTypeMatch('all');
+    state.onUpdateCardPool('evil');
+    state.onUpdateSelectedCardRoles(['boss']);
+    state.onUpdateExcludedCardRoles([]);
+    state.onUpdateCardRoleMatch('all');
+    state.onUpdateSelectedCardFactions(['order']);
+    state.onUpdateExcludedCardFactions(['blood']);
+    state.onUpdateCardFactionMatch('all');
 
     state.resetManaGroup();
     state.resetKeywordGroup();
     state.resetTypeGroup();
+    state.resetCardRoleGroup();
 
-    expect(controller.selectionState.value.manaTypeSymbolIds).toEqual([]);
-    expect(controller.selectionState.value.manaTypeSymbolExcludeIds).toEqual([]);
-    expect(controller.selectionState.value.manaSymbolMatch).toBe('any');
+    expect(controller.selectionState.value.cardPool).toBe('evil');
+    expect(controller.selectionState.value.cardRoleIds).toEqual([]);
+    expect(controller.selectionState.value.cardRoleExcludeIds).toEqual([]);
+    expect(controller.selectionState.value.cardRoleMatch).toBe('any');
+    expect(controller.selectionState.value.cardFactionIds).toEqual(['order']);
+    expect(controller.selectionState.value.cardFactionExcludeIds).toEqual(['blood']);
+    expect(controller.selectionState.value.cardFactionMatch).toBe('all');
+
+    state.resetCardFactionGroup();
+
+    expect(controller.selectionState.value.manaFamilyIds).toEqual([]);
+    expect(controller.selectionState.value.manaFamilyExcludeIds).toEqual([]);
+    expect(controller.selectionState.value.manaFamilyMatch).toBe('any');
     expect(controller.selectionState.value.manaCostMin).toBe('');
     expect(controller.selectionState.value.manaCostMax).toBe('');
     expect(controller.selectionState.value.keywordIds).toEqual([]);
@@ -31,5 +66,80 @@ describe('useCardFilterController', () => {
     expect(controller.selectionState.value.typeIds).toEqual([]);
     expect(controller.selectionState.value.typeExcludeIds).toEqual([]);
     expect(controller.selectionState.value.typeMatch).toBe('any');
+    expect(controller.selectionState.value.cardPool).toBe('evil');
+    expect(controller.selectionState.value.cardRoleExcludeIds).toEqual([]);
+    expect(controller.selectionState.value.cardFactionIds).toEqual([]);
+    expect(controller.selectionState.value.cardFactionExcludeIds).toEqual([]);
+    expect(controller.selectionState.value.cardFactionMatch).toBe('any');
+  });
+
+  test('discards filter metadata that resolves after the result set changes', async () => {
+    let resolveFirst: ((value: typeof emptyFilters) => void) | undefined;
+    const firstResponse = new Promise<typeof emptyFilters>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const currentResponse = {
+      ...emptyFilters,
+      tags: [{ id: 'current-tag', label: 'Current tag', key: 'current-tag' }],
+    };
+    vi.mocked(fetchCardFilters)
+      .mockReturnValueOnce(firstResponse)
+      .mockResolvedValueOnce(currentResponse);
+    const resultSetKey = ref(0);
+    const controller = useCardFilterController({ resultSetKey });
+
+    const firstLoad = controller.loadFilters();
+    resultSetKey.value = 1;
+    await nextTick();
+    resolveFirst?.(emptyFilters);
+    await firstLoad;
+    await vi.waitFor(() => {
+      expect(controller.filtersLoaded.value).toBe(true);
+    });
+
+    expect(controller.filters.value).toEqual(currentResponse);
+  });
+
+  test('binds filter metadata authority to the requested pool', async () => {
+    let resolvePlayer: ((value: typeof emptyFilters) => void) | undefined;
+    const playerResponse = new Promise<typeof emptyFilters>((resolve) => {
+      resolvePlayer = resolve;
+    });
+    const evilResponse = {
+      ...emptyFilters,
+      tags: [{ id: 'evil-tag', label: 'Evil tag', key: 'evil-tag' }],
+    };
+    vi.mocked(fetchCardFilters)
+      .mockReturnValueOnce(playerResponse)
+      .mockResolvedValueOnce(evilResponse);
+    const resultSetKey = ref(0);
+    const cardPool = ref<'player' | 'evil'>('player');
+    const controller = useCardFilterController({ resultSetKey, cardPool });
+
+    const firstLoad = controller.loadFilters();
+    cardPool.value = 'evil';
+    resultSetKey.value = 1;
+    await nextTick();
+    resolvePlayer?.(emptyFilters);
+    await firstLoad;
+    await vi.waitFor(() => {
+      expect(controller.filtersLoaded.value).toBe(true);
+    });
+
+    expect(fetchCardFilters).toHaveBeenNthCalledWith(1, 'player');
+    expect(fetchCardFilters).toHaveBeenNthCalledWith(2, 'evil');
+    expect(controller.filters.value).toEqual(evilResponse);
+  });
+
+  test('records a current request failure without treating it as loaded metadata', async () => {
+    const failure = new Error('filter metadata unavailable');
+    vi.mocked(fetchCardFilters).mockRejectedValueOnce(failure);
+    const controller = useCardFilterController({ cardPool: ref<'player'>('player') });
+
+    await expect(controller.loadFilters()).rejects.toThrow('filter metadata unavailable');
+
+    expect(controller.filtersLoaded.value).toBe(false);
+    expect(controller.filtersError.value).toBe(failure);
+    expect(controller.filters.value).toEqual(emptyFilters);
   });
 });

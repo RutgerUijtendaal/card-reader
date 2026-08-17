@@ -14,6 +14,7 @@ from card_reader_core.models import (
     NOTIFICATION_EVENT_DECK_CARD_VERSION_CHANGED,
     NOTIFICATION_EVENT_PARSE_FLAG_ITEM_REVIEWED,
     Card,
+    CardRoleAssignment,
     CardVersion,
     CardVersionImage,
     Deck,
@@ -29,16 +30,29 @@ def test_notification_examples_seed_real_layout_data_idempotently() -> None:
         password="ValidPassword123!",
         is_staff=True,
     )
+    _create_versioned_card(
+        key="0-notification-gm-hero",
+        name="Notification GM Hero",
+        hero=True,
+        with_history=False,
+        card_pool="evil",
+    )
+    _create_versioned_card(
+        key="0-notification-gm-change",
+        name="Notification GM Change",
+        hero=False,
+        card_pool="evil",
+    )
     hero, _hero_previous, _hero_current = _create_versioned_card(
         key="z-notification-hero",
         name="Notification Hero",
-        is_hero=True,
+        hero=True,
         with_history=False,
     )
     card, previous, current = _create_versioned_card(
         key="a-notification-change",
         name="Notification Change",
-        is_hero=False,
+        hero=False,
     )
 
     first = seed_notification_examples(username=user.username)
@@ -98,11 +112,14 @@ def _create_versioned_card(
     *,
     key: str,
     name: str,
-    is_hero: bool,
+    hero: bool,
     with_history: bool = True,
+    card_pool: str = "player",
 ) -> tuple[Card, CardVersion | None, CardVersion]:
     template = Template.objects.get(key="mtg-like-v1")
-    card = Card.objects.create(key=key, label=name, is_hero=is_hero)
+    card = Card.objects.create(key=key, label=name, card_pool=card_pool)
+    if hero:
+        CardRoleAssignment.objects.create(card=card, role="hero")
     previous = (
         _create_card_version(
             card=card,
@@ -142,7 +159,7 @@ def _create_card_version(
         template=template,
         image_hash=f"{card.key}-{version_number}",
         name=name,
-        type_line="Hero" if card.is_hero else "Persistent Spell",
+        type_line="Hero" if card.role_assignments.filter(role="hero").exists() else "Persistent Spell",
         mana_cost="1",
         mana_symbols_json=[],
         mana_value=1,

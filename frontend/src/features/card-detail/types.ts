@@ -1,11 +1,19 @@
 import type { CardDeckReferenceSummary } from '@/domain/card-deck-references/types';
 import type { CardGroupSummary, MetadataGroupName, ScalarFieldName } from '@/domain/cards/types';
 import type { CardLifecycleStatus } from '@/domain/cards/utils/filters/cardLifecycle';
+import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardFaction } from '@/domain/cards/cardFactions';
+import type { CardPool } from '@/domain/cards/cardPools';
+import type { ManaFamily } from '@/domain/cards/manaFamilies';
 
 export type CardDetail = {
   id: string;
   label: string;
   name: string;
+  card_pool: CardPool;
+  card_roles: CardRole[];
+  card_factions: CardFaction[];
+  card_mana_families: ManaFamily[];
   lifecycle_status?: CardLifecycleStatus;
   card_groups: CardGroupSummary[];
   deck_references: CardDeckReferenceSummary[];
@@ -20,7 +28,10 @@ export type EditorForm = {
   attack: string;
   health: string;
   rules_text: string;
-  is_hero: boolean;
+  card_pool: CardPool;
+  card_roles: CardRole[];
+  card_factions: CardFaction[];
+  card_mana_families: ManaFamily[];
   deck_building_config: string;
   lifecycle_status: CardLifecycleStatus;
   keyword_ids: string[];

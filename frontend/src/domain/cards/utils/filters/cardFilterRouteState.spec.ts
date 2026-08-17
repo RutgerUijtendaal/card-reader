@@ -3,6 +3,7 @@ import { createEmptyCardFilterState } from '@/domain/cards/utils/filters/cardFil
 import {
   buildCardFilterRouteQuery,
   getCardFilterSignature,
+  isCardFilterStateReady,
   parseCardFilterRouteQuery,
 } from '@/domain/cards/utils/filters/cardFilterRouteState';
 
@@ -24,7 +25,7 @@ describe('cardFilterRouteState', () => {
     expect(state).toMatchObject({
       query: 'dragons',
       keywordKeys: ['dragon', 'flying'],
-      manaSymbolKeys: ['mana-fire', 'mana-water'],
+      manaFamilyKeys: ['mana-fire', 'mana-water'],
       otherSymbolKeys: ['tap'],
       typeKeys: ['creature'],
       typeExcludeKeys: ['spell'],
@@ -44,9 +45,9 @@ describe('cardFilterRouteState', () => {
       mana_family_match: 'all',
     });
 
-    expect(state.manaSymbolKeys).toEqual(['arcane', 'dark']);
-    expect(state.manaSymbolExcludeKeys).toEqual(['primal']);
-    expect(state.manaSymbolMatch).toBe('all');
+    expect(state.manaFamilyKeys).toEqual(['arcane', 'dark']);
+    expect(state.manaFamilyExcludeKeys).toEqual(['primal']);
+    expect(state.manaFamilyMatch).toBe('all');
   });
 
   test('round-trips non-default lifecycle status through route query state', () => {
@@ -60,6 +61,39 @@ describe('cardFilterRouteState', () => {
     expect(
       buildCardFilterRouteQuery(parseCardFilterRouteQuery({ lifecycle_status: 'active' })),
     ).toEqual({});
+  });
+
+  test('round-trips final roles and factions through independent filters', () => {
+    const state = parseCardFilterRouteQuery({
+      card_roles: ['location', 'event', 'boss', 'shop_item'],
+      card_role_exclude: 'boon',
+      card_factions: ['metal', 'dark', 'order', 'unsupported'],
+      card_faction_exclude: 'blood',
+      card_faction_match: 'all',
+    });
+
+    expect(state.cardRoleKeys).toEqual(['boss', 'event', 'location', 'shop_item']);
+    expect(state.cardRoleExcludeKeys).toEqual(['boon']);
+    expect(state.cardFactionKeys).toEqual(['dark', 'metal', 'order']);
+    expect(state.cardFactionExcludeKeys).toEqual(['blood']);
+    expect(state.cardFactionMatch).toBe('all');
+    expect(buildCardFilterRouteQuery(state)).toMatchObject({
+      card_roles: ['boss', 'event', 'location', 'shop_item'],
+      card_role_exclude: ['boon'],
+      card_factions: ['dark', 'metal', 'order'],
+      card_faction_exclude: ['blood'],
+      card_faction_match: 'all',
+    });
+  });
+
+  test('serializes Evil and Neutral explicitly and normalizes obsolete pools to Player', () => {
+    expect(buildCardFilterRouteQuery(parseCardFilterRouteQuery({ card_pool: 'evil' }))).toEqual({
+      card_pool: 'evil',
+    });
+    expect(buildCardFilterRouteQuery(parseCardFilterRouteQuery({ card_pool: 'neutral' }))).toEqual({
+      card_pool: 'neutral',
+    });
+    expect(parseCardFilterRouteQuery({ card_pool: 'unknown' }).cardPool).toBe('player');
   });
 
   test('produces a stable signature for equivalent filter selections', () => {
@@ -79,5 +113,14 @@ describe('cardFilterRouteState', () => {
     );
 
     expect(left).toBe(right);
+  });
+
+  test('marks route-backed actions ready only after filters match the route', () => {
+    const playerState = createEmptyCardFilterState('player');
+    const evilState = createEmptyCardFilterState('evil');
+
+    expect(isCardFilterStateReady(false, evilState, evilState)).toBe(false);
+    expect(isCardFilterStateReady(true, playerState, evilState)).toBe(false);
+    expect(isCardFilterStateReady(true, evilState, evilState)).toBe(true);
   });
 });

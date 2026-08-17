@@ -3,14 +3,21 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import AppHotkeysPanel from '@/app/components/AppHotkeysPanel.vue';
 
-const { authState } = vi.hoisted(() => ({
+const { authState, workspaceState } = vi.hoisted(() => ({
   authState: {
     authenticated: true,
+  },
+  workspaceState: {
+    activePool: 'player' as 'player' | 'evil' | 'neutral',
   },
 }));
 
 vi.mock('@/domain/session/store', () => ({
   useAuthStore: () => authState,
+}));
+
+vi.mock('@/domain/cards/cardPoolWorkspace', () => ({
+  useCardPoolWorkspaceStore: () => workspaceState,
 }));
 
 vi.mock('@/shared/composables/useFloatingPopover', async () => {
@@ -68,6 +75,7 @@ describe('AppHotkeysPanel', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     authState.authenticated = true;
+    workspaceState.activePool = 'player';
   });
 
   test('shows default hotkeys away from the active playtester route', async () => {
@@ -77,6 +85,7 @@ describe('AppHotkeysPanel', () => {
     expect(mounted.container.textContent).toContain('Search');
     expect(mounted.container.textContent).toContain('New Deck');
     expect(mounted.container.textContent).not.toContain('Shuffle');
+    expect(mounted.container.querySelector('[data-hotkey-count]')?.getAttribute('data-hotkey-count')).toBe('4');
 
     mounted.unmount();
   });
@@ -92,6 +101,17 @@ describe('AppHotkeysPanel', () => {
     expect(mounted.container.textContent).not.toContain('Shuffle');
     expect(mounted.container.textContent).not.toContain('Search and quick actions');
     expect(mounted.container.textContent).not.toContain('New Deck');
+
+    mounted.unmount();
+  });
+
+  test('hides the Player-only New Deck shortcut in non-Player workspaces', async () => {
+    workspaceState.activePool = 'evil';
+    const mounted = await mountPanel('/cards');
+
+    expect(mounted.container.textContent).toContain('Search');
+    expect(mounted.container.textContent).not.toContain('New Deck');
+    expect(mounted.container.querySelector('[data-hotkey-count]')?.getAttribute('data-hotkey-count')).toBe('3');
 
     mounted.unmount();
   });
@@ -146,6 +166,7 @@ describe('AppHotkeysPanel', () => {
     );
 
     expect(trigger).not.toBeNull();
+    expect(trigger?.parentElement?.classList.contains('justify-center')).toBe(true);
     expect(mounted.container.textContent?.trim()).toBe('');
     trigger?.click();
     await nextTick();

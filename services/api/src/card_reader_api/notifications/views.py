@@ -29,7 +29,11 @@ class NotificationSummaryView(APIView):
         user_id = _notification_user_id(request)
         if user_id is None:
             return Response({"unread_count": 0})
-        return Response({"unread_count": count_unread_notifications(user_id)})
+        return Response(
+            {
+                "unread_count": count_unread_notifications(user_id)
+            }
+        )
 
 
 class NotificationListView(APIView):
@@ -106,7 +110,9 @@ class MarkAllNotificationsReadView(APIView):
         user_id = _notification_user_id(request)
         if user_id is None:
             return Response({"detail": "Authentication required."}, status=status.HTTP_403_FORBIDDEN)
-        updated_count = mark_all_notifications_read(user_id)
+        updated_count = mark_all_notifications_read(
+            user_id,
+        )
         return Response({"updated_count": updated_count, "unread_count": 0})
 
 

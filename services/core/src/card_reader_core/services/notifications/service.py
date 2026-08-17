@@ -11,9 +11,13 @@ from card_reader_core.models import (
     Card,
     CardVersionParseFlagItem,
     Deck,
+    PLAYER_CARD_POOL,
     UserNotification,
 )
-from card_reader_core.repositories.notifications import NotificationInput, create_or_coalesce_notification
+from card_reader_core.repositories.notifications import (
+    NotificationInput,
+    create_or_coalesce_notification,
+)
 
 from .types import (
     DECK_CARD_VERSION_CHANGE_IMPORT_CREATED,
@@ -103,7 +107,7 @@ class NotificationService:
         import_item_id: str | None = None,
     ) -> list[UserNotification]:
         card = Card.objects.filter(id=card_id).first()
-        if card is None:
+        if card is None or card.card_pool != PLAYER_CARD_POOL:
             return []
 
         decks = (
@@ -141,7 +145,11 @@ class NotificationService:
         import_item_id: str | None = None,
     ) -> UserNotification | None:
         owner_id = str(getattr(deck.owner, "pk", ""))
-        if not owner_id or owner_id == actor_id:
+        if (
+            card.card_pool != PLAYER_CARD_POOL
+            or not owner_id
+            or owner_id == actor_id
+        ):
             return None
         card_name = card.label
         return self.notify(

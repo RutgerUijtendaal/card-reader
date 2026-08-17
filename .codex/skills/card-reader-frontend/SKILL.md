@@ -5,7 +5,7 @@ description: Work on the Card Reader Vue frontend for gallery, review, imports, 
 
 # Card Reader Frontend
 
-Follow `AGENTS.md` first. Use this skill both when implementing frontend changes and when reviewing them. It should help place code correctly and preserve the repo's existing UI and state patterns.
+Follow `AGENTS.md` first. Use this skill both when implementing frontend changes and when reviewing them. Add `card-reader-classification`, `card-reader-developer-data`, `card-reader-notifications`, `card-reader-playtester`, or `card-reader-tts` when a change enters one of those specialized workflows.
 
 ## Core Rules
 
@@ -16,6 +16,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Keep reusable card queries, filters, gallery behavior, sorting, symbols, preferences, and card UI in `frontend/src/domain/cards`.
 - Keep reusable deck contracts, clients, constraints, calculations, exports, route helpers, tags, and deck UI in `frontend/src/domain/decks`; use `frontend/src/domain/deck-building` for contracts shared with cards.
 - Keep app bootstrap, routing, shell navigation/hotkeys, theme orchestration, and global styles in `frontend/src/app`.
+- Keep icons consistent across matching sidebar links and page headers. Source stable section icons from `frontend/src/shared/components/app/appSectionIcons.ts`, and pool-aware Gallery icons from the cards-domain pool icon mapping; never import separate icons for the two surfaces.
 - Keep generic API infrastructure, form/modal/layout controls, floating UI, keyboard/pointer helpers, and generic composables in `frontend/src/shared`.
 - Keep Axios calls in the focused `api.ts` or `api/*` client owned by the relevant feature or domain. Pages, components, stores, and workflow composables consume typed client functions instead of the shared Axios instance.
 - Co-locate unit and component specs with their source. Use a feature `tests/` directory only for scenarios spanning several source files.
@@ -35,6 +36,9 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Avoid overusing containers and card shells. Prefer letting controls and content float on the app background when hierarchy remains clear, using dividers, spacing, accent lines, and selected states for visual separation between sections.
 - Keep user-facing page and section descriptions focused on the enduring purpose and end result of the screen; avoid copy that calls out specific implementation details, temporary workflow mechanics, or design decisions that may look out of place as the page grows.
 - Verify visible UI in both light and dark modes.
+- Treat Player, Evil, and Neutral card data as equally public. Do not model pool entitlements or redact card payloads by viewer.
+- Treat the selected pool as ordinary workspace context only. Admin and Review remain global, and new imports must start without inherited pool or template defaults.
+- Keep Gallery facet visibility, hidden-state sanitation, and pool-scoped catalog reconciliation in the cards-domain Gallery policy; do not leak that policy into Admin, Review, or purpose-specific deck filters.
 - Model multi-phase workflows with tagged states rather than overlapping booleans, and cover their allowed transition table with tests.
 - When an uncertain state includes active reconciliation and a later user-decision phase, encode that phase in the tagged state so route guards block only while background completion may still navigate.
 - Capture an immutable request payload and idempotency key before uncertain mutations; retries must reuse both exactly.
@@ -68,7 +72,8 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 9. If the change touches deck-building constraints, load defaults/examples from the backend metadata endpoint and keep frontend fallbacks covered by tests.
 10. If the change touches a routed page with initial data fetching, preserve or add a page-shaped skeleton that matches the loaded layout.
 11. If the change touches visible UI, preserve token-backed theme behavior and verify both light and dark modes.
-12. Co-locate affected specs, then run targeted tests, lint, and typecheck; run the build when entrypoints, routing, aliases, or lint configuration change.
+12. If the change touches workspace or pool state, test direct navigation, anonymous access, rapid workspace changes, and global Admin/Review behavior as applicable.
+13. Co-locate affected specs, then run targeted tests, lint, and typecheck; run the build when entrypoints, routing, aliases, or lint configuration change.
 
 ## Review Focus
 
@@ -86,11 +91,14 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Page layouts that reintroduce max-height primary list containers instead of using shell page scroll with sticky/bounded asides
 - Routed pages that show empty states, partial controls, or text-only loading while initial page data is still loading
 - Theme drift from raw colors, light-only assumptions, or component-local styling systems
+- Sidebar and page-header icons that represent the same section but do not consume the same shared icon definition
 - Unnecessary framed containers where divider-separated, background-floating content would be clearer and more consistent
 - UI changes verified in one theme only
 - Missing validation for touched frontend behavior
 - Flag combinations that encode hidden workflow phases, mutable retry payloads, cleanup that gates confirmed success, or tabs that silently overwrite storage
 - Deck-building defaults or example JSON copied into UI code without a backend metadata source or fallback test
+- Pool entitlement fields, viewer-dependent card redaction, or global staff screens accidentally scoped by workspace
+- Hidden Gallery filter state surviving in routes or requests, or failed catalog loads erasing selections
 
 ## File Hotspots
 

@@ -1,7 +1,7 @@
 <template>
   <section class="flex flex-col gap-6">
     <AppPageHeader
-      :icon="Upload"
+      :icon="APP_SECTION_ICONS.imports"
       title="Imports"
       subtitle="Configure card image imports and follow their progress."
       title-tag="h2"
@@ -59,14 +59,185 @@
               description="Choose how the uploaded cards should be interpreted."
             >
               <div class="grid gap-5 md:grid-cols-2">
-                <label class="field-label md:col-span-2">
+                <label class="field-label">
                   Template
                   <AppSelect
                     v-model="pickerTemplateId"
                     :options="templateOptions"
+                    placeholder="Select a template"
+                    placeholder-disabled
+                    :disabled="formLocked"
                     required
                   />
                 </label>
+                <label class="field-label">
+                  Card pool
+                  <AppSelect
+                    :model-value="cardPool"
+                    :options="cardPoolOptions"
+                    placeholder="Select a card pool"
+                    placeholder-disabled
+                    :disabled="formLocked"
+                    required
+                    @update:model-value="setCardPool"
+                  />
+                </label>
+                <fieldset class="theme-divider space-y-3 border-t pt-4 md:col-span-2">
+                  <legend class="field-label">
+                    Card roles
+                  </legend>
+                  <div class="flex flex-wrap gap-3">
+                    <label class="theme-section-title inline-flex items-center gap-2 text-sm">
+                      <input
+                        v-model="cardRoleMode"
+                        type="radio"
+                        value="automatic"
+                        :disabled="formLocked"
+                      >
+                      Automatic
+                    </label>
+                    <label class="theme-section-title inline-flex items-center gap-2 text-sm">
+                      <input
+                        v-model="cardRoleMode"
+                        type="radio"
+                        value="override"
+                        :disabled="formLocked"
+                      >
+                      Override
+                    </label>
+                  </div>
+                  <p class="theme-section-muted mt-1 text-sm">
+                    Automatic uses matching Tag, Type, and Symbol rules for this pool. Override uses exactly these roles for every card in the batch.
+                  </p>
+                  <div
+                    v-if="cardRoleMode === 'override'"
+                    class="flex flex-wrap gap-3"
+                  >
+                    <label
+                      v-for="option in cardRoleOptions"
+                      :key="option.value"
+                      class="theme-section-title inline-flex items-center gap-2 text-sm"
+                    >
+                      <input
+                        v-model="cardRoleOverride"
+                        type="checkbox"
+                        :value="option.value"
+                        :disabled="formLocked"
+                      >
+                      {{ option.label }}
+                    </label>
+                    <span
+                      v-if="cardRoleOverride.length === 0"
+                      class="theme-section-muted basis-full text-sm"
+                    >
+                      Normal — no special roles
+                    </span>
+                  </div>
+                </fieldset>
+                <fieldset class="theme-divider space-y-3 border-t pt-4 md:col-span-2">
+                  <legend class="field-label">
+                    Card factions
+                  </legend>
+                  <div class="flex flex-wrap gap-3">
+                    <label class="theme-section-title inline-flex items-center gap-2 text-sm">
+                      <input
+                        v-model="cardFactionMode"
+                        type="radio"
+                        value="automatic"
+                        :disabled="formLocked"
+                      >
+                      Automatic
+                    </label>
+                    <label class="theme-section-title inline-flex items-center gap-2 text-sm">
+                      <input
+                        v-model="cardFactionMode"
+                        type="radio"
+                        value="override"
+                        :disabled="formLocked"
+                      >
+                      Override
+                    </label>
+                  </div>
+                  <p class="theme-section-muted mt-1 text-sm">
+                    Automatic uses matching Tag, Type, and Symbol rules for this pool. Override uses exactly these factions for every card in the batch.
+                  </p>
+                  <div
+                    v-if="cardFactionMode === 'override'"
+                    class="flex flex-wrap gap-3"
+                  >
+                    <label
+                      v-for="option in cardFactionOptions"
+                      :key="option.value"
+                      class="theme-section-title inline-flex items-center gap-2 text-sm"
+                    >
+                      <input
+                        v-model="cardFactionOverride"
+                        type="checkbox"
+                        :value="option.value"
+                        :disabled="formLocked"
+                      >
+                      {{ option.label }}
+                    </label>
+                    <span
+                      v-if="cardFactionOverride.length === 0"
+                      class="theme-section-muted basis-full text-sm"
+                    >
+                      No faction
+                    </span>
+                  </div>
+                </fieldset>
+                <fieldset class="theme-divider space-y-3 border-t pt-4 md:col-span-2">
+                  <legend class="field-label">
+                    Mana Families
+                  </legend>
+                  <div class="flex flex-wrap gap-3">
+                    <label class="theme-section-title inline-flex items-center gap-2 text-sm">
+                      <input
+                        v-model="cardManaFamilyMode"
+                        type="radio"
+                        value="automatic"
+                        :disabled="formLocked"
+                      >
+                      Automatic
+                    </label>
+                    <label class="theme-section-title inline-flex items-center gap-2 text-sm">
+                      <input
+                        v-model="cardManaFamilyMode"
+                        type="radio"
+                        value="override"
+                        :disabled="formLocked"
+                      >
+                      Override
+                    </label>
+                  </div>
+                  <p class="theme-section-muted mt-1 text-sm">
+                    Automatic uses matching Tag, Type, and Symbol rules for this pool. Override uses exactly these Mana Families for every card in the batch.
+                  </p>
+                  <div
+                    v-if="cardManaFamilyMode === 'override'"
+                    class="flex flex-wrap gap-3"
+                  >
+                    <label
+                      v-for="option in manaFamilyOptions"
+                      :key="option.value"
+                      class="theme-section-title inline-flex items-center gap-2 text-sm"
+                    >
+                      <input
+                        v-model="cardManaFamilyOverride"
+                        type="checkbox"
+                        :value="option.value"
+                        :disabled="formLocked"
+                      >
+                      {{ option.label }}
+                    </label>
+                    <span
+                      v-if="cardManaFamilyOverride.length === 0"
+                      class="theme-section-muted basis-full text-sm"
+                    >
+                      Colorless
+                    </span>
+                  </div>
+                </fieldset>
               </div>
 
               <p
@@ -122,6 +293,7 @@
                       pattern="[0-9]+\.[0-9]+"
                       placeholder="14.1"
                       autocomplete="off"
+                      :disabled="formLocked"
                       :aria-invalid="contentVersionBaseError.length > 0"
                       aria-describedby="content-version-base-help content-version-patch-help"
                       required
@@ -164,6 +336,7 @@
                   <textarea
                     v-model="contentVersionDescription"
                     class="input-base min-h-28 resize-y"
+                    :disabled="formLocked"
                     required
                   />
                 </label>
@@ -175,12 +348,14 @@
               title="Source images"
               description="Add one image or a folder of supported card images."
             >
-              <ImportSourcePicker
-                :files="pickedFiles"
-                :reset-key="fileInputKey"
-                @select="setPickedFiles"
-                @clear="clearPickedFiles"
-              />
+              <div :class="formLocked ? 'pointer-events-none opacity-60' : ''">
+                <ImportSourcePicker
+                  :files="pickedFiles"
+                  :reset-key="fileInputKey"
+                  @select="setPickedFiles"
+                  @clear="clearPickedFiles"
+                />
+              </div>
             </AppFormSection>
 
             <div
@@ -200,13 +375,23 @@
                 The import will be added to the parser queue.
               </span>
               <button
+                v-if="createState.phase === 'uncertain'"
+                class="btn-secondary"
+                type="button"
+                @click="abandonPendingAttempt"
+              >
+                Abandon attempt and edit
+              </button>
+              <button
                 class="btn-primary w-full justify-center sm:w-auto sm:min-w-44"
                 type="submit"
                 :disabled="
                   pickedFiles.length === 0 ||
                     templates.length === 0 ||
+                    pickerTemplateId === null ||
+                    cardPool === null ||
                     !hasValidVersionInput ||
-                    creatingJob
+                    creatingJob || createState.phase === 'reconciling'
                 "
               >
                 {{ submitButtonLabel }}
@@ -221,6 +406,7 @@
           <ImportActivityPanel
             :active-jobs="activeJobs"
             :recent-jobs="recentJobs"
+            :template-label-by-key="templateLabelByKey"
             :active-loaded="activeJobsLoaded"
             :history-loaded="historyLoaded"
             :refreshing="isRefreshing"
@@ -230,8 +416,12 @@
             :canceling-count="cancelingCount"
             :cancelling-job-ids="cancellingJobIds"
             :last-refreshed-at="lastRefreshedAt"
+            :selected-job-detail="selectedJobDetail"
+            :detail-loading="detailLoading"
             @refresh="refreshActivity"
             @cancel="cancelJob"
+            @view="viewJobDetail"
+            @close-detail="closeJobDetail"
           />
         </div>
       </div>
@@ -240,18 +430,32 @@
 </template>
 
 <script setup lang="ts">
-import { Info, Upload } from 'lucide-vue-next';
+import { CARD_ROLE_OPTIONS } from '@/domain/cards/cardRoles';
+import { CARD_FACTION_OPTIONS } from '@/domain/cards/cardFactions';
+import { CARD_POOL_OPTIONS } from '@/domain/cards/cardPools';
+import { MANA_FAMILY_OPTIONS } from '@/domain/cards/manaFamilies';
+import { Info } from 'lucide-vue-next';
 import { computed } from 'vue';
+import { onBeforeRouteLeave } from 'vue-router';
 import ImportActivityPanel from '@/features/import-jobs/components/ImportActivityPanel.vue';
 import ImportSourcePicker from '@/features/import-jobs/components/ImportSourcePicker.vue';
 import { useImportJobsController } from '@/features/import-jobs/composables/useImportJobsController';
+import { useAuthStore } from '@/domain/session/store';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
+import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppFormSection from '@/shared/components/app/AppFormSection.vue';
 import AppSelect from '@/shared/components/app/AppSelect.vue';
 
 const {
   pickerTemplateId,
+  cardPool,
+  cardRoleMode,
+  cardRoleOverride,
+  cardFactionMode,
+  cardFactionOverride,
+  cardManaFamilyMode,
+  cardManaFamilyOverride,
   contentVersionBase,
   contentVersionDescription,
   currentContentVersion,
@@ -270,20 +474,46 @@ const {
   cancellingJobIds,
   lastRefreshedAt,
   templates,
+  selectedJobDetail,
+  detailLoading,
   queuedCount,
   runningCount,
   cancelingCount,
   contentVersionBaseError,
   hasValidVersionInput,
   submitButtonLabel,
+  formLocked,
+  hasUnresolvedCreateAttempt,
+  createState,
   refreshActivity,
   createJobFromPicker,
   cancelJob,
+  viewJobDetail,
+  closeJobDetail,
   setPickedFiles,
+  setCardPool,
   clearPickedFiles,
+  abandonPendingAttempt,
 } = useImportJobsController();
+const auth = useAuthStore();
 
 const templateOptions = computed(() =>
-  templates.value.map((item) => ({ value: item.key, label: `${item.label} (${item.key})` })),
+  templates.value.map((item) => ({ value: item.key, label: item.label })),
 );
+const templateLabelByKey = computed<Record<string, string>>(() =>
+  Object.fromEntries(templates.value.map((item) => [item.key, item.label])),
+);
+const cardPoolOptions = CARD_POOL_OPTIONS;
+const cardRoleOptions = CARD_ROLE_OPTIONS;
+const cardFactionOptions = CARD_FACTION_OPTIONS;
+const manaFamilyOptions = MANA_FAMILY_OPTIONS;
+
+onBeforeRouteLeave(() => {
+  if (!auth.canAccessStaffRoutes) return true;
+  if (!hasUnresolvedCreateAttempt.value) return true;
+  if (createState.value.phase !== 'uncertain') return false;
+  return globalThis.confirm(
+    'The outcome of this import is still uncertain. Leaving now discards the locked retry details and can cause a duplicate import. Leave anyway?',
+  );
+});
 </script>

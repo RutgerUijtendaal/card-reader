@@ -1,4 +1,8 @@
 import type { DeckCardSummary, DeckUpsertRequest } from '@/domain/decks/types';
+import { isCardFaction } from '@/domain/cards/cardFactions';
+import { isCardPool } from '@/domain/cards/cardPools';
+import { isCardRole } from '@/domain/cards/cardRoles';
+import { isManaFamily } from '@/domain/cards/manaFamilies';
 import type {
   DeckForm,
   DeckFormEntry,
@@ -124,8 +128,16 @@ const normalizeEntries = (value: unknown): DeckFormEntry[] | null => {
 
 const normalizeSideboard = (value: unknown): DeckFormSideboard | null => {
   if (!isRecord(value) || typeof value.id !== 'string' || typeof value.name !== 'string') return null;
+  if (value.source_id !== undefined && typeof value.source_id !== 'string') return null;
   const entries = normalizeEntries(value.entries);
-  return entries === null ? null : { id: value.id, name: value.name, entries };
+  return entries === null
+    ? null
+    : {
+        id: value.id,
+        ...(value.source_id ? { source_id: value.source_id } : {}),
+        name: value.name,
+        entries,
+      };
 };
 
 const normalizeForm = (value: unknown): DeckForm | null => {
@@ -171,13 +183,36 @@ const isSymbolOption = (value: unknown): boolean =>
   && typeof value.text_token === 'string'
   && (value.asset_url === null || typeof value.asset_url === 'string');
 
-const isCardSnapshot = (value: unknown): value is DeckCardSummary =>
-  isRecord(value)
-  && value.result_type === 'card'
+const normalizeCardSnapshot = (value: unknown): DeckCardSummary | null => {
+  if (!isRecord(value)) return null;
+  let cardPool: DeckCardSummary['card_pool'];
+  let cardRoles: DeckCardSummary['card_roles'];
+  if (
+    isCardPool(value.card_pool)
+    && isStringArray(value.card_roles)
+    && value.card_roles.every(isCardRole)
+  ) {
+    cardPool = value.card_pool;
+    cardRoles = [...value.card_roles];
+  } else if (typeof value.is_hero === 'boolean') {
+    cardPool = 'player';
+    cardRoles = value.is_hero ? ['hero'] : [];
+  } else {
+    return null;
+  }
+  if (
+    (value.card_factions !== undefined
+      && (!isStringArray(value.card_factions) || !value.card_factions.every(isCardFaction)))
+    || (value.card_mana_families !== undefined
+      && (!isStringArray(value.card_mana_families)
+        || !value.card_mana_families.every(isManaFamily)))
+  ) {
+    return null;
+  }
+  if (!(value.result_type === 'card'
   && typeof value.id === 'string'
   && typeof value.key === 'string'
   && typeof value.label === 'string'
-  && typeof value.is_hero === 'boolean'
   && typeof value.template_id === 'string'
   && typeof value.version_id === 'string'
   && typeof value.version_number === 'number'
@@ -198,14 +233,24 @@ const isCardSnapshot = (value: unknown): value is DeckCardSummary =>
   && Array.isArray(value.tags) && value.tags.every(isMetadataOption)
   && Array.isArray(value.symbols) && value.symbols.every(isSymbolOption)
   && Array.isArray(value.types) && value.types.every(isMetadataOption)
-  && (value.image_url === null || typeof value.image_url === 'string');
+  && (value.image_url === null || typeof value.image_url === 'string'))) return null;
+
+  const normalized: Record<string, unknown> = {
+    ...value,
+    card_pool: cardPool,
+    card_roles: cardRoles,
+  };
+  delete normalized.is_hero;
+  return normalized as DeckCardSummary;
+};
 
 const normalizeCards = (value: unknown): Record<string, DeckCardSummary> | null => {
   if (!isRecord(value)) return null;
   const cards: Record<string, DeckCardSummary> = {};
   for (const card of Object.values(value)) {
-    if (!isCardSnapshot(card)) return null;
-    cards[card.id] = card;
+    const normalized = normalizeCardSnapshot(card);
+    if (normalized === null) return null;
+    cards[normalized.id] = normalized;
   }
   return cards;
 };

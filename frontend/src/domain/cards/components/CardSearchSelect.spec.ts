@@ -19,7 +19,7 @@ const buildCard = (overrides: Partial<CardListItem> = {}): CardListItem => ({
   result_type: 'card',
   image_url: '/card.png',
   label: 'Card 1',
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   template_id: 'template-1',
   version_id: 'version-1',
   version_number: 1,
@@ -137,6 +137,21 @@ describe('CardSearchSelect', () => {
 
     expect(mounted.select).toHaveBeenCalledWith(expect.objectContaining({ id: 'card-1' }));
     expect(document.body.querySelector('button[aria-label="Select Card 1"]')).not.toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('passes the selected card pool to the cards API', async () => {
+    const mounted = await mountSearch({ cardPool: 'evil' });
+
+    await typeSearch(mounted.input(), 'Event');
+
+    expect(mockedGet).toHaveBeenCalledWith('/cards', {
+      params: expect.objectContaining({
+        q: 'Event',
+        card_pool: 'evil',
+      }),
+    });
 
     mounted.unmount();
   });

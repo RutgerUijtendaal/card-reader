@@ -5,6 +5,7 @@ dist/
 coverage/
 __pycache__/
 .pytest_cache/
+pytest-cache-files-*/
 .mypy_cache/
 .ruff_cache/
 .venv/
@@ -31,6 +32,7 @@ services/*/build/
 .DS_Store
 .vscode/
 .idea/
+.codex/config.toml
 .tmp/
 services/integration/.runtime/
 *.spec

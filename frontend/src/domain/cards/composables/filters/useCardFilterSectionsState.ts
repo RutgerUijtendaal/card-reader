@@ -4,16 +4,16 @@ import type { CardFiltersResponse } from '@/domain/cards/types';
 import type { CardFilterCatalog } from '@/domain/cards/utils/filters/cardFilterSelection';
 import type { MetadataFavoriteGroup } from '@/domain/cards/composables/filters/useMetadataFilterFavorites';
 import type { ReturnTypeUseCardFilterState } from '@/domain/cards/composables/filters/useCardFilterState';
+import type { CardPool } from '@/domain/cards/cardPools';
 import type {
   CardFilterSectionsState,
   LifecycleFilterValue,
   MatchMode,
 } from '@/domain/cards/utils/filters/cardFilterSectionsState';
 
-const createArrayUpdater =
-  (target: { value: string[] }) =>
+const createArrayUpdater = <T extends string>(target: { value: T[] }) =>
   (value: string[]): void => {
-    target.value = value;
+    target.value = value as T[];
   };
 
 const createStringUpdater =
@@ -34,6 +34,12 @@ const createLifecycleUpdater =
     target.value = value;
   };
 
+const createCardPoolUpdater =
+  (target: { value: CardPool }) =>
+  (value: CardPool): void => {
+    target.value = value;
+  };
+
 export const useCardFilterSectionsState = (
   filterState: ReturnTypeUseCardFilterState,
   filters: Ref<CardFiltersResponse>,
@@ -41,10 +47,20 @@ export const useCardFilterSectionsState = (
   favoriteKeys: Record<MetadataFavoriteGroup, ComputedRef<string[]>>,
   toggleFavorite: (group: MetadataFavoriteGroup, key: string) => void,
 ) => {
+  const resetCardRoleGroup = (): void => {
+    filterState.cardRoleIds.value = [];
+    filterState.cardRoleExcludeIds.value = [];
+    filterState.cardRoleMatch.value = 'any';
+  };
+  const resetCardFactionGroup = (): void => {
+    filterState.cardFactionIds.value = [];
+    filterState.cardFactionExcludeIds.value = [];
+    filterState.cardFactionMatch.value = 'any';
+  };
   const resetManaGroup = (): void => {
-    filterState.manaTypeSymbolIds.value = [];
-    filterState.manaTypeSymbolExcludeIds.value = [];
-    filterState.manaSymbolMatch.value = 'any';
+    filterState.manaFamilyIds.value = [];
+    filterState.manaFamilyExcludeIds.value = [];
+    filterState.manaFamilyMatch.value = 'any';
     filterState.manaCostMin.value = '';
     filterState.manaCostMax.value = '';
   };
@@ -88,15 +104,46 @@ export const useCardFilterSectionsState = (
   };
 
   const filterSectionsState = computed<CardFilterSectionsState>(() => ({
+    cardPool: filterState.cardPool.value,
+    onUpdateCardPool: createCardPoolUpdater(filterState.cardPool),
+    cardPoolOptions: (filters.value.card_pools ?? []).map((option) => ({
+      id: option.key,
+      key: option.key,
+      label: option.label,
+    })),
+    selectedCardRoles: filterState.cardRoleIds.value,
+    onUpdateSelectedCardRoles: createArrayUpdater(filterState.cardRoleIds),
+    excludedCardRoles: filterState.cardRoleExcludeIds.value,
+    onUpdateExcludedCardRoles: createArrayUpdater(filterState.cardRoleExcludeIds),
+    cardRoleMatch: filterState.cardRoleMatch.value,
+    onUpdateCardRoleMatch: createMatchModeUpdater(filterState.cardRoleMatch),
+    cardRoleOptions: (filters.value.card_roles ?? []).map((option) => ({
+      id: option.key,
+      key: option.key,
+      label: option.label,
+    })),
+    selectedCardFactions: filterState.cardFactionIds.value,
+    onUpdateSelectedCardFactions: createArrayUpdater(filterState.cardFactionIds),
+    excludedCardFactions: filterState.cardFactionExcludeIds.value,
+    onUpdateExcludedCardFactions: createArrayUpdater(filterState.cardFactionExcludeIds),
+    cardFactionMatch: filterState.cardFactionMatch.value,
+    onUpdateCardFactionMatch: createMatchModeUpdater(filterState.cardFactionMatch),
+    cardFactionOptions: (filters.value.card_factions ?? []).map((option) => ({
+      id: option.key,
+      key: option.key,
+      label: option.label,
+    })),
+    resetCardRoleGroup,
+    resetCardFactionGroup,
     lifecycleStatus: filterState.lifecycleStatus.value,
     onUpdateLifecycleStatus: createLifecycleUpdater(filterState.lifecycleStatus),
-    selectedManaTypeSymbolIds: filterState.manaTypeSymbolIds.value,
-    onUpdateSelectedManaTypeSymbolIds: createArrayUpdater(filterState.manaTypeSymbolIds),
-    excludedManaTypeSymbolIds: filterState.manaTypeSymbolExcludeIds.value,
-    onUpdateExcludedManaTypeSymbolIds: createArrayUpdater(filterState.manaTypeSymbolExcludeIds),
-    manaSymbolMatch: filterState.manaSymbolMatch.value,
-    onUpdateManaSymbolMatch: createMatchModeUpdater(filterState.manaSymbolMatch),
-    manaTypeOptions: filterCatalog.value.manaSymbols,
+    selectedManaFamilyIds: filterState.manaFamilyIds.value,
+    onUpdateSelectedManaFamilyIds: createArrayUpdater(filterState.manaFamilyIds),
+    excludedManaFamilyIds: filterState.manaFamilyExcludeIds.value,
+    onUpdateExcludedManaFamilyIds: createArrayUpdater(filterState.manaFamilyExcludeIds),
+    manaFamilyMatch: filterState.manaFamilyMatch.value,
+    onUpdateManaFamilyMatch: createMatchModeUpdater(filterState.manaFamilyMatch),
+    manaFamilyOptions: filterCatalog.value.manaFamilies,
     manaCostMin: filterState.manaCostMin.value,
     onUpdateManaCostMin: createStringUpdater(filterState.manaCostMin),
     manaCostMax: filterState.manaCostMax.value,
@@ -164,6 +211,8 @@ export const useCardFilterSectionsState = (
 
   return {
     filterSectionsState,
+    resetCardRoleGroup,
+    resetCardFactionGroup,
     resetManaGroup,
     resetAffinityGroup,
     resetDevotionGroup,

@@ -1,20 +1,44 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from django.db import transaction
 
+from card_reader_core.database import retry_sqlite_write
 from card_reader_core.models import (
     Card,
     CardAlias,
+    CardClassificationInferenceEvidence,
+    DEFAULT_CARD_POOL,
+    EVIL_CARD_POOL,
+    CardFaction,
+    CardPool,
+    CardRole,
+    CardRoleAssignment,
     CardVersion,
     ImportJobItem,
     ImportJobStatus,
     ParseResult,
+    card_faction_identity_key,
+    card_faction_keys,
+    card_mana_family_keys,
     card_is_deprecated,
+    card_role_keys,
     now_utc,
 )
-from card_reader_core.services.card_merges import ensure_card_alias, resolve_card_by_name_key
+from card_reader_core.metadata import ManaFamily
+from card_reader_core.repositories.classification_reviews import (
+    create_classification_review_item,
+)
+from card_reader_core.repositories.import_jobs import (
+    CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING,
+    EVIL_FACTION_UNRESOLVED_WARNING,
+    MATCHED_DEPRECATED_CARD_WARNING,
+    remove_import_warning,
+    upsert_import_warning,
+)
 
 from ..helpers import extract_mana_symbols, infer_mana_value, normalize_slug_key, to_int_or_none
 from ..metadata import (
@@ -31,6 +55,8 @@ from ..metadata import (
 )
 from ..templates import get_template_by_key
 from .images import save_image_record
+from .classification import set_card_mana_families
+from .identity import change_card_identity, create_card_identity, resolve_card_by_name_key
 from .queries import get_latest_card_version
 from .snapshots import (
     DEFAULT_FIELD_SOURCES,
@@ -39,6 +65,26 @@ from .snapshots import (
     decode_field_sources,
 )
 from .types import ParsedCardSaveResult
+
+
+UnknownEvilFactionMatchReason = Literal[
+    "existing_unresolved_card",
+    "matched_checksum",
+    "matched_name",
+    "matched_checksum_and_name",
+    "no_candidate",
+    "ambiguous_checksum",
+    "ambiguous_name",
+    "conflicting_evidence",
+]
+
+
+@dataclass(frozen=True)
+class UnknownEvilFactionMatch:
+    card: Card | None
+    reason: UnknownEvilFactionMatchReason
+    checksum_candidate_count: int
+    name_candidate_count: int
 
 
 def save_parsed_card(
@@ -56,6 +102,11 @@ def save_parsed_card(
     tag_suggestions: list[SuggestionCandidate] | None = None,
     type_suggestions: list[SuggestionCandidate] | None = None,
     reparse_existing: bool = True,
+    card_pool: CardPool = DEFAULT_CARD_POOL,
+    resolved_card_roles: tuple[CardRole, ...] = (),
+    resolved_card_factions: tuple[CardFaction, ...] = (),
+    resolved_card_mana_families: tuple[ManaFamily, ...] = (),
+    classification_evidence: CardClassificationInferenceEvidence | None = None,
 ) -> CardVersion:
     return save_parsed_card_result(
         item=item,
@@ -71,9 +122,15 @@ def save_parsed_card(
         tag_suggestions=tag_suggestions,
         type_suggestions=type_suggestions,
         reparse_existing=reparse_existing,
+        card_pool=card_pool,
+        resolved_card_roles=resolved_card_roles,
+        resolved_card_factions=resolved_card_factions,
+        resolved_card_mana_families=resolved_card_mana_families,
+        classification_evidence=classification_evidence,
     ).version
 
 
+@retry_sqlite_write
 def save_parsed_card_result(
     *,
     item: ImportJobItem,
@@ -89,11 +146,77 @@ def save_parsed_card_result(
     tag_suggestions: list[SuggestionCandidate] | None = None,
     type_suggestions: list[SuggestionCandidate] | None = None,
     reparse_existing: bool = True,
+    card_pool: CardPool = DEFAULT_CARD_POOL,
+    resolved_card_roles: tuple[CardRole, ...] = (),
+    resolved_card_factions: tuple[CardFaction, ...] = (),
+    resolved_card_mana_families: tuple[ManaFamily, ...] = (),
+    classification_evidence: CardClassificationInferenceEvidence | None = None,
 ) -> ParsedCardSaveResult:
-    if item.target_card_version is not None:
-        return ParsedCardSaveResult(
-            version=reparse_target_version(
+    # A failed atomic attempt can leave relation assignments cached on the Python
+    # instance even though the database transaction rolled them back. Every retry
+    # must therefore start from the authoritative persisted item state.
+    was_targeted = (
+        item.target_card_pool_snapshot is not None
+        or item.target_card is not None
+        or item.target_card_version is not None
+    )
+    item = (
+        ImportJobItem.objects.select_related(
+            "job__content_version",
+            "job__template",
+            "target_card",
+            "target_card_version__card",
+        )
+        .get(id=item.id)
+    )
+    if was_targeted and (
+        item.target_card is None or item.target_card_version is None
+    ):
+        raise ValueError("The target Card no longer exists; queue a new reparse.")
+    resolved_evidence: CardClassificationInferenceEvidence = classification_evidence or {
+        "roles": {
+            "mode": "automatic",
+            "matched_tag_sources": [],
+            "matched_type_sources": [],
+            "matched_symbol_sources": [],
+            "matched_rules": [],
+            "override_roles": [],
+            "resolved_roles": list(resolved_card_roles),
+            "snapshot_digest": "",
+        },
+        "factions": {
+            "mode": "automatic",
+            "matched_tag_sources": [],
+            "matched_type_sources": [],
+            "matched_symbol_sources": [],
+            "matched_rules": [],
+            "override_factions": [],
+            "resolved_factions": list(resolved_card_factions),
+            "snapshot_digest": "",
+        },
+        "mana_families": {
+            "mode": "automatic",
+            "matched_tag_sources": [],
+            "matched_type_sources": [],
+            "matched_symbol_sources": [],
+            "matched_rules": [],
+            "override_mana_families": [],
+            "resolved_mana_families": list(resolved_card_mana_families),
+            "snapshot_digest": "",
+        },
+    }
+    parsed_name = normalized_fields.get("name", "").strip() or Path(item.source_file).stem
+    is_unknown_evil_faction_import = (
+        item.target_card_version is None
+        and reparse_existing
+        and card_pool == EVIL_CARD_POOL
+        and not resolved_card_factions
+    )
+    with transaction.atomic():
+        if item.target_card_version is not None:
+            version = reparse_target_version(
                 item=item,
+                card_pool=card_pool,
                 template_id=template_id,
                 checksum=checksum,
                 normalized_fields=normalized_fields,
@@ -105,21 +228,28 @@ def save_parsed_card_result(
                 symbol_ids=symbol_ids or [],
                 tag_suggestions=tag_suggestions or [],
                 type_suggestions=type_suggestions or [],
-            ),
-            created_new_version=False,
-        )
-
-    parsed_name = normalized_fields.get("name", "").strip() or Path(item.source_file).stem
-    card_key = normalize_slug_key(parsed_name)
-
-    with transaction.atomic():
-        existing_version = None
-        if reparse_existing:
-            existing_version = (
-                CardVersion.objects.filter(image_hash=checksum, is_latest=True)
-                .order_by("-updated_at")
-                .first()
             )
+            finalize_import_item(
+                item,
+                version,
+                card_pool=card_pool,
+                resolved_card_roles=resolved_card_roles,
+                resolved_card_factions=resolved_card_factions,
+                resolved_card_mana_families=resolved_card_mana_families,
+                evidence=resolved_evidence,
+                is_new_card=False,
+            )
+            return ParsedCardSaveResult(version=version, created_new_version=False)
+
+        existing_version = (
+            _resolve_existing_import_version(
+                checksum=checksum,
+                card_pool=card_pool,
+                resolved_card_factions=resolved_card_factions,
+            )
+            if reparse_existing
+            else None
+        )
         if existing_version is not None:
             if should_create_content_version_snapshot(item, existing_version):
                 version = create_content_version_snapshot_from_existing(
@@ -138,11 +268,9 @@ def save_parsed_card_result(
                     type_suggestions=type_suggestions or [],
                 )
                 apply_latest_version_identity(existing_version.card, version)
-                sync_import_item_lifecycle_warning(item, existing_version.card)
-                mark_item_completed(item)
-                return ParsedCardSaveResult(version=version, created_new_version=True)
-            return ParsedCardSaveResult(
-                version=update_existing_version(
+                created_new_version = True
+            else:
+                version = update_existing_version(
                     item,
                     existing_version,
                     normalized_fields,
@@ -154,13 +282,79 @@ def save_parsed_card_result(
                     symbol_ids=symbol_ids or [],
                     tag_suggestions=tag_suggestions or [],
                     type_suggestions=type_suggestions or [],
+                )
+                created_new_version = False
+            finalize_import_item(
+                item,
+                version,
+                card_pool=card_pool,
+                resolved_card_roles=resolved_card_roles,
+                resolved_card_factions=resolved_card_factions,
+                resolved_card_mana_families=resolved_card_mana_families,
+                evidence=resolved_evidence,
+                is_new_card=False,
+                unknown_evil_faction_match=(
+                    _existing_unknown_evil_faction_match(
+                        card=existing_version.card,
+                        checksum=checksum,
+                        parsed_name=parsed_name,
+                    )
+                    if is_unknown_evil_faction_import
+                    else None
                 ),
-                created_new_version=False,
+            )
+            return ParsedCardSaveResult(
+                version=version,
+                created_new_version=created_new_version,
             )
 
-        card = resolve_card_by_name_key(parsed_name)
-        if card is None:
-            card = Card.objects.create(key=card_key, label=parsed_name)
+        existing_unknown_faction_card = (
+            resolve_card_by_name_key(
+                name=parsed_name,
+                card_pool=card_pool,
+                card_factions=resolved_card_factions,
+            )
+            if is_unknown_evil_faction_import
+            else None
+        )
+        unknown_evil_faction_match = (
+            _existing_unknown_evil_faction_match(
+                card=existing_unknown_faction_card,
+                checksum=checksum,
+                parsed_name=parsed_name,
+            )
+            if existing_unknown_faction_card is not None
+            else (
+                _resolve_unknown_evil_faction_import(
+                    checksum=checksum,
+                    parsed_name=parsed_name,
+                )
+                if is_unknown_evil_faction_import
+                else None
+            )
+        )
+        matched_card = (
+            unknown_evil_faction_match.card
+            if unknown_evil_faction_match is not None
+            else None
+        )
+        if matched_card is None:
+            card, created_new_card = create_card_identity(
+                name=parsed_name,
+                card_pool=card_pool,
+                card_factions=resolved_card_factions,
+            )
+        else:
+            card = matched_card
+            created_new_card = False
+        if created_new_card:
+            CardRoleAssignment.objects.bulk_create(
+                [CardRoleAssignment(card=card, role=role) for role in resolved_card_roles]
+            )
+            set_card_mana_families(
+                card=card,
+                mana_families=resolved_card_mana_families,
+            )
 
         latest = get_latest_card_version(card.id)
         if latest and latest.image_hash == checksum and reparse_existing:
@@ -181,11 +375,9 @@ def save_parsed_card_result(
                     type_suggestions=type_suggestions or [],
                 )
                 apply_latest_version_identity(card, version)
-                sync_import_item_lifecycle_warning(item, card)
-                mark_item_completed(item)
-                return ParsedCardSaveResult(version=version, created_new_version=True)
-            return ParsedCardSaveResult(
-                version=update_existing_version(
+                created_new_version = True
+            else:
+                version = update_existing_version(
                     item,
                     latest,
                     normalized_fields,
@@ -197,8 +389,22 @@ def save_parsed_card_result(
                     symbol_ids=symbol_ids or [],
                     tag_suggestions=tag_suggestions or [],
                     type_suggestions=type_suggestions or [],
-                ),
-                created_new_version=False,
+                )
+                created_new_version = False
+            finalize_import_item(
+                item,
+                version,
+                card_pool=card_pool,
+                resolved_card_roles=resolved_card_roles,
+                resolved_card_factions=resolved_card_factions,
+                resolved_card_mana_families=resolved_card_mana_families,
+                evidence=resolved_evidence,
+                is_new_card=created_new_card,
+                unknown_evil_faction_match=unknown_evil_faction_match,
+            )
+            return ParsedCardSaveResult(
+                version=version,
+                created_new_version=created_new_version,
             )
 
         version = create_parsed_card_version(
@@ -216,30 +422,148 @@ def save_parsed_card_result(
             tag_suggestions=tag_suggestions or [],
             type_suggestions=type_suggestions or [],
         )
-        sync_import_item_lifecycle_warning(item, card)
-        mark_item_completed(item)
-
         apply_latest_version_identity(card, version)
+        finalize_import_item(
+            item,
+            version,
+            card_pool=card_pool,
+            resolved_card_roles=resolved_card_roles,
+            resolved_card_factions=resolved_card_factions,
+            resolved_card_mana_families=resolved_card_mana_families,
+            evidence=resolved_evidence,
+            is_new_card=created_new_card,
+            unknown_evil_faction_match=unknown_evil_faction_match,
+        )
         return ParsedCardSaveResult(version=version, created_new_version=True)
 
 
+def _resolve_existing_import_version(
+    *,
+    checksum: str,
+    card_pool: CardPool,
+    resolved_card_factions: tuple[CardFaction, ...],
+) -> CardVersion | None:
+    faction_key = card_faction_identity_key(resolved_card_factions)
+    return (
+        CardVersion.objects.filter(
+            image_hash=checksum,
+            is_latest=True,
+            card__card_pool=card_pool,
+            card__faction_identity_key=faction_key,
+        )
+        .order_by("-updated_at")
+        .first()
+    )
+
+
+def _resolve_unknown_evil_faction_import(
+    *,
+    checksum: str,
+    parsed_name: str,
+) -> UnknownEvilFactionMatch:
+    """Resolve an unclassified Evil import only when its evidence is unambiguous."""
+    empty_faction_key = card_faction_identity_key(())
+    checksum_candidates = (
+        CardVersion.objects.filter(
+            image_hash=checksum,
+            card__card_pool=EVIL_CARD_POOL,
+        )
+        .exclude(card__faction_identity_key=empty_faction_key)
+        .order_by()
+        .values_list("card_id", flat=True)
+        .distinct()
+    )
+    checksum_candidate_count = checksum_candidates.count()
+    checksum_card_id = checksum_candidates.first() if checksum_candidate_count == 1 else None
+
+    name_key = normalize_slug_key(parsed_name)
+    name_card_ids: set[str] = set()
+    if name_key:
+        name_card_ids.update(
+            Card.objects.filter(card_pool=EVIL_CARD_POOL, key=name_key)
+            .exclude(faction_identity_key=empty_faction_key)
+            .values_list("id", flat=True)
+        )
+        name_card_ids.update(
+            CardAlias.objects.filter(card_pool=EVIL_CARD_POOL, key=name_key)
+            .exclude(faction_identity_key=empty_faction_key)
+            .values_list("card_id", flat=True)
+        )
+    name_candidate_count = len(name_card_ids)
+    name_card_id = next(iter(name_card_ids)) if name_candidate_count == 1 else None
+
+    if checksum_candidate_count > 1:
+        reason: UnknownEvilFactionMatchReason = "ambiguous_checksum"
+        matched_card_id = None
+    elif name_candidate_count > 1:
+        reason = "ambiguous_name"
+        matched_card_id = None
+    elif (
+        checksum_card_id is not None
+        and name_card_id is not None
+        and checksum_card_id != name_card_id
+    ):
+        reason = "conflicting_evidence"
+        matched_card_id = None
+    elif checksum_card_id is not None:
+        reason = (
+            "matched_checksum_and_name"
+            if name_card_id == checksum_card_id
+            else "matched_checksum"
+        )
+        matched_card_id = checksum_card_id
+    elif name_card_id is not None:
+        reason = "matched_name"
+        matched_card_id = name_card_id
+    else:
+        reason = "no_candidate"
+        matched_card_id = None
+
+    matched_card = (
+        Card.objects.filter(
+            id=matched_card_id,
+            card_pool=EVIL_CARD_POOL,
+        )
+        .exclude(faction_identity_key=empty_faction_key)
+        .first()
+        if matched_card_id is not None
+        else None
+    )
+    if matched_card_id is not None and matched_card is None:
+        reason = "no_candidate"
+
+    return UnknownEvilFactionMatch(
+        card=matched_card,
+        reason=reason,
+        checksum_candidate_count=checksum_candidate_count,
+        name_candidate_count=name_candidate_count,
+    )
+
+
+def _existing_unknown_evil_faction_match(
+    *,
+    card: Card,
+    checksum: str,
+    parsed_name: str,
+) -> UnknownEvilFactionMatch:
+    candidate_match = _resolve_unknown_evil_faction_import(
+        checksum=checksum,
+        parsed_name=parsed_name,
+    )
+    return UnknownEvilFactionMatch(
+        card=card,
+        reason="existing_unresolved_card",
+        checksum_candidate_count=candidate_match.checksum_candidate_count,
+        name_candidate_count=candidate_match.name_candidate_count,
+    )
+
+
 def apply_latest_version_identity(card: Card, version: CardVersion) -> None:
-    update_fields = ["latest_version", "updated_at"]
+    if normalize_slug_key(version.name) != card.key or card.label != version.name:
+        change_card_identity(card=card, label=version.name)
     card.latest_version = version
     card.updated_at = now_utc()
-    next_key = normalize_slug_key(version.name)
-    if next_key != card.key or card.label != version.name:
-        previous_key = card.key
-        previous_label = card.label
-        conflicting_card = Card.objects.filter(key=next_key).exclude(id=card.id).first()
-        conflicting_alias = CardAlias.objects.filter(key=next_key).exclude(card_id=card.id).first()
-        if conflicting_card is not None or conflicting_alias is not None:
-            raise ValueError("Card name conflicts with another card or alias. Use card merge to resolve the duplicate.")
-        card.label = version.name
-        card.key = next_key
-        ensure_card_alias(card=card, key=previous_key, label=previous_label)
-        update_fields = ["label", "key", *update_fields]
-    card.save(update_fields=list(dict.fromkeys(update_fields)))
+    card.save(update_fields=["latest_version", "updated_at"])
 
 
 def should_create_content_version_snapshot(item: ImportJobItem, version: CardVersion) -> bool:
@@ -267,7 +591,10 @@ def create_parsed_card_version(
     replace_card_version_keywords(card_version_id=version.id, keyword_ids=keyword_ids)
     replace_card_version_tags(card_version_id=version.id, tag_ids=tag_ids)
     replace_card_version_types(card_version_id=version.id, type_ids=type_ids)
-    replace_card_version_symbols(card_version_id=version.id, symbol_ids=symbol_ids)
+    replace_card_version_symbols(
+        card_version_id=version.id,
+        symbol_ids=symbol_ids,
+    )
     parse_result = save_parse_result(version, raw_ocr, normalized_fields, confidence)
     replace_card_version_metadata_suggestions(
         card_version_id=version.id,
@@ -409,6 +736,7 @@ def clone_card_version_for_content_version_snapshot(
 def reparse_target_version(
     *,
     item: ImportJobItem,
+    card_pool: CardPool,
     template_id: str,
     checksum: str,
     normalized_fields: dict[str, str],
@@ -424,20 +752,33 @@ def reparse_target_version(
     target_version = item.target_card_version
     if target_version is None:
         raise ValueError("Target card version is required for targeted reparses")
-    version = (
-        CardVersion.objects.select_related("card", "template", "previous_version")
-        .filter(id=target_version.id)
-        .first()
-    )
-    if version is None:
-        raise ValueError(f"Target card version '{target_version.id}' does not exist")
-    if not version.is_latest:
-        raise ValueError("Only latest card versions can be reparsed")
-    if item.target_card is not None and version.card.id != item.target_card.id:
-        raise ValueError("Target card version does not belong to the requested card")
-
-    reset_manual_state = version.template.key != template_id
+    requested_card = item.target_card
     with transaction.atomic():
+        version = (
+            CardVersion.objects.select_for_update()
+            .select_related("card", "template", "previous_version")
+            .filter(id=target_version.id)
+            .first()
+        )
+        if version is None:
+            raise ValueError(f"Target card version '{target_version.id}' does not exist")
+        if not version.is_latest:
+            raise ValueError("Only latest card versions can be reparsed")
+        if requested_card is not None and version.card.id != requested_card.id:
+            raise ValueError("Target card version does not belong to the requested card")
+
+        target_card = (
+            Card.objects.select_for_update().filter(id=version.card.id).first()
+        )
+        if target_card is None:
+            raise ValueError("The target Card no longer exists; queue a new reparse.")
+        if target_card.card_pool != card_pool:
+            raise ValueError(
+                "The target Card pool changed while this reparse was queued; "
+                "queue a new reparse for its current pool."
+            )
+        version.card = target_card
+        reset_manual_state = version.template.key != template_id
         return update_existing_version(
             item,
             version,
@@ -536,23 +877,148 @@ def update_existing_version(
     card = Card.objects.filter(id=version.card.id).first()
     if card is not None:
         apply_latest_version_identity(card, version)
-        sync_import_item_lifecycle_warning(item, card)
-    mark_item_completed(item)
     return version
 
 
 def sync_import_item_lifecycle_warning(item: ImportJobItem, card: Card) -> None:
     if not card_is_deprecated(card):
-        item.warning_code = None
-        item.warning_message = None
-        item.updated_at = now_utc()
-        item.save(update_fields=["warning_code", "warning_message", "updated_at"])
+        remove_import_warning(item, MATCHED_DEPRECATED_CARD_WARNING)
         return
 
-    item.warning_code = "matched_deprecated_card"
-    item.warning_message = f"Import matched deprecated card '{card.label}'. The card remains deprecated."
-    item.updated_at = now_utc()
-    item.save(update_fields=["warning_code", "warning_message", "updated_at"])
+    upsert_import_warning(
+        item,
+        {
+            "code": MATCHED_DEPRECATED_CARD_WARNING,
+            "message": f"Import matched deprecated card '{card.label}'. The card remains deprecated.",
+        },
+    )
+
+
+def sync_unknown_evil_faction_warning(
+    item: ImportJobItem,
+    card: Card,
+    match: UnknownEvilFactionMatch | None,
+) -> None:
+    if match is None or card_faction_keys(card):
+        remove_import_warning(item, EVIL_FACTION_UNRESOLVED_WARNING)
+        return
+
+    ambiguous_reasons = {
+        "ambiguous_checksum",
+        "ambiguous_name",
+        "conflicting_evidence",
+    }
+    message = (
+        "No Evil faction was inferred and existing Card evidence was ambiguous. "
+        "No automatic merge was performed; review and assign this Card's faction."
+        if match.reason in ambiguous_reasons
+        else "No Evil faction was inferred. Review and assign this Card's faction."
+    )
+    upsert_import_warning(
+        item,
+        {
+            "code": EVIL_FACTION_UNRESOLVED_WARNING,
+            "message": message,
+            "details": {
+                "reason": match.reason,
+                "checksum_candidate_count": match.checksum_candidate_count,
+                "name_candidate_count": match.name_candidate_count,
+            },
+        },
+    )
+
+
+def finalize_import_item(
+    item: ImportJobItem,
+    version: CardVersion,
+    *,
+    card_pool: CardPool,
+    resolved_card_roles: tuple[CardRole, ...],
+    resolved_card_factions: tuple[CardFaction, ...],
+    resolved_card_mana_families: tuple[ManaFamily, ...],
+    evidence: CardClassificationInferenceEvidence,
+    is_new_card: bool,
+    unknown_evil_faction_match: UnknownEvilFactionMatch | None = None,
+) -> None:
+    card = version.card
+    live_roles = card_role_keys(card)
+    live_factions = card_faction_keys(card)
+    live_mana_families = card_mana_family_keys(card)
+    evidence_payload: dict[str, object] = dict(evidence)
+    evidence_payload["live_classification"] = {
+        "card_pool": card.card_pool,
+        "card_roles": list(live_roles),
+        "card_factions": list(live_factions),
+        "card_mana_families": list(live_mana_families),
+    }
+
+    if item.target_card_pool_snapshot is not None:
+        queued_roles = tuple(item.target_card_roles_snapshot_json)
+        queued_factions = tuple(item.target_card_factions_snapshot_json)
+        queued_mana_families = tuple(item.target_card_mana_families_snapshot_json)
+        evidence_payload["queued_target_classification"] = {
+            "card_pool": item.target_card_pool_snapshot,
+            "card_roles": list(queued_roles),
+            "card_factions": list(queued_factions),
+            "card_mana_families": list(queued_mana_families),
+        }
+        if (
+            item.target_card_pool_snapshot != card.card_pool
+            or queued_roles != live_roles
+            or queued_factions != live_factions
+            or queued_mana_families != live_mana_families
+        ):
+            upsert_import_warning(
+                item,
+                {
+                    "code": CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING,
+                    "message": "Card classification changed while this reparse was queued; the live value was preserved.",
+                    "details": {
+                        "queued": evidence_payload["queued_target_classification"],
+                        "live": evidence_payload["live_classification"],
+                    },
+                },
+            )
+        else:
+            remove_import_warning(item, CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING)
+
+    classification_mismatch = not is_new_card and (
+        card.card_pool != card_pool
+        or live_roles != resolved_card_roles
+        or live_factions != resolved_card_factions
+        or live_mana_families != resolved_card_mana_families
+    )
+    if classification_mismatch:
+        existing_classification: dict[str, object] = {
+            "card_pool": card.card_pool,
+            "card_roles": list(live_roles),
+            "card_factions": list(live_factions),
+            "card_mana_families": list(live_mana_families),
+        }
+        inferred_classification: dict[str, object] = {
+            "card_pool": card_pool,
+            "card_roles": list(resolved_card_roles),
+            "card_factions": list(resolved_card_factions),
+            "card_mana_families": list(resolved_card_mana_families),
+        }
+        create_classification_review_item(
+            import_item=item,
+            card=card,
+            card_version=version,
+            existing_classification=existing_classification,
+            inferred_classification=inferred_classification,
+            inference_evidence=evidence_payload,
+        )
+
+    item.resolved_card_roles_json = list(resolved_card_roles)
+    item.resolved_card_factions_json = list(resolved_card_factions)
+    item.resolved_card_mana_families_json = list(resolved_card_mana_families)
+    item.classification_inference_json = evidence_payload
+    item.target_card = card
+    item.target_card_version = version
+    sync_unknown_evil_faction_warning(item, card, unknown_evil_faction_match)
+    sync_import_item_lifecycle_warning(item, card)
+    mark_item_completed(item)
 
 
 def create_new_version(
@@ -645,7 +1111,22 @@ def mark_item_completed(item: ImportJobItem) -> None:
     item.status = ImportJobStatus.completed
     item.error_message = None
     item.updated_at = now_utc()
-    item.save(update_fields=["status", "error_message", "updated_at"])
+    item.save(
+        update_fields=[
+            "status",
+            "error_message",
+            "warning_code",
+            "warning_message",
+            "warnings_json",
+            "resolved_card_roles_json",
+            "resolved_card_factions_json",
+            "resolved_card_mana_families_json",
+            "classification_inference_json",
+            "target_card",
+            "target_card_version",
+            "updated_at",
+        ]
+    )
 
 
 def apply_parsed_output_to_version(
@@ -689,6 +1170,9 @@ def apply_parsed_output_to_version(
     if field_sources["metadata"]["types"] == FIELD_SOURCE_AUTO:
         replace_card_version_types(card_version_id=version.id, type_ids=type_ids)
     if field_sources["metadata"]["symbols"] == FIELD_SOURCE_AUTO:
-        replace_card_version_symbols(card_version_id=version.id, symbol_ids=symbol_ids)
+        replace_card_version_symbols(
+            card_version_id=version.id,
+            symbol_ids=symbol_ids,
+        )
 
     version.confidence = float(confidence.get("overall", 0.0))

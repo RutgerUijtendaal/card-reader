@@ -1,30 +1,48 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from rest_framework import serializers
 
+from card_reader_api.cards.public_urls import card_image_asset_url
+from card_reader_api.common.serializer_values import ValidatedStringValuesMixin
 from card_reader_core.metadata import MANA_FAMILIES
 from card_reader_core.models import (
+    CARD_POOLS,
+    CARD_FACTIONS,
+    CARD_ROLE_FILTER_VALUES,
+    CARD_ROLES,
     CARD_LIFECYCLE_FILTER_VALUES,
     CARD_LIFECYCLE_STATUSES,
     DEFAULT_CARD_LIFECYCLE_FILTER,
     Card,
+    CardPool,
+    CardFaction,
     CardLifecycleFilter,
     CardVersion,
+    CardRoleFilter,
     Keyword,
     Symbol,
     Tag,
     Type,
+    card_role_keys,
+    card_faction_keys,
+    card_mana_family_keys,
     normalize_card_lifecycle_filter,
 )
-from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE
-from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC, CARD_SORT_VALUES, CardFilterParams
+from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE, CardListRow
+from card_reader_core.repositories.cards import (
+    CARD_SORT_DEFAULT,
+    CARD_SORT_TYPES_ASC,
+    CARD_SORT_UPDATED_DESC,
+    CARD_SORT_VALUES,
+    CardFilterParams,
+    CardSort,
+)
 from card_reader_core.rules import render_enriched_rule_text
 from card_reader_core.services.decks import normalize_deck_building_config
 
 if TYPE_CHECKING:
     from card_reader_core.models import CardGroup, Deck
-    from card_reader_core.repositories.cards import CardSort
     from card_reader_core.services.cards import CardEditState, CardMetadata
 
 MANA_FAMILY_KEYS = tuple(family.key for family in MANA_FAMILIES)
@@ -37,6 +55,14 @@ class CardListFilterParams(CardFilterParams):
     page: int
     page_size: int
     show_groups: bool
+
+
+class CardFilterMetadataScopeSerializer(serializers.Serializer[dict[str, object]]):
+    card_pool = serializers.ChoiceField(choices=CARD_POOLS, required=False)
+
+    def requested_card_pool(self) -> CardPool | None:
+        value = self.validated_data.get("card_pool")
+        return cast(CardPool, value) if isinstance(value, str) else None
 
 
 def card_payload(
@@ -56,20 +82,25 @@ def card_payload(
         "key": card.key,
         "label": card.label,
         "name": version.name,
-        "is_hero": card.is_hero,
+        "card_pool": card.card_pool,
+        "card_roles": list(card_role_keys(card)),
+        "card_factions": list(card_faction_keys(card)),
+        "card_mana_families": list(card_mana_family_keys(card)),
         "deck_building_config": normalize_deck_building_config(card.deck_building_config_json),
         "lifecycle_status": card.lifecycle_status,
         "template_id": version.template.key,
         "version_id": version.id,
         "version_number": version.version_number,
-        "previous_version_id": version.previous_version.id if version.previous_version is not None else None,
+        "previous_version_id": version.previous_version.id
+        if version.previous_version is not None
+        else None,
         "is_latest": version.is_latest,
         "content_version": _content_version_payload(version),
         "type_line": version.type_line,
         "mana_cost": version.mana_cost,
         "mana_symbols": _decode_mana_symbols(version.mana_symbols_json),
         "mana_value": version.mana_value,
-        "mana_family_sort_key": version.mana_family_sort_key,
+        "mana_family_sort_key": card.mana_family_sort_key,
         "attack": version.attack,
         "health": version.health,
         "rules_text_enriched": version.rules_text_enriched or version.rules_text,
@@ -98,6 +129,23 @@ def card_payload(
     if edit_state is not None:
         payload.update(edit_state_payload(edit_state))
     return payload
+
+
+def card_list_row_payload(row: CardListRow) -> dict[str, object]:
+    return card_payload(
+        row.version.card,
+        row.version,
+        image_url=card_image_asset_url(
+            row.image,
+            fallback_url=f"/cards/{row.version.card.id}/image",
+        ),
+        metadata={
+            "keywords": row.keywords,
+            "tags": row.tags,
+            "symbols": row.symbols,
+            "types": row.types,
+        },
+    )
 
 
 def _content_version_payload(version: CardVersion) -> dict[str, object] | None:
@@ -158,7 +206,11 @@ def symbol_option(symbol: Symbol) -> dict[str, object]:
     }
 
 
-def card_group_summary_payload(group: CardGroup, *, card_id: str | None = None) -> dict[str, object]:
+def card_group_summary_payload(
+    group: CardGroup,
+    *,
+    card_id: str | None = None,
+) -> dict[str, object]:
     members = list(group.members.all())
     anchor_card_id = group.anchor_card.id
     card_ids = [member.card.id for member in members]
@@ -167,6 +219,7 @@ def card_group_summary_payload(group: CardGroup, *, card_id: str | None = None) 
         "id": group.id,
         "key": group.key,
         "name": group.name,
+        "card_pool": group.anchor_card.card_pool,
         "anchor_card_id": anchor_card_id,
         "member_count": len(members),
         "card_ids": card_ids,
@@ -176,7 +229,9 @@ def card_group_summary_payload(group: CardGroup, *, card_id: str | None = None) 
 
 
 def card_deck_reference_payload(deck: Deck, *, card_id: str) -> dict[str, object]:
-    mainboard_quantity = sum(int(entry.quantity) for entry in deck.entries.all() if entry.card.id == card_id)
+    mainboard_quantity = sum(
+        int(entry.quantity) for entry in deck.entries.all() if entry.card.id == card_id
+    )
     sideboard_quantity = sum(
         int(entry.quantity)
         for sideboard in deck.sideboards.all()
@@ -184,7 +239,7 @@ def card_deck_reference_payload(deck: Deck, *, card_id: str) -> dict[str, object
         if entry.card.id == card_id
     )
     return {
-        "is_hero": deck.hero_card.id == card_id,
+        "as_hero": deck.hero_card.id == card_id,
         "mainboard_quantity": mainboard_quantity,
         "sideboard_quantity": sideboard_quantity,
     }
@@ -195,10 +250,7 @@ def _render_card_rule_text(version: CardVersion, metadata: CardMetadata | None) 
         return version.rules_text
     if metadata is None:
         return version.rules_text
-    symbol_tokens_by_key = {
-        symbol.key: symbol.text_token
-        for symbol in metadata["symbols"]
-    }
+    symbol_tokens_by_key = {symbol.key: symbol.text_token for symbol in metadata["symbols"]}
     return render_enriched_rule_text(
         version.rules_text_enriched,
         symbol_tokens_by_key=symbol_tokens_by_key,
@@ -220,18 +272,31 @@ def _first_symbol_asset_url(raw: object) -> str | None:
     return None
 
 
-class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
+class CardFiltersQuerySerializer(
+    ValidatedStringValuesMixin,
+    serializers.Serializer[dict[str, object]],
+):
     q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     query = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    card_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    card_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
     max_confidence = serializers.FloatField(required=False, allow_null=True)
-    keyword_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    keyword_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
+    keyword_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    keyword_match = serializers.ChoiceField(choices=["any", "all"], required=False, allow_null=True)
     tag_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    tag_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
-    mana_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    mana_symbol_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    mana_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
+    tag_match = serializers.ChoiceField(choices=["any", "all"], required=False, allow_null=True)
+    mana_symbol_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    mana_symbol_exclude_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    mana_symbol_match = serializers.ChoiceField(
+        choices=["any", "all"], required=False, allow_null=True
+    )
     mana_family_keys = serializers.ListField(
         child=serializers.ChoiceField(choices=MANA_FAMILY_KEYS),
         required=False,
@@ -242,24 +307,74 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
         required=False,
         allow_empty=True,
     )
-    mana_family_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
-    affinity_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    affinity_symbol_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    affinity_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
-    devotion_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    devotion_symbol_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    devotion_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
-    other_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    other_symbol_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    other_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
-    symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    type_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    type_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    type_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
+    mana_family_match = serializers.ChoiceField(
+        choices=["any", "all"], required=False, allow_null=True
+    )
+    affinity_symbol_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    affinity_symbol_exclude_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    affinity_symbol_match = serializers.ChoiceField(
+        choices=["any", "all"], required=False, allow_null=True
+    )
+    devotion_symbol_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    devotion_symbol_exclude_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    devotion_symbol_match = serializers.ChoiceField(
+        choices=["any", "all"], required=False, allow_null=True
+    )
+    other_symbol_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    other_symbol_exclude_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    other_symbol_match = serializers.ChoiceField(
+        choices=["any", "all"], required=False, allow_null=True
+    )
+    symbol_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    type_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    type_exclude_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    type_match = serializers.ChoiceField(choices=["any", "all"], required=False, allow_null=True)
     mana_cost_min = serializers.IntegerField(required=False, allow_null=True)
     mana_cost_max = serializers.IntegerField(required=False, allow_null=True)
     template_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    is_hero = serializers.BooleanField(required=False, allow_null=True)
+    card_pool = serializers.ChoiceField(choices=CARD_POOLS, required=False)
+    card_roles = serializers.ListField(
+        child=serializers.ChoiceField(choices=CARD_ROLE_FILTER_VALUES),
+        required=False,
+        allow_empty=True,
+    )
+    card_role_exclude = serializers.ListField(
+        child=serializers.ChoiceField(choices=CARD_ROLE_FILTER_VALUES),
+        required=False,
+        allow_empty=True,
+    )
+    card_role_match = serializers.ChoiceField(choices=["any", "all"], required=False, default="any")
+    card_factions = serializers.ListField(
+        child=serializers.ChoiceField(choices=CARD_FACTIONS),
+        required=False,
+        allow_empty=True,
+    )
+    card_faction_exclude = serializers.ListField(
+        child=serializers.ChoiceField(choices=CARD_FACTIONS),
+        required=False,
+        allow_empty=True,
+    )
+    card_faction_match = serializers.ChoiceField(
+        choices=["any", "all"], required=False, default="any"
+    )
     attack_min = serializers.IntegerField(required=False, allow_null=True)
     attack_max = serializers.IntegerField(required=False, allow_null=True)
     health_min = serializers.IntegerField(required=False, allow_null=True)
@@ -269,9 +384,11 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
         required=False,
         default=DEFAULT_CARD_LIFECYCLE_FILTER,
     )
-    sort = serializers.ChoiceField(choices=CARD_SORT_VALUES, required=False, default=CARD_SORT_UPDATED_DESC)
+    sort = serializers.ChoiceField(choices=CARD_SORT_VALUES, required=False)
     page = serializers.IntegerField(required=False, min_value=1, default=1)
-    page_size = serializers.IntegerField(required=False, min_value=1, default=DEFAULT_CARD_PAGE_SIZE)
+    page_size = serializers.IntegerField(
+        required=False, min_value=1, default=DEFAULT_CARD_PAGE_SIZE
+    )
     show_groups = serializers.BooleanField(required=False, default=False)
 
     def validated_filters(self) -> CardFilterParams:
@@ -305,7 +422,27 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
             "mana_cost_min": self._int_or_none("mana_cost_min"),
             "mana_cost_max": self._int_or_none("mana_cost_max"),
             "template_id": self._string_or_none("template_id"),
-            "is_hero": self._bool_or_none("is_hero"),
+            "card_pool": cast(
+                CardPool | None,
+                self.validated_data.get("card_pool"),
+            ),
+            "card_roles": cast(
+                list[CardRoleFilter] | None, self._string_list_or_none("card_roles")
+            ),
+            "card_role_exclude": cast(
+                list[CardRoleFilter] | None,
+                self._string_list_or_none("card_role_exclude"),
+            ),
+            "card_role_match": self.validated_data.get("card_role_match", "any"),
+            "card_factions": cast(
+                list[CardFaction] | None,
+                self._string_list_or_none("card_factions"),
+            ),
+            "card_faction_exclude": cast(
+                list[CardFaction] | None,
+                self._string_list_or_none("card_faction_exclude"),
+            ),
+            "card_faction_match": self.validated_data.get("card_faction_match", "any"),
             "attack_min": self._int_or_none("attack_min"),
             "attack_max": self._int_or_none("attack_max"),
             "health_min": self._int_or_none("health_min"),
@@ -323,12 +460,24 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
             "show_groups": bool(self.validated_data.get("show_groups", False)),
         }
 
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        if attrs.get("card_pool") is None and attrs.get("sort") in {
+            CARD_SORT_DEFAULT,
+            CARD_SORT_TYPES_ASC,
+        }:
+            raise serializers.ValidationError(
+                {"sort": "This sort requires an explicit card_pool."}
+            )
+        roles = attrs.get("card_roles")
+        if attrs.get("card_role_match") == "all" and isinstance(roles, list):
+            if "standard" in roles and len(set(roles)) > 1:
+                raise serializers.ValidationError(
+                    {"card_roles": "Normal cannot be combined with other roles when matching all."}
+                )
+        return attrs
+
     def _query_or_none(self) -> str | None:
         return self._string_or_none("q") or self._string_or_none("query")
-
-    def _string_or_none(self, key: str) -> str | None:
-        value = self.validated_data.get(key)
-        return value if isinstance(value, str) else None
 
     def _float_or_none(self, key: str) -> float | None:
         value = self.validated_data.get(key)
@@ -348,19 +497,15 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
 
     def _sort_value(self, key: str) -> CardSort:
         value = self.validated_data.get(key)
-        return value if value in CARD_SORT_VALUES else CARD_SORT_UPDATED_DESC
+        if value in CARD_SORT_VALUES:
+            return cast(CardSort, value)
+        if self.validated_data.get("card_pool") is None:
+            return CARD_SORT_UPDATED_DESC
+        return CARD_SORT_DEFAULT
 
     def _lifecycle_status_value(self, key: str) -> CardLifecycleFilter:
         value = self.validated_data.get(key)
         return normalize_card_lifecycle_filter(value)
-
-    def _string_list_or_none(self, key: str) -> list[str] | None:
-        value = self.validated_data.get(key)
-        if not isinstance(value, list):
-            return None
-        out = [item for item in value if isinstance(item, str)]
-        return out or None
-
 
 class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
     name = serializers.CharField(required=False, allow_blank=False)
@@ -370,17 +515,40 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
     health = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     rules_text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     rules_text_enriched = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    is_hero = serializers.BooleanField(required=False)
+    card_pool = serializers.ChoiceField(choices=CARD_POOLS, required=False)
+    card_roles = serializers.ListField(
+        child=serializers.ChoiceField(choices=CARD_ROLES),
+        required=False,
+        allow_empty=True,
+    )
+    card_factions = serializers.ListField(
+        child=serializers.ChoiceField(choices=CARD_FACTIONS),
+        required=False,
+        allow_empty=True,
+    )
+    card_mana_families = serializers.ListField(
+        child=serializers.ChoiceField(choices=MANA_FAMILY_KEYS),
+        required=False,
+        allow_empty=True,
+    )
     deck_building_config = serializers.JSONField(required=False)
     lifecycle_status = serializers.ChoiceField(choices=CARD_LIFECYCLE_STATUSES, required=False)
     keyword_ids = serializers.ListField(child=serializers.CharField(), required=False)
     tag_ids = serializers.ListField(child=serializers.CharField(), required=False)
     type_ids = serializers.ListField(child=serializers.CharField(), required=False)
     symbol_ids = serializers.ListField(child=serializers.CharField(), required=False)
-    restore_fields = serializers.ListField(child=serializers.CharField(), required=False, default=list)
-    restore_metadata_groups = serializers.ListField(child=serializers.CharField(), required=False, default=list)
-    unlock_fields = serializers.ListField(child=serializers.CharField(), required=False, default=list)
-    unlock_metadata_groups = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    restore_fields = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+    restore_metadata_groups = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+    unlock_fields = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+    unlock_metadata_groups = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
 
     def validate_restore_fields(self, value: list[str]) -> list[str]:
         return _validated_names(value, SCALAR_FIELDS, "Invalid scalar field name.")
@@ -407,8 +575,14 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
                 updates[field_name] = self.validated_data[field_name]
         if "rules_text_enriched" in self.validated_data:
             updates["rules_text"] = self.validated_data["rules_text_enriched"]
-        if "is_hero" in self.validated_data:
-            updates["is_hero"] = self.validated_data["is_hero"]
+        if "card_pool" in self.validated_data:
+            updates["card_pool"] = self.validated_data["card_pool"]
+        if "card_roles" in self.validated_data:
+            updates["card_roles"] = self.validated_data["card_roles"]
+        if "card_factions" in self.validated_data:
+            updates["card_factions"] = self.validated_data["card_factions"]
+        if "card_mana_families" in self.validated_data:
+            updates["card_mana_families"] = self.validated_data["card_mana_families"]
         if "deck_building_config" in self.validated_data:
             updates["deck_building_config"] = self.validated_data["deck_building_config"]
         if "lifecycle_status" in self.validated_data:
@@ -457,7 +631,9 @@ class CardVersionParseFlagCreateSerializer(serializers.Serializer[dict[str, obje
                 continue
             expected_value = item.get("expected_value")
             if not isinstance(expected_value, str) or not expected_value.strip():
-                raise serializers.ValidationError("Property flag suggestions require an expected value.")
+                raise serializers.ValidationError(
+                    "Property flag suggestions require an expected value."
+                )
         return value
 
 
@@ -465,3 +641,4 @@ def _validated_names(values: list[str], allowed: set[str], message: str) -> list
     if not all(value in allowed for value in values):
         raise serializers.ValidationError(message)
     return values
+    card_role_keys,

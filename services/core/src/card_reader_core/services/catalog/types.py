@@ -30,6 +30,10 @@ class SuggestionOccurrencePreview(TypedDict):
     image_url: str | None
     source_text: str
     normalized_source_text: str
+    card_pool: str
+    card_roles: list[str]
+    card_factions: list[str]
+    card_mana_families: list[str]
 
 
 class LinkedCardPreview(TypedDict):
@@ -38,6 +42,10 @@ class LinkedCardPreview(TypedDict):
     card_version_id: str
     card_version_name: str
     image_url: str | None
+    card_pool: str
+    card_roles: list[str]
+    card_factions: list[str]
+    card_mana_families: list[str]
 
 
 class CatalogSuggestionDetail(TypedDict):
@@ -62,15 +70,18 @@ class TagDetail(TypedDict):
     entry: Tag
     linked_cards: list[LinkedCardPreview]
     linked_card_count: int
+    classification_rules: list[dict[str, object]]
 
 
 class TypeDetail(TypedDict):
     entry: Type
     linked_cards: list[LinkedCardPreview]
     linked_card_count: int
+    classification_rules: list[dict[str, object]]
 
 
 class SymbolDetail(TypedDict):
     entry: Symbol
     linked_cards: list[LinkedCardPreview]
     linked_card_count: int
+    classification_rules: list[dict[str, object]]

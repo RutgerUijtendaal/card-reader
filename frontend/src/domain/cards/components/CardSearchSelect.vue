@@ -63,6 +63,7 @@ import { fetchCards } from '@/domain/cards/api';
 import SmallCardSearchResultRow from '@/domain/cards/components/SmallCardSearchResultRow.vue';
 import { managementCardSearchLifecycleParams } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { CardListItem } from '@/domain/cards/types';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 const props = withDefaults(defineProps<{
   label: string;
@@ -72,6 +73,7 @@ const props = withDefaults(defineProps<{
   disabledActionLabel?: string;
   pageSize?: number;
   selectionMode?: 'single' | 'multi';
+  cardPool?: CardPool;
 }>(), {
   placeholder: 'Search cards...',
   disabled: false,
@@ -79,6 +81,7 @@ const props = withDefaults(defineProps<{
   disabledActionLabel: 'Unavailable',
   pageSize: 12,
   selectionMode: 'single',
+  cardPool: 'player',
 });
 
 const emit = defineEmits<{
@@ -93,6 +96,7 @@ const suppressNextQuerySearch = ref(false);
 const triggerRef = ref<HTMLElement | null>(null);
 const panelRef = ref<HTMLElement | null>(null);
 const panelWidth = ref(320);
+let searchRequestId = 0;
 const disabledCardIdsSet = computed(() => new Set(props.disabledCardIds));
 const floating = useFloating(triggerRef, panelRef, {
   open: isOpen,
@@ -105,6 +109,8 @@ const x = computed(() => floating.x.value ?? 0);
 const y = computed(() => floating.y.value ?? 0);
 
 const runSearch = async (): Promise<void> => {
+  const requestId = searchRequestId + 1;
+  searchRequestId = requestId;
   const searchTerm = query.value.trim();
   if (props.disabled || searchTerm.length === 0) {
     results.value = [];
@@ -116,13 +122,18 @@ const runSearch = async (): Promise<void> => {
   try {
     const response = await fetchCards<CardListItem>({
       q: searchTerm,
+      card_pool: props.cardPool,
       ...managementCardSearchLifecycleParams(),
       page: 1,
       page_size: props.pageSize,
     });
-    results.value = response.results.filter((item): item is CardListItem => item.result_type === 'card');
+    if (requestId === searchRequestId) {
+      results.value = response.results.filter((item): item is CardListItem => item.result_type === 'card');
+    }
   } finally {
-    searching.value = false;
+    if (requestId === searchRequestId) {
+      searching.value = false;
+    }
   }
 };
 
@@ -181,6 +192,18 @@ watch(
       query.value = '';
       results.value = [];
       closeResults();
+    }
+  },
+);
+
+watch(
+  () => props.cardPool,
+  () => {
+    searchRequestId += 1;
+    results.value = [];
+    searching.value = false;
+    if (isOpen.value && query.value.trim().length > 0) {
+      debouncedSearch();
     }
   },
 );

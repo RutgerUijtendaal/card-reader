@@ -1,0 +1,112 @@
+{
+  "input": {
+    "image": "cards/devourer.webp",
+    "card_pool": "evil",
+    "template_key": "mtg-like-v1",
+    "job_options": {
+      "reparse_existing": true
+    }
+  },
+  "expected": {
+    "card": {
+      "key": "devourer",
+      "label": "Devourer",
+      "card_pool": "evil"
+    },
+    "fields": {
+      "template_key": "mtg-like-v1",
+      "name": "Devourer",
+      "type_line": "Creature - Order Sherian Elemental",
+      "mana_cost": "4",
+      "mana_value": 4,
+      "mana_symbols": [],
+      "attack": 6,
+      "health": 6,
+      "rules_text_raw": "Arrival: Reveal each Hero's hand and\nbanish card from each Hero's hand.\nWhile there are cards banished by this card, this creatures\nhealth is equal to the combined cost of the banished cards.\nWhen this card kills a creature, banish it instead. When this\ncard damages a Hero, banish a random card from its hand.\nAll cards banished by this are put in their owners\nhands when this creature leaves play, even if it\nno longer has this ability.",
+      "rules_text_enriched": "Arrival: Reveal each Hero's hand and\nbanish card from each Hero's hand.\nWhile there are cards banished by this card, this creatures\nhealth is equal to the combined cost of the banished cards.\nWhen this card kills a creature, banish it instead. When this\ncard damages a Hero, banish a random card from its hand.\nAll cards banished by this are put in their owners\nhands when this creature leaves play, even if it\nno longer has this ability.",
+      "rules_text": "Arrival: Reveal each Hero's hand and\nbanish card from each Hero's hand.\nWhile there are cards banished by this card, this creatures\nhealth is equal to the combined cost of the banished cards.\nWhen this card kills a creature, banish it instead. When this\ncard damages a Hero, banish a random card from its hand.\nAll cards banished by this are put in their owners\nhands when this creature leaves play, even if it\nno longer has this ability.",
+      "version_number": 1
+    },
+    "metadata": {
+      "keywords": [
+        "arrival",
+        "banish"
+      ],
+      "tags": [
+        "order"
+      ],
+      "symbols": [],
+      "types": [
+        "creature"
+      ],
+      "symbol_types": {}
+    },
+    "suggestions": {
+      "tags": [
+        {
+          "normalized_value": "elemental",
+          "display_value": "Elemental",
+          "source_text": "Order Sherian Elemental",
+          "normalized_source_text": "Order Sherian Elemental",
+          "status": "pending"
+        },
+        {
+          "normalized_value": "sherian",
+          "display_value": "Sherian",
+          "source_text": "Order Sherian Elemental",
+          "normalized_source_text": "Order Sherian Elemental",
+          "status": "pending"
+        }
+      ],
+      "types": []
+    },
+    "snapshot": {
+      "fields": {
+        "name": "Devourer",
+        "type_line": "Creature - Order Sherian Elemental",
+        "mana_cost": "4",
+        "attack": 6,
+        "health": 6,
+        "rules_text": "Arrival: Reveal each Hero's hand and\nbanish card from each Hero's hand.\nWhile there are cards banished by this card, this creatures\nhealth is equal to the combined cost of the banished cards.\nWhen this card kills a creature, banish it instead. When this\ncard damages a Hero, banish a random card from its hand.\nAll cards banished by this are put in their owners\nhands when this creature leaves play, even if it\nno longer has this ability."
+      },
+      "metadata": {
+        "keywords": [
+          "arrival",
+          "banish"
+        ],
+        "tags": [
+          "order"
+        ],
+        "types": [
+          "creature"
+        ],
+        "symbols": []
+      }
+    },
+    "field_sources": {
+      "fields": {
+        "name": "auto",
+        "type_line": "auto",
+        "mana_cost": "auto",
+        "attack": "auto",
+        "health": "auto",
+        "rules_text": "auto"
+      },
+      "metadata": {
+        "keywords": "auto",
+        "tags": "auto",
+        "types": "auto",
+        "symbols": "auto"
+      }
+    },
+    "job": {
+      "status": "completed",
+      "card_pool": "evil",
+      "total_items": 1,
+      "processed_items": 1,
+      "item_statuses": [
+        "completed"
+      ]
+    }
+  }
+}

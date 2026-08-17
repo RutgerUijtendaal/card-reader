@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import type { RouteRecordRaw, RouterHistory } from 'vue-router';
 import { useAuthStore } from '@/domain/session/store';
 import LoginPage from '@/features/auth/LoginPage.vue';
 import PasswordSetupPage from '@/features/auth/PasswordSetupPage.vue';
@@ -16,72 +17,150 @@ import NotificationsPage from '@/features/notifications/NotificationsPage.vue';
 import ReviewQueuePage from '@/features/review-queue/ReviewQueuePage.vue';
 import SettingsPage from '@/features/settings/SettingsPage.vue';
 import AdminPage from '@/features/admin/AdminPage.vue';
+import { isCardPool, type CardPool } from '@/domain/cards/cardPools';
+import {
+  buildWorkspaceGalleryLocation,
+  useCardPoolWorkspaceStore,
+} from '@/domain/cards/cardPoolWorkspace';
 
 const APP_TITLE = "Maity's Card Game";
 const buildDocumentTitle = (pageTitle?: string): string => (pageTitle ? `${pageTitle} | ${APP_TITLE}` : APP_TITLE);
 
-export const router = createRouter({
-  history: createWebHistory(),
-  routes: [
-    { path: '/', redirect: '/cards' },
-    { path: '/cards', component: CardGalleryPage, meta: { title: 'Gallery' } },
-    { path: '/cards/:id', component: CardPublicDetailPage, props: true, meta: { title: 'Card' } },
-    { path: '/card-groups/:id', component: CardGroupDetailPage, props: true, meta: { title: 'Card Group' } },
-    { path: '/decks', component: DeckIndexPage, meta: { title: 'Decks' } },
-    { path: '/decks/:id', component: DeckDetailPage, props: true, meta: { title: 'Deck' } },
-    { path: '/playtester', component: PlaytesterPage, meta: { title: 'Playtester' } },
-    { path: '/playtester/:deckId', component: PlaytesterPage, meta: { title: 'Playtester' } },
-    { path: '/login', component: LoginPage, meta: { public: true, title: 'Sign In' } },
-    { path: '/password-setup', component: PasswordSetupPage, meta: { public: true, title: 'Password Setup' } },
-    { path: '/my/decks', component: DeckIndexPage, meta: { requiresAuth: true, title: 'My Decks' } },
-    { path: '/my/decks/:id', component: DeckDetailPage, meta: { requiresAuth: true, title: 'My Deck' }, props: true },
-    { path: '/my/decks/new', component: DeckEditorPage, meta: { requiresAuth: true, title: 'New Deck' } },
-    { path: '/my/decks/:id/edit', component: DeckEditorPage, meta: { requiresAuth: true, title: 'Edit Deck' }, props: true },
-    { path: '/notifications', component: NotificationsPage, meta: { requiresAuth: true, title: 'Notifications' } },
-    { path: '/settings', component: SettingsPage, meta: { title: 'Settings' } },
-    { path: '/imports', component: ImportJobsPage, meta: { requiresStaff: true, title: 'Imports' } },
-    { path: '/operations', component: OperationsPage, meta: { requiresStaff: true, title: 'Operations' } },
-    { path: '/import-jobs', redirect: '/imports' },
-    { path: '/cards/:id/edit', component: CardDetailPage, props: true, meta: { requiresStaff: true, title: 'Edit Card' } },
-    { path: '/review', component: ReviewQueuePage, meta: { requiresStaff: true, title: 'Review Queue' } },
-    { path: '/admin', component: AdminPage, meta: { requiresStaff: true, title: 'Admin' } },
-  ],
-});
+export const APP_ROUTES: RouteRecordRaw[] = [
+  { path: '/', redirect: '/cards' },
+  { path: '/cards', component: CardGalleryPage, meta: { workspaceCapability: 'gallery', title: 'Gallery' } },
+  { path: '/cards/:id', component: CardPublicDetailPage, props: true, meta: { workspaceCapability: 'resource', title: 'Card' } },
+  { path: '/card-groups/:id', component: CardGroupDetailPage, props: true, meta: { workspaceCapability: 'resource', title: 'Card Group' } },
+  { path: '/decks', component: DeckIndexPage, meta: { title: 'Decks', workspaceCapability: 'player-only' } },
+  { path: '/decks/:id', component: DeckDetailPage, props: true, meta: { title: 'Deck', workspaceCapability: 'player-only' } },
+  { path: '/playtester', component: PlaytesterPage, meta: { title: 'Playtester', workspaceCapability: 'player-only' } },
+  { path: '/playtester/:deckId', component: PlaytesterPage, meta: { title: 'Playtester', workspaceCapability: 'player-only' } },
+  { path: '/login', component: LoginPage, meta: { public: true, title: 'Sign In', workspaceCapability: 'global' } },
+  { path: '/password-setup', component: PasswordSetupPage, meta: { public: true, title: 'Password Setup', workspaceCapability: 'global' } },
+  { path: '/my/decks', component: DeckIndexPage, meta: { requiresAuth: true, workspaceCapability: 'player-only', title: 'My Decks' } },
+  { path: '/my/decks/:id', component: DeckDetailPage, meta: { requiresAuth: true, workspaceCapability: 'player-only', title: 'My Deck' }, props: true },
+  { path: '/my/decks/new', component: DeckEditorPage, meta: { requiresAuth: true, workspaceCapability: 'player-only', title: 'New Deck' } },
+  { path: '/my/decks/:id/edit', component: DeckEditorPage, meta: { requiresAuth: true, workspaceCapability: 'player-only', title: 'Edit Deck' }, props: true },
+  { path: '/notifications', component: NotificationsPage, meta: { requiresAuth: true, title: 'Notifications', workspaceCapability: 'global' } },
+  { path: '/settings', component: SettingsPage, meta: { title: 'Settings', workspaceCapability: 'global' } },
+  { path: '/imports', component: ImportJobsPage, meta: { requiresStaff: true, title: 'Imports', workspaceCapability: 'global' } },
+  { path: '/operations', component: OperationsPage, meta: { requiresStaff: true, title: 'Operations', workspaceCapability: 'global' } },
+  { path: '/import-jobs', redirect: '/imports' },
+  { path: '/cards/:id/edit', component: CardDetailPage, props: true, meta: { workspaceCapability: 'resource', requiresStaff: true, title: 'Edit Card' } },
+  { path: '/review', component: ReviewQueuePage, meta: { requiresStaff: true, title: 'Review Queue', workspaceCapability: 'global' } },
+  { path: '/admin', component: AdminPage, meta: { requiresStaff: true, title: 'Admin', workspaceCapability: 'global' } },
+];
 
-router.beforeEach(async (to) => {
-  const auth = useAuthStore();
-  if (!auth.initialized) {
-    await auth.fetchCurrentUser();
+const resolveRouteWorkspacePool = (
+  workspaceCapability: unknown,
+  cardPool: unknown,
+  returnCardPool: unknown,
+): CardPool | undefined => {
+  if (workspaceCapability === 'gallery') {
+    return isCardPool(cardPool) ? cardPool : undefined;
   }
-
-  if (to.path === '/login' && auth.canAccessStaffRoutes) {
-    return '/operations';
+  if (workspaceCapability !== 'resource') {
+    return undefined;
   }
-
-  if (to.meta.requiresAuth && !auth.authenticated) {
-    return {
-      path: '/login',
-      query: { redirect: to.fullPath },
-    };
+  if (isCardPool(returnCardPool)) {
+    return returnCardPool;
   }
+  return isCardPool(cardPool) ? cardPool : undefined;
+};
 
-  if (to.meta.requiresStaff && !auth.canAccessStaffRoutes) {
-    if (auth.authenticated) {
-      return '/cards';
+export const createAppRouter = (history: RouterHistory = createWebHistory()) => {
+  const router = createRouter({
+    history,
+    routes: APP_ROUTES,
+  });
+
+  router.beforeEach(async (to) => {
+    const auth = useAuthStore();
+    if (!auth.initialized) {
+      await auth.fetchCurrentUser();
     }
-    return {
-      path: '/login',
-      query: { redirect: to.fullPath },
-    };
-  }
+    const workspace = useCardPoolWorkspaceStore();
+    const rawRequestedPool = to.query.card_pool;
+    const requestedPool = isCardPool(rawRequestedPool) ? rawRequestedPool : undefined;
+    if (to.meta.requiresAuth && !auth.authenticated) {
+      return {
+        path: '/login',
+        query: { redirect: to.fullPath },
+      };
+    }
 
-  return true;
-});
+    if (to.meta.requiresStaff && !auth.canAccessStaffRoutes) {
+      if (auth.authenticated) {
+        return '/cards';
+      }
+      return {
+        path: '/login',
+        query: { redirect: to.fullPath },
+      };
+    }
 
-router.afterEach((to) => {
-  if (typeof document === 'undefined') {
-    return;
-  }
+    if (to.meta.workspaceCapability === 'player-only') {
+      if (rawRequestedPool !== undefined) {
+        const query = { ...to.query };
+        delete query.card_pool;
+        return { path: to.path, query, hash: to.hash };
+      }
+    }
 
-  document.title = buildDocumentTitle(typeof to.meta.title === 'string' ? to.meta.title : undefined);
-});
+    if (to.meta.workspaceCapability === 'gallery') {
+      if (requestedPool === 'player' && rawRequestedPool !== undefined) {
+        return buildWorkspaceGalleryLocation('player', to.query);
+      }
+      if (rawRequestedPool !== undefined && requestedPool === undefined) {
+        return buildWorkspaceGalleryLocation('player', to.query);
+      }
+      const redirectedFromExplicitPool = to.redirectedFrom?.meta.workspaceCapability === 'gallery'
+        && to.redirectedFrom.query.card_pool !== undefined;
+      if (
+        rawRequestedPool === undefined
+        && !redirectedFromExplicitPool
+        && workspace.activePool !== 'player'
+      ) {
+        return buildWorkspaceGalleryLocation(workspace.activePool, to.query);
+      }
+    }
+
+    if (to.path === '/login' && auth.canAccessStaffRoutes) {
+      return '/operations';
+    }
+
+    return true;
+  });
+
+  router.afterEach((to, _from, failure) => {
+    if (failure) {
+      return;
+    }
+    const workspace = useCardPoolWorkspaceStore();
+    let acceptedWorkspacePool: CardPool | undefined;
+    if (to.meta.workspaceCapability === 'gallery') {
+      acceptedWorkspacePool = isCardPool(to.query.card_pool) ? to.query.card_pool : 'player';
+    } else if (to.meta.workspaceCapability === 'player-only') {
+      acceptedWorkspacePool = 'player';
+    } else if (to.meta.workspaceCapability === 'resource') {
+      acceptedWorkspacePool = resolveRouteWorkspacePool(
+        to.meta.workspaceCapability,
+        to.query.card_pool,
+        to.query.return_card_pool,
+      );
+    }
+    if (acceptedWorkspacePool) {
+      workspace.selectPool(acceptedWorkspacePool);
+    }
+
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    document.title = buildDocumentTitle(typeof to.meta.title === 'string' ? to.meta.title : undefined);
+  });
+
+  return router;
+};
+
+export const router = createAppRouter();

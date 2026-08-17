@@ -2,23 +2,66 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from PIL import Image
 
-from card_reader_core.models import Symbol
+from card_reader_core.models import (
+    EVIL_CARD_POOL,
+    NEUTRAL_CARD_POOL,
+    PLAYER_CARD_POOL,
+    CardPool,
+    Symbol,
+)
 from card_reader_parser.parsers.regions.name_mana_cost_parser import NameManaCostParser
 from card_reader_parser.parsers.symbol_detector import DetectedSymbol, DetectionBBox
 
+MANA_BADGE_OCR_CONFIG = {
+    "mana_badge_ocr": {
+        "cut_region": {
+            "unit": "relative",
+            "x": 0.86,
+            "y": 0.0,
+            "w": 0.14,
+            "h": 1.0,
+        },
+        "scales": [3, 2],
+    }
+}
+
 
 class StubOcrRunner:
-    def __init__(self, text: str) -> None:
-        self._text = text
+    def __init__(
+        self,
+        text: str | list[str],
+        *,
+        lines: list[str] | None = None,
+        line_rows: list[dict[str, Any]] | None = None,
+        confidences: list[float] | None = None,
+    ) -> None:
+        self._texts = text if isinstance(text, list) else [text]
+        self._lines = line_rows or [
+            {"text": line, "confidence": (confidences or [0.9])[0]}
+            for line in (lines or [self._texts[0]])
+        ]
+        self._confidences = confidences or [0.9]
+        self.calls: list[tuple[int, int]] = []
 
-    def run(self, _image: Image.Image, config: dict[str, object] | None = None) -> dict[str, object]:
+    def run(self, image: Image.Image, config: dict[str, object] | None = None) -> dict[str, object]:
         _ = config
+        self.calls.append(image.size)
+        call_index = len(self.calls) - 1
+        text = self._texts[min(call_index, len(self._texts) - 1)]
+        confidence = self._confidences[min(call_index, len(self._confidences) - 1)]
+        lines = (
+            self._lines
+            if len(self.calls) == 1
+            else [{"text": text, "confidence": confidence}]
+        )
         return {
-            "text": self._text,
-            "confidence": 0.9,
-            "lines": [{"text": self._text, "confidence": 0.9}],
+            "text": text,
+            "confidence": confidence,
+            "lines": lines,
         }
 
 
@@ -26,6 +69,7 @@ class StubSymbolDetector:
     def __init__(self, detections: list[DetectedSymbol]) -> None:
         self._detections = detections
         self.last_expected_symbol_types: set[str] | None = None
+        self.call_count = 0
 
     def detect(
         self,
@@ -36,6 +80,7 @@ class StubSymbolDetector:
     ) -> list[DetectedSymbol]:
         _ = image
         _ = symbols
+        self.call_count += 1
         self.last_expected_symbol_types = expected_symbol_types
         return self._detections
 
@@ -103,18 +148,342 @@ def test_name_mana_cost_parser_keeps_x_without_detected_symbols() -> None:
     assert result.normalized_fields["mana_symbols"] == "x"
 
 
-def _parse(*, text: str, detections: list[DetectedSymbol]) -> Any:
-    parser = NameManaCostParser(StubOcrRunner(text), StubSymbolDetector(detections))
-    return parser.parse(
+@pytest.mark.parametrize(
+    ("text", "expected_name", "expected_cost"),
+    [
+        ("Devourer 4", "Devourer", "4"),
+        ("Ancient Devourer 12", "Ancient Devourer", "12"),
+        ("Ancient Devourer 004", "Ancient Devourer", "4"),
+    ],
+)
+def test_evil_name_mana_cost_parser_uses_trailing_ocr_integer(
+    text: str,
+    expected_name: str,
+    expected_cost: str,
+) -> None:
+    trailing_token = text.rsplit(maxsplit=1)[-1]
+    result, _ocr_runner = _parse_with_runner(
+        text=[text, expected_cost],
+        line_rows=[
+            {"text": expected_name, "confidence": 0.9, "x": 70, "y": 20},
+            {"text": trailing_token, "confidence": 0.9, "x": 190, "y": 20},
+        ],
+        detections=[_detection("occult-mana", x=120)],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
+    )
+
+    assert result.normalized_fields["name"] == expected_name
+    assert result.normalized_fields["mana_cost"] == expected_cost
+    assert result.normalized_fields["mana_total"] == expected_cost
+    assert result.normalized_fields["mana_symbols"] == ""
+    assert result.detected_symbols == []
+
+
+def test_evil_name_mana_cost_parser_combines_split_ocr_lines() -> None:
+    result, ocr_runner = _parse_with_runner(
+        text=["Devourer\n4", "", ""],
+        line_rows=[
+            {"text": "Devourer", "confidence": 0.9, "x": 70, "y": 20},
+            {"text": "4", "confidence": 0.9, "x": 190, "y": 20},
+        ],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
+    )
+
+    assert result.normalized_fields["name"] == "Devourer"
+    assert result.normalized_fields["mana_cost"] == "4"
+    assert result.normalized_fields["mana_total"] == "4"
+    assert ocr_runner.calls == [(200, 40), (84, 120), (56, 80)]
+
+
+def test_evil_name_mana_cost_parser_preserves_unverified_title_digits() -> None:
+    result, ocr_runner = _parse_with_runner(
+        text=["Project 13", "", ""],
+        line_rows=[
+            {
+                "text": "Project 13",
+                "confidence": 0.9,
+                "x": 70,
+                "y": 20,
+                "box": [(20, 10), (195, 10), (195, 30), (20, 30)],
+            },
+        ],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
+    )
+
+    assert result.normalized_fields["name"] == "Project 13"
+    assert result.normalized_fields["mana_cost"] == ""
+    assert result.normalized_fields["mana_total"] == ""
+    assert result.debug["trailing_ocr_integer_confirmed"] is False
+    assert ocr_runner.calls == [(200, 40), (84, 120), (56, 80)]
+
+
+def test_evil_name_mana_cost_parser_preserves_title_digits_when_badge_differs() -> None:
+    result = _parse(
+        text=["Project 13", "4"],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
+    )
+
+    assert result.normalized_fields["name"] == "Project 13"
+    assert result.normalized_fields["mana_cost"] == "4"
+    assert result.normalized_fields["mana_total"] == "4"
+    assert result.debug["trailing_ocr_integer_confirmed"] is False
+
+
+def test_evil_name_mana_cost_parser_preserves_matching_numeric_title_suffix() -> None:
+    result, _ocr_runner = _parse_with_runner(
+        text=["Project 5", "5"],
+        line_rows=[
+            {
+                "text": "Project 5",
+                "confidence": 0.9,
+                "x": 70,
+                "y": 20,
+                "box": [(20, 10), (195, 10), (195, 30), (20, 30)],
+            },
+        ],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
+    )
+
+    assert result.normalized_fields["name"] == "Project 5"
+    assert result.normalized_fields["mana_cost"] == "5"
+    assert result.normalized_fields["mana_total"] == "5"
+    assert result.debug["trailing_ocr_integer_confirmed"] is False
+
+
+def test_evil_name_mana_cost_parser_leaves_missing_cost_empty() -> None:
+    result, ocr_runner = _parse_with_runner(
+        text="Devourer",
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+    )
+
+    assert result.normalized_fields["name"] == "Devourer"
+    assert result.normalized_fields["mana_cost"] == ""
+    assert result.normalized_fields["mana_total"] == ""
+    assert result.normalized_fields["mana_symbols"] == ""
+    assert ocr_runner.calls == [(200, 40)]
+
+
+@pytest.mark.parametrize(
+    ("badge_text", "expected_cost", "expected_total", "expected_symbols"),
+    [
+        ("X", "X", "0", "x"),
+        ("1", "1", "1", ""),
+    ],
+)
+def test_evil_name_mana_cost_parser_reads_isolated_badge_with_scaled_fallback(
+    badge_text: str,
+    expected_cost: str,
+    expected_total: str,
+    expected_symbols: str,
+) -> None:
+    result, ocr_runner = _parse_with_runner(
+        text=["Counter Rune" if badge_text == "X" else "Amulet of Order", badge_text],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
+        confidences=[0.4, 0.8],
+    )
+
+    assert result.normalized_fields["name"] == (
+        "Counter Rune" if badge_text == "X" else "Amulet of Order"
+    )
+    assert result.normalized_fields["mana_cost"] == expected_cost
+    assert result.normalized_fields["mana_total"] == expected_total
+    assert result.normalized_fields["mana_symbols"] == expected_symbols
+    assert ocr_runner.calls == [(200, 40), (84, 120)]
+    assert result.text.endswith(f"\n{badge_text}")
+    assert [line["text"] for line in result.lines] == [
+        "Counter Rune" if badge_text == "X" else "Amulet of Order",
+        badge_text,
+    ]
+    assert result.lines[-1]["ocr_source"] == "mana_badge"
+    assert result.confidence == pytest.approx(0.4)
+    assert result.field_confidences == {"name": 0.4, "mana_cost": 0.8}
+
+
+def test_evil_name_mana_cost_parser_does_not_treat_trailing_title_x_as_mana() -> None:
+    result, ocr_runner = _parse_with_runner(
+        text=["Project X", "", ""],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
+    )
+
+    assert result.normalized_fields["name"] == "Project X"
+    assert result.normalized_fields["mana_cost"] == ""
+    assert result.normalized_fields["mana_total"] == ""
+    assert result.normalized_fields["mana_symbols"] == ""
+    assert ocr_runner.calls == [(200, 40), (84, 120), (56, 80)]
+
+
+def test_evil_name_mana_cost_parser_removes_spatially_confirmed_x_from_name() -> None:
+    result, _ocr_runner = _parse_with_runner(
+        text=["Counter Rune X", "X"],
+        line_rows=[
+            {"text": "Counter Rune", "confidence": 0.9, "x": 70, "y": 20},
+            {"text": "X", "confidence": 0.9, "x": 190, "y": 20},
+        ],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
+    )
+
+    assert result.normalized_fields["name"] == "Counter Rune"
+    assert result.normalized_fields["mana_cost"] == "X"
+    assert result.normalized_fields["mana_total"] == "0"
+    assert result.normalized_fields["mana_symbols"] == "x"
+
+
+def test_evil_name_mana_cost_parser_preserves_title_x_with_separate_x_badge() -> None:
+    result, _ocr_runner = _parse_with_runner(
+        text=["Project X", "X"],
+        line_rows=[
+            {
+                "text": "Project X",
+                "confidence": 0.9,
+                "x": 70,
+                "y": 20,
+                "box": [(20, 10), (195, 10), (195, 30), (20, 30)],
+            },
+        ],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
+    )
+
+    assert result.normalized_fields["name"] == "Project X"
+    assert result.normalized_fields["mana_cost"] == "X"
+
+
+def test_evil_name_mana_cost_parser_rejects_unsafe_badge_scale() -> None:
+    region_spec = {
+        "mana_badge_ocr": {
+            "cut_region": MANA_BADGE_OCR_CONFIG["mana_badge_ocr"]["cut_region"],
+            "scales": [3000, 2],
+        }
+    }
+    result, ocr_runner = _parse_with_runner(
+        text=["Amulet of Order", "1"],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=region_spec,
+    )
+
+    assert result.normalized_fields["mana_cost"] == "1"
+    assert ocr_runner.calls == [(200, 40), (56, 80)]
+
+
+def test_evil_name_mana_cost_parser_deduplicates_badge_scales() -> None:
+    region_spec = {
+        "mana_badge_ocr": {
+            "cut_region": MANA_BADGE_OCR_CONFIG["mana_badge_ocr"]["cut_region"],
+            "scales": [3, 3, 2, 2],
+        }
+    }
+    result, ocr_runner = _parse_with_runner(
+        text=["Amulet of Order", "", "1"],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=region_spec,
+    )
+
+    assert result.normalized_fields["mana_cost"] == "1"
+    assert ocr_runner.calls == [(200, 40), (84, 120), (56, 80)]
+
+
+def test_neutral_name_mana_cost_parser_leaves_cost_fields_empty() -> None:
+    result = _parse(
+        text="Neutral Relic",
+        detections=[_detection("occult-mana", x=120)],
+        card_pool=NEUTRAL_CARD_POOL,
+        expected_detector_calls=0,
+    )
+
+    assert result.normalized_fields["name"] == "Neutral Relic"
+    assert result.normalized_fields["mana_cost"] == ""
+    assert result.normalized_fields["mana_total"] == ""
+    assert result.normalized_fields["mana_symbols"] == ""
+    assert result.detected_symbols == []
+
+
+def _parse(
+    *,
+    text: str | list[str],
+    detections: list[DetectedSymbol],
+    lines: list[str] | None = None,
+    line_rows: list[dict[str, Any]] | None = None,
+    card_pool: CardPool = PLAYER_CARD_POOL,
+    expected_detector_calls: int = 1,
+    region_spec: dict[str, Any] | None = None,
+    confidences: list[float] | None = None,
+) -> Any:
+    result, _ocr_runner = _parse_with_runner(
+        text=text,
+        detections=detections,
+        lines=lines,
+        line_rows=line_rows,
+        card_pool=card_pool,
+        expected_detector_calls=expected_detector_calls,
+        region_spec=region_spec,
+        confidences=confidences,
+    )
+    return result
+
+
+def _parse_with_runner(
+    *,
+    text: str | list[str],
+    detections: list[DetectedSymbol],
+    lines: list[str] | None = None,
+    line_rows: list[dict[str, Any]] | None = None,
+    card_pool: CardPool = PLAYER_CARD_POOL,
+    expected_detector_calls: int = 1,
+    region_spec: dict[str, Any] | None = None,
+    confidences: list[float] | None = None,
+) -> tuple[Any, StubOcrRunner]:
+    detector = StubSymbolDetector(detections)
+    ocr_runner = StubOcrRunner(
+        text,
+        lines=lines,
+        line_rows=line_rows,
+        confidences=confidences,
+    )
+    parser = NameManaCostParser(ocr_runner, detector)
+    result = parser.parse(
         region_name="top_bar",
         image=Image.new("RGB", (200, 40), "white"),
         image_stem="fallback-name",
-        region_spec={},
+        card_pool=card_pool,
+        region_spec=region_spec or {},
         symbols=[
             _symbol("colorless-mana-1"),
             _symbol("occult-mana"),
         ],
     )
+    assert detector.call_count == expected_detector_calls
+    return result, ocr_runner
 
 
 def _symbol(key: str) -> Symbol:

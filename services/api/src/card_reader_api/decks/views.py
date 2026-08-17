@@ -43,12 +43,18 @@ def _deck_list_response(
 ) -> Response:
     if serializer.wants_summary():
         results = [
-            deck_summary_payload(deck, include_pending_suggestions=include_pending_suggestions)
+            deck_summary_payload(
+                deck,
+                include_pending_suggestions=include_pending_suggestions,
+            )
             for deck in decks
         ]
     else:
         results = [
-            deck_payload(deck, include_pending_suggestions=include_pending_suggestions)
+            deck_payload(
+                deck,
+                include_pending_suggestions=include_pending_suggestions,
+            )
             for deck in decks
         ]
     return Response(results)
@@ -76,7 +82,10 @@ def _deck_summary_page_response(
             "page_size": summary_page.page_size,
             "snapshot_at": summary_page.snapshot_at.isoformat(),
             "results": [
-                deck_summary_payload(deck, include_pending_suggestions=include_pending_suggestions)
+                deck_summary_payload(
+                    deck,
+                    include_pending_suggestions=include_pending_suggestions,
+                )
                 for deck in summary_page.results
             ],
         }
@@ -129,7 +138,9 @@ class PublicDeckListView(APIView):
                 cursor_id=cursor_id,
                 **filters,
             )
-            return _deck_summary_page_response(summary_page)
+            return _deck_summary_page_response(
+                summary_page,
+            )
         list_decks = service.list_public_deck_summaries if serializer.wants_summary() else service.list_public_decks
         decks = list_decks(
             search_query=filters["search_query"],
@@ -143,7 +154,10 @@ class PublicDeckListView(APIView):
             deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
             deck_tag_match=filters["deck_tag_match"],
         )
-        return _deck_list_response(serializer, decks)
+        return _deck_list_response(
+            serializer,
+            decks,
+        )
 
 
 class PublicDeckDetailView(APIView):
@@ -155,7 +169,12 @@ class PublicDeckDetailView(APIView):
         if deck is None:
             return not_found("Deck not found")
         is_owner = viewer_id is not None and str(getattr(deck.owner, "pk", "")) == viewer_id
-        return Response(deck_payload(deck, include_pending_suggestions=is_owner))
+        return Response(
+            deck_payload(
+                deck,
+                include_pending_suggestions=is_owner,
+            )
+        )
 
 
 class OwnerDeckListCreateView(APIView):
@@ -207,7 +226,10 @@ class OwnerDeckListCreateView(APIView):
                 deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
                 deck_tag_match=filters["deck_tag_match"],
             )
-            return _deck_summary_page_response(summary_page, include_pending_suggestions=True)
+            return _deck_summary_page_response(
+                summary_page,
+                include_pending_suggestions=True,
+            )
         list_decks = service.list_owner_deck_summaries if serializer.wants_summary() else service.list_owner_decks
         decks = list_decks(
             owner_id,
@@ -221,7 +243,11 @@ class OwnerDeckListCreateView(APIView):
             deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
             deck_tag_match=filters["deck_tag_match"],
         )
-        return _deck_list_response(serializer, decks, include_pending_suggestions=True)
+        return _deck_list_response(
+            serializer,
+            decks,
+            include_pending_suggestions=True,
+        )
 
     def post(self, request: Request) -> Response:
         raw_creation_id = request.headers.get("Idempotency-Key")
@@ -240,7 +266,12 @@ class OwnerDeckListCreateView(APIView):
                 client_creation_id,
             )
             if existing is not None:
-                return Response(deck_payload(existing, include_pending_suggestions=True))
+                return Response(
+                    deck_payload(
+                        existing,
+                        include_pending_suggestions=True,
+                    )
+                )
             if key_used:
                 return Response(
                     {"detail": "The deck created by this key has been deleted."},
@@ -266,6 +297,7 @@ class OwnerDeckListCreateView(APIView):
                     DeckSideboardInput(
                         name=sideboard["name"],
                         entries=[DeckEntryInput(**entry) for entry in sideboard["entries"]],
+                        source_id=str(sideboard["id"]) if "id" in sideboard else None,
                     )
                     for sideboard in serializer.validated_data.get("sideboards", [])
                 ],
@@ -287,7 +319,10 @@ class OwnerDeckListCreateView(APIView):
             )
         except ValueError as exc:
             return bad_request(str(exc))
-        payload = deck_payload(deck, include_pending_suggestions=True)
+        payload = deck_payload(
+            deck,
+            include_pending_suggestions=True,
+        )
         payload["tag_suggestion_results"] = deck_tag_suggestion_results_payload(
             tag_service.describe_suggestion_results(serializer.validated_data.get("suggested_type_labels", []))
         )
@@ -310,7 +345,12 @@ class OwnerDeckCreationLookupView(APIView):
                     status=status.HTTP_410_GONE,
                 )
             return not_found("Deck not found")
-        return Response(deck_payload(deck, include_pending_suggestions=True))
+        return Response(
+            deck_payload(
+                deck,
+                include_pending_suggestions=True,
+            )
+        )
 
 
 class OwnerDeckDetailView(APIView):
@@ -323,7 +363,12 @@ class OwnerDeckDetailView(APIView):
             deck = service.get_deck(deck_id)
         if deck is None:
             return not_found("Deck not found")
-        return Response(deck_payload(deck, include_pending_suggestions=True))
+        return Response(
+            deck_payload(
+                deck,
+                include_pending_suggestions=True,
+            )
+        )
 
     def patch(self, request: Request, deck_id: str) -> Response:
         service = DeckService()
@@ -332,7 +377,6 @@ class OwnerDeckDetailView(APIView):
             accessible_deck = service.get_deck(deck_id)
         if accessible_deck is None:
             return not_found("Deck not found")
-
         serializer = DeckWriteSerializer(data=request.data, partial=True)
         if not serializer.is_valid():
             return serializer_error(serializer)
@@ -358,6 +402,7 @@ class OwnerDeckDetailView(APIView):
                             DeckSideboardInput(
                                 name=sideboard["name"],
                                 entries=[DeckEntryInput(**entry) for entry in sideboard["entries"]],
+                                source_id=str(sideboard["id"]) if "id" in sideboard else None,
                             )
                             for sideboard in serializer.validated_data["sideboards"]
                         ]
@@ -392,7 +437,10 @@ class OwnerDeckDetailView(APIView):
             return bad_request(str(exc))
         if deck is None:
             return not_found("Deck not found")
-        payload = deck_payload(deck, include_pending_suggestions=True)
+        payload = deck_payload(
+            deck,
+            include_pending_suggestions=True,
+        )
         submitted_suggestions = (
             serializer.validated_data.get("suggested_type_labels", [])
             if "suggested_type_labels" in serializer.validated_data

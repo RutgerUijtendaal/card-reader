@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from card_reader_core.repositories.cards import (
     get_card,
@@ -8,9 +9,16 @@ from card_reader_core.repositories.cards import (
     get_latest_card_version,
     resolve_image_file_path,
 )
-from card_reader_core.repositories.import_jobs import ImportJobItemTarget, create_import_job_with_files
+from card_reader_core.repositories.import_jobs import ImportJobItemTarget
 from card_reader_core.config.settings import settings
+from card_reader_core.models import (
+    CardPool,
+    card_faction_keys,
+    card_mana_family_keys,
+    card_role_keys,
+)
 from card_reader_core.services.templates import TemplateService
+from card_reader_core.services.imports import ImportService
 
 
 class CardReparseError(ValueError):
@@ -47,12 +55,21 @@ class CardActionService:
         if image_path is None:
             raise CardReparseError("Latest card image file is missing for reparse.")
 
-        job = create_import_job_with_files(
+        job = ImportService().create_reparse_job_with_files(
             source_path=settings.storage_root_dir / "cards" / card.id / "reparse-latest",
             template_id=resolved_template_id,
-            options={"reparse_existing": True},
             files=[image_path],
-            item_targets=[ImportJobItemTarget(card_id=card.id, card_version_id=version.id)],
+            item_targets=[
+                ImportJobItemTarget(
+                    card_id=card.id,
+                    card_version_id=version.id,
+                    card_pool=cast(CardPool, card.card_pool),
+                    card_roles=card_role_keys(card),
+                    card_factions=card_faction_keys(card),
+                    card_mana_families=card_mana_family_keys(card),
+                )
+            ],
+            card_pool=cast(CardPool, card.card_pool),
         )
         return CardReparseQueueResult(
             job_id=job.id,

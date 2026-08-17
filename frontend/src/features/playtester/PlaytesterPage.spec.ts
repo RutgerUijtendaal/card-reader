@@ -73,7 +73,7 @@ const card = {
   label: 'Card 1',
   result_type: 'card' as const,
   image_url: null,
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   lifecycle_status: 'active' as const,
   template_id: '',
   version_id: 'card-1-version',
@@ -125,7 +125,7 @@ const deckRecord = {
   difficulty: null,
   visibility: 'public' as const,
   owner: { id: 'user-1', username: 'owner' },
-  hero_card: { ...card, id: 'hero', key: 'hero', name: 'Hero', label: 'Hero', is_hero: true },
+  hero_card: { ...card, id: 'hero', key: 'hero', name: 'Hero', label: 'Hero', card_pool: 'player' as const, card_roles: ['hero' as const] },
   mainboard: {
     total_cards: 14,
     unique_cards: 3,
@@ -147,6 +147,7 @@ const deckRecord = {
     label: 'Ready',
     issues: [],
   },
+  has_non_player_cards: false,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 };

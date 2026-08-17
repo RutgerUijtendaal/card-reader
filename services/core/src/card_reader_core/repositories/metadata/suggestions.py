@@ -97,7 +97,10 @@ def list_metadata_suggestions(
         MetadataSuggestion.objects.filter(kind=kind)
         .select_related("accepted_tag", "accepted_type")
         .annotate(
-            occurrence_count=Count("card_version_metadata_suggestions", distinct=True)
+            occurrence_count=Count(
+                "card_version_metadata_suggestions",
+                distinct=True,
+            )
         )
         .filter(occurrence_count__gt=0)
         .order_by("-occurrence_count", "display_value", "normalized_value")
@@ -117,8 +120,15 @@ def list_card_version_suggestion_occurrences(
     suggestion_id: str,
 ) -> list[CardVersionMetadataSuggestion]:
     return list(
-        CardVersionMetadataSuggestion.objects.filter(suggestion_id=suggestion_id)
+        CardVersionMetadataSuggestion.objects.filter(
+            suggestion_id=suggestion_id,
+        )
         .select_related("card_version__card", "parse_result")
-        .prefetch_related("card_version__images")
+        .prefetch_related(
+            "card_version__images",
+            "card_version__card__role_assignments",
+            "card_version__card__faction_assignments",
+            "card_version__card__mana_family_assignments",
+        )
         .order_by("-created_at")
     )

@@ -21,6 +21,8 @@ const buildDeck = (overrides: Partial<DeckSummaryRecord> = {}): DeckSummaryRecor
     id: 'hero-1',
     key: 'hero-1',
     label: 'Azure Hero',
+    card_pool: 'player',
+    card_roles: ['hero'],
     image_url: '/media/cards/hero.png',
     name: 'Azure Hero',
     symbols: [
@@ -44,6 +46,7 @@ const buildDeck = (overrides: Partial<DeckSummaryRecord> = {}): DeckSummaryRecor
     label: 'Ready',
     deprecated_card_count: 0,
   },
+  has_non_player_cards: false,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
   ...overrides,

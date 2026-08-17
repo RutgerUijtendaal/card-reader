@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from card_reader_api.auth.password_flow import PasswordSetupService
-from card_reader_api.common.auth_access import capability_payload
+from card_reader_api.common.auth_access import capability_payload, is_authenticated
 from card_reader_core.services.user_activity import UserActivityService
 
 
@@ -44,7 +44,7 @@ class CurrentUserView(APIView):
 
     def get(self, request: Request) -> Response:
         csrf_token = get_token(request)
-        if not request.user.is_authenticated:
+        if not is_authenticated(request.user):
             return Response(
                 {
                     "authenticated": False,

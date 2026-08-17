@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import time
+from collections.abc import Callable
 
 from django.db import transaction
 
@@ -17,8 +18,12 @@ from card_reader_core.repositories.tts_card_sheets import (
     list_sheet_ids_needing_render,
     list_usable_card_sources,
     prioritize_sheets,
+    refresh_card_source_visibility,
+    retire_incompatible_sheet_slots,
     release_expired_render_claims,
     request_sheet_rerender,
+    sheet_has_incompatible_slots,
+    sheet_has_unretired_incompatible_slots,
     sync_card_sources,
     sync_merged_card_source,
     upgrade_sheet_layouts,
@@ -44,18 +49,30 @@ class TtsCardSheetService:
         normalized_ids = list(dict.fromkeys(card_ids))
         if not normalized_ids:
             return set()
-        return sync_card_sources(list_usable_card_sources(normalized_ids))
+        affected_sheet_ids = sync_card_sources(list_usable_card_sources(normalized_ids))
+        affected_sheet_ids.update(refresh_card_source_visibility(normalized_ids))
+        return affected_sheet_ids
+
+    def ensure_sheet_current(self, sheet_id: str) -> bool:
+        if not sheet_has_incompatible_slots(sheet_id):
+            return True
+        if sheet_has_unretired_incompatible_slots(sheet_id):
+            retire_incompatible_sheet_slots(sheet_id)
+        return sheet_id not in list_sheet_ids_needing_render([sheet_id])
 
     def reconcile_all(
         self,
         *,
         render: bool = False,
         force: bool = False,
+        progress: Callable[[str], None] | None = None,
     ) -> TtsCardSheetReconciliationResult:
+        _report_progress(progress, "Scanning card images for pool-partitioned TTS sheet assignments...")
         usable_cards = 0
         assigned_cards = 0
         affected_sheet_ids = upgrade_sheet_layouts()
         all_sheet_ids = set(list_all_sheet_ids())
+        affected_sheet_ids.update(refresh_card_source_visibility())
         for sources in iter_usable_card_source_batches():
             card_ids = [source.card.id for source in sources]
             usable_cards += len(sources)
@@ -63,6 +80,10 @@ class TtsCardSheetService:
             assignments = get_card_sheet_assignments(card_ids)
             assigned_cards += len(assignments)
             all_sheet_ids.update(row.sheet_id for row in assignments.values())
+            _report_progress(
+                progress,
+                f"Prepared {usable_cards} usable card images and {assigned_cards} assignments...",
+            )
         missing_sheet_ids = self._unavailable_sheet_ids(list(all_sheet_ids))
         request_sheet_rerender(missing_sheet_ids)
         affected_sheet_ids.update(missing_sheet_ids)
@@ -70,7 +91,16 @@ class TtsCardSheetService:
             request_sheet_rerender(list(all_sheet_ids))
             affected_sheet_ids.update(all_sheet_ids)
         affected_sheet_ids.update(list_sheet_ids_needing_render(list(all_sheet_ids)))
-        rendered_count = self.render_sheets_now(sorted(affected_sheet_ids)) if render else 0
+        _report_progress(
+            progress,
+            f"TTS assignment complete: {assigned_cards} cards across {len(all_sheet_ids)} sheets; "
+            f"{len(affected_sheet_ids)} sheets need work.",
+        )
+        rendered_count = (
+            self.render_sheets_now(sorted(affected_sheet_ids), progress=progress)
+            if render
+            else 0
+        )
         return TtsCardSheetReconciliationResult(
             usable_cards=usable_cards,
             assigned_cards=assigned_cards,
@@ -127,9 +157,12 @@ class TtsCardSheetService:
         sheet_ids: list[str],
         *,
         respect_not_before: bool = False,
+        progress: Callable[[str], None] | None = None,
     ) -> int:
         rendered = 0
-        for sheet_id in list(dict.fromkeys(sheet_ids)):
+        unique_sheet_ids = list(dict.fromkeys(sheet_ids))
+        total_sheets = len(unique_sheet_ids)
+        for position, sheet_id in enumerate(unique_sheet_ids, start=1):
             while sheet_id in list_sheet_ids_needing_render([sheet_id]):
                 claimed = claim_sheet_for_render(
                     sheet_id,
@@ -137,8 +170,21 @@ class TtsCardSheetService:
                 )
                 if claimed is None:
                     break
+                _report_progress(
+                    progress,
+                    f"Rendering TTS card sheet {position}/{total_sheets}...",
+                )
                 render_claimed_sheet(claimed)
                 rendered += 1
+                _report_progress(
+                    progress,
+                    f"Rendered TTS card sheet {position}/{total_sheets}.",
+                )
+        if unique_sheet_ids:
+            _report_progress(
+                progress,
+                f"TTS rendering complete: {rendered} sheet revisions rendered.",
+            )
         return rendered
 
     def _wait_until_ready(self, sheet_ids: list[str], *, timeout_seconds: float) -> None:
@@ -171,6 +217,11 @@ class TtsCardSheetService:
             if not rendered_checksums.get(sheet_id)
             or not tts_card_sheet_path(sheet_id, rendered_checksums[sheet_id]).is_file()
         ]
+
+
+def _report_progress(progress: Callable[[str], None] | None, message: str) -> None:
+    if progress is not None:
+        progress(message)
 
 
 __all__ = [

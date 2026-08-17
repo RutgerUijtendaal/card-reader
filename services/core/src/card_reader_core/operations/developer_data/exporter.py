@@ -6,14 +6,23 @@ import re
 import shutil
 import tarfile
 import tempfile
-from typing import Any
+from typing import Any, cast
 
 from django.db.migrations.recorder import MigrationRecorder
-
 from card_reader_core.config.settings import settings
 from card_reader_core.models import (
+    CARD_CLASSIFICATION_SOURCE_TAG,
+    CARD_CLASSIFICATION_SOURCE_TYPE,
+    CARD_CLASSIFICATION_TARGET_ROLE,
+    CARD_CLASSIFICATION_TARGET_FACTION,
+    CARD_FACTION_DEFINITIONS,
+    CARD_POOL_DEFINITIONS,
+    CARD_POOLS,
+    CARD_ROLE_DEFINITIONS,
+    PLAYER_CARD_POOL,
     Card,
     CardBack,
+    CardClassificationRule,
     CardGroup,
     ContentVersion,
     DeckTag,
@@ -22,10 +31,19 @@ from card_reader_core.models import (
     Tag,
     Template,
     Type,
+    CardPool,
+    card_faction_keys,
+    card_mana_family_keys,
+    card_role_keys,
 )
-from card_reader_core.storage import relativize_image_storage_path, relativize_storage_path
+from card_reader_core.metadata import MANA_FAMILIES
+from card_reader_core.storage import (
+    calculate_checksum,
+    relativize_image_storage_path,
+    relativize_storage_path,
+)
 
-from .archive import DeveloperDataError, canonical_json_bytes, sha256_file
+from .archive import DeveloperDataError, canonical_json_bytes
 from .schema import (
     DEVELOPER_DATA_FORMAT_VERSION,
     BundleFileRecord,
@@ -35,8 +53,10 @@ from .schema import (
     CardGroupRecord,
     CardImageRecord,
     CardRecord,
+    CardReferenceRecord,
     CardVersionRecord,
     CatalogRecord,
+    ClassificationRuleRecord,
     ContentVersionRecord,
     DeckTagRecord,
     DeveloperDataManifest,
@@ -44,6 +64,11 @@ from .schema import (
     DeveloperDataSelection,
     SymbolRecord,
     TemplateRecord,
+)
+
+DEVELOPER_DATA_CARD_POOL = PLAYER_CARD_POOL
+DEVELOPER_DATA_EXCLUDED_POOLS = tuple(
+    pool for pool in CARD_POOLS if pool != DEVELOPER_DATA_CARD_POOL
 )
 
 
@@ -60,7 +85,9 @@ def export_developer_data(
     except Exception as exc:
         raise DeveloperDataError(f"Developer-data selection is invalid: {selection_path}") from exc
     if output_path.exists():
-        raise DeveloperDataError(f"Refusing to overwrite existing developer-data archive: {output_path}")
+        raise DeveloperDataError(
+            f"Refusing to overwrite existing developer-data archive: {output_path}"
+        )
 
     cards, groups = _resolve_selection(selection)
     payload = _build_payload(cards=cards, groups=groups)
@@ -104,28 +131,49 @@ def _resolve_selection(
     selection: DeveloperDataSelection,
 ) -> tuple[list[Card], list[CardGroup]]:
     selected_keys = set(selection.card_keys)
-    group_queryset = CardGroup.objects.all()
+    group_card_ids: set[str] = set()
+    group_queryset = CardGroup.objects.filter(
+        anchor_card__card_pool=DEVELOPER_DATA_CARD_POOL,
+    ).exclude(members__card__card_pool__in=DEVELOPER_DATA_EXCLUDED_POOLS)
     if not selection.include_all_card_groups:
         group_queryset = group_queryset.filter(key__in=selection.card_group_keys)
     groups = list(
-        group_queryset
-        .select_related("anchor_card")
+        group_queryset.select_related("anchor_card")
         .prefetch_related("members__card")
         .order_by("key")
     )
     missing_groups = sorted(set(selection.card_group_keys) - {group.key for group in groups})
     if missing_groups:
-        raise DeveloperDataError(f"Selected card groups were not found: {', '.join(missing_groups)}")
+        raise DeveloperDataError(
+            f"Selected card groups were not found: {', '.join(missing_groups)}"
+        )
     for group in groups:
-        selected_keys.add(group.anchor_card.key)
-        selected_keys.update(member.card.key for member in group.members.all())
+        group_card_ids.add(group.anchor_card.id)
+        group_card_ids.update(member.card.id for member in group.members.all())
 
-    card_queryset = Card.objects.all()
+    card_queryset = Card.objects.filter(card_pool=DEVELOPER_DATA_CARD_POOL)
+    explicit_matches: dict[str, list[str]] = {}
+    for card_id, card_key in card_queryset.filter(key__in=selected_keys).values_list("id", "key"):
+        explicit_matches.setdefault(card_key, []).append(card_id)
+    missing_cards = sorted(selected_keys - explicit_matches.keys())
+    if missing_cards:
+        raise DeveloperDataError(f"Selected cards were not found: {', '.join(missing_cards)}")
+    ambiguous_cards = sorted(
+        card_key for card_key, card_ids in explicit_matches.items() if len(card_ids) > 1
+    )
+    if ambiguous_cards:
+        raise DeveloperDataError(
+            "Selected card keys are ambiguous across faction namespaces: "
+            f"{', '.join(ambiguous_cards)}"
+        )
     if not selection.include_all_cards:
-        card_queryset = card_queryset.filter(key__in=selected_keys)
+        selected_card_ids = group_card_ids | {card_ids[0] for card_ids in explicit_matches.values()}
+        card_queryset = card_queryset.filter(id__in=selected_card_ids)
     cards = list(
-        card_queryset
-        .prefetch_related(
+        card_queryset.prefetch_related(
+            "role_assignments",
+            "faction_assignments",
+            "mana_family_assignments",
             "aliases",
             "versions__template",
             "versions__content_version",
@@ -134,12 +182,8 @@ def _resolve_selection(
             "versions__card_version_tags__tag",
             "versions__card_version_symbols__symbol",
             "versions__card_version_types__type",
-        )
-        .order_by("key")
+        ).order_by("key", "faction_identity_key", "id")
     )
-    missing_cards = sorted(selected_keys - {card.key for card in cards})
-    if missing_cards:
-        raise DeveloperDataError(f"Selected cards were not found: {', '.join(missing_cards)}")
     return cards, groups
 
 
@@ -156,9 +200,22 @@ def _build_payload(*, cards: list[Card], groups: list[CardGroup]) -> DeveloperDa
         types=[_catalog_record(row) for row in Type.objects.order_by("key")],
         symbols=[_symbol_record(row) for row in Symbol.objects.order_by("key")],
         templates=[
-            TemplateRecord(key=row.key, label=row.label, definition=row.definition_json)
+            TemplateRecord(
+                key=row.key,
+                label=row.label,
+                definition=row.definition_json,
+            )
             for row in Template.objects.order_by("key")
         ],
+        classification_rules=sorted(
+            (
+                _classification_rule_record(row)
+                for row in CardClassificationRule.objects.select_related(
+                    "tag", "type", "symbol"
+                )
+            ),
+            key=_classification_rule_sort_key,
+        ),
         deck_tags=[
             DeckTagRecord(kind=row.kind, key=row.key, label=row.label)
             for row in DeckTag.objects.order_by("kind", "key")
@@ -172,14 +229,73 @@ def _build_payload(*, cards: list[Card], groups: list[CardGroup]) -> DeveloperDa
                 patch=row.patch,
                 description=row.description,
             )
-            for row in ContentVersion.objects.filter(version_number__in=content_version_numbers).order_by(
-                "major", "minor", "patch"
-            )
+            for row in ContentVersion.objects.filter(
+                version_number__in=content_version_numbers
+            ).order_by("major", "minor", "patch")
         ],
         cards=[_card_record(card) for card in cards],
         card_groups=[_group_record(group) for group in groups],
         current_card_back=_card_back_record(CardBack.objects.filter(is_current=True).first()),
     )
+
+
+def _classification_rule_record(
+    row: CardClassificationRule,
+) -> ClassificationRuleRecord:
+    source = (
+        row.tag
+        if row.source_kind == "tag"
+        else row.type
+        if row.source_kind == "type"
+        else row.symbol
+    )
+    if source is None:
+        raise DeveloperDataError(f"Classification rule {row.id} has no source.")
+    return ClassificationRuleRecord(
+        card_pool=cast(CardPool, row.card_pool),
+        target_kind=row.target_kind,
+        target_key=row.target_key,
+        source_kind=row.source_kind,
+        source_key=source.key,
+        enabled=row.enabled,
+    )
+
+
+def _classification_rule_sort_key(
+    rule: ClassificationRuleRecord,
+) -> tuple[int, int, int, int, str]:
+    pool_rank = next(
+        definition.rank for definition in CARD_POOL_DEFINITIONS if definition.key == rule.card_pool
+    )
+    if rule.target_kind == CARD_CLASSIFICATION_TARGET_ROLE:
+        target_kind_rank = 0
+        target_rank = next(
+            definition.rank
+            for definition in CARD_ROLE_DEFINITIONS
+            if definition.key == rule.target_key
+        )
+    elif rule.target_kind == CARD_CLASSIFICATION_TARGET_FACTION:
+        target_kind_rank = 1
+        target_rank = next(
+            definition.rank
+            for definition in CARD_FACTION_DEFINITIONS
+            if definition.key == rule.target_key
+        )
+    else:
+        target_kind_rank = 2
+        target_rank = next(
+            definition.rank
+            for definition in MANA_FAMILIES
+            if definition.key == rule.target_key
+        )
+    source_kind_rank = (
+        0
+        if rule.source_kind == CARD_CLASSIFICATION_SOURCE_TAG
+        else 1
+        if rule.source_kind == CARD_CLASSIFICATION_SOURCE_TYPE
+        else 2
+    )
+    return pool_rank, target_kind_rank, target_rank, source_kind_rank, rule.source_key
 
 
 def _catalog_record(row: Keyword | Tag | Type) -> CatalogRecord:
@@ -194,7 +310,9 @@ def _symbol_record(row: Symbol) -> SymbolRecord:
         detector_type=row.detector_type,
         detection_config=dict(row.detection_config_json),
         text_enrichment=dict(row.text_enrichment_json),
-        reference_assets=[_normalize_symbol_asset_path(value) for value in row.reference_assets_json],
+        reference_assets=[
+            _normalize_symbol_asset_path(value) for value in row.reference_assets_json
+        ],
         text_token=row.text_token,
         enabled=row.enabled,
     )
@@ -215,7 +333,10 @@ def _card_record(card: Card) -> CardRecord:
     return CardRecord(
         key=card.key,
         label=card.label,
-        is_hero=card.is_hero,
+        card_pool=cast(CardPool, card.card_pool),
+        card_roles=list(card_role_keys(card)),
+        card_factions=list(card_faction_keys(card)),
+        card_mana_families=list(card_mana_family_keys(card)),
         deck_building_config=dict(card.deck_building_config_json),
         lifecycle_status=card.lifecycle_status,
         latest_version_number=latest_number,
@@ -275,11 +396,23 @@ def _group_record(group: CardGroup) -> CardGroupRecord:
     return CardGroupRecord(
         key=group.key,
         name=group.name,
-        anchor_card_key=group.anchor_card.key,
+        anchor_card_ref=_card_reference_record(group.anchor_card),
         members=[
-            CardGroupMemberRecord(card_key=member.card.key, position=member.position)
+            CardGroupMemberRecord(
+                card_ref=_card_reference_record(member.card),
+                position=member.position,
+            )
             for member in sorted(group.members.all(), key=lambda row: row.position)
         ],
+    )
+
+
+def _card_reference_record(card: Card) -> CardReferenceRecord:
+    return CardReferenceRecord(
+        key=card.key,
+        card_pool=cast(CardPool, card.card_pool),
+        card_factions=list(card_faction_keys(card)),
+        card_mana_families=list(card_mana_family_keys(card)),
     )
 
 
@@ -306,13 +439,28 @@ def _validate_coverage(
     errors: list[str] = []
     if len(payload.cards) < coverage.min_cards:
         errors.append(f"requires at least {coverage.min_cards} cards")
-    if sum(card.is_hero for card in payload.cards) < coverage.min_heroes:
-        errors.append(f"requires at least {coverage.min_heroes} heroes")
-    if sum(card.lifecycle_status == "deprecated" for card in payload.cards) < coverage.min_deprecated_cards:
+    for card_pool, minimum in coverage.min_cards_by_pool.items():
+        count = sum(card.card_pool == card_pool for card in payload.cards)
+        if count < minimum:
+            errors.append(f"requires at least {minimum} {card_pool} cards")
+    for card_role, minimum in coverage.min_cards_by_role.items():
+        count = sum(
+            (not card.card_roles if card_role == "standard" else card_role in card.card_roles)
+            for card in payload.cards
+        )
+        if count < minimum:
+            errors.append(f"requires at least {minimum} cards with role {card_role}")
+    if (
+        sum(card.lifecycle_status == "deprecated" for card in payload.cards)
+        < coverage.min_deprecated_cards
+    ):
         errors.append(f"requires at least {coverage.min_deprecated_cards} deprecated cards")
     if len(payload.card_groups) < coverage.min_card_groups:
         errors.append(f"requires at least {coverage.min_card_groups} card groups")
-    if sum(len(card.versions) > 1 for card in payload.cards) < coverage.min_cards_with_multiple_versions:
+    if (
+        sum(len(card.versions) > 1 for card in payload.cards)
+        < coverage.min_cards_with_multiple_versions
+    ):
         errors.append(
             f"requires at least {coverage.min_cards_with_multiple_versions} cards with version history"
         )
@@ -320,6 +468,62 @@ def _validate_coverage(
     missing_templates = sorted(set(coverage.required_template_keys) - template_keys)
     if missing_templates:
         errors.append(f"missing required templates: {', '.join(missing_templates)}")
+    tag_keys = {tag.key for tag in payload.tags}
+    missing_tags = sorted(set(coverage.required_tag_keys) - tag_keys)
+    if missing_tags:
+        errors.append(f"missing required tags: {', '.join(missing_tags)}")
+    faction_counts = {
+        faction: sum(faction in card.card_factions for card in payload.cards)
+        for faction in coverage.min_cards_by_faction
+    }
+    for faction, minimum in coverage.min_cards_by_faction.items():
+        if faction_counts[faction] < minimum:
+            errors.append(
+                f"faction {faction} has {faction_counts[faction]} cards; requires {minimum}"
+            )
+    mana_family_counts = {
+        family: sum(family in card.card_mana_families for card in payload.cards)
+        for family in coverage.min_cards_by_mana_family
+    }
+    for family, minimum in coverage.min_cards_by_mana_family.items():
+        if mana_family_counts[family] < minimum:
+            errors.append(
+                f"mana family {family} has {mana_family_counts[family]} cards; "
+                f"requires {minimum}"
+            )
+    available_rules = {
+        (
+            rule.card_pool,
+            rule.target_kind,
+            rule.target_key,
+            rule.source_kind,
+            rule.source_key,
+            rule.enabled,
+        )
+        for rule in payload.classification_rules
+    }
+    missing_rules = [
+        rule
+        for rule in coverage.required_classification_rules
+        if (
+            rule.card_pool,
+            rule.target_kind,
+            rule.target_key,
+            rule.source_kind,
+            rule.source_key,
+            rule.enabled,
+        )
+        not in available_rules
+    ]
+    if missing_rules:
+        errors.append(
+            "missing required classification rules: "
+            + ", ".join(
+                f"{rule.card_pool}/{rule.target_kind}:{rule.target_key}"
+                f"<-{rule.source_kind}:{rule.source_key}"
+                for rule in missing_rules
+            )
+        )
     if payload.current_card_back is None:
         errors.append("requires a current card back")
     if errors:
@@ -345,9 +549,7 @@ _FORBIDDEN_CREDENTIAL_KEYS = {
     "secret",
     "token",
 }
-_FORBIDDEN_CREDENTIAL_KEY_SUFFIXES = tuple(
-    f"_{key}" for key in _FORBIDDEN_CREDENTIAL_KEYS
-)
+_FORBIDDEN_CREDENTIAL_KEY_SUFFIXES = tuple(f"_{key}" for key in _FORBIDDEN_CREDENTIAL_KEYS)
 _ALLOWED_PUBLIC_CREDENTIAL_LIKE_KEYS = {"text_token"}
 _WINDOWS_ABSOLUTE_PATH = re.compile(r"^[A-Za-z]:[\\/]")
 
@@ -371,8 +573,7 @@ def _validate_public_json(value: object, *, context: str) -> None:
             _validate_public_json(nested, context=f"{context}[{index}]")
         return
     if isinstance(value, str) and (
-        _WINDOWS_ABSOLUTE_PATH.match(value)
-        or value.startswith(("/", "\\\\"))
+        _WINDOWS_ABSOLUTE_PATH.match(value) or value.startswith(("/", "\\\\"))
     ):
         raise DeveloperDataError(f"Forbidden absolute filesystem path in {context}.")
 
@@ -380,9 +581,8 @@ def _validate_public_json(value: object, *, context: str) -> None:
 def _is_credential_key(normalized_key: str) -> bool:
     if normalized_key in _ALLOWED_PUBLIC_CREDENTIAL_LIKE_KEYS:
         return False
-    return (
-        normalized_key in _FORBIDDEN_CREDENTIAL_KEYS
-        or normalized_key.endswith(_FORBIDDEN_CREDENTIAL_KEY_SUFFIXES)
+    return normalized_key in _FORBIDDEN_CREDENTIAL_KEYS or normalized_key.endswith(
+        _FORBIDDEN_CREDENTIAL_KEY_SUFFIXES
     )
 
 
@@ -433,7 +633,7 @@ def _build_file_manifest(staging_root: Path) -> list[BundleFileRecord]:
     return [
         BundleFileRecord(
             path=path.relative_to(staging_root).as_posix(),
-            sha256=sha256_file(path),
+            sha256=calculate_checksum(path),
             size_bytes=path.stat().st_size,
         )
         for path in sorted(staging_root.rglob("*"))
@@ -448,11 +648,14 @@ def _payload_counts(payload: DeveloperDataPayload) -> dict[str, int]:
         "types": len(payload.types),
         "symbols": len(payload.symbols),
         "templates": len(payload.templates),
+        "classification_rules": len(payload.classification_rules),
         "deck_tags": len(payload.deck_tags),
         "content_versions": len(payload.content_versions),
         "cards": len(payload.cards),
         "card_versions": sum(len(card.versions) for card in payload.cards),
-        "card_images": sum(len(version.images) for card in payload.cards for version in card.versions),
+        "card_images": sum(
+            len(version.images) for card in payload.cards for version in card.versions
+        ),
         "card_groups": len(payload.card_groups),
         "card_backs": int(payload.current_card_back is not None),
     }

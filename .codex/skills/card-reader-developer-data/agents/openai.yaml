@@ -1,0 +1,4 @@
+interface:
+  display_name: "Card Reader Developer Data"
+  short_description: "Maintain developer-data bundle workflows"
+  default_prompt: "Use $card-reader-developer-data to change Card Reader developer-data selection, bundle schemas, compatibility, publishing, downloading, or bootstrap flows."

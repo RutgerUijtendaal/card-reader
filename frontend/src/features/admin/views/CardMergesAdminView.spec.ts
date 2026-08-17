@@ -25,13 +25,17 @@ vi.mock('vue-sonner', () => ({
   },
 }));
 
-const buildCard = (id: string, name: string): CardListItem => ({
+const buildCard = (
+  id: string,
+  name: string,
+  cardPool: CardListItem['card_pool'] = 'player',
+): CardListItem => ({
   id,
   key: id,
   result_type: 'card',
   image_url: `/${id}.png`,
   label: name,
-  is_hero: false,
+  card_pool: cardPool, card_roles: [],
   template_id: 'template-1',
   version_id: `${id}-version`,
   version_number: 1,
@@ -61,6 +65,10 @@ const buildPreview = (): CardMergePreview => ({
     label: 'Target Card',
     latest_name: 'Target Card',
     version_count: 1,
+    card_pool: 'player',
+    card_roles: [],
+    card_factions: [],
+    card_mana_families: ['arcane'],
   },
   sources: [
     {
@@ -69,9 +77,14 @@ const buildPreview = (): CardMergePreview => ({
       label: 'Source Card',
       latest_name: 'Source Card',
       version_count: 1,
+      card_pool: 'player',
+      card_roles: [],
+      card_factions: [],
+      card_mana_families: ['dark'],
     },
   ],
   aliases: [],
+  warnings: ["Source Card's mana families differ from Target Card; the target assignment will be kept."],
   relations: {
     deck_entry_collisions: 0,
     sideboard_entry_collisions: 0,
@@ -89,14 +102,14 @@ const flushPromises = async (): Promise<void> => {
   await Promise.resolve();
 };
 
-const mountView = async () => {
+const mountView = async (location = '/admin') => {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/admin', component: { template: '<div />' } }],
   });
-  await router.push('/admin');
+  await router.push(location);
   await router.isReady();
 
   const app = createApp(CardMergesAdminView);
@@ -184,6 +197,47 @@ describe('CardMergesAdminView', () => {
     expect(apiPost).toHaveBeenCalledWith('/admin/card-merges/preview', {
       target_card_id: 'target-1',
       source_card_ids: ['source-1'],
+    });
+
+    mounted.unmount();
+  });
+
+  test('uses a prefilled Evil card as the merge search pool', async () => {
+    vi.useFakeTimers();
+    apiGet.mockImplementation((url: string) => {
+      if (url === '/cards/gm-source') {
+        return Promise.resolve({ data: buildCard('gm-source', 'GM Source', 'evil') });
+      }
+      if (url === '/cards') {
+        return Promise.resolve({
+          data: {
+            count: 1,
+            next_page: null,
+            previous_page: null,
+            page: 1,
+            page_size: 12,
+            results: [buildCard('gm-target', 'GM Target', 'evil')],
+          },
+        });
+      }
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+
+    const mounted = await mountView('/admin?admin_merge_source=gm-source');
+    const poolSelect = mounted.container.querySelector<HTMLSelectElement>('select');
+    const targetInput = mounted.container.querySelector<HTMLInputElement>('input[placeholder="Search canonical card"]');
+    if (!(poolSelect instanceof HTMLSelectElement) || !(targetInput instanceof HTMLInputElement)) {
+      throw new Error('expected merge pool and target controls');
+    }
+    expect(poolSelect.value).toBe('evil');
+
+    await searchAndSelect(targetInput, 'Target', 'Select GM Target');
+
+    expect(apiGet).toHaveBeenCalledWith('/cards', {
+      params: expect.objectContaining({
+        q: 'Target',
+        card_pool: 'evil',
+      }),
     });
 
     mounted.unmount();

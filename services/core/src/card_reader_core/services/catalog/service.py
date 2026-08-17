@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from django.db import transaction
+from django.db.models.deletion import ProtectedError
 
 from card_reader_core.models import (
     CardVersion,
@@ -10,6 +13,9 @@ from card_reader_core.models import (
     Symbol,
     Tag,
     Type,
+    card_faction_keys,
+    card_mana_family_keys,
+    card_role_keys,
     now_utc,
 )
 from card_reader_core.repositories.cards import decode_field_sources
@@ -54,6 +60,12 @@ from card_reader_core.repositories.metadata import (
     update_tag,
     update_type,
 )
+from card_reader_core.services.classification_rules import (
+    ClassificationRuleService,
+    classification_rule_payload,
+    ensure_default_mana_family_classification_rules,
+    reconcile_mana_family_rules_for_symbol_rename,
+)
 from .input_normalization import CatalogInputNormalizer
 from .types import (
     CatalogData,
@@ -65,6 +77,18 @@ from .types import (
     TagDetail,
     TypeDetail,
 )
+
+
+def _protected_rule_message(label: str, rules: Sequence[object]) -> str:
+    rule_labels = sorted(
+        {
+            f"{getattr(rule, 'card_pool')} {getattr(rule, 'target_kind')} "
+            f"{getattr(rule, 'target_key')}"
+            for rule in rules
+        }
+    )
+    details = ", ".join(rule_labels) if rule_labels else "classification rules"
+    return f"{label} is used by {details}. Remove or repoint those rules first."
 
 
 class CatalogService:
@@ -85,26 +109,53 @@ class CatalogService:
             },
         }
 
-    def list_suggestions(self, *, kind: str, status: str | None = None) -> list[CatalogSuggestionDetail]:
-        rows = list_metadata_suggestions(kind=kind, status=status)
-        return [self._suggestion_detail_from_row(row) for row in rows]
+    def list_suggestions(
+        self,
+        *,
+        kind: str,
+        status: str | None = None,
+    ) -> list[CatalogSuggestionDetail]:
+        rows = list_metadata_suggestions(
+            kind=kind,
+            status=status,
+        )
+        return [
+            self._suggestion_detail_from_row(row) for row in rows
+        ]
 
-    def get_suggestion_detail(self, *, suggestion_id: str) -> CatalogSuggestionDetail | None:
+    def get_suggestion_detail(
+        self,
+        *,
+        suggestion_id: str,
+    ) -> CatalogSuggestionDetail | None:
         suggestion = get_metadata_suggestion(suggestion_id)
         if suggestion is None:
             return None
-        occurrence_count = len(list_card_version_suggestion_occurrences(suggestion_id))
-        return self._suggestion_detail(suggestion, occurrence_count=occurrence_count)
+        occurrence_count = len(
+            list_card_version_suggestion_occurrences(
+                suggestion_id,
+            )
+        )
+        if occurrence_count == 0:
+            return None
+        return self._suggestion_detail(
+            suggestion,
+            occurrence_count=occurrence_count,
+        )
 
     def reject_suggestion(self, *, suggestion_id: str) -> MetadataSuggestion | None:
         return reject_metadata_suggestion(suggestion_id=suggestion_id)
 
-    def get_keyword_detail(self, *, entry_id: str) -> KeywordDetail | None:
+    def get_keyword_detail(
+        self, *, entry_id: str
+    ) -> KeywordDetail | None:
         entry = get_keyword(entry_id)
         if entry is None:
             return None
         linked_cards, linked_card_count = self._linked_cards_for_versions(
-            *list_latest_versions_for_keyword_detail(entry_id=entry_id)
+            *list_latest_versions_for_keyword_detail(
+                entry_id=entry_id,
+            )
         )
         return {
             "entry": entry,
@@ -117,38 +168,69 @@ class CatalogService:
         if entry is None:
             return None
         linked_cards, linked_card_count = self._linked_cards_for_versions(
-            *list_latest_versions_for_tag_detail(entry_id=entry_id)
+            *list_latest_versions_for_tag_detail(
+                entry_id=entry_id,
+            )
         )
         return {
             "entry": entry,
             "linked_cards": linked_cards,
             "linked_card_count": linked_card_count,
+            "classification_rules": [
+                classification_rule_payload(rule)
+                for rule in ClassificationRuleService().rules_for_source(
+                    source_kind="tag",
+                    source_id=entry_id,
+                )
+            ],
         }
 
-    def get_type_detail(self, *, entry_id: str) -> TypeDetail | None:
+    def get_type_detail(
+        self, *, entry_id: str
+    ) -> TypeDetail | None:
         entry = get_type(entry_id)
         if entry is None:
             return None
         linked_cards, linked_card_count = self._linked_cards_for_versions(
-            *list_latest_versions_for_type_detail(entry_id=entry_id)
+            *list_latest_versions_for_type_detail(
+                entry_id=entry_id,
+            )
         )
         return {
             "entry": entry,
             "linked_cards": linked_cards,
             "linked_card_count": linked_card_count,
+            "classification_rules": [
+                classification_rule_payload(rule)
+                for rule in ClassificationRuleService().rules_for_source(
+                    source_kind="type",
+                    source_id=entry_id,
+                )
+            ],
         }
 
-    def get_symbol_detail(self, *, entry_id: str) -> SymbolDetail | None:
+    def get_symbol_detail(
+        self, *, entry_id: str
+    ) -> SymbolDetail | None:
         entry = get_symbol(entry_id)
         if entry is None:
             return None
         linked_cards, linked_card_count = self._linked_cards_for_versions(
-            *list_latest_versions_for_symbol_detail(entry_id=entry_id)
+            *list_latest_versions_for_symbol_detail(
+                entry_id=entry_id,
+            )
         )
         return {
             "entry": entry,
             "linked_cards": linked_cards,
             "linked_card_count": linked_card_count,
+            "classification_rules": [
+                classification_rule_payload(rule)
+                for rule in ClassificationRuleService().rules_for_source(
+                    source_kind="symbol",
+                    source_id=entry_id,
+                )
+            ],
         }
 
     def accept_suggestion_to_existing(
@@ -189,7 +271,9 @@ class CatalogService:
         if suggestion is None:
             return None
 
-        chosen_label = self._normalizer.normalize_label(label or suggestion.display_value or suggestion.normalized_value)
+        chosen_label = self._normalizer.normalize_label(
+            label or suggestion.display_value or suggestion.normalized_value
+        )
         with transaction.atomic():
             if suggestion.kind == "tag":
                 target_tag = self.create_tag(
@@ -220,7 +304,9 @@ class CatalogService:
         return create_keyword(
             key=normalized_key,
             label=normalized_label,
-            identifiers_json=self._normalizer.normalize_identifiers_json(normalized_label, identifiers),
+            identifiers_json=self._normalizer.normalize_identifiers_json(
+                normalized_label, identifiers
+            ),
         )
 
     def create_tag(
@@ -236,7 +322,9 @@ class CatalogService:
         return create_tag(
             key=normalized_key,
             label=normalized_label,
-            identifiers_json=self._normalizer.normalize_identifiers_json(normalized_label, identifiers),
+            identifiers_json=self._normalizer.normalize_identifiers_json(
+                normalized_label, identifiers
+            ),
         )
 
     def create_type(
@@ -252,7 +340,9 @@ class CatalogService:
         return create_type(
             key=normalized_key,
             label=normalized_label,
-            identifiers_json=self._normalizer.normalize_identifiers_json(normalized_label, identifiers),
+            identifiers_json=self._normalizer.normalize_identifiers_json(
+                normalized_label, identifiers
+            ),
         )
 
     def update_keyword(
@@ -276,7 +366,9 @@ class CatalogService:
             self._ensure_unique("keyword", normalized_key, exclude_id=row.id)
             updates["key"] = normalized_key
         if identifiers is not None:
-            updates["identifiers_json"] = self._normalizer.normalize_identifiers_json(current_label, identifiers)
+            updates["identifiers_json"] = self._normalizer.normalize_identifiers_json(
+                current_label, identifiers
+            )
         return update_keyword(entry_id=entry_id, updates=updates)
 
     def update_tag(
@@ -300,7 +392,9 @@ class CatalogService:
             self._ensure_unique("tag", normalized_key, exclude_id=row.id)
             updates["key"] = normalized_key
         if identifiers is not None:
-            updates["identifiers_json"] = self._normalizer.normalize_identifiers_json(current_label, identifiers)
+            updates["identifiers_json"] = self._normalizer.normalize_identifiers_json(
+                current_label, identifiers
+            )
         return update_tag(entry_id=entry_id, updates=updates)
 
     def update_type(
@@ -324,9 +418,12 @@ class CatalogService:
             self._ensure_unique("type", normalized_key, exclude_id=row.id)
             updates["key"] = normalized_key
         if identifiers is not None:
-            updates["identifiers_json"] = self._normalizer.normalize_identifiers_json(current_label, identifiers)
+            updates["identifiers_json"] = self._normalizer.normalize_identifiers_json(
+                current_label, identifiers
+            )
         return update_type(entry_id=entry_id, updates=updates)
 
+    @transaction.atomic
     def create_symbol(
         self,
         *,
@@ -349,7 +446,7 @@ class CatalogService:
             None,
             field_name="text_enrichment_json",
         )
-        return create_symbol(
+        symbol = create_symbol(
             key=normalized_key,
             label=normalized_label,
             symbol_type=self._normalizer.normalize_symbol_type(symbol_type),
@@ -360,7 +457,10 @@ class CatalogService:
             text_token=(text_token or "").strip(),
             enabled=enabled if enabled is not None else True,
         )
+        ensure_default_mana_family_classification_rules(symbol_keys={symbol.key})
+        return symbol
 
+    @transaction.atomic
     def update_symbol(
         self,
         *,
@@ -411,6 +511,11 @@ class CatalogService:
                 old_key=previous_key,
                 new_key=updated_symbol.key,
             )
+        if updated_symbol.key != previous_key:
+            reconcile_mana_family_rules_for_symbol_rename(
+                symbol=updated_symbol,
+                previous_key=previous_key,
+            )
 
         return updated_symbol
 
@@ -418,13 +523,34 @@ class CatalogService:
         return delete_keyword(entry_id=entry_id)
 
     def delete_tag(self, *, entry_id: str) -> bool:
-        return delete_tag(entry_id=entry_id)
+        try:
+            return delete_tag(entry_id=entry_id)
+        except ProtectedError as exc:
+            rules = ClassificationRuleService().rules_for_source(
+                source_kind="tag",
+                source_id=entry_id,
+            )
+            raise ValueError(_protected_rule_message("Tag", rules)) from exc
 
     def delete_type(self, *, entry_id: str) -> bool:
-        return delete_type(entry_id=entry_id)
+        try:
+            return delete_type(entry_id=entry_id)
+        except ProtectedError as exc:
+            rules = ClassificationRuleService().rules_for_source(
+                source_kind="type",
+                source_id=entry_id,
+            )
+            raise ValueError(_protected_rule_message("Type", rules)) from exc
 
     def delete_symbol(self, *, entry_id: str) -> bool:
-        return delete_symbol(entry_id=entry_id)
+        try:
+            return delete_symbol(entry_id=entry_id)
+        except ProtectedError as exc:
+            rules = ClassificationRuleService().rules_for_source(
+                source_kind="symbol",
+                source_id=entry_id,
+            )
+            raise ValueError(_protected_rule_message("Symbol", rules)) from exc
 
     def _apply_symbol_updates(
         self,
@@ -448,7 +574,9 @@ class CatalogService:
                 detection_config_json,
             )
         if text_enrichment_json is not None:
-            self._normalizer.validate_symbol_config_json(text_enrichment_json, None, field_name="text_enrichment_json")
+            self._normalizer.validate_symbol_config_json(
+                text_enrichment_json, None, field_name="text_enrichment_json"
+            )
             updates["text_enrichment_json"] = self._normalizer.normalize_object_json(
                 text_enrichment_json,
                 field_name="text_enrichment_json",
@@ -463,8 +591,14 @@ class CatalogService:
         if enabled is not None:
             updates["enabled"] = enabled
 
-    def _suggestion_detail_from_row(self, row: MetadataSuggestionListRow) -> CatalogSuggestionDetail:
-        return self._suggestion_detail(row.suggestion, occurrence_count=row.occurrence_count)
+    def _suggestion_detail_from_row(
+        self,
+        row: MetadataSuggestionListRow,
+    ) -> CatalogSuggestionDetail:
+        return self._suggestion_detail(
+            row.suggestion,
+            occurrence_count=row.occurrence_count,
+        )
 
     def _suggestion_detail(
         self,
@@ -472,7 +606,9 @@ class CatalogService:
         *,
         occurrence_count: int,
     ) -> CatalogSuggestionDetail:
-        occurrences = list_card_version_suggestion_occurrences(suggestion.id)
+        occurrences = list_card_version_suggestion_occurrences(
+            suggestion.id,
+        )
         previews: list[SuggestionOccurrencePreview] = []
         for occurrence in occurrences[:5]:
             card_version = occurrence.card_version
@@ -487,6 +623,10 @@ class CatalogService:
                     "image_url": self._image_url(card.id, card_version.id, image),
                     "source_text": occurrence.source_text,
                     "normalized_source_text": occurrence.normalized_source_text,
+                    "card_pool": card.card_pool,
+                    "card_roles": list(card_role_keys(card)),
+                    "card_factions": list(card_faction_keys(card)),
+                    "card_mana_families": list(card_mana_family_keys(card)),
                 }
             )
         return {
@@ -513,7 +653,9 @@ class CatalogService:
         if suggestion.kind == "type" and target_type is None:
             raise ValueError("Type target is required")
 
-        occurrences = list_card_version_suggestion_occurrences(suggestion.id)
+        occurrences = list_card_version_suggestion_occurrences(
+            suggestion.id,
+        )
         for occurrence in occurrences:
             version = occurrence.card_version
             field_sources = decode_field_sources(version.field_sources_json)
@@ -552,6 +694,10 @@ class CatalogService:
                     "card_version_id": version.id,
                     "card_version_name": version.name,
                     "image_url": self._image_url(version.card.id, version.id, image),
+                    "card_pool": version.card.card_pool,
+                    "card_roles": list(card_role_keys(version.card)),
+                    "card_factions": list(card_faction_keys(version.card)),
+                    "card_mana_families": list(card_mana_family_keys(version.card)),
                 }
             )
         return previews, linked_card_count

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
 from django.core.management import call_command
 
@@ -11,9 +10,8 @@ from card_reader_core.repositories.cards import (
     list_filtered_latest_card_version_reparse_sources,
     list_latest_card_version_reparse_sources,
 )
-from card_reader_core.repositories.import_jobs import ImportJobItemTarget, create_import_job_with_files
-from card_reader_core.config.settings import settings
 from card_reader_core.services.cards import CardImageConversionResult, convert_card_images_to_webp
+from card_reader_core.services.imports import queue_grouped_reparse_jobs
 
 
 @dataclass(slots=True)
@@ -74,43 +72,19 @@ class MaintenanceService:
         source_name_prefix: str,
         message_suffix: str,
     ) -> MaintenanceResult:
-        grouped_files: dict[str, list[Path]] = {}
         if not sources:
             return MaintenanceResult(message=empty_message, removed_paths=[])
-
-        item_count = 0
-        for source in sources:
-            template_id = source.template_id
-            image_path = source.image_path
-            grouped_files.setdefault(template_id, []).append(image_path)
-            item_count += 1
-
-        if not grouped_files:
+        summary = queue_grouped_reparse_jobs(
+            sources=sources,
+            source_name_prefix=source_name_prefix,
+        )
+        if summary.item_count == 0:
             return MaintenanceResult(message=unreadable_message, removed_paths=[])
-
-        job_count = 0
-        for template_id, files in grouped_files.items():
-            targets = [
-                ImportJobItemTarget(
-                    card_id=source.card_id,
-                    card_version_id=source.card_version_id,
-                )
-                for source in sources
-                if source.template_id == template_id
-            ]
-            create_import_job_with_files(
-                source_path=settings.storage_root_dir / "maintenance" / f"{source_name_prefix}-{template_id}",
-                template_id=template_id,
-                options={"reparse_existing": True},
-                files=files,
-                item_targets=targets,
-            )
-            job_count += 1
 
         return MaintenanceResult(
             message=(
-                f"Queued {job_count} reparse job{'s' if job_count != 1 else ''} "
-                f"for {item_count} latest card image{'s' if item_count != 1 else ''}"
+                f"Queued {summary.job_count} reparse job{'s' if summary.job_count != 1 else ''} "
+                f"for {summary.item_count} latest card image{'s' if summary.item_count != 1 else ''}"
                 f"{message_suffix}"
             ),
             removed_paths=[],

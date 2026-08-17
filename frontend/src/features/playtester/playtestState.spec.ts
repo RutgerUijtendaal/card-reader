@@ -53,7 +53,7 @@ const buildCard = (
   label: name,
   result_type: 'card',
   image_url: null,
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   lifecycle_status: 'active',
   template_id: '',
   version_id: id,
@@ -85,7 +85,7 @@ const buildDeck = (): DeckRecord => ({
   difficulty: null,
   visibility: 'public',
   owner: { id: 'user-1', username: 'owner' },
-  hero_card: { ...buildCard('hero', 'Hero'), is_hero: true },
+  hero_card: { ...buildCard('hero', 'Hero'), card_pool: 'player' as const, card_roles: ['hero' as const] },
   mainboard: {
     total_cards: 12,
     unique_cards: 4,
@@ -108,6 +108,7 @@ const buildDeck = (): DeckRecord => ({
     label: 'Ready',
     issues: [],
   },
+  has_non_player_cards: false,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 });

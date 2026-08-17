@@ -98,6 +98,6 @@ class CardVersionParseFlagItem(TimestampedModel):
     class Meta:
         db_table = "card_version_parse_flag_item"
         indexes = [
-            models.Index(fields=["status", "created_at"], name="ix_parse_flag_item_status_created"),
+            models.Index(fields=["status", "created_at"], name="ix_parse_flag_status_created"),
             models.Index(fields=["property_key", "status"], name="ix_parse_flag_item_prop_status"),
         ]

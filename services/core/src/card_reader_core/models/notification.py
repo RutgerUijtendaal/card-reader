@@ -67,7 +67,10 @@ class UserNotification(TimestampedModel):
         db_table = "user_notification"
         indexes = [
             models.Index(fields=["recipient", "read_at", "-last_event_at"], name="ix_notification_recipient_read"),
-            models.Index(fields=["recipient", "dedupe_key", "read_at"], name="ix_notification_recipient_dedupe"),
+            models.Index(
+                fields=["recipient", "dedupe_key", "read_at"],
+                name="ix_notif_recipient_dedupe",
+            ),
             models.Index(fields=["event_type", "subject_type", "subject_id"], name="ix_notification_subject"),
         ]
         constraints = [

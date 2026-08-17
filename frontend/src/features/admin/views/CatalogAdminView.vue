@@ -26,8 +26,17 @@
         @select-entry="selectEntry"
       />
 
+      <ClassificationDefinitionDetail
+        v-if="isClassificationKind"
+        :definition="selectedClassificationRow"
+        :tags="catalog.tags"
+        :types="catalog.types"
+        :symbols="catalog.symbols"
+        @changed="loadCatalog"
+      />
+
       <CatalogDetailSection
-        v-if="!isSuggestedKind"
+        v-else-if="!isSuggestedKind"
         :selected-kind="selectedKind"
         :selected-row="selectedKnownRow"
         :is-creating-new="isCreatingNew"
@@ -43,6 +52,7 @@
         :linked-card-count="selectedKnownRow && 'linked_card_count' in selectedKnownRow ? selectedKnownRow.linked_card_count ?? 0 : 0"
         :linked-decks="selectedKnownRow && 'linked_decks' in selectedKnownRow ? selectedKnownRow.linked_decks ?? [] : []"
         :linked-deck-count="selectedKnownRow && 'linked_deck_count' in selectedKnownRow ? selectedKnownRow.linked_deck_count ?? 0 : 0"
+        :classification-rules="selectedKnownRow && 'classification_rules' in selectedKnownRow ? selectedKnownRow.classification_rules ?? [] : []"
         @create="createEntry"
         @save="updateSelectedEntry"
         @create-new="startCreateEntry"
@@ -93,6 +103,7 @@ import CatalogDetailSection from '@/features/admin/components/CatalogDetailSecti
 import CatalogEntriesSection from '@/features/admin/components/CatalogEntriesSection.vue';
 import CatalogKindSidebar from '@/features/admin/components/CatalogKindSidebar.vue';
 import CatalogSuggestionDetailSection from '@/features/admin/components/CatalogSuggestionDetailSection.vue';
+import ClassificationDefinitionDetail from '@/features/admin/components/ClassificationDefinitionDetail.vue';
 import {
   detectionConfigExample,
   kindItemLabel,
@@ -103,15 +114,18 @@ import {
 
 const {
   catalogKindGroups,
+  catalog,
   selectedKind,
   allCurrentRows,
   currentRows,
   currentSearchTerm,
   selectedEntryId,
   selectedKnownRow,
+  selectedClassificationRow,
   selectedSuggestionRow,
   isCreatingNew,
   isSuggestedKind,
+  isClassificationKind,
   canCreateSelectedKind,
   editorEntry,
   existingSuggestionOptions,

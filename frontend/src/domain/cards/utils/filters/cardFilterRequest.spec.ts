@@ -5,10 +5,14 @@ import { buildCardFilterApiPayload, buildCardFilterApiSearchParams } from './car
 const selection: CardFilterSelectionState = {
   query: '',
   lifecycleStatus: 'deprecated',
+  cardPool: 'player',
+  cardRoleMatch: 'any',
+  cardRoleIds: [],
+  cardRoleExcludeIds: ['hero'],
   keywordMatch: 'all',
   tagMatch: 'all',
   typeMatch: 'any',
-  manaSymbolMatch: 'all',
+  manaFamilyMatch: 'all',
   affinitySymbolMatch: 'all',
   devotionSymbolMatch: 'any',
   otherSymbolMatch: 'any',
@@ -21,8 +25,8 @@ const selection: CardFilterSelectionState = {
   healthMax: '',
   keywordIds: ['kw-1'],
   tagIds: ['tag-1'],
-  manaTypeSymbolIds: ['arcane'],
-  manaTypeSymbolExcludeIds: ['arcane'],
+  manaFamilyIds: ['arcane'],
+  manaFamilyExcludeIds: ['arcane'],
   affinitySymbolIds: ['sym-2'],
   affinitySymbolExcludeIds: ['sym-2'],
   devotionSymbolIds: ['sym-3'],
@@ -39,6 +43,8 @@ describe('cardFilterRequest', () => {
     const payload = buildCardFilterApiPayload(selection);
 
     expect(params.get('lifecycle_status')).toBe('deprecated');
+    expect(params.get('card_pool')).toBe('player');
+    expect(params.getAll('card_role_exclude')).toEqual(['hero']);
     expect(params.getAll('keyword_ids')).toEqual(['kw-1']);
     expect(params.get('keyword_match')).toBe('all');
     expect(params.getAll('tag_ids')).toEqual(['tag-1']);
@@ -83,18 +89,21 @@ describe('cardFilterRequest', () => {
     });
   });
 
-  test('uses literal mana-symbol params for a catalog fallback selection', () => {
-    const fallbackSelection: CardFilterSelectionState = {
-      ...selection,
-      manaTypeSymbolIds: ['legacy-mana-symbol:sym-1'],
-      manaTypeSymbolExcludeIds: ['legacy-mana-symbol:sym-2'],
-    };
+  test('omits the card pool for explicitly global requests', () => {
+    const params = buildCardFilterApiSearchParams(selection, { cardPool: null });
+    const payload = buildCardFilterApiPayload(selection, { cardPool: null });
 
-    const params = buildCardFilterApiSearchParams(fallbackSelection);
+    expect(params.has('card_pool')).toBe(false);
+    expect(payload).not.toHaveProperty('card_pool');
+    expect(params.getAll('keyword_ids')).toEqual(['kw-1']);
+    expect(payload.keyword_ids).toEqual(['kw-1']);
+  });
 
-    expect(params.getAll('mana_symbol_ids')).toEqual(['sym-1']);
-    expect(params.getAll('mana_symbol_exclude_ids')).toEqual(['sym-2']);
-    expect(params.get('mana_symbol_match')).toBe('all');
-    expect(params.getAll('mana_family_keys')).toEqual([]);
+  test('honors an explicit card pool override', () => {
+    const params = buildCardFilterApiSearchParams(selection, { cardPool: 'evil' });
+    const payload = buildCardFilterApiPayload(selection, { cardPool: 'evil' });
+
+    expect(params.get('card_pool')).toBe('evil');
+    expect(payload.card_pool).toBe('evil');
   });
 });

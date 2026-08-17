@@ -6,6 +6,7 @@ from enum import StrEnum
 from card_reader_core.models import (
     ACTIVE_CARD_LIFECYCLE_STATUS,
     ALL_CARD_LIFECYCLE_FILTER,
+    PLAYER_CARD_POOL,
     CardVersionImage,
 )
 from card_reader_core.repositories.cards import (
@@ -45,6 +46,7 @@ class TtsCardExportCard:
 @dataclass(frozen=True)
 class TtsCardExportSheet:
     sheet_id: str
+    card_pool: str
     sequence: int
     columns: int
     rows: int
@@ -103,10 +105,14 @@ class _ResolvedTtsCardSelection:
     source_metadata: dict[str, object]
     entries: list[_ResolvedTtsCardSelectionEntry]
     skipped: list[TtsCardExportSkippedCard]
+    require_player_cards: bool = False
 
 
 class TtsCardExportService:
-    def build_gallery_export(self, filters: CardFilterParams) -> TtsCardExportData:
+    def build_gallery_export(
+        self,
+        filters: CardFilterParams,
+    ) -> TtsCardExportData:
         selection = _ResolvedTtsCardSelection(
             collection_name="Card Reader Gallery",
             collection_description=None,
@@ -119,7 +125,10 @@ class TtsCardExportService:
         )
         return self._build_export(selection)
 
-    def build_content_version_export(self, content_version_id: str) -> TtsCardExportData:
+    def build_content_version_export(
+        self,
+        content_version_id: str,
+    ) -> TtsCardExportData:
         content_version = get_content_version(content_version_id)
         if content_version is None:
             raise TtsCardExportError(
@@ -161,7 +170,7 @@ class TtsCardExportService:
                 },
                 entries=_selection_entries(rows),
                 skipped=skipped,
-            )
+            ),
         )
 
     def build_deck_export(
@@ -236,10 +245,20 @@ class TtsCardExportService:
                 source_metadata=source_metadata,
                 entries=entries,
                 skipped=skipped,
-            )
+                require_player_cards=True,
+            ),
         )
 
-    def _build_export(self, selection: _ResolvedTtsCardSelection) -> TtsCardExportData:
+    def _build_export(
+        self,
+        selection: _ResolvedTtsCardSelection,
+    ) -> TtsCardExportData:
+        if selection.require_player_cards and any(
+            entry.row.version.card.card_pool != PLAYER_CARD_POOL
+            for entry in selection.entries
+        ):
+            raise _deck_source_unavailable()
+
         card_back = CardBackService().get_current()
         card_back_asset_path = (
             resolve_card_back_image_asset_path(card_back) if card_back is not None else None
@@ -334,6 +353,7 @@ class TtsCardExportService:
         sheets = [
             TtsCardExportSheet(
                 sheet_id=assignment.sheet_id,
+                card_pool=assignment.card_pool,
                 sequence=assignment.sheet_sequence,
                 columns=get_tts_card_sheet_layout(assignment.layout_version).columns,
                 rows=get_tts_card_sheet_layout(assignment.layout_version).rows,
@@ -384,4 +404,11 @@ def _required_card_unavailable(name: str, reason: str) -> TtsCardExportError:
     return TtsCardExportError(
         TtsCardExportErrorCode.REQUIRED_CARD_UNAVAILABLE,
         f"Required deck hero '{name}' {reason}.",
+    )
+
+
+def _deck_source_unavailable() -> TtsCardExportError:
+    return TtsCardExportError(
+        TtsCardExportErrorCode.DECK_SOURCE_NOT_FOUND,
+        "Deck not found",
     )

@@ -11,13 +11,13 @@ from card_reader_core.operations.developer_data import (
     DeveloperDataError,
     PublishedBundleStore,
     export_developer_data,
-    sha256_file,
 )
 from card_reader_core.operations.developer_data.schema import PublishedBundle
 from card_reader_core.repositories.developer_data import (
     mark_build_failed,
     mark_build_succeeded,
 )
+from card_reader_core.storage import calculate_checksum
 
 from .validation import validate_temporary_import
 
@@ -59,7 +59,7 @@ def _export_validate_publish(build: DeveloperDataBuild) -> PublishedBundle:
             source_revision=os.getenv("CARD_READER_RELEASE_REVISION", "unknown"),
             bundle_version=build.bundle_version,
         )
-        archive_sha256 = sha256_file(archive_path)
+        archive_sha256 = calculate_checksum(archive_path)
         validate_temporary_import(
             archive_path=archive_path,
             bundle_version=manifest.bundle_version,

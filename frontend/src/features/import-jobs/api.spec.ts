@@ -41,10 +41,18 @@ describe('importJobs api', () => {
     const file = new File(['image'], 'card.png', { type: 'image/png' });
 
     await createImportJob({
+      creationKey: 'f1e10412-e8e8-49cb-9717-a24d2eec38c1',
       templateId: 'mtg-like-v1',
       contentVersionBase: '14.1',
       contentVersionDescription: 'Current release.',
       files: [file],
+      cardPool: 'evil',
+      cardRoleMode: 'override',
+      cardRoleOverride: ['boon', 'event'],
+      cardFactionMode: 'override',
+      cardFactionOverride: ['order', 'blood'],
+      cardManaFamilyMode: 'override',
+      cardManaFamilyOverride: ['dark', 'occult'],
     });
 
     const formData = vi.mocked(api.post).mock.calls[0]?.[1] as FormData;
@@ -54,6 +62,14 @@ describe('importJobs api', () => {
       expect.objectContaining({ headers: { 'Content-Type': 'multipart/form-data' } }),
     );
     expect(formData.get('template_id')).toBe('mtg-like-v1');
+    expect(formData.get('creation_key')).toBe('f1e10412-e8e8-49cb-9717-a24d2eec38c1');
+    expect(formData.get('card_pool')).toBe('evil');
+    expect(formData.get('card_role_mode')).toBe('override');
+    expect(formData.get('card_role_override')).toBe('["boon","event"]');
+    expect(formData.get('card_faction_mode')).toBe('override');
+    expect(formData.get('card_faction_override')).toBe('["order","blood"]');
+    expect(formData.get('card_mana_family_mode')).toBe('override');
+    expect(formData.get('card_mana_family_override')).toBe('["dark","occult"]');
     expect(formData.get('content_version_base')).toBe('14.1');
     expect(formData.get('content_version_description')).toBe('Current release.');
     expect(formData.get('options_json')).toBe('{}');

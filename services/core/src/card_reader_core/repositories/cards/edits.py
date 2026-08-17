@@ -3,18 +3,23 @@ from __future__ import annotations
 from django.db import transaction
 
 from card_reader_core.models import (
+    CARD_ROLES,
+    CARD_FACTIONS,
     DEPRECATED_CARD_LIFECYCLE_STATUS,
     Card,
-    CardAlias,
+    CardFaction,
+    CardPool,
+    CardRoleAssignment,
     CardVersion,
+    is_card_pool,
     is_card_lifecycle_status,
     now_utc,
 )
 from card_reader_core.rules import render_enriched_rule_text
-from card_reader_core.services.card_merges import ensure_card_alias
+from card_reader_core.metadata import MANA_FAMILY_BY_KEY
 
 from ..card_groups import card_is_group_anchor
-from ..helpers import infer_mana_value, normalize_slug_key
+from ..helpers import infer_mana_value
 from ..metadata import (
     get_symbols_for_card_version,
     replace_card_version_keywords,
@@ -23,6 +28,8 @@ from ..metadata import (
     replace_card_version_types,
 )
 from .queries import get_card, get_latest_card_version
+from .classification import set_card_mana_families
+from .identity import change_card_identity
 from .snapshots import (
     FIELD_SOURCE_AUTO,
     FIELD_SOURCE_MANUAL,
@@ -76,7 +83,7 @@ def update_latest_card_version(
         for group_name in restore_metadata_groups:
             if group_name not in field_sources["metadata"]:
                 continue
-            restore_metadata_group_from_snapshot(version.id, group_name, snapshot)
+            restore_metadata_group_from_snapshot(version, group_name, snapshot)
             field_sources["metadata"][group_name] = FIELD_SOURCE_AUTO
             if group_name == "symbols":
                 symbol_links_changed = True
@@ -117,8 +124,57 @@ def update_latest_card_version(
             )
             field_sources["metadata"]["symbols"] = FIELD_SOURCE_MANUAL
             symbol_links_changed = True
-        if "is_hero" in updates:
-            card.is_hero = bool(updates["is_hero"])
+        classification_changed = False
+        destination_card_pool: CardPool | None = None
+        destination_card_factions: tuple[CardFaction, ...] | None = None
+        if "card_pool" in updates:
+            card_pool = str(updates["card_pool"])
+            if not is_card_pool(card_pool):
+                raise ValueError("Invalid card pool.")
+            destination_card_pool = card_pool
+            classification_changed = True
+        if "card_mana_families" in updates:
+            raw_mana_families = updates["card_mana_families"]
+            if not isinstance(raw_mana_families, list):
+                raise ValueError("Card mana families must be a list.")
+            requested_mana_families = [str(value) for value in raw_mana_families]
+            if any(value not in MANA_FAMILY_BY_KEY for value in requested_mana_families):
+                raise ValueError("Invalid card mana family.")
+            set_card_mana_families(
+                card=card,
+                mana_families=requested_mana_families,
+            )
+            classification_changed = True
+        if "card_factions" in updates:
+            raw_factions = updates["card_factions"]
+            if not isinstance(raw_factions, list):
+                raise ValueError("Card factions must be a list.")
+            requested_factions = {str(faction) for faction in raw_factions}
+            if not requested_factions.issubset(CARD_FACTIONS):
+                raise ValueError("Invalid card faction.")
+            destination_card_factions = tuple(
+                faction for faction in CARD_FACTIONS if faction in requested_factions
+            )
+            classification_changed = True
+        if "card_roles" in updates:
+            raw_roles = updates["card_roles"]
+            if not isinstance(raw_roles, list):
+                raise ValueError("Card roles must be a list.")
+            requested_roles = {str(role) for role in raw_roles}
+            if not requested_roles.issubset(CARD_ROLES):
+                raise ValueError("Invalid card role.")
+            CardRoleAssignment.objects.filter(card_id=card.id).exclude(role__in=requested_roles).delete()
+            existing_roles = set(
+                CardRoleAssignment.objects.filter(card_id=card.id).values_list("role", flat=True)
+            )
+            CardRoleAssignment.objects.bulk_create(
+                [CardRoleAssignment(card=card, role=role) for role in CARD_ROLES if role in requested_roles - existing_roles],
+                ignore_conflicts=True,
+            )
+            prefetched_objects = getattr(card, "_prefetched_objects_cache", None)
+            if prefetched_objects is not None:
+                prefetched_objects.pop("role_assignments", None)
+            classification_changed = True
         if "deck_building_config" in updates:
             card.deck_building_config_json = updates["deck_building_config"]
         if "lifecycle_status" in updates:
@@ -132,28 +188,28 @@ def update_latest_card_version(
         if symbol_links_changed:
             apply_manual_rule_text(version, version.rules_text_enriched)
 
-        if restored_name or "name" in updates:
-            next_key = normalize_slug_key(version.name)
-            conflicting_card = Card.objects.filter(key=next_key).exclude(id=card.id).first()
-            conflicting_alias = CardAlias.objects.filter(key=next_key).exclude(card_id=card.id).first()
-            if conflicting_card is not None or conflicting_alias is not None:
-                raise ValueError("Card name conflicts with another card or alias. Use card merge to resolve the duplicate.")
-            ensure_card_alias(card=card, key=card.key, label=card.label)
-            card.label = version.name
-            card.key = next_key
+        identity_changed = (
+            restored_name
+            or "name" in updates
+            or "card_pool" in updates
+            or "card_factions" in updates
+        )
+        if identity_changed:
+            change_card_identity(
+                card=card,
+                label=version.name if restored_name or "name" in updates else None,
+                card_pool=destination_card_pool,
+                card_factions=destination_card_factions,
+            )
         if (
             restored_name
             or "name" in updates
-            or "is_hero" in updates
+            or classification_changed
             or "deck_building_config" in updates
             or "lifecycle_status" in updates
         ):
             card.updated_at = now_utc()
             update_fields = ["updated_at"]
-            if restored_name or "name" in updates:
-                update_fields = ["label", "key", *update_fields]
-            if "is_hero" in updates:
-                update_fields = ["is_hero", *update_fields]
             if "deck_building_config" in updates:
                 update_fields = ["deck_building_config_json", *update_fields]
             if "lifecycle_status" in updates:

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from django.db import models
 
 from .base import TimestampedModel, uuid_str
+from .card import CARD_POOL_CHOICES
 
 if TYPE_CHECKING:
     from .card_version import CardVersion, ParseResult
@@ -54,6 +55,123 @@ class Type(TimestampedModel):
 
     class Meta:
         db_table = "type"
+
+
+CARD_CLASSIFICATION_TARGET_ROLE: Literal["role"] = "role"
+CARD_CLASSIFICATION_TARGET_FACTION: Literal["faction"] = "faction"
+CARD_CLASSIFICATION_TARGET_MANA_FAMILY: Literal["mana_family"] = "mana_family"
+CardClassificationTargetKind = Literal["role", "faction", "mana_family"]
+CARD_CLASSIFICATION_TARGET_KIND_CHOICES = (
+    (CARD_CLASSIFICATION_TARGET_ROLE, "Role"),
+    (CARD_CLASSIFICATION_TARGET_FACTION, "Faction"),
+    (CARD_CLASSIFICATION_TARGET_MANA_FAMILY, "Mana Family"),
+)
+
+CARD_CLASSIFICATION_SOURCE_TAG: Literal["tag"] = "tag"
+CARD_CLASSIFICATION_SOURCE_TYPE: Literal["type"] = "type"
+CARD_CLASSIFICATION_SOURCE_SYMBOL: Literal["symbol"] = "symbol"
+CardClassificationSourceKind = Literal["tag", "type", "symbol"]
+CARD_CLASSIFICATION_SOURCE_KIND_CHOICES = (
+    (CARD_CLASSIFICATION_SOURCE_TAG, "Tag"),
+    (CARD_CLASSIFICATION_SOURCE_TYPE, "Type"),
+    (CARD_CLASSIFICATION_SOURCE_SYMBOL, "Symbol"),
+)
+
+
+class CardClassificationRule(TimestampedModel):
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    card_pool: models.CharField[str, str] = models.CharField(
+        max_length=16,
+        choices=CARD_POOL_CHOICES,
+        db_index=True,
+    )
+    target_kind: models.CharField[str, str] = models.CharField(
+        max_length=16,
+        choices=CARD_CLASSIFICATION_TARGET_KIND_CHOICES,
+        db_index=True,
+    )
+    target_key: models.CharField[str, str] = models.CharField(max_length=64, db_index=True)
+    source_kind: models.CharField[str, str] = models.CharField(
+        max_length=16,
+        choices=CARD_CLASSIFICATION_SOURCE_KIND_CHOICES,
+        db_index=True,
+    )
+    tag: models.ForeignKey[Tag | None, Tag | None] = models.ForeignKey(
+        "Tag",
+        on_delete=models.PROTECT,
+        related_name="classification_rules",
+        db_column="tag_id",
+        null=True,
+        blank=True,
+        default=None,
+    )
+    type: models.ForeignKey[Type | None, Type | None] = models.ForeignKey(
+        "Type",
+        on_delete=models.PROTECT,
+        related_name="classification_rules",
+        db_column="type_id",
+        null=True,
+        blank=True,
+        default=None,
+    )
+    symbol: models.ForeignKey[Symbol | None, Symbol | None] = models.ForeignKey(
+        "Symbol",
+        on_delete=models.PROTECT,
+        related_name="classification_rules",
+        db_column="symbol_id",
+        null=True,
+        blank=True,
+        default=None,
+    )
+    enabled: models.BooleanField[bool, bool] = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "card_classification_rule"
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        source_kind=CARD_CLASSIFICATION_SOURCE_TAG,
+                        tag__isnull=False,
+                        type__isnull=True,
+                        symbol__isnull=True,
+                    )
+                    | models.Q(
+                        source_kind=CARD_CLASSIFICATION_SOURCE_TYPE,
+                        tag__isnull=True,
+                        type__isnull=False,
+                        symbol__isnull=True,
+                    )
+                    | models.Q(
+                        source_kind=CARD_CLASSIFICATION_SOURCE_SYMBOL,
+                        tag__isnull=True,
+                        type__isnull=True,
+                        symbol__isnull=False,
+                    )
+                ),
+                name="ck_classification_rule_source_fk",
+            ),
+            models.UniqueConstraint(
+                fields=("card_pool", "target_kind", "target_key", "tag"),
+                condition=models.Q(source_kind=CARD_CLASSIFICATION_SOURCE_TAG),
+                name="uq_class_rule_tag_target",
+            ),
+            models.UniqueConstraint(
+                fields=("card_pool", "target_kind", "target_key", "type"),
+                condition=models.Q(source_kind=CARD_CLASSIFICATION_SOURCE_TYPE),
+                name="uq_class_rule_type_target",
+            ),
+            models.UniqueConstraint(
+                fields=("card_pool", "target_kind", "target_key", "symbol"),
+                condition=models.Q(source_kind=CARD_CLASSIFICATION_SOURCE_SYMBOL),
+                name="uq_class_rule_symbol_target",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("card_pool", "enabled", "tag"), name="ix_class_rule_pool_tag"),
+            models.Index(fields=("card_pool", "enabled", "type"), name="ix_class_rule_pool_type"),
+            models.Index(fields=("card_pool", "enabled", "symbol"), name="ix_class_rule_pool_symbol"),
+        ]
 
 
 class MetadataSuggestion(TimestampedModel):
@@ -134,7 +252,9 @@ class CardVersionSymbol(TimestampedModel):
             models.Index(fields=["symbol", "card_version"], name="ix_cv_symbol_symbol_version"),
         ]
         constraints = [
-            models.UniqueConstraint(fields=("card_version", "symbol"), name="ux_card_version_symbol_pair")
+            models.UniqueConstraint(
+                fields=("card_version", "symbol"), name="ux_card_version_symbol_pair"
+            )
         ]
 
 
@@ -159,7 +279,9 @@ class CardVersionKeyword(TimestampedModel):
             models.Index(fields=["keyword", "card_version"], name="ix_cv_keyword_keyword_version"),
         ]
         constraints = [
-            models.UniqueConstraint(fields=("card_version", "keyword"), name="ux_card_version_keyword_pair")
+            models.UniqueConstraint(
+                fields=("card_version", "keyword"), name="ux_card_version_keyword_pair"
+            )
         ]
 
 
@@ -181,7 +303,9 @@ class CardVersionType(TimestampedModel):
             models.Index(fields=["type", "card_version"], name="ix_cv_type_type_version"),
         ]
         constraints = [
-            models.UniqueConstraint(fields=("card_version", "type"), name="ux_card_version_type_pair")
+            models.UniqueConstraint(
+                fields=("card_version", "type"), name="ux_card_version_type_pair"
+            )
         ]
 
 
@@ -219,5 +343,3 @@ class CardVersionMetadataSuggestion(TimestampedModel):
                 name="ux_card_version_metadata_suggestion_pair",
             )
         ]
-
-

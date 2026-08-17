@@ -153,6 +153,7 @@ describe('OperationsPage', () => {
     const mounted = await mountPage('/operations');
 
     expect(mounted.container.querySelector('.app-page-layout-standard')).not.toBeNull();
+    expect(mounted.container.querySelector('.app-page-header-primary .lucide-activity')).not.toBeNull();
 
     mounted.app.unmount();
   });

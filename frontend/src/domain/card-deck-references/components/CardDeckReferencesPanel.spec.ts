@@ -34,7 +34,7 @@ const buildDeck = (
     id: 'hero-card',
     key: 'hero-card',
     label: 'Hero Card',
-    is_hero: true,
+    card_pool: 'player' as const, card_roles: ['hero' as const],
     template_id: 'template-1',
     version_id: 'version-1',
     version_number: 1,
@@ -75,6 +75,7 @@ const buildDeck = (
     label: 'Ready',
     issues: [],
   },
+  has_non_player_cards: false,
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
   card_reference: cardReference,
@@ -82,12 +83,12 @@ const buildDeck = (
 
 const deckReferences: CardDeckReferenceSummary[] = [
   buildDeck('deck-owned', 'Owned Control', 'user-1', {
-    is_hero: false,
+    as_hero: false,
     mainboard_quantity: 2,
     sideboard_quantity: 1,
   }),
   buildDeck('deck-public', 'Public Aggro', 'user-2', {
-    is_hero: true,
+    as_hero: true,
     mainboard_quantity: 0,
     sideboard_quantity: 0,
   }),

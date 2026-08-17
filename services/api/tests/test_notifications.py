@@ -10,6 +10,7 @@ import pytest
 
 from card_reader_core.config import settings
 from card_reader_core.models import (
+    CardMergeRedirect,
     CardVersion,
     ImportJob,
     ImportJobItem,
@@ -29,6 +30,7 @@ from card_reader_core.services.notifications import (
     DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
     NotificationService,
 )
+from card_reader_core.services.tts_card_sheets import TtsCardSheetService
 from card_reader_core.storage import resolve_storage_path
 from test_decks import _create_card
 from test_parse_flags import _create_card_version
@@ -398,7 +400,7 @@ def test_notification_event_name_migration_preserves_rows_and_dedupe_keys() -> N
 def test_notification_previous_version_migration_backfills_only_safe_rows() -> None:
     _clear_notifications()
     user = _create_user("notification-version-migration", "password")
-    card = _create_card(name="Notification Version Migration Card", is_hero=False)
+    card = _create_card(name="Notification Version Migration Card", hero=False)
     previous_version = card.latest_version
     assert previous_version is not None
     current_version = CardVersion.objects.create(
@@ -445,7 +447,7 @@ def test_notification_previous_version_migration_backfills_only_safe_rows() -> N
             },
         )
     )
-    mismatched_card = _create_card(name="Mismatched Notification Card", is_hero=False)
+    mismatched_card = _create_card(name="Mismatched Notification Card", hero=False)
     mismatched = create_or_coalesce_notification(
         NotificationInput(
             recipient_id=str(user.pk),
@@ -536,6 +538,73 @@ def test_parse_flag_review_creates_submitter_notification() -> None:
     assert payload["metadata"] == notification.metadata_json
 
 
+def test_parse_flag_review_notification_remains_visible_after_card_pool_change() -> None:
+    _clear_notifications()
+    submitter = _create_user("notification-gm-flag-submit", "password")
+    reviewer = _create_user("notification-gm-flag-reviewer", "password", is_staff=True)
+    card, version = _create_card_version(name="Notification Reclassified Flag Card")
+    submit_client = Client(HTTP_HOST="localhost")
+    submit_client.force_login(submitter)
+    submit_response = submit_client.post(
+        f"/cards/{card.id}/versions/{version.id}/flags",
+        data={
+            "items": [
+                {
+                    "property_key": "name",
+                    "expected_value": "Corrected Reclassified Flag Card",
+                }
+            ],
+        },
+        content_type="application/json",
+    )
+    assert submit_response.status_code == 201
+    card.card_pool = "evil"
+    card.save(update_fields=["card_pool"])
+    review_client = Client(HTTP_HOST="localhost")
+    review_client.force_login(reviewer)
+    flag = review_client.get("/review/parse-flags").json()["results"][0]
+    item_id = flag["items"][0]["id"]
+
+    review_response = review_client.patch(
+        f"/review/parse-flags/items/{item_id}",
+        data={"status": "resolved"},
+        content_type="application/json",
+    )
+
+    assert review_response.status_code == 200
+    assert UserNotification.objects.filter(recipient_id=str(submitter.pk)).exists()
+    assert submit_client.get("/notifications?status=all").json()["count"] == 1
+
+
+def test_staff_submitter_receives_parse_review_notification_for_evil_card() -> None:
+    _clear_notifications()
+    submitter = _create_user("notification-evil-flag-submit", "password", is_staff=True)
+    reviewer = _create_user("notification-evil-flag-reviewer", "password", is_staff=True)
+    card, version = _create_card_version(name="Notification Evil Flag Card")
+    card.card_pool = "evil"
+    card.save(update_fields=["card_pool"])
+    submit_client = Client(HTTP_HOST="localhost")
+    submit_client.force_login(submitter)
+    submit_response = submit_client.post(
+        f"/cards/{card.id}/versions/{version.id}/flags",
+        data={"items": [{"property_key": "name", "expected_value": "Corrected Evil Card"}]},
+        content_type="application/json",
+    )
+    assert submit_response.status_code == 201
+    reviewer_client = Client(HTTP_HOST="localhost")
+    reviewer_client.force_login(reviewer)
+    flag = reviewer_client.get("/review/parse-flags").json()["results"][0]
+
+    response = reviewer_client.patch(
+        f"/review/parse-flags/items/{flag['items'][0]['id']}",
+        data={"status": "resolved"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert submit_client.get("/notifications?status=all").json()["count"] == 1
+
+
 def test_parse_flag_self_review_creates_notification_in_development(monkeypatch) -> None:
     _clear_notifications()
     monkeypatch.setattr(settings, "environment", "development")
@@ -568,8 +637,8 @@ def test_card_update_does_not_notify_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-deck-owner", "password")
     actor = _create_user("notification-card-editor", "password", is_staff=True)
-    hero = _create_card(name="Notification Hero", is_hero=True)
-    card = _create_card(name="Notification Mainboard", is_hero=False)
+    hero = _create_card(name="Notification Hero", hero=True)
+    card = _create_card(name="Notification Mainboard", hero=False)
     DeckService().create_owner_deck(
         owner_id=str(owner.pk),
         name="Notification Deck",
@@ -600,8 +669,8 @@ def test_card_promotion_notifies_sideboard_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-sideboard-owner", "password")
     actor = _create_user("notification-sideboard-editor", "password", is_staff=True)
-    hero = _create_card(name="Notification Sideboard Hero", is_hero=True)
-    card = _create_card(name="Notification Sideboard Card", is_hero=False)
+    hero = _create_card(name="Notification Sideboard Hero", hero=True)
+    card = _create_card(name="Notification Sideboard Card", hero=False)
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.pk),
         name="Notification Sideboard Deck",
@@ -656,7 +725,7 @@ def test_card_version_change_notifies_hero_deck_owner_but_not_actor() -> None:
     _clear_notifications()
     owner = _create_user("notification-hero-owner", "password")
     actor = _create_user("notification-hero-actor", "password", is_staff=True)
-    hero = _create_card(name="Notification Changed Hero", is_hero=True)
+    hero = _create_card(name="Notification Changed Hero", hero=True)
     hero_version = hero.latest_version
     assert hero_version is not None
     deck = DeckService().create_owner_deck(
@@ -699,12 +768,154 @@ def test_card_version_change_notifies_hero_deck_owner_but_not_actor() -> None:
     assert not UserNotification.objects.filter(recipient_id=str(actor.pk)).exists()
 
 
+@pytest.mark.django_db(transaction=True)
+def test_evil_reclassification_keeps_card_notifications_and_stops_future_deck_delivery() -> None:
+    _clear_notifications()
+    owner = _create_user("notification-reclassified-owner", "password")
+    hero = _create_card(name="Notification Reclassified Hero", hero=True)
+    card = _create_card(name="Notification Reclassified Card", hero=False)
+    DeckService().create_owner_deck(
+        owner_id=str(owner.pk),
+        name="Notification Reclassified Deck",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=1)],
+        sideboards=[],
+    )
+    version = card.latest_version
+    assert version is not None
+    service = NotificationService()
+    created = service.notify_deck_owners_card_version_changed(
+        card_id=card.id,
+        card_version_id=version.id,
+        previous_card_version_id=None,
+        cause=DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
+    )
+    create_or_coalesce_notification(
+        NotificationInput(
+            recipient_id=str(owner.pk),
+            event_type="parse_flag_item.reviewed",
+            subject_type="parse_flag_item",
+            subject_id="reclassified-flag-item",
+            target_url=f"/cards/{card.id}?version_id={version.id}",
+            title=f"Flag resolved: {card.label}",
+            message="A card-linked flag was resolved.",
+            metadata={"card_id": card.id, "card_version_id": version.id},
+        )
+    )
+    merged_source_card_id = "notification-reclassified-merged-source"
+    CardMergeRedirect.objects.create(old_card_id=merged_source_card_id, target_card=card)
+    create_or_coalesce_notification(
+        NotificationInput(
+            recipient_id=str(owner.pk),
+            event_type="parse_flag_item.reviewed",
+            subject_type="parse_flag_item",
+            subject_id="reclassified-merged-source-flag-item",
+            target_url=f"/cards/{merged_source_card_id}",
+            title="Flag resolved: merged source",
+            message="A merged-source card-linked flag was resolved.",
+            metadata={"card_id": merged_source_card_id, "card_version_id": version.id},
+        )
+    )
+    assert len(created) == 1
+    assert UserNotification.objects.filter(recipient_id=str(owner.pk), archived_at__isnull=True).count() == 3
+
+    updated = update_latest_card_version_with_notifications(
+        card_id=card.id,
+        updates={"card_pool": "evil"},
+        restore_fields=[],
+        restore_metadata_groups=[],
+        unlock_fields=[],
+        unlock_metadata_groups=[],
+    )
+
+    assert updated is not None
+    assert UserNotification.objects.filter(recipient_id=str(owner.pk), archived_at__isnull=True).count() == 3
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(owner)
+    assert client.get("/notifications?status=all").json()["count"] == 3
+    assert service.notify_deck_owners_card_version_changed(
+        card_id=card.id,
+        card_version_id=version.id,
+        previous_card_version_id=None,
+        cause=DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
+    ) == []
+    assert UserNotification.objects.filter(recipient_id=str(owner.pk), archived_at__isnull=True).count() == 3
+
+
+@pytest.mark.django_db(transaction=True)
+def test_evil_reclassification_keeps_notifications_stored_while_reconciling_tts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_notifications()
+    owner = _create_user("notification-cleanup-failure-owner", "password")
+    card = _create_card(name="Notification Cleanup Failure Card", hero=False)
+    version = card.latest_version
+    assert version is not None
+    notification = create_or_coalesce_notification(
+        NotificationInput(
+            recipient_id=str(owner.pk),
+            event_type="parse_flag_item.reviewed",
+            subject_type="parse_flag_item",
+            subject_id="cleanup-failure-flag-item",
+            target_url=f"/cards/{card.id}?version_id={version.id}",
+            title=f"Flag resolved: {card.label}",
+            message="A card-linked flag was resolved.",
+            metadata={"card_id": card.id, "card_version_id": version.id},
+        )
+    )
+    merged_source_card_id = "notification-cleanup-failure-merged-source"
+    CardMergeRedirect.objects.create(old_card_id=merged_source_card_id, target_card=card)
+    redirected_notification = create_or_coalesce_notification(
+        NotificationInput(
+            recipient_id=str(owner.pk),
+            event_type="parse_flag_item.reviewed",
+            subject_type="parse_flag_item",
+            subject_id="cleanup-failure-merged-source-flag-item",
+            target_url=f"/cards/{merged_source_card_id}",
+            title="Flag resolved: merged source",
+            message="A merged-source card-linked flag was resolved.",
+            metadata={"card_id": merged_source_card_id, "card_version_id": version.id},
+        )
+    )
+    synced_card_ids: list[str] = []
+
+    def record_sync(_service: TtsCardSheetService, card_ids: list[str]) -> set[str]:
+        synced_card_ids.extend(card_ids)
+        return set()
+
+    monkeypatch.setattr(TtsCardSheetService, "sync_cards", record_sync)
+
+    updated = update_latest_card_version_with_notifications(
+        card_id=card.id,
+        updates={"card_pool": "evil"},
+        restore_fields=[],
+        restore_metadata_groups=[],
+        unlock_fields=[],
+        unlock_metadata_groups=[],
+    )
+
+    assert updated is not None
+    card.refresh_from_db()
+    notification.refresh_from_db()
+    redirected_notification.refresh_from_db()
+    assert card.card_pool == "evil"
+    assert notification.archived_at is None
+    assert redirected_notification.archived_at is None
+    assert synced_card_ids == [card.id]
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(owner)
+    assert client.get("/notifications?status=all").json()["count"] == 2
+    assert client.get("/notifications/summary").json()["unread_count"] == 2
+
+
 def test_noop_card_promotion_does_not_notify_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-noop-promotion-owner", "password")
     actor = _create_user("notification-noop-promotion-editor", "password", is_staff=True)
-    hero = _create_card(name="Notification Noop Promotion Hero", is_hero=True)
-    card = _create_card(name="Notification Noop Promotion Card", is_hero=False)
+    hero = _create_card(name="Notification Noop Promotion Hero", hero=True)
+    card = _create_card(name="Notification Noop Promotion Card", hero=False)
     DeckService().create_owner_deck(
         owner_id=str(owner.pk),
         name="Notification Noop Promotion Deck",
@@ -731,8 +942,8 @@ def test_noop_card_promotion_does_not_notify_deck_owner() -> None:
 def test_import_reparse_does_not_notify_affected_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-import-owner", "password")
-    hero = _create_card(name="Notification Import Hero", is_hero=True)
-    card = _create_card(name="Notification Import Card", is_hero=False)
+    hero = _create_card(name="Notification Import Hero", hero=True)
+    card = _create_card(name="Notification Import Card", hero=False)
     DeckService().create_owner_deck(
         owner_id=str(owner.pk),
         name="Notification Import Deck",
@@ -780,8 +991,8 @@ def test_import_reparse_does_not_notify_affected_deck_owner() -> None:
 def test_import_new_version_notifies_affected_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-import-new-owner", "password")
-    hero = _create_card(name="Notification Import New Hero", is_hero=True)
-    card = _create_card(name="Notification Import New Card", is_hero=False)
+    hero = _create_card(name="Notification Import New Hero", hero=True)
+    card = _create_card(name="Notification Import New Card", hero=False)
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.pk),
         name="Notification Import New Deck",

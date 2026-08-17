@@ -14,7 +14,7 @@ const buildVersion = (overrides: Partial<CardVersionDetail> = {}): CardVersionDe
   id: 'card-1',
   key: 'card-1',
   label: 'Card 1',
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [], card_factions: [], card_mana_families: [],
   deck_building_config: { overrides: {} },
   template_id: 'template-1',
   version_id: 'version-1',
@@ -86,7 +86,7 @@ const buildForm = (overrides: Partial<EditorForm> = {}): EditorForm => ({
   attack: '',
   health: '',
   rules_text: '',
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [], card_factions: [], card_mana_families: [],
   deck_building_config: JSON.stringify({ overrides: {} }, null, 2),
   lifecycle_status: 'active',
   keyword_ids: [],
@@ -104,15 +104,22 @@ const emptyOptions = (): [] => [];
 
 const mountPane = async ({
   deprecatedStatusDisabled = false,
+  formOverrides = {},
+  saveError = '',
 }: {
   deprecatedStatusDisabled?: boolean;
+  formOverrides?: Partial<EditorForm>;
+  saveError?: string;
 } = {}) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const updateLifecycleStatus = vi.fn();
   const saveCard = vi.fn();
   const saveVersion = vi.fn();
-  const form = reactive(buildForm());
+  const toggleCardRole = vi.fn();
+  const toggleCardFaction = vi.fn();
+  const toggleCardManaFamily = vi.fn();
+  const form = reactive(buildForm(formOverrides));
   const reparseTemplateId = ref('template-1');
   const reparseTemplates: ReparseTemplateOption[] = [
     { id: 'template-1', key: 'template-1', label: 'Default' },
@@ -130,6 +137,7 @@ const mountPane = async ({
             isSaving: false,
             isQueuingReparse: false,
             saveMessage: '',
+            saveError,
             deckBuildingConfigExample: JSON.stringify(
               {
                 overrides: {
@@ -169,6 +177,9 @@ const mountPane = async ({
             onSaveCard: saveCard,
             onSaveVersion: saveVersion,
             onUpdateLifecycleStatus: updateLifecycleStatus,
+            onToggleCardRole: toggleCardRole,
+            onToggleCardFaction: toggleCardFaction,
+            onToggleCardManaFamily: toggleCardManaFamily,
           });
       },
     }),
@@ -181,6 +192,9 @@ const mountPane = async ({
     saveCard,
     saveVersion,
     updateLifecycleStatus,
+    toggleCardRole,
+    toggleCardFaction,
+    toggleCardManaFamily,
     unmount: () => {
       app.unmount();
       container.remove();
@@ -243,7 +257,7 @@ describe('CardVersionEditorPane tabs', () => {
     const mounted = await mountPane();
 
     expect(mounted.container.textContent).toContain('Card Version Editor');
-    expect(mounted.container.textContent).not.toContain('Hero Card');
+    expect(mounted.container.textContent).not.toContain('Card Classification');
     expect(mounted.container.textContent).not.toContain('Deck-Building Config JSON');
     expect(mounted.container.textContent).not.toContain('Card Status');
     expect(mounted.container.textContent).toContain('Mana Cost');
@@ -252,7 +266,17 @@ describe('CardVersionEditorPane tabs', () => {
     await clickButton(mounted.container, 'Card');
 
     expect(mounted.container.textContent).toContain('Card Editor');
-    expect(mounted.container.textContent).toContain('Hero Card');
+    expect(mounted.container.textContent).toContain('Card Classification');
+    expect(mounted.container.textContent).toContain('Evil');
+    expect(mounted.container.textContent).toContain('Neutral');
+    expect(mounted.container.textContent).toContain('Normal');
+    expect(mounted.container.textContent).toContain('Boss');
+    expect(mounted.container.textContent).toContain('Location');
+    expect(mounted.container.textContent).toContain('Shop Item');
+    expect(mounted.container.textContent).toContain('Mana');
+    expect(mounted.container.textContent).toContain('Order');
+    expect(mounted.container.textContent).toContain('Mana Families');
+    expect(mounted.container.textContent).toContain('Arcane');
     expect(mounted.container.textContent).toContain('Deck-Building Config JSON');
     expect(mounted.container.textContent).toContain('Card Status');
     expect(mounted.container.textContent).not.toContain('Mana Cost');
@@ -274,6 +298,56 @@ describe('CardVersionEditorPane tabs', () => {
     mounted.unmount();
   });
 
+  test('presents roles, factions, and mana families as compact multi-select buttons', async () => {
+    const mounted = await mountPane({
+      formOverrides: {
+        card_roles: ['boss'],
+        card_factions: ['order'],
+        card_mana_families: ['arcane'],
+      },
+    });
+    await clickButton(mounted.container, 'Card');
+
+    const boss = mounted.container.querySelector('[data-testid="card-role-option-boss"]');
+    const hero = mounted.container.querySelector('[data-testid="card-role-option-hero"]');
+    const order = mounted.container.querySelector('[data-testid="card-faction-option-order"]');
+    const dark = mounted.container.querySelector('[data-testid="card-faction-option-dark"]');
+    const metal = mounted.container.querySelector('[data-testid="card-faction-option-metal"]');
+    const arcane = mounted.container.querySelector('[data-testid="card-mana-family-option-arcane"]');
+    const primal = mounted.container.querySelector('[data-testid="card-mana-family-option-primal"]');
+
+    expect(boss?.getAttribute('aria-pressed')).toBe('true');
+    expect(hero?.getAttribute('aria-pressed')).toBe('false');
+    expect(order?.getAttribute('aria-pressed')).toBe('true');
+    expect(dark?.getAttribute('aria-pressed')).toBe('false');
+    expect(metal?.getAttribute('aria-pressed')).toBe('false');
+    expect(arcane?.getAttribute('aria-pressed')).toBe('true');
+    expect(primal?.getAttribute('aria-pressed')).toBe('false');
+
+    (hero as HTMLButtonElement).click();
+    (order as HTMLButtonElement).click();
+    (metal as HTMLButtonElement).click();
+    (primal as HTMLButtonElement).click();
+    await nextTick();
+
+    expect(mounted.toggleCardRole).toHaveBeenCalledWith('hero', true);
+    expect(mounted.toggleCardFaction).toHaveBeenCalledWith('order', false);
+    expect(mounted.toggleCardFaction).toHaveBeenCalledWith('metal', true);
+    expect(mounted.toggleCardManaFamily).toHaveBeenCalledWith('primal', true);
+    mounted.unmount();
+  });
+
+  test('explains empty role, faction, and mana selections as derived states', async () => {
+    const mounted = await mountPane();
+    await clickButton(mounted.container, 'Card');
+
+    expect(mounted.container.textContent).toContain('Normal');
+    expect(mounted.container.textContent).toContain('No faction');
+    expect(mounted.container.textContent).toContain('Colorless');
+
+    mounted.unmount();
+  });
+
   test('emits separate save events for card and version tabs', async () => {
     const mounted = await mountPane();
 
@@ -286,6 +360,18 @@ describe('CardVersionEditorPane tabs', () => {
     expect(mounted.saveCard).toHaveBeenCalledTimes(1);
     expect(mounted.saveVersion).toHaveBeenCalledTimes(1);
 
+    mounted.unmount();
+  });
+
+  test('shows save failures as an accessible error on the active editor tab', async () => {
+    const message = 'Card name conflicts with another identity. Merge the duplicate cards.';
+    const mounted = await mountPane({ saveError: message });
+
+    expect(mounted.container.querySelector('[role="alert"]')?.textContent).toContain(message);
+
+    await clickButton(mounted.container, 'Card');
+
+    expect(mounted.container.querySelector('[role="alert"]')?.textContent).toContain(message);
     mounted.unmount();
   });
 });

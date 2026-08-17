@@ -1,0 +1,4 @@
+interface:
+  display_name: "Card Reader Core"
+  short_description: "Maintain shared Card Reader domain foundations"
+  default_prompt: "Use $card-reader-core to change shared Card Reader models, repositories, services, migrations, configuration, or storage safely."

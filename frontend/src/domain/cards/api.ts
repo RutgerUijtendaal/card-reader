@@ -6,6 +6,7 @@ import type {
 } from '@/domain/cards/types';
 import type { CardFilterApiPayload } from '@/domain/cards/utils/filters/cardFilterRequest';
 import type { CardSort } from '@/domain/cards/utils/gallery/cardSort';
+import type { CardPool } from '@/domain/cards/cardPools';
 import {
   mapTtsExportResponse,
   type TtsExportApiResponse,
@@ -24,15 +25,20 @@ export type TtsCardExportSource =
       content_version_id: string;
     };
 
-export const fetchCards = async <TCard>(
+export const fetchCardPage = async <TCard>(
+  endpoint: string,
   params: URLSearchParams | CardQueryParams,
 ): Promise<PaginatedCardsResponse<TCard>> => {
   const response =
     params instanceof URLSearchParams
-      ? await api.get<PaginatedCardsResponse<TCard>>(`/cards?${params.toString()}`)
-      : await api.get<PaginatedCardsResponse<TCard>>('/cards', { params });
+      ? await api.get<PaginatedCardsResponse<TCard>>(`${endpoint}?${params.toString()}`)
+      : await api.get<PaginatedCardsResponse<TCard>>(endpoint, { params });
   return response.data;
 };
+
+export const fetchCards = async <TCard>(
+  params: URLSearchParams | CardQueryParams,
+): Promise<PaginatedCardsResponse<TCard>> => fetchCardPage('/cards', params);
 
 export const fetchCard = async <TCard>(cardId: string): Promise<TCard> => {
   const response = await api.get<TCard>(`/cards/${cardId}`);
@@ -44,8 +50,10 @@ export const fetchCardVersions = async (cardId: string): Promise<CardVersionDeta
   return response.data;
 };
 
-export const fetchCardFilters = async (): Promise<CardFiltersResponse> => {
-  const response = await api.get<CardFiltersResponse>('/cards/filters');
+export const fetchCardFilters = async (cardPool?: CardPool): Promise<CardFiltersResponse> => {
+  const response = cardPool
+    ? await api.get<CardFiltersResponse>('/cards/filters', { params: { card_pool: cardPool } })
+    : await api.get<CardFiltersResponse>('/cards/filters');
   return response.data;
 };
 

@@ -1,9 +1,14 @@
-import type { TemplateParserType } from '@/domain/templates/types';
+import type { TemplateParserType } from '@/domain/templates/parserTypes';
 import type { JsonObject } from '@/shared/types/json';
+import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardFaction } from '@/domain/cards/cardFactions';
+import type { CardPool } from '@/domain/cards/cardPools';
+import type { ManaFamily } from '@/domain/cards/manaFamilies';
 
 export type KnownCatalogKind = 'keywords' | 'tags' | 'symbols' | 'types' | 'deck-roles' | 'deck-types';
 export type SuggestedCatalogKind = 'suggested-tags' | 'suggested-types' | 'suggested-deck-types';
-export type CatalogKind = KnownCatalogKind | SuggestedCatalogKind;
+export type ClassificationCatalogKind = 'card-roles' | 'card-factions' | 'card-mana-families';
+export type CatalogKind = KnownCatalogKind | SuggestedCatalogKind | ClassificationCatalogKind;
 
 export type CatalogSearchState = Record<CatalogKind, string>;
 
@@ -11,6 +16,7 @@ export type TemplatePreviewCardOption = {
   id: string;
   label: string;
   name: string;
+  card_pool: CardPool;
   template_id: string;
   image_url: string | null;
 };
@@ -46,6 +52,10 @@ export type CardMergeCardSummary = {
   label: string;
   latest_name: string;
   version_count: number;
+  card_pool: CardPool;
+  card_roles: CardRole[];
+  card_factions: CardFaction[];
+  card_mana_families: ManaFamily[];
 };
 
 export type CardMergeAliasPreview = {
@@ -67,6 +77,7 @@ export type CardMergePreview = {
   };
   resulting_version_count: number;
   blocking_conflicts: string[];
+  warnings: string[];
   can_apply: boolean;
 };
 
@@ -138,6 +149,9 @@ export type CardGroupMemberRecord = {
   card_id: string;
   card_label: string;
   card_name: string;
+  card_pool: CardPool;
+  card_factions: CardFaction[];
+  card_mana_families: ManaFamily[];
   position: number;
   is_anchor: boolean;
   image_url: string | null;
@@ -147,6 +161,7 @@ export type CardGroupRecord = {
   id: string;
   key: string;
   name: string;
+  card_pool: CardPool;
   anchor_card_id: string;
   anchor_card_name: string;
   member_count: number;
@@ -159,6 +174,10 @@ export type LinkedCardPreview = {
   card_version_id: string;
   card_version_name: string;
   image_url: string | null;
+  card_pool: CardPool;
+  card_roles: CardRole[];
+  card_factions: CardFaction[];
+  card_mana_families: ManaFamily[];
 };
 
 export type LinkedDeckPreview = {
@@ -199,6 +218,7 @@ export type TagRecord = {
   identifiers_text: string;
   linked_cards?: LinkedCardPreview[];
   linked_card_count?: number;
+  classification_rules?: ClassificationRuleRecord[];
 };
 
 export type TypeRecord = {
@@ -209,6 +229,47 @@ export type TypeRecord = {
   identifiers_text: string;
   linked_cards?: LinkedCardPreview[];
   linked_card_count?: number;
+  classification_rules?: ClassificationRuleRecord[];
+};
+
+export type ClassificationTargetKind = 'role' | 'faction' | 'mana_family';
+export type ClassificationSourceKind = 'tag' | 'type' | 'symbol';
+
+export type ClassificationRuleRecord = {
+  id: string;
+  card_pool: CardPool;
+  target_kind: ClassificationTargetKind;
+  target_key: string;
+  source_kind: ClassificationSourceKind;
+  source_id: string;
+  source_key: string;
+  source_label: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ClassificationDefinitionRecord = {
+  id: string;
+  key: string;
+  label: string;
+  rank: number;
+  target_kind: ClassificationTargetKind;
+  derived: boolean;
+  linked_card_counts: Partial<Record<CardPool, number>>;
+  rule_counts: Partial<Record<CardPool, Record<ClassificationSourceKind, number>>>;
+  rules: ClassificationRuleRecord[];
+  display_symbol_key: string | null;
+  display_symbol: Pick<SymbolApiRecord, 'id' | 'key' | 'label'> | null;
+};
+
+export type ClassificationRuleUpsertRequest = {
+  card_pool: CardPool;
+  target_kind: ClassificationTargetKind;
+  target_key: string;
+  source_kind: ClassificationSourceKind;
+  source_id: string;
+  enabled: boolean;
 };
 
 export type SymbolRecord = {
@@ -224,6 +285,7 @@ export type SymbolRecord = {
   enabled: boolean;
   linked_cards?: LinkedCardPreview[];
   linked_card_count?: number;
+  classification_rules?: ClassificationRuleRecord[];
 };
 
 export type CatalogResponse = {
@@ -236,6 +298,11 @@ export type CatalogResponse = {
   suggested: {
     tags: SuggestionRecord[];
     types: SuggestionRecord[];
+  };
+  classification: {
+    roles: ClassificationDefinitionRecord[];
+    factions: ClassificationDefinitionRecord[];
+    mana_families: ClassificationDefinitionRecord[];
   };
 };
 
@@ -268,6 +335,11 @@ export type CatalogApiResponse = {
   suggested: {
     tags: SuggestionApiRecord[];
     types: SuggestionApiRecord[];
+  };
+  classification?: {
+    roles: ClassificationDefinitionRecord[];
+    factions: ClassificationDefinitionRecord[];
+    mana_families: ClassificationDefinitionRecord[];
   };
 };
 
@@ -329,6 +401,10 @@ export type SuggestionOccurrencePreview = {
   image_url: string | null;
   source_text: string;
   normalized_source_text: string;
+  card_pool: CardPool;
+  card_roles: CardRole[];
+  card_factions: CardFaction[];
+  card_mana_families: ManaFamily[];
 };
 
 export type SuggestionAcceptedTarget = {
@@ -363,7 +439,7 @@ export type DeckTagCatalogApiResponse = {
   suggested_types: Array<Omit<SuggestionApiRecord, 'occurrences'> & { linked_decks?: LinkedDeckPreview[] }>;
 };
 
-export type CatalogRow = KeywordRecord | TagRecord | TypeRecord | SymbolRecord | DeckTagRecord | SuggestionRecord;
+export type CatalogRow = KeywordRecord | TagRecord | TypeRecord | SymbolRecord | DeckTagRecord | SuggestionRecord | ClassificationDefinitionRecord;
 
 export type CatalogFormEntry = {
   label: string;

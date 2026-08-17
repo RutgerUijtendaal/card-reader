@@ -26,8 +26,15 @@ class PublicCardGroupDetailView(APIView):
         serializer = CardFiltersQuerySerializer(data=_lifecycle_query_data(request))
         if not serializer.is_valid():
             return serializer_error(serializer)
-        lifecycle_status = serializer.validated_filters()["lifecycle_status"]
-        group = CardGroupService().get_group(group_id)
+        filters = serializer.validated_filters()
+        lifecycle_status = filters["lifecycle_status"]
+        card_pool = filters["card_pool"]
+        service = CardGroupService()
+        group = (
+            service.get_group(group_id)
+            if card_pool is None
+            else service.get_group_for_pool(group_id, card_pool=card_pool)
+        )
         if group is None:
             return not_found("Card group not found")
         viewer_id = str(getattr(request.user, "pk", "")) if is_authenticated(request.user) else None
@@ -35,7 +42,10 @@ class PublicCardGroupDetailView(APIView):
             card_group_detail_payload(
                 group,
                 lifecycle_status=lifecycle_status,
-                anchor_deck_references=card_deck_references_payload(group.anchor_card.id, viewer_id=viewer_id),
+                anchor_deck_references=card_deck_references_payload(
+                    group.anchor_card.id,
+                    viewer_id=viewer_id,
+                ),
             )
         )
 
@@ -101,7 +111,11 @@ class StaffCardGroupDetailView(APIView):
 
 
 def _lifecycle_query_data(request: Request) -> dict[str, object]:
+    data: dict[str, object] = {}
     lifecycle_status = request.query_params.get("lifecycle_status")
-    if lifecycle_status is None:
-        return {}
-    return {"lifecycle_status": lifecycle_status}
+    if lifecycle_status is not None:
+        data["lifecycle_status"] = lifecycle_status
+    card_pool = request.query_params.get("card_pool")
+    if card_pool is not None:
+        data["card_pool"] = card_pool
+    return data
