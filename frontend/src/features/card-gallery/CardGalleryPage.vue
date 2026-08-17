@@ -328,7 +328,7 @@ const displayItems = computed(() =>
     : cards.value,
 );
 const exportsReady = computed(() => isCardFilterStateReady(
-  filtersLoaded.value,
+  cardCollectionFiltersReady.value,
   readFilterState(),
   currentRouteFilterState.value,
 ));

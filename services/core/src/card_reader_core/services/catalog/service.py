@@ -423,6 +423,7 @@ class CatalogService:
             )
         return update_type(entry_id=entry_id, updates=updates)
 
+    @transaction.atomic
     def create_symbol(
         self,
         *,

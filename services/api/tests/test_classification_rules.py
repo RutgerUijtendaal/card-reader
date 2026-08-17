@@ -371,6 +371,33 @@ def test_creating_a_symbol_only_reconciles_that_symbol_default() -> None:
     )
 
 
+def test_symbol_creation_rolls_back_when_default_rule_seeding_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    canonical_key = "primal-mana"
+    CardClassificationRule.objects.filter(symbol__key=canonical_key).delete()
+    Symbol.objects.filter(key=canonical_key).delete()
+
+    def fail_rule_seeding(*, symbol_keys: set[str] | None = None) -> int:
+        assert symbol_keys == {canonical_key}
+        raise RuntimeError("rule seeding failed")
+
+    monkeypatch.setattr(
+        catalog_service_module,
+        "ensure_default_mana_family_classification_rules",
+        fail_rule_seeding,
+    )
+
+    with pytest.raises(RuntimeError, match="rule seeding failed"):
+        CatalogService().create_symbol(
+            key=canonical_key,
+            label="Primal Mana",
+            symbol_type="mana",
+        )
+
+    assert not Symbol.objects.filter(key=canonical_key).exists()
+
+
 def test_renaming_a_symbol_to_a_canonical_key_reconciles_its_default_rule() -> None:
     canonical_symbol = Symbol.objects.get(key="arcane-mana")
     assert (
