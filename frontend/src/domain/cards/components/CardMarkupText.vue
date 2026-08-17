@@ -19,11 +19,29 @@
       :style="{ position: 'fixed', left: `${x}px`, top: `${y}px` }"
     >
       <CardHoverTooltip
-        v-if="hoverCard"
+        v-if="hoverCard && showsImage && showsDetails"
         :card="hoverCard"
-        :image-url="showsImage ? hoverCard.image_url : null"
-        :details-revealed="showsDetails"
+        :image-url="hoverCard.image_url"
+        :details-revealed="true"
         :hover-preview-scale="hoverPreviewScale"
+      />
+      <div
+        v-else-if="hoverCard && showsImage && hoverCard.image_url"
+        class="theme-card-frame pointer-events-none overflow-hidden rounded-xl shadow-2xl"
+        :style="enlargedPreviewStyle"
+      >
+        <div class="theme-card-image-well aspect-[63/88]">
+          <img
+            :src="toAbsoluteApiUrl(hoverCard.image_url)"
+            :alt="hoverCard.name || 'Card preview'"
+            class="h-full w-full object-cover"
+          >
+        </div>
+      </div>
+      <CardHoverTooltip
+        v-else-if="hoverCard && showsDetails"
+        :card="hoverCard"
+        :details-revealed="true"
       />
       <div
         v-else
@@ -38,12 +56,14 @@
 <script setup lang="ts">
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { computed, ref } from 'vue';
+import { toAbsoluteApiUrl } from '@/shared/api/client';
 import CardHoverTooltip from '@/domain/cards/components/CardHoverTooltip.vue';
 import { useHoverModePreferences } from '@/domain/cards/composables/useHoverModePreferences';
 import type { SymbolFilterOption, CardListItem } from '@/domain/cards/types';
 import { fetchHoverPreviewCard } from '@/domain/cards/utils/cardHoverPreview';
 import { renderCardMarkupHtml } from '@/domain/cards/utils/cardMarkup';
 import type { HoverMode } from '@/domain/cards/utils/gallery/hoverMode';
+import { getHoverPreviewCardWidthRem } from '@/domain/cards/utils/gallery/hoverPreviewScale';
 
 defineOptions({ inheritAttrs: false });
 
@@ -85,6 +105,9 @@ const showsDetails = computed(
 );
 const showPreview = computed(() => activeCardId.value !== null);
 const { hoverPreviewScale } = preferences;
+const enlargedPreviewStyle = computed(() => ({
+  width: `${getHoverPreviewCardWidthRem(hoverPreviewScale.value)}rem`,
+}));
 const floating = useFloating(triggerRef, panelRef, {
   open: showPreview,
   placement: 'right-start',
