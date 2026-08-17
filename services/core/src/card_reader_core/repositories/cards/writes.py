@@ -294,11 +294,10 @@ def save_parsed_card_result(
                 evidence=resolved_evidence,
                 is_new_card=False,
                 unknown_evil_faction_match=(
-                    UnknownEvilFactionMatch(
+                    _existing_unknown_evil_faction_match(
                         card=existing_version.card,
-                        reason="existing_unresolved_card",
-                        checksum_candidate_count=0,
-                        name_candidate_count=0,
+                        checksum=checksum,
+                        parsed_name=parsed_name,
                     )
                     if is_unknown_evil_faction_import
                     else None
@@ -319,11 +318,10 @@ def save_parsed_card_result(
             else None
         )
         unknown_evil_faction_match = (
-            UnknownEvilFactionMatch(
+            _existing_unknown_evil_faction_match(
                 card=existing_unknown_faction_card,
-                reason="existing_unresolved_card",
-                checksum_candidate_count=0,
-                name_candidate_count=0,
+                checksum=checksum,
+                parsed_name=parsed_name,
             )
             if existing_unknown_faction_card is not None
             else (
@@ -539,6 +537,24 @@ def _resolve_unknown_evil_faction_import(
         reason=reason,
         checksum_candidate_count=checksum_candidate_count,
         name_candidate_count=name_candidate_count,
+    )
+
+
+def _existing_unknown_evil_faction_match(
+    *,
+    card: Card,
+    checksum: str,
+    parsed_name: str,
+) -> UnknownEvilFactionMatch:
+    candidate_match = _resolve_unknown_evil_faction_import(
+        checksum=checksum,
+        parsed_name=parsed_name,
+    )
+    return UnknownEvilFactionMatch(
+        card=card,
+        reason="existing_unresolved_card",
+        checksum_candidate_count=candidate_match.checksum_candidate_count,
+        name_candidate_count=candidate_match.name_candidate_count,
     )
 
 
