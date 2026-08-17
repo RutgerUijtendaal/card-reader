@@ -375,6 +375,49 @@ describe('CardGalleryPage pool-aware filters', () => {
     mounted.unmount();
   });
 
+  test('keeps catalog-free filter changes after facet hydration fails and later recovers', async () => {
+    let filterRequestCount = 0;
+    const mounted = await mountGallery(
+      '/cards',
+      'player',
+      undefined,
+      () => {
+        filterRequestCount += 1;
+        return filterRequestCount === 1
+          ? Promise.reject(new Error('facet failure'))
+          : Promise.resolve({ data: filters });
+      },
+    );
+    const searchInput = mounted.container.querySelector<HTMLInputElement>(
+      'input[placeholder="Search by name, type, rules, or cost..."]',
+    );
+    if (!searchInput) {
+      throw new Error('expected Gallery search input');
+    }
+
+    searchInput.value = 'dragon';
+    searchInput.dispatchEvent(new Event('input'));
+
+    await vi.waitFor(() => {
+      expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?q=dragon');
+      expect(mounted.requestRoutes).toEqual(['/cards', '/cards?q=dragon']);
+    });
+
+    const retryButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Retry filter options',
+    );
+    expect(retryButton).toBeDefined();
+    retryButton?.click();
+
+    await vi.waitFor(() => {
+      expect(mounted.filterRequests).toEqual(['player', 'player']);
+      expect(mounted.requestRoutes.at(-1)).toBe('/cards?q=dragon');
+    });
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?q=dragon');
+
+    mounted.unmount();
+  });
+
   test('keeps legacy mana-symbol routes pending when facet hydration fails', async () => {
     const mounted = await mountGallery(
       '/cards?mana_symbol_match=all&mana_symbol_keys=arcane-mana'

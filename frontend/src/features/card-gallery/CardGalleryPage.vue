@@ -173,6 +173,7 @@ import { useAuthStore } from '@/domain/session/store';
 import type { GalleryItem } from '@/domain/cards/types';
 import {
   createEmptyCardFilterState,
+  type CardFilterState,
 } from '@/domain/cards/utils/filters/cardFilterState';
 import {
   getGalleryVisibleFilterSections,
@@ -271,13 +272,16 @@ const {
   setOverrideHoverMode,
   clearOverrideHoverMode,
 } = useHoverModeSurface('gallery');
-const cardCollectionFiltersReady = computed(() => (
+const isFilterStateReadyForCatalogStatus = (state: CardFilterState): boolean => (
   filtersLoaded.value
   || (
     filtersError.value !== null
-    && !cardFilterStateRequiresCatalog(visibleRouteFilterState.value)
+    && !cardFilterStateRequiresCatalog(state)
   )
-));
+);
+const cardCollectionFiltersReady = computed(
+  () => isFilterStateReadyForCatalogStatus(visibleRouteFilterState.value),
+);
 const collection = useCardCollection<GalleryItem>({
   buildSearchParams: () => {
     const params = buildCardFilterApiSearchParams(selectionState.value);
@@ -377,13 +381,13 @@ const clearGalleryHoverModeOverride = (): void => {
 };
 
 const updateFilterRoute = (): void => {
-  if (!filtersLoaded.value) {
-    return;
-  }
   const nextRouteState = sanitizeGalleryFilterStateForPool(
     readFilterState(),
     workspace.activePool,
   );
+  if (!isFilterStateReadyForCatalogStatus(nextRouteState)) {
+    return;
+  }
   if (sameCardFilterState(nextRouteState, currentRouteFilterState.value)) {
     return;
   }
