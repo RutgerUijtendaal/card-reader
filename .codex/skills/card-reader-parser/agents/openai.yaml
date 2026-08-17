@@ -1,0 +1,4 @@
+interface:
+  display_name: "Card Reader Parser"
+  short_description: "Maintain parser and OCR workflows"
+  default_prompt: "Use $card-reader-parser to update Card Reader polling, OCR adapters, extraction, symbol detection, or parser persistence."

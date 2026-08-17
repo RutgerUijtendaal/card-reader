@@ -1,0 +1,4 @@
+interface:
+  display_name: "Card Reader API"
+  short_description: "Maintain the Card Reader Django API"
+  default_prompt: "Use $card-reader-api to update Card Reader endpoints, serializers, authentication, API settings, or API-side workflows."

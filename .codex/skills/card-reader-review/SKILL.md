@@ -13,6 +13,11 @@ Follow `AGENTS.md` first. Use this skill when reviewing pull requests, local dif
 - Schema ownership mistakes outside `services/core`
 - Core layering drift: transport logic in repositories, Django query/write details in services, or domain workflows in API views
 - New one-off modules in `card_reader_core` root or legacy `*_repository.py` files instead of feature packages
+- Coupled Card invariants updated through partial write paths, especially faction identity keys, alias namespaces, mana-family sort keys, and assignment sets
+- Classification drift between stored Card authority and latest-version evidence, or roles/mana families entering identity matching
+- Ambiguous Evil imports merged without agreeing singleton evidence, or classification mismatches written as warnings instead of immutable review items
+- Pool-aware default sort drift between backend SQL components and frontend embedded-collection sorting
+- Gallery-only facet policy leaking into Admin, Review, maintenance, or deck workflows
 - Frontend dependency drift against the enforced layers and validated domain allowlist, especially feature-to-feature imports, shared/domain upward imports, unapproved cross-domain edges, or cycles
 - Card filter and gallery logic drift outside `frontend/src/domain/cards`, including duplicated API reads or route/request/id-translation logic placed in the wrong focused filter file
 - Direct Axios calls from pages, components, stores, or workflow composables instead of focused feature/domain API clients
@@ -22,7 +27,10 @@ Follow `AGENTS.md` first. Use this skill when reviewing pull requests, local dif
 - Playtester state ownership regressions that blur core, board, opening, and draft-persistence modules or reintroduce an aggregate façade
 - Theme/token drift or light/dark regressions in visible frontend changes
 - Auth regressions around public vs staff/superuser behavior
+- Viewer-dependent pool redaction or workspace-scoped Admin/Review behavior despite equal public card-pool access
 - Import pipeline regressions in async job creation, claiming, and persistence
+- Developer-data changes that weaken current validation, break retained immutable formats, include private/operational rows, or hand-edit the lock
+- TTS changes that reuse/move slots, mix pools on a sheet, publish without the live claim, or drift from the shared v2 payload
 - Missing lint, typing, or test coverage for touched behavior
 - Stateful workflows encoded as interacting flags without an explicit transition model
 - Cleanup failures that block or undo an already confirmed authoritative success
