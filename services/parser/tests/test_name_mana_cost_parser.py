@@ -162,10 +162,11 @@ def test_evil_name_mana_cost_parser_uses_trailing_ocr_integer(
     expected_cost: str,
 ) -> None:
     result = _parse(
-        text=text,
+        text=[text, expected_cost],
         detections=[_detection("occult-mana", x=120)],
         card_pool=EVIL_CARD_POOL,
         expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
     )
 
     assert result.normalized_fields["name"] == expected_name
@@ -176,17 +177,62 @@ def test_evil_name_mana_cost_parser_uses_trailing_ocr_integer(
 
 
 def test_evil_name_mana_cost_parser_combines_split_ocr_lines() -> None:
-    result = _parse(
-        text="Devourer\n4",
-        lines=["Devourer", "4"],
+    result, ocr_runner = _parse_with_runner(
+        text=["Devourer\n4", "", ""],
+        line_rows=[
+            {"text": "Devourer", "confidence": 0.9, "x": 70, "y": 20},
+            {"text": "4", "confidence": 0.9, "x": 190, "y": 20},
+        ],
         detections=[],
         card_pool=EVIL_CARD_POOL,
         expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
     )
 
     assert result.normalized_fields["name"] == "Devourer"
     assert result.normalized_fields["mana_cost"] == "4"
     assert result.normalized_fields["mana_total"] == "4"
+    assert ocr_runner.calls == [(200, 40), (84, 120), (56, 80)]
+
+
+def test_evil_name_mana_cost_parser_preserves_unverified_title_digits() -> None:
+    result, ocr_runner = _parse_with_runner(
+        text=["Project 13", "", ""],
+        line_rows=[
+            {
+                "text": "Project 13",
+                "confidence": 0.9,
+                "x": 70,
+                "y": 20,
+                "box": [(20, 10), (195, 10), (195, 30), (20, 30)],
+            },
+        ],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
+    )
+
+    assert result.normalized_fields["name"] == "Project 13"
+    assert result.normalized_fields["mana_cost"] == ""
+    assert result.normalized_fields["mana_total"] == ""
+    assert result.debug["trailing_ocr_integer_confirmed"] is False
+    assert ocr_runner.calls == [(200, 40), (84, 120), (56, 80)]
+
+
+def test_evil_name_mana_cost_parser_preserves_title_digits_when_badge_differs() -> None:
+    result = _parse(
+        text=["Project 13", "4"],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
+    )
+
+    assert result.normalized_fields["name"] == "Project 13"
+    assert result.normalized_fields["mana_cost"] == "4"
+    assert result.normalized_fields["mana_total"] == "4"
+    assert result.debug["trailing_ocr_integer_confirmed"] is False
 
 
 def test_evil_name_mana_cost_parser_leaves_missing_cost_empty() -> None:
