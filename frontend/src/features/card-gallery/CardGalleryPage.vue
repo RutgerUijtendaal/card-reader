@@ -156,7 +156,7 @@
 
 <script setup lang="ts">
 import { useScroll, useTimeoutFn } from '@vueuse/core';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { Copy, Download, Pencil } from 'lucide-vue-next';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { useCsvExport } from '@/shared/composables/useCsvExport';
@@ -173,6 +173,7 @@ import { useAuthStore } from '@/domain/session/store';
 import type { GalleryItem } from '@/domain/cards/types';
 import {
   createEmptyCardFilterState,
+  type CardFilterState,
 } from '@/domain/cards/utils/filters/cardFilterState';
 import {
   getGalleryVisibleFilterSections,
@@ -246,6 +247,13 @@ const currentRouteFilterState = computed(() => (
     : visibleRouteFilterState.value
 ));
 const currentRouteSignature = computed(() => getCardFilterSignature(currentRouteFilterState.value));
+const pendingFilterRouteState = shallowRef<CardFilterState | null>(null);
+let pendingFilterRouteDebounceElapsed = false;
+let observedFilterStateSnapshot = sanitizeGalleryFilterStateForPool(
+  readFilterState(),
+  workspace.activePool,
+);
+const filterRouteUpdatePending = computed(() => pendingFilterRouteState.value !== null);
 const visibleFilterSections = computed(() =>
   getGalleryVisibleFilterSections(workspace.activePool),
 );
@@ -271,13 +279,16 @@ const {
   setOverrideHoverMode,
   clearOverrideHoverMode,
 } = useHoverModeSurface('gallery');
-const cardCollectionFiltersReady = computed(() => (
+const isFilterStateReadyForCatalogStatus = (state: CardFilterState): boolean => (
   filtersLoaded.value
   || (
     filtersError.value !== null
-    && !cardFilterStateRequiresCatalog(visibleRouteFilterState.value)
+    && !cardFilterStateRequiresCatalog(state)
   )
-));
+);
+const cardCollectionFiltersReady = computed(
+  () => isFilterStateReadyForCatalogStatus(visibleRouteFilterState.value),
+);
 const collection = useCardCollection<GalleryItem>({
   buildSearchParams: () => {
     const params = buildCardFilterApiSearchParams(selectionState.value);
@@ -376,26 +387,82 @@ const clearGalleryHoverModeOverride = (): void => {
   clearOverrideHoverMode();
 };
 
-const updateFilterRoute = (): void => {
-  if (!filtersLoaded.value) {
-    return;
-  }
-  const nextRouteState = sanitizeGalleryFilterStateForPool(
-    readFilterState(),
-    workspace.activePool,
-  );
-  if (sameCardFilterState(nextRouteState, currentRouteFilterState.value)) {
+const filterStateValueEquals = (
+  left: CardFilterState[keyof CardFilterState],
+  right: CardFilterState[keyof CardFilterState],
+): boolean => (
+  Array.isArray(left) && Array.isArray(right)
+    ? left.length === right.length && left.every((value, index) => value === right[index])
+    : left === right
+);
+
+const mergeChangedFilterState = (
+  baseState: CardFilterState,
+  previousState: CardFilterState,
+  nextState: CardFilterState,
+): CardFilterState => {
+  const mergedState = { ...baseState };
+  (Object.keys(nextState) as (keyof CardFilterState)[]).forEach((key) => {
+    const nextValue = nextState[key];
+    if (!filterStateValueEquals(previousState[key], nextValue)) {
+      Object.assign(mergedState, {
+        [key]: Array.isArray(nextValue) ? [...nextValue] : nextValue,
+      });
+    }
+  });
+  return mergedState;
+};
+
+const applyPendingFilterRoute = (nextRouteState: CardFilterState): void => {
+  if (!isFilterStateReadyForCatalogStatus(nextRouteState)) {
     return;
   }
   void router.replace({
     path: '/cards',
     query: buildCardFilterRouteQuery(nextRouteState),
+  }).finally(() => {
+    if (pendingFilterRouteState.value === nextRouteState) {
+      pendingFilterRouteState.value = null;
+    }
   });
+};
+
+const capturePendingFilterRoute = (): CardFilterState | null => {
+  const nextFilterState = sanitizeGalleryFilterStateForPool(
+    readFilterState(),
+    workspace.activePool,
+  );
+  if (sameCardFilterState(nextFilterState, observedFilterStateSnapshot)) {
+    return pendingFilterRouteState.value;
+  }
+  const baseState = pendingFilterRouteState.value ?? visibleRouteFilterState.value;
+  const nextRouteState = pendingFilterRouteState.value !== null
+    || (!filtersLoaded.value && cardFilterStateRequiresCatalog(visibleRouteFilterState.value))
+    ? mergeChangedFilterState(baseState, observedFilterStateSnapshot, nextFilterState)
+    : nextFilterState;
+  observedFilterStateSnapshot = nextFilterState;
+  if (sameCardFilterState(nextRouteState, currentRouteFilterState.value)) {
+    pendingFilterRouteState.value = null;
+    pendingFilterRouteDebounceElapsed = false;
+    return null;
+  }
+  pendingFilterRouteState.value = nextRouteState;
+  pendingFilterRouteDebounceElapsed = false;
+  return nextRouteState;
+};
+
+const flushPendingFilterRoute = (): void => {
+  const pendingState = pendingFilterRouteState.value;
+  if (!pendingState) {
+    return;
+  }
+  pendingFilterRouteDebounceElapsed = true;
+  applyPendingFilterRoute(pendingState);
 };
 const {
   start: debouncedUpdateRoute,
   stop: cancelDebouncedUpdateRoute,
-} = useTimeoutFn(updateFilterRoute, 250, { immediate: false });
+} = useTimeoutFn(flushPendingFilterRoute, 250, { immediate: false });
 
 const observedFilterState = computed(() => selectionState.value);
 const galleryNavigationSearchParams = computed(() => {
@@ -413,15 +480,67 @@ const galleryRequestSignature = computed(
 watch(
   observedFilterState,
   () => {
-    debouncedUpdateRoute();
+    const nextFilterState = sanitizeGalleryFilterStateForPool(
+      readFilterState(),
+      workspace.activePool,
+    );
+    if (sameCardFilterState(nextFilterState, observedFilterStateSnapshot)) {
+      return;
+    }
+    cancelDebouncedUpdateRoute();
+    if (capturePendingFilterRoute()) {
+      debouncedUpdateRoute();
+    }
   },
   { deep: true },
+);
+
+watch(
+  [filtersLoaded, filtersError],
+  () => {
+    const pendingState = pendingFilterRouteState.value;
+    if (
+      pendingState
+      && pendingFilterRouteDebounceElapsed
+      && isFilterStateReadyForCatalogStatus(pendingState)
+    ) {
+      applyPendingFilterRoute(pendingState);
+    }
+  },
+  { flush: 'sync' },
+);
+
+watch(
+  () => route.fullPath,
+  (fullPath) => {
+    const pendingState = pendingFilterRouteState.value;
+    if (!pendingState) {
+      return;
+    }
+    const pendingFullPath = router.resolve({
+      path: '/cards',
+      query: buildCardFilterRouteQuery(pendingState),
+    }).fullPath;
+    if (fullPath === pendingFullPath) {
+      return;
+    }
+    cancelDebouncedUpdateRoute();
+    pendingFilterRouteState.value = null;
+    pendingFilterRouteDebounceElapsed = false;
+  },
+  { flush: 'sync' },
 );
 
 watch(
   () => workspace.generation,
   () => {
     cancelDebouncedUpdateRoute();
+    pendingFilterRouteState.value = null;
+    pendingFilterRouteDebounceElapsed = false;
+    observedFilterStateSnapshot = sanitizeGalleryFilterStateForPool(
+      readFilterState(),
+      workspace.activePool,
+    );
     invalidateTtsCardExport();
     clearGalleryNavigationState();
   },
@@ -451,21 +570,34 @@ watch(
 );
 
 watch(
-  [galleryRequestSignature, cardCollectionFiltersReady, () => route.fullPath],
-  async ([searchParams, ready]) => {
-    if (!ready) {
+  [
+    galleryRequestSignature,
+    cardCollectionFiltersReady,
+    () => route.fullPath,
+    filterRouteUpdatePending,
+  ],
+  async ([searchParams, ready, , routeUpdatePending]) => {
+    const routeState = currentRouteFilterState.value;
+    if (
+      (ready || filtersError.value !== null)
+      && !routeUpdatePending
+      && !sameCardFilterState(readFilterState(), routeState)
+    ) {
+      applyRouteFilterState(routeState);
+      observedFilterStateSnapshot = sanitizeGalleryFilterStateForPool(
+        readFilterState(),
+        workspace.activePool,
+      );
+    }
+
+    if (!ready || routeUpdatePending) {
       return;
     }
 
     collection.invalidatePendingLoads();
-    const routeState = currentRouteFilterState.value;
     if (route.fullPath !== canonicalRouteFullPath.value) {
       await router.replace({ path: '/cards', query: canonicalRouteQuery.value });
       return;
-    }
-
-    if (!sameCardFilterState(readFilterState(), routeState)) {
-      applyRouteFilterState(routeState);
     }
 
     const snapshot = getGallerySnapshot<GalleryItem>(searchParams);
@@ -492,15 +624,22 @@ watch(
 );
 
 const resetFilters = (): void => {
+  cancelDebouncedUpdateRoute();
+  pendingFilterRouteState.value = null;
+  pendingFilterRouteDebounceElapsed = false;
   const defaults = sanitizeGalleryFilterStateForPool(
     createEmptyCardFilterState(workspace.activePool),
     workspace.activePool,
   );
   applyRouteFilterState(defaults);
+  observedFilterStateSnapshot = defaults;
   void router.replace({ path: '/cards', query: buildCardFilterRouteQuery(defaults) });
 };
 
 const retryFilterLoad = (): void => {
+  cancelDebouncedUpdateRoute();
+  capturePendingFilterRoute();
+  flushPendingFilterRoute();
   void loadFilters().catch(() => undefined);
 };
 
