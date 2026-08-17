@@ -8,7 +8,10 @@ from .service import (
     ClassificationRuleUpdateConflictError,
     classification_rule_payload,
 )
-from .defaults import ensure_default_mana_family_classification_rules
+from .defaults import (
+    ensure_default_mana_family_classification_rules,
+    reconcile_mana_family_rules_for_symbol_rename,
+)
 
 __all__ = [
     "CLASSIFICATION_RULE_SNAPSHOT_SCHEMA_VERSION",
@@ -20,4 +23,5 @@ __all__ = [
     "ClassificationRuleUpdateConflictError",
     "classification_rule_payload",
     "ensure_default_mana_family_classification_rules",
+    "reconcile_mana_family_rules_for_symbol_rename",
 ]
