@@ -570,6 +570,46 @@ def test_unknown_evil_faction_prefers_existing_no_faction_namespace() -> None:
     assert repeated_item.warnings_json[0]["details"] == {
         "reason": "existing_unresolved_card",
         "checksum_candidate_count": 0,
+        "name_candidate_count": 1,
+    }
+
+
+@pytest.mark.django_db
+def test_unknown_evil_faction_checksum_reuse_reports_factioned_candidates() -> None:
+    template = Template.objects.create(
+        key="existing-unknown-checksum-import",
+        label="Existing Unknown Checksum",
+    )
+    unresolved_version, _unresolved_item = _import_card(
+        template=template,
+        source_name="existing-unknown-checksum-first.webp",
+        checksum="existing-unknown-shared-art",
+        name="Existing Unknown Checksum Card",
+    )
+    factioned_card, _created = create_card_identity(
+        name="Factioned Checksum Candidate",
+        card_pool="evil",
+        card_factions=("blood",),
+    )
+    CardVersion.objects.create(
+        card=factioned_card,
+        template=template,
+        image_hash="existing-unknown-shared-art",
+        name=factioned_card.label,
+    )
+
+    repeated_version, repeated_item = _import_card(
+        template=template,
+        source_name="existing-unknown-checksum-second.webp",
+        checksum="existing-unknown-shared-art",
+        name="Existing Unknown Checksum Card",
+    )
+
+    assert repeated_version.card_id == unresolved_version.card_id
+    assert repeated_version.card_id != factioned_card.id
+    assert repeated_item.warnings_json[0]["details"] == {
+        "reason": "existing_unresolved_card",
+        "checksum_candidate_count": 1,
         "name_candidate_count": 0,
     }
 
