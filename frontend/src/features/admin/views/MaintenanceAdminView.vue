@@ -128,8 +128,28 @@
                 >
               </label>
 
+              <label class="field-label">
+                Card pool
+                <select
+                  v-model="reparseCardPool"
+                  class="input-base"
+                >
+                  <option value="">
+                    All pools
+                  </option>
+                  <option
+                    v-for="option in filterSectionsState.cardPoolOptions"
+                    :key="option.key"
+                    :value="option.key"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+
               <CardFilterSections
                 :state="filterSectionsState"
+                :show-card-pool="false"
                 :default-open-sections="[]"
               />
             </div>
@@ -177,6 +197,7 @@ import {
   buildCardFilterApiSearchParams,
 } from '@/domain/cards/utils/filters/cardFilterRequest';
 import { useCardFilterController } from '@/domain/cards/composables/filters/useCardFilterController';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 const runningBackfillSuggestions = ref(false);
 const runningQueueReparse = ref(false);
@@ -185,6 +206,7 @@ const runningPreviewCount = ref(false);
 const runningQueueFilteredReparse = ref(false);
 const filteredMatchCount = ref<number | null>(null);
 const filtersExpanded = ref(false);
+const reparseCardPool = ref<CardPool | ''>('');
 const {
   filtersLoaded,
   filterSectionsState,
@@ -200,15 +222,22 @@ const filterQuery = computed({
     query.value = value;
   },
 });
+const reparseFilterRequest = computed(() => ({
+  cardPool: reparseCardPool.value || null,
+}));
 
 const hasActiveReparseFilters = computed(
-  () => buildCardFilterApiSearchParams(selectionState.value).toString().length > 0,
+  () =>
+    buildCardFilterApiSearchParams(
+      selectionState.value,
+      reparseFilterRequest.value,
+    ).toString().length > 0,
 );
 const reparseFilterSignature = computed(() =>
-  buildCardFilterApiSearchParams(selectionState.value).toString(),
+  buildCardFilterApiSearchParams(selectionState.value, reparseFilterRequest.value).toString(),
 );
 const activeFilterCount = computed(() => {
-  const payload = buildCardFilterApiPayload(selectionState.value);
+  const payload = buildCardFilterApiPayload(selectionState.value, reparseFilterRequest.value);
   return Object.keys(payload).filter((key) => !key.endsWith('_match')).length;
 });
 const activeFilterSummary = computed(() => {
@@ -235,7 +264,10 @@ const previewFilteredReparseCount = async (): Promise<void> => {
   if (runningPreviewCount.value || !hasActiveReparseFilters.value) return;
   runningPreviewCount.value = true;
   try {
-    const params = buildCardFilterApiSearchParams(selectionState.value);
+    const params = buildCardFilterApiSearchParams(
+      selectionState.value,
+      reparseFilterRequest.value,
+    );
     params.set('page', '1');
     params.set('page_size', '1');
     const response = await fetchCards<never>(params);
@@ -257,7 +289,9 @@ const queueFilteredReparse = async (): Promise<void> => {
   if (runningQueueFilteredReparse.value || !hasActiveReparseFilters.value) return;
   runningQueueFilteredReparse.value = true;
   try {
-    const response = await requestFilteredLatestReparse(buildCardFilterApiPayload(selectionState.value));
+    const response = await requestFilteredLatestReparse(
+      buildCardFilterApiPayload(selectionState.value, reparseFilterRequest.value),
+    );
     toast.success(response.message);
   } catch (error) {
     console.error('Queue filtered latest reparse failed', error);
@@ -269,6 +303,7 @@ const queueFilteredReparse = async (): Promise<void> => {
 
 const resetFilteredReparse = (): void => {
   resetFilters();
+  reparseCardPool.value = '';
   filteredMatchCount.value = null;
 };
 

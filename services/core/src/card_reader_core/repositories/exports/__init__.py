@@ -10,6 +10,7 @@ from card_reader_core.models import (
     CardPool,
     CardRoleFilter,
     Symbol,
+    card_faction_keys,
 )
 from card_reader_core.repositories.cards import CARD_SORT_DEFAULT
 from card_reader_core.rules import render_enriched_rule_text
@@ -83,6 +84,9 @@ def export_cards_csv(
             "symbols",
             "keywords",
             "confidence",
+            "card_id",
+            "card_pool",
+            "card_factions",
         ],
     )
     writer.writeheader()
@@ -143,8 +147,11 @@ def export_cards_csv(
             ]
             writer.writerow(
                 {
+                    "card_id": row.version.card.id,
                     "card_key": _sanitize_csv_text(row.version.card.key),
                     "name": _sanitize_csv_text(row.version.name),
+                    "card_pool": row.version.card.card_pool,
+                    "card_factions": _join_labels(list(card_faction_keys(row.version.card))),
                     "mana_cost": _sanitize_csv_text(row.version.mana_cost),
                     "mana_symbols": _replace_symbol_keys(_join_labels(mana_symbols)),
                     "attack": row.version.attack,
