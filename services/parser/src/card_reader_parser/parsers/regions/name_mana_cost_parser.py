@@ -158,6 +158,11 @@ class NameManaCostParser:
                     and not has_variable_x
                     and mana_badge_result.mana_total
                     == trailing_integer_candidate.value
+                    and self._primary_ocr_contains_badge_token(
+                        filtered_lines,
+                        token=trailing_integer_candidate.token,
+                        bounds=mana_badge_result.bounds,
+                    )
                 )
                 if has_variable_x:
                     mana_symbol_keys.append("x")

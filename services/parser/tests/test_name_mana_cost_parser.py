@@ -161,8 +161,13 @@ def test_evil_name_mana_cost_parser_uses_trailing_ocr_integer(
     expected_name: str,
     expected_cost: str,
 ) -> None:
-    result = _parse(
+    trailing_token = text.rsplit(maxsplit=1)[-1]
+    result, _ocr_runner = _parse_with_runner(
         text=[text, expected_cost],
+        line_rows=[
+            {"text": expected_name, "confidence": 0.9, "x": 70, "y": 20},
+            {"text": trailing_token, "confidence": 0.9, "x": 190, "y": 20},
+        ],
         detections=[_detection("occult-mana", x=120)],
         card_pool=EVIL_CARD_POOL,
         expected_detector_calls=0,
@@ -232,6 +237,30 @@ def test_evil_name_mana_cost_parser_preserves_title_digits_when_badge_differs() 
     assert result.normalized_fields["name"] == "Project 13"
     assert result.normalized_fields["mana_cost"] == "4"
     assert result.normalized_fields["mana_total"] == "4"
+    assert result.debug["trailing_ocr_integer_confirmed"] is False
+
+
+def test_evil_name_mana_cost_parser_preserves_matching_numeric_title_suffix() -> None:
+    result, _ocr_runner = _parse_with_runner(
+        text=["Project 5", "5"],
+        line_rows=[
+            {
+                "text": "Project 5",
+                "confidence": 0.9,
+                "x": 70,
+                "y": 20,
+                "box": [(20, 10), (195, 10), (195, 30), (20, 30)],
+            },
+        ],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
+    )
+
+    assert result.normalized_fields["name"] == "Project 5"
+    assert result.normalized_fields["mana_cost"] == "5"
+    assert result.normalized_fields["mana_total"] == "5"
     assert result.debug["trailing_ocr_integer_confirmed"] is False
 
 
