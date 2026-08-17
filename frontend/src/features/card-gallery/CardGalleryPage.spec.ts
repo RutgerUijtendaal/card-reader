@@ -635,6 +635,33 @@ describe('CardGalleryPage pool-aware filters', () => {
     mounted.unmount();
   });
 
+  test('cancels pending fallback edits when same-page navigation changes the route', async () => {
+    const mounted = await mountGallery(
+      '/cards',
+      'player',
+      () => Promise.resolve({ data: { ...emptyCardsPage, count: 7 } }),
+      () => Promise.reject(new Error('facet failure')),
+    );
+    const searchInput = mounted.container.querySelector<HTMLInputElement>(
+      'input[placeholder="Search by name, type, rules, or cost..."]',
+    );
+    if (!searchInput) {
+      throw new Error('expected Gallery search input');
+    }
+
+    searchInput.value = 'pending';
+    searchInput.dispatchEvent(new Event('input'));
+    await flushPromises();
+    await mounted.router.push('/cards?tag_keys=dragon');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?tag_keys=dragon');
+    expect(mounted.requestRoutes).toEqual(['/cards']);
+    expect(mounted.container.textContent).not.toContain('7 results');
+
+    mounted.unmount();
+  });
+
   test('reconciles metadata when switching between pool catalogs', async () => {
     const poolFilters: Record<'player' | 'evil' | 'neutral', CardFiltersResponse> = {
       player: {

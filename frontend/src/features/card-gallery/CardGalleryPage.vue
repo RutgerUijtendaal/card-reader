@@ -511,6 +511,27 @@ watch(
 );
 
 watch(
+  () => route.fullPath,
+  (fullPath) => {
+    const pendingState = pendingFilterRouteState.value;
+    if (!pendingState) {
+      return;
+    }
+    const pendingFullPath = router.resolve({
+      path: '/cards',
+      query: buildCardFilterRouteQuery(pendingState),
+    }).fullPath;
+    if (fullPath === pendingFullPath) {
+      return;
+    }
+    cancelDebouncedUpdateRoute();
+    pendingFilterRouteState.value = null;
+    pendingFilterRouteDebounceElapsed = false;
+  },
+  { flush: 'sync' },
+);
+
+watch(
   () => workspace.generation,
   () => {
     cancelDebouncedUpdateRoute();
