@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="3000" height="1900" viewBox="0 0 3000 1900" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="3100" height="1900" viewBox="0 0 3100 1900" role="img" aria-labelledby="title desc">
   <title id="title">Card Reader card database relationships</title>
   <desc id="desc">Orthogonal database diagram with import lineage across the top and separate bands for card consumers, stable card identity, version and review lineage, and version metadata. Relationship lines use open routing lanes around entity boxes and separate attachment segments at every destination.</desc>
   <defs>
@@ -9,6 +9,7 @@
       .bg { fill: #f8fafc; }
       .band { fill: #ffffff; stroke: #cbd5e1; stroke-width: 3; rx: 24; }
       .band-title { font: 700 25px Inter, Arial, sans-serif; fill: #0f172a; }
+      .band-title-tight { font: 700 22px Inter, Arial, sans-serif; fill: #0f172a; }
       .box { stroke-width: 3; rx: 17; }
       .card { fill: #dbeafe; stroke: #2563eb; }
       .left { fill: #fef9c3; stroke: #a16207; }
@@ -37,19 +38,19 @@
     </style>
   </defs>
 
-  <rect class="bg" width="3000" height="1900"/>
+  <rect class="bg" width="3100" height="1900"/>
   <text x="70" y="75" style="font: 700 42px Inter, Arial, sans-serif; fill: #0f172a;">Card Reader: card model relationships</text>
   <text x="70" y="112" style="font: 18px Inter, Arial, sans-serif; fill: #475569;">Orthogonal routing keeps every relationship outside entity boxes. Shared travel trunks split into dedicated attachment segments before reaching a model.</text>
 
-  <rect class="band" x="50" y="135" width="2900" height="315"/>
+  <rect class="band" x="50" y="135" width="3000" height="315"/>
   <text class="band-title" x="80" y="177">Import lineage / parser output / external actors</text>
   <rect class="band" x="50" y="480" width="720" height="1370"/>
   <text class="band-title" x="80" y="525">Built from cards</text>
   <rect class="band" x="800" y="480" width="540" height="1370"/>
   <text class="band-title" x="830" y="525">Stable identity</text>
   <rect class="band" x="1370" y="480" width="660" height="1370"/>
-  <text class="band-title" x="1400" y="525">Version and review lineage</text>
-  <rect class="band" x="2060" y="480" width="890" height="1370"/>
+  <text class="band-title-tight" x="1450" y="525">Version and review lineage</text>
+  <rect class="band" x="2060" y="480" width="990" height="1370"/>
   <text class="band-title" x="2090" y="525">Version metadata</text>
 
   <!-- Top band entities -->
@@ -125,8 +126,8 @@
   <text class="title" x="580" y="1437">DeckTag</text>
   <text class="field" x="580" y="1466">kind • key • label</text>
   <rect class="box left" x="100" y="1580" width="250" height="90"/>
-  <text class="title-small" x="225" y="1617">DeckTagSuggestionDeck</text>
-  <text class="field" x="225" y="1646">suggestion + deck • active</text>
+  <text class="title-tight" x="225" y="1607"><tspan x="225">DeckTagSuggestion</tspan><tspan x="225" dy="17">Deck</tspan></text>
+  <text class="small" x="225" y="1652">suggestion + deck • active</text>
   <rect class="box left" x="450" y="1580" width="260" height="90"/>
   <text class="title-small" x="580" y="1617">DeckTagSuggestion</text>
   <text class="field" x="580" y="1646">value/status/target/retries</text>
@@ -144,15 +145,15 @@
   <text class="field" x="1070" y="929">mana_family_sort_key</text>
   <text class="small" x="1070" y="954">lifecycle + deck config • latest_version</text>
   <rect class="box card" x="850" y="1050" width="125" height="110"/>
-  <text class="model-name" x="913" y="1084">CardRoleAssignment</text>
+  <text class="model-name" x="913" y="1078"><tspan x="913">CardRole</tspan><tspan x="913" dy="13">Assignment</tspan></text>
   <text class="small" x="913" y="1122">role key</text>
   <text class="small" x="913" y="1148">none = Normal</text>
   <rect class="box card" x="990" y="1050" width="145" height="110"/>
-  <text class="model-name" x="1063" y="1084">CardFactionAssignment</text>
+  <text class="model-name" x="1063" y="1078"><tspan x="1063">CardFaction</tspan><tspan x="1063" dy="13">Assignment</tspan></text>
   <text class="small" x="1063" y="1122">faction key</text>
   <text class="small" x="1063" y="1148">identity input</text>
   <rect class="box card" x="1150" y="1050" width="140" height="110"/>
-  <text class="model-name-small" x="1220" y="1084">CardManaFamilyAssignment</text>
+  <text class="model-name-small" x="1220" y="1078"><tspan x="1220">CardManaFamily</tspan><tspan x="1220" dy="13">Assignment</tspan></text>
   <text class="small" x="1220" y="1122">family key</text>
   <text class="small" x="1220" y="1148">none = Colorless</text>
   <rect class="box tts" x="850" y="1290" width="440" height="110"/>
@@ -345,9 +346,10 @@
   <text class="label" x="2240" y="1610">rule tag source</text>
 
   <!-- Accepted suggestion values approach their targets on separate final ports -->
-  <path class="thin" d="M2900 1350 L2910 1350 L2910 680 L2900 680"/>
-  <path class="thin" d="M2900 1390 L2915 1390 L2915 1220 L2900 1220"/>
-  <text class="label" x="2710" y="1460">accepted type / tag</text>
+  <path class="thin" d="M2900 1350 L3000 1350 L3000 565 L2780 565 L2780 610"/>
+  <text class="label" x="2810" y="555">accepted type</text>
+  <path class="thin" d="M2900 1390 L2980 1390 L2980 1120 L2780 1120 L2780 1150"/>
+  <text class="label" x="2795" y="1110">accepted tag</text>
 
   <text class="lane-note" x="60" y="1880">Relationship geometry: orthogonal lanes only • no entity-box crossings • dedicated destination attachment segments</text>
 </svg>
