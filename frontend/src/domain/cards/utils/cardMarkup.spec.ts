@@ -119,4 +119,26 @@ describe('card markup', () => {
 
     expect(html).toContain('data-card-reference-id="card-1"');
   });
+
+  it('does not match inline-code delimiters across CommonMark blocks', () => {
+    const source = '`note\n\n[[card:card-1|Hero]]`';
+    const activeTrigger = '`note\n\n[[card:hero`';
+    const html = renderCardMarkupHtml(source);
+
+    expect(html).toContain('data-card-reference-id="card-1"');
+    expect(findCardMarkupTrigger(activeTrigger, activeTrigger.length - 1)).toMatchObject({
+      kind: 'card',
+      query: 'hero',
+    });
+  });
+
+  it('keeps escaped references literal and suppresses their autocomplete', () => {
+    const source = '\\[[card:card-1|Hero]] \\[[symbol:fire]]';
+    const html = renderCardMarkupHtml(source);
+
+    expect(html).not.toContain('data-card-reference-id');
+    expect(html).toContain('[[card:card-1|Hero]]');
+    expect(html).toContain('[[symbol:fire]]');
+    expect(findCardMarkupTrigger('\\[[card:hero', 13)).toBeNull();
+  });
 });

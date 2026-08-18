@@ -13,6 +13,16 @@ export type CardMarkupTrigger = {
   query: string;
 };
 
+type CardReferenceMeta = { kind: 'card'; id: string; label: string };
+type SymbolReferenceMeta = { kind: 'symbol'; key: string };
+type ReferenceMeta = CardReferenceMeta | SymbolReferenceMeta;
+type MarkupToken = {
+  type: string;
+  content: string;
+  meta: unknown;
+  children: MarkupToken[] | null;
+};
+
 export const buildCardReference = (cardId: string, displayLabel: string): string => {
   const escapedLabel = displayLabel
     .replace(/\\/g, '\\\\')
@@ -35,6 +45,7 @@ export const findCardMarkupTrigger = (value: string, caret: number): CardMarkupT
     start < 0 ||
     beforeCaret.slice(start).includes(']]') ||
     completedAfterCaret ||
+    isEscapedAt(value, start) ||
     isInsideCode(value, start)
   ) {
     return null;
@@ -57,17 +68,7 @@ export const renderCardMarkupHtml = (
   symbols: readonly SymbolFilterOption[] = [],
 ): string => {
   const symbolByKey = new Map(symbols.map((symbol) => [symbol.key, symbol]));
-  const markdown = new MarkdownIt('commonmark', {
-    html: false,
-    breaks: true,
-    linkify: false,
-    typographer: false,
-  });
-  const { markup: protectedMarkup, references } = protectReferences(
-    markup,
-    symbolByKey,
-    codeBlockLines(markdown, markup),
-  );
+  const markdown = createMarkupParser(symbolByKey);
   markdown.disable('image');
   markdown.validateLink = (url) => /^(?:https?:|mailto:|\/|#)/i.test(url);
   const defaultLinkOpen = markdown.renderer.rules.link_open;
@@ -82,15 +83,7 @@ export const renderCardMarkupHtml = (
       ? defaultLinkOpen(tokens, index, options, environment, renderer)
       : renderer.renderToken(tokens, index, options);
   };
-  let html = markdown.render(protectedMarkup);
-  if (references.size > 0) {
-    const placeholders = new RegExp(
-      [...references.keys()].map(escapeRegExp).join('|'),
-      'g',
-    );
-    html = html.replace(placeholders, (placeholder) => references.get(placeholder) ?? placeholder);
-  }
-  return DOMPurify.sanitize(html, {
+  return DOMPurify.sanitize(markdown.render(markup), {
     ALLOWED_TAGS: [
       'a',
       'blockquote',
@@ -115,143 +108,94 @@ export const renderCardMarkupHtml = (
   });
 };
 
-const protectReferences = (
-  markup: string,
-  symbolByKey: ReadonlyMap<string, SymbolFilterOption>,
-  protectedLines: ReadonlySet<number>,
-): { markup: string; references: Map<string, string> } => {
-  const output: string[] = [];
-  const references = new Map<string, string>();
-  const placeholderPrefix = unusedPlaceholderPrefix(markup);
-  let position = 0;
-  let lineIndex = 0;
-  let inlineTicks = 0;
-  let atLineStart = true;
-  while (position < markup.length) {
-    if (atLineStart && protectedLines.has(lineIndex)) {
-      const newline = markup.indexOf('\n', position);
-      const lineEnd = newline < 0 ? markup.length : newline + 1;
-      output.push(markup.slice(position, lineEnd));
-      position = lineEnd;
-      lineIndex += 1;
-      inlineTicks = 0;
-      atLineStart = true;
-      continue;
-    }
-    const remaining = markup.slice(position);
-    if (markup[position] === '`') {
-      const ticks = remaining.match(/^`+/)?.[0] ?? '`';
-      if (
-        inlineTicks === 0 &&
-        hasMatchingBacktickRun(markup, position + ticks.length, ticks.length)
-      ) {
-        inlineTicks = ticks.length;
-      } else if (ticks.length === inlineTicks) {
-        inlineTicks = 0;
-      }
-      output.push(ticks);
-      position += ticks.length;
-      atLineStart = false;
-      continue;
-    }
-    if (inlineTicks === 0) {
-      const cardMatch = remaining.match(cardReferencePattern);
-      const symbolMatch = remaining.match(symbolReferencePattern);
-      const match = cardMatch ?? symbolMatch;
-      if (match) {
-        const placeholder = `${placeholderPrefix}${references.size}X`;
-        if (cardMatch) {
-          const id = cardMatch[1] ?? '';
-          const label = (cardMatch[2] ?? '').replace(escapedCardCharacterPattern, '$1');
-          references.set(
-            placeholder,
-            `<a class="card-markup-reference" data-card-reference-id="${escapeHtml(id)}" href="/cards/${encodeURIComponent(id)}">${escapeHtml(label)}</a>`,
-          );
-        } else {
-          const key = symbolMatch?.[1] ?? '';
-          const symbol = symbolByKey.get(key);
-          references.set(
-            placeholder,
-            `<span class="card-markup-symbol" title="${escapeHtml(symbol?.label ?? key)}">${escapeHtml(symbol?.text_token || key)}</span>`,
-          );
-        }
-        output.push(placeholder);
-        position += match[0].length;
-        atLineStart = false;
-        continue;
-      }
-    }
-    const character = markup[position] ?? '';
-    output.push(character);
-    position += 1;
-    atLineStart = character === '\n';
-    if (atLineStart) lineIndex += 1;
-  }
-  return { markup: output.join(''), references };
+export const extractSymbolReferenceKeys = (markup: string): string[] => {
+  const tokens = createMarkupParser(new Map()).parse(markup, {});
+  const keys: string[] = [];
+  visitTokens(tokens, (token) => {
+    const meta = token.meta as ReferenceMeta | null;
+    if (token.type === 'symbol_reference' && meta?.kind === 'symbol') keys.push(meta.key);
+  });
+  return keys;
 };
 
 const isInsideCode = (value: string, position: number): boolean => {
-  const before = value.slice(0, position);
-  const lineIndex = (before.match(/\n/g) ?? []).length;
+  const marker = unusedMarker(value, 'CARDREADERCARETPOSITION');
+  const markedValue = `${value.slice(0, position)}${marker}${value.slice(position)}`;
   const markdown = new MarkdownIt('commonmark', { html: false });
-  if (codeBlockLines(markdown, value).has(lineIndex)) return true;
-  return codeSpanContainsPosition(value, position);
-};
-
-const codeSpanContainsPosition = (value: string, position: number): boolean => {
-  let cursor = 0;
-  while (cursor < position) {
-    const opening = value.indexOf('`', cursor);
-    if (opening < 0 || opening >= position) return false;
-    const length = backtickRunLength(value, opening);
-    const closing = matchingBacktickRun(value, opening + length, length);
-    if (closing < 0) {
-      cursor = opening + length;
-      continue;
+  let inside = false;
+  visitTokens(markdown.parse(markedValue, {}), (token) => {
+    if (['code_inline', 'code_block', 'fence'].includes(token.type) && token.content.includes(marker)) {
+      inside = true;
     }
-    if (position > opening && position < closing + length) return true;
-    cursor = closing + length;
+  });
+  return inside;
+};
+
+const createMarkupParser = (
+  symbolByKey: ReadonlyMap<string, SymbolFilterOption>,
+): InstanceType<typeof MarkdownIt> => {
+  const markdown = new MarkdownIt('commonmark', {
+    html: false,
+    breaks: true,
+    linkify: false,
+    typographer: false,
+  });
+  markdown.inline.ruler.before('text', 'card_reader_reference', (state, silent) => {
+    const remaining = state.src.slice(state.pos);
+    const cardMatch = remaining.match(cardReferencePattern);
+    const symbolMatch = remaining.match(symbolReferencePattern);
+    const match = cardMatch ?? symbolMatch;
+    if (!match) return false;
+    if (!silent) {
+      if (cardMatch) {
+        const token = state.push('card_reference', '', 0);
+        token.meta = {
+          kind: 'card',
+          id: cardMatch[1] ?? '',
+          label: (cardMatch[2] ?? '').replace(escapedCardCharacterPattern, '$1'),
+        } satisfies CardReferenceMeta;
+      } else {
+        const token = state.push('symbol_reference', '', 0);
+        token.meta = { kind: 'symbol', key: symbolMatch?.[1] ?? '' } satisfies SymbolReferenceMeta;
+      }
+    }
+    state.pos += match[0].length;
+    return true;
+  });
+  markdown.renderer.rules.card_reference = (tokens, index) => {
+    const meta = tokens[index]?.meta as ReferenceMeta | null;
+    if (meta?.kind !== 'card') return '';
+    return `<a class="card-markup-reference" data-card-reference-id="${escapeHtml(meta.id)}" href="/cards/${encodeURIComponent(meta.id)}">${escapeHtml(meta.label)}</a>`;
+  };
+  markdown.renderer.rules.symbol_reference = (tokens, index) => {
+    const meta = tokens[index]?.meta as ReferenceMeta | null;
+    if (meta?.kind !== 'symbol') return '';
+    const symbol = symbolByKey.get(meta.key);
+    return `<span class="card-markup-symbol" title="${escapeHtml(symbol?.label ?? meta.key)}">${escapeHtml(symbol?.text_token || meta.key)}</span>`;
+  };
+  return markdown;
+};
+
+const visitTokens = (
+  tokens: readonly MarkupToken[],
+  visitor: (token: MarkupToken) => void,
+): void => {
+  for (const token of tokens) {
+    visitor(token);
+    if (token.children) visitTokens(token.children, visitor);
   }
-  return false;
 };
 
-const hasMatchingBacktickRun = (value: string, start: number, length: number): boolean =>
-  matchingBacktickRun(value, start, length) >= 0;
-
-const matchingBacktickRun = (value: string, start: number, length: number): number => {
-  let cursor = start;
-  while (cursor < value.length) {
-    const candidate = value.indexOf('`', cursor);
-    if (candidate < 0) return -1;
-    const candidateLength = backtickRunLength(value, candidate);
-    if (candidateLength === length) return candidate;
-    cursor = candidate + candidateLength;
-  }
-  return -1;
+const isEscapedAt = (value: string, position: number): boolean => {
+  let backslashes = 0;
+  for (let index = position - 1; index >= 0 && value[index] === '\\'; index -= 1) backslashes += 1;
+  return backslashes % 2 === 1;
 };
 
-const backtickRunLength = (value: string, start: number): number => {
-  let end = start;
-  while (value[end] === '`') end += 1;
-  return end - start;
-};
-
-const codeBlockLines = (
-  markdown: InstanceType<typeof MarkdownIt>,
-  markup: string,
-): Set<number> => {
-  const lines = new Set<number>();
-  for (const token of markdown.parse(markup, {})) {
-    if (!['code_block', 'fence'].includes(token.type) || !token.map) continue;
-    for (let line = token.map[0]; line < token.map[1]; line += 1) lines.add(line);
-  }
-  return lines;
-};
-
-const unusedPlaceholderPrefix = (markup: string): string => {
-  let prefix = 'CARDREADERREFERENCETOKEN';
-  while (markup.includes(prefix)) prefix += 'X';
-  return prefix;
+const unusedMarker = (value: string, base: string): string => {
+  let marker = base;
+  while (value.includes(marker)) marker += 'X';
+  return marker;
 };
 
 const escapeHtml = (value: string): string =>
@@ -261,5 +205,3 @@ const escapeHtml = (value: string): string =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-
-const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

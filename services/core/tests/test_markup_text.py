@@ -23,6 +23,18 @@ def test_render_markup_plain_resolves_references_after_unmatched_backticks() -> 
     assert render_markup_plain("`note [[card:card-1|Hero]]") == "`note Hero"
 
 
+def test_render_markup_plain_does_not_match_backticks_across_blocks() -> None:
+    assert render_markup_plain("`note\n\n[[card:card-1|Hero]]`") == "`note\n\nHero`"
+
+
+def test_render_markup_plain_keeps_escaped_references_literal() -> None:
+    markup = r"\[[card:card-1|Hero]] \[[symbol:fire]]"
+
+    assert render_markup_plain(markup, symbol_tokens_by_key={"fire": "{F}"}) == (
+        "[[card:card-1|Hero]] [[symbol:fire]]"
+    )
+
+
 def test_render_markup_plain_avoids_authored_placeholder_collisions() -> None:
     markup = "CARDREADERREFERENCETOKEN0X [[card:card-1|Hero]]"
 
@@ -88,3 +100,11 @@ def test_symbol_key_refresh_ignores_inline_and_fenced_code() -> None:
         old_symbol_key="old",
         new_symbol_key="new",
     ) == "[[symbol:new]] `[[symbol:old]]`\n```\n[[symbol:old]]\n```\n    [[symbol:old]]"
+
+
+def test_symbol_key_refresh_ignores_escaped_placeholders() -> None:
+    assert replace_symbol_placeholder_key(
+        r"\[[symbol:old]] [[symbol:old]]",
+        old_symbol_key="old",
+        new_symbol_key="new",
+    ) == r"\[[symbol:old]] [[symbol:new]]"

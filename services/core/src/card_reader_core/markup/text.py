@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
 from markdown_it import MarkdownIt
+from markdown_it.rules_inline import StateInline
 
 
 SYMBOL_PLACEHOLDER_PATTERN = re.compile(r"\[\[symbol:([a-z0-9-]+)\]\]")
@@ -12,6 +12,8 @@ CARD_REFERENCE_PATTERN = re.compile(
     r"\[\[card:([^|\]\\\s]+)\|((?:\\.|[^\]\\])+)\]\]"
 )
 _ESCAPED_CARD_CHARACTER_PATTERN = re.compile(r"\\([\\|\]])")
+
+
 def build_symbol_placeholder(symbol_key: str) -> str:
     return f"[[symbol:{symbol_key.strip().lower()}]]"
 
@@ -34,7 +36,11 @@ def replace_symbol_placeholder_key(
 ) -> str:
     old_placeholder = build_symbol_placeholder(old_symbol_key)
     new_placeholder = build_symbol_placeholder(new_symbol_key)
-    return _transform_markup_text(markup, lambda value: value.replace(old_placeholder, new_placeholder))
+    return _transform_markup_text(
+        markup,
+        old_placeholder=old_placeholder,
+        transform=lambda _value: new_placeholder,
+    )
 
 
 def render_markup_plain(
@@ -44,18 +50,27 @@ def render_markup_plain(
     compact: bool = False,
 ) -> str:
     symbols = symbol_tokens_by_key or {}
-    protected_markup, reference_values = _protect_references(markup, symbols)
-    parser = MarkdownIt("commonmark", {"html": False, "breaks": True})
+    parser = _markup_parser()
     parser.disable("image")
     blocks: list[tuple[str, tuple[int, int] | None]] = []
-    for token in parser.parse(protected_markup):
+    for token in parser.parse(markup):
         if token.type == "inline":
             output: list[str] = []
             for child in token.children or []:
                 if child.type == "text":
-                    output.append(_restore_references(child.content, reference_values))
+                    output.append(child.content)
                 elif child.type == "code_inline":
                     output.append(child.content)
+                elif child.type == "card_reference":
+                    output.append(str(child.meta.get("label", "")))
+                elif child.type == "symbol_reference":
+                    key = str(child.meta.get("key", ""))
+                    symbol_token = symbols.get(key)
+                    output.append(
+                        symbol_token
+                        if symbol_token is not None and symbol_token.strip()
+                        else key
+                    )
                 elif child.type in {"softbreak", "hardbreak"}:
                     output.append("\n")
             source_map = (token.map[0], token.map[1]) if token.map is not None else None
@@ -92,129 +107,95 @@ def render_markup_plain(
     return "\n".join(normalized).strip()
 
 
-def _protect_references(
+def _markup_parser() -> MarkdownIt:
+    parser = MarkdownIt(
+        "commonmark",
+        {"html": False, "breaks": True, "linkify": False, "typographer": False},
+    )
+    parser.inline.ruler.before("text", "card_reader_reference", _reference_rule)
+    return parser
+
+
+def _reference_rule(state: StateInline, silent: bool) -> bool:
+    card_match = CARD_REFERENCE_PATTERN.match(state.src, state.pos)
+    symbol_match = SYMBOL_PLACEHOLDER_PATTERN.match(state.src, state.pos)
+    match = card_match or symbol_match
+    if match is None:
+        return False
+    if not silent:
+        if card_match is not None:
+            token = state.push("card_reference", "", 0)
+            token.meta = {
+                "id": card_match.group(1),
+                "label": _ESCAPED_CARD_CHARACTER_PATTERN.sub(r"\1", card_match.group(2)),
+                "source_start": state.pos,
+            }
+        else:
+            token = state.push("symbol_reference", "", 0)
+            token.meta = {
+                "key": symbol_match.group(1) if symbol_match else "",
+                "source_start": state.pos,
+            }
+    state.pos = match.end()
+    return True
+
+
+def _transform_markup_text(
     markup: str,
-    symbol_tokens_by_key: Mapping[str, str],
-) -> tuple[str, dict[str, str]]:
+    *,
+    old_placeholder: str,
+    transform: Callable[[str], str],
+) -> str:
     output: list[str] = []
-    values: dict[str, str] = {}
-    placeholder_prefix = _unused_placeholder_prefix(markup)
-    position = 0
-    protected_lines = _code_block_lines(markup)
-    line_index = 0
-    inline_ticks = 0
-    at_line_start = True
-    while position < len(markup):
-        if at_line_start and line_index in protected_lines:
-            newline = markup.find("\n", position)
-            line_end = len(markup) if newline < 0 else newline + 1
-            output.append(markup[position:line_end])
-            position = line_end
-            line_index += 1
-            inline_ticks = 0
-            at_line_start = True
-            continue
-        if markup[position] == "`":
-            tick_match = re.match(r"`+", markup[position:])
-            assert tick_match is not None
-            tick_count = len(tick_match.group(0))
-            if inline_ticks == 0 and _matching_backtick_run(
-                markup, position + tick_count, tick_count
-            ) >= 0:
-                inline_ticks = tick_count
-            elif tick_count == inline_ticks:
-                inline_ticks = 0
-            output.append(tick_match.group(0))
-            position += tick_count
-            at_line_start = False
-            continue
-        if inline_ticks == 0:
-            card_match = CARD_REFERENCE_PATTERN.match(markup, position)
-            symbol_match = SYMBOL_PLACEHOLDER_PATTERN.match(markup, position)
-            match = card_match or symbol_match
-            if match is not None:
-                placeholder = f"{placeholder_prefix}{len(values)}X"
-                if card_match is not None:
-                    value = _ESCAPED_CARD_CHARACTER_PATTERN.sub(r"\1", card_match.group(2))
-                else:
-                    key = match.group(1)
-                    token = symbol_tokens_by_key.get(key)
-                    value = token if token is not None and token.strip() else key
-                values[placeholder] = value
-                output.append(placeholder)
-                position = match.end()
-                at_line_start = False
-                continue
-        character = markup[position]
-        output.append(character)
-        position += 1
-        at_line_start = character == "\n"
-        if at_line_start:
-            line_index += 1
-    return "".join(output), values
+    cursor = 0
+    while True:
+        position = markup.find(old_placeholder, cursor)
+        if position < 0:
+            output.append(markup[cursor:])
+            return "".join(output)
+        output.append(markup[cursor:position])
+        if _position_is_symbol_reference(markup, position, old_placeholder):
+            output.append(transform(old_placeholder))
+        else:
+            output.append(old_placeholder)
+        cursor = position + len(old_placeholder)
 
 
-def _restore_references(value: str, references: Mapping[str, str]) -> str:
-    if not references:
-        return value
-    pattern = re.compile("|".join(re.escape(key) for key in references))
-    return pattern.sub(lambda match: references[match.group(0)], value)
-
-
-def _matching_backtick_run(value: str, start: int, length: int) -> int:
-    cursor = start
-    while cursor < len(value):
-        candidate = value.find("`", cursor)
-        if candidate < 0:
-            return -1
-        match = re.match(r"`+", value[candidate:])
-        assert match is not None
-        candidate_length = len(match.group(0))
-        if candidate_length == length:
-            return candidate
-        cursor = candidate + candidate_length
-    return -1
-
-
-def _unused_placeholder_prefix(markup: str) -> str:
-    prefix = "CARDREADERREFERENCETOKEN"
-    while prefix in markup:
-        prefix += "X"
-    return prefix
-
-
-def _transform_markup_text(markup: str, transform: Callable[[str], str]) -> str:
-    # Markdown-it does not retain source offsets for inline children. Protect code ranges with
-    # sentinels while applying this narrowly scoped token replacement.
-    protected: dict[str, str] = {}
-
-    def protect_value(value: str) -> str:
-        key = f"\x00card-reader-code-{len(protected)}\x00"
-        protected[key] = value
-        return key
-
-    code_lines = _code_block_lines(markup)
-    protected_markup = "".join(
-        protect_value(line) if index in code_lines else line
-        for index, line in enumerate(markup.splitlines(keepends=True))
+def _position_is_symbol_reference(
+    markup: str,
+    position: int,
+    placeholder: str,
+) -> bool:
+    marker = _unused_marker(markup, "CARDREADERCARETPOSITION")
+    marker_position = position
+    while marker_position > 0 and markup[marker_position - 1] == "\\":
+        marker_position -= 1
+    marked_markup = (
+        f"{markup[:marker_position]}{marker}{markup[marker_position:]}"
     )
-    protected_markup = re.sub(
-        r"(`+)(.*?)\1",
-        lambda match: protect_value(match.group(0)),
-        protected_markup,
-        flags=re.DOTALL,
-    )
-    transformed = transform(protected_markup)
-    for key, original in protected.items():
-        transformed = transformed.replace(key, original)
-    return transformed
-
-
-def _code_block_lines(markup: str) -> set[int]:
-    parser = MarkdownIt("commonmark", {"html": False})
-    lines: set[int] = set()
-    for token in parser.parse(markup):
-        if token.type not in {"code_block", "fence"} or token.map is None:
+    expected_key = SYMBOL_PLACEHOLDER_PATTERN.fullmatch(placeholder)
+    if expected_key is None:
+        return False
+    for token in _markup_parser().parse(marked_markup):
+        marker_offset = token.content.find(marker)
+        if token.type != "inline" or marker_offset < 0:
             continue
-        lines.update(range(token.map[0], token.map[1]))
-    return lines
+        expected_start = (
+            marker_offset + len(marker) + position - marker_position
+        )
+        children = token.children or []
+        for child in children:
+            if (
+                child.type == "symbol_reference"
+                and child.meta.get("key") == expected_key.group(1)
+                and child.meta.get("source_start") == expected_start
+            ):
+                return True
+    return False
+
+
+def _unused_marker(value: str, base: str) -> str:
+    marker = base
+    while marker in value:
+        marker += "X"
+    return marker
