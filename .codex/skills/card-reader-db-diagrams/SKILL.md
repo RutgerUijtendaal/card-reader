@@ -19,14 +19,15 @@ uv run --no-project python -c "import xml.etree.ElementTree as ET; ET.parse('doc
 
 ## Diagram Layout
 
-Use the established linear schematic:
+Use a banded linear schematic:
 
 - Top band: import/parser lineage and external auth/template context.
 - Left band: things built from `Card`, such as decks, sideboards, groups, aliases, and merge redirects.
 - Center band: `Card` as the stable identity.
-- Right band: what cards are made from, centered around `CardVersion`, images, parse results, parse flags, metadata link tables, and canonical metadata tables.
+- Right-center band: version and review lineage, centered around `CardVersion`, images, parse results, and parse flags.
+- Far-right band: metadata link tables and their aligned canonical metadata tables.
 
-Keep `Card` visually central. Decks and groups should point to `Card`, not to `CardVersion` metadata. Avoid adding a deck-to-version-metadata callout; explain that relationship in prose if needed.
+Keep `Card` visually central. Decks and groups should point to `Card`, not to `CardVersion` metadata. Avoid adding a deck-to-version-metadata callout; explain that relationship in prose if needed. Preserve these semantic groupings while they remain useful, but split, resize, or rename bands when a group can no longer provide clear routing space.
 
 ## Current Model Semantics
 
@@ -41,6 +42,12 @@ Keep `Card` visually central. Decks and groups should point to `Card`, not to `C
 
 ## SVG Style Rules
 
+- Use orthogonal connectors only: every relationship segment must be horizontal or vertical. Do not use curves, arcs, or diagonal segments.
+- Treat the open space between boxes and bands as explicit routing lanes. A connector must travel through those lanes and must never cross an entity box, even when a more direct route would be shorter.
+- Give every relationship its own final attachment segment and its own attachment point on the destination box. Relationships may share a trunk while travelling, but they must split before approaching a box; do not stack arrowheads or merge the final stretch.
+- Keep visible clearance between parallel lanes, box edges, labels, and arrowheads. Prefer a longer perimeter route over a tight path through a populated group.
+- Expand the canvas, band, or inter-band gutter before shrinking boxes, reducing readable text, or accepting crowded routing.
+- Reserve box sides intentionally: use distinct ports for multiple incoming relationships, and prefer the side that faces the connector's owning lane.
 - Use exact model names in boxes, including long names such as `CardVersionMetadataSuggestion`; reduce label font size instead of abbreviating when needed.
 - Prefer straight, aligned pairs for metadata rows:
   - `CardVersionType -> Type`
@@ -48,12 +55,14 @@ Keep `Card` visually central. Decks and groups should point to `Card`, not to `C
   - `CardVersionKeyword -> Keyword`
   - `CardVersionTag -> Tag`
   - `CardVersionMetadataSuggestion -> MetadataSuggestion`
-- Route metadata relationships from the bottom-center of `CardVersion`, then branch horizontally into the metadata link rows.
+- Route metadata relationships from `CardVersion` into a clear collector lane, then branch horizontally into the metadata link rows. The collector is a travel trunk only; each metadata row keeps a separate final segment.
 - Put `CardVersionParseFlag` and `CardVersionParseFlagItem` above `CardVersionImage` and `ParseResult`; place the item box to the right of the parent flag.
 - Draw `ImportJob.template -> Template` as a solid FK relationship, not a dashed logical key reference.
-- Keep labels away from arrow crossings. If labels overlap, move the label before moving model boxes.
-- Route long top-band arrows through open space. The `ImportJob.template -> Template` arrow should arc upward rather than pass through other boxes.
+- Keep labels in open lane space and away from crossings. If a label overlaps, move the label within its lane before moving model boxes.
+- Route long top-band relationships through the reserved upper, lower, or perimeter lanes. In particular, route `ImportJob.template -> Template` above the boxes with orthogonal segments.
 - Keep all boxes inside their container bands. If a box no longer fits, widen the band/canvas before accepting overflow.
+
+Before finishing, inspect a rendered raster copy at a readable scale in addition to validating the XML. Check every connector end and every long lane for box intersections, merged final approaches, clipped labels, and accidental diagonal or curved segments.
 
 ## Documentation
 
