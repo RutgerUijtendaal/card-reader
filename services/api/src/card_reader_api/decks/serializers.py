@@ -385,9 +385,19 @@ class DeckSideboardWriteSerializer(serializers.Serializer[dict[str, object]]):
 class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
     name = serializers.CharField(required=True, allow_blank=False)
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    description_markup = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    description_markup = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        trim_whitespace=False,
+    )
     long_description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    long_description_markup = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    long_description_markup = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        trim_whitespace=False,
+    )
     difficulty = serializers.ChoiceField(
         choices=cast(tuple[DeckDifficulty, ...], ("easy", "medium", "hard")),
         required=False,

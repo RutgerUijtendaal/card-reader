@@ -124,6 +124,12 @@ describe('card markup', () => {
     });
   });
 
+  it('does not carry abandoned autocomplete triggers across lines', () => {
+    const value = 'Abandoned [[card:old\nNew paragraph';
+
+    expect(findCardMarkupTrigger(value, value.length)).toBeNull();
+  });
+
   it('resolves references after unmatched backticks', () => {
     const html = renderCardMarkupHtml('`note [[card:card-1|Hero]]');
 

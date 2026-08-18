@@ -51,6 +51,7 @@ export const findCardMarkupTrigger = (value: string, caret: number): CardMarkupT
     return null;
   }
   const fragment = beforeCaret.slice(start + 2);
+  if (/[\r\n]/.test(fragment)) return null;
   if (fragment.startsWith('card:')) {
     return { start, end: caret, kind: 'card', query: fragment.slice(5) };
   }
