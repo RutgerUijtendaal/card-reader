@@ -26,6 +26,14 @@ describe('card markup', () => {
     expect(html).toContain('[[card:card-2|Villain]]');
   });
 
+  it('keeps references in indented code blocks literal', () => {
+    const html = renderCardMarkupHtml('    [[card:card-1|Indented]]\n\t[[symbol:fire]]');
+
+    expect(html).not.toContain('data-card-reference-id');
+    expect(html).toContain('[[card:card-1|Indented]]');
+    expect(html).toContain('[[symbol:fire]]');
+  });
+
   it('resumes resolving references after a closing fence', () => {
     const html = renderCardMarkupHtml(
       '```\n[[card:card-1|Inside]]\n```\n\n[[card:card-2|Outside]]',
@@ -64,6 +72,10 @@ describe('card markup', () => {
     expect(html).toContain('rel="noopener noreferrer"');
   });
 
+  it('uses CommonMark without default-preset extensions', () => {
+    expect(renderCardMarkupHtml('~~literal~~')).toContain('~~literal~~');
+  });
+
   it('finds unified and narrowed autocomplete triggers outside code', () => {
     expect(findCardMarkupTrigger('Use [[dra', 9)).toMatchObject({ kind: 'all', query: 'dra' });
     expect(findCardMarkupTrigger('Use [[card:hero', 15)).toMatchObject({
@@ -71,5 +83,12 @@ describe('card markup', () => {
       query: 'hero',
     });
     expect(findCardMarkupTrigger('`[[card:hero', 13)).toBeNull();
+  });
+
+  it('ignores autocomplete inside completed references and indented code', () => {
+    const completed = '[[card:old|Old]]';
+
+    expect(findCardMarkupTrigger(completed, completed.indexOf('old') + 2)).toBeNull();
+    expect(findCardMarkupTrigger('    [[card:hero', 15)).toBeNull();
   });
 });

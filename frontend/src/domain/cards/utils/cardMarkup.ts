@@ -27,7 +27,13 @@ export const buildSymbolReference = (key: string): string =>
 export const findCardMarkupTrigger = (value: string, caret: number): CardMarkupTrigger | null => {
   const beforeCaret = value.slice(0, caret);
   const start = beforeCaret.lastIndexOf('[[');
-  if (start < 0 || beforeCaret.slice(start).includes(']]') || isInsideCode(value, start)) {
+  const completedAfterCaret = start >= 0 && value.indexOf(']]', Math.max(caret, start + 2)) >= 0;
+  if (
+    start < 0 ||
+    beforeCaret.slice(start).includes(']]') ||
+    completedAfterCaret ||
+    isInsideCode(value, start)
+  ) {
     return null;
   }
   const fragment = beforeCaret.slice(start + 2);
@@ -48,13 +54,17 @@ export const renderCardMarkupHtml = (
   symbols: readonly SymbolFilterOption[] = [],
 ): string => {
   const symbolByKey = new Map(symbols.map((symbol) => [symbol.key, symbol]));
-  const { markup: protectedMarkup, references } = protectReferences(markup, symbolByKey);
-  const markdown = new MarkdownIt({
+  const markdown = new MarkdownIt('commonmark', {
     html: false,
     breaks: true,
     linkify: false,
     typographer: false,
   });
+  const { markup: protectedMarkup, references } = protectReferences(
+    markup,
+    symbolByKey,
+    codeBlockLines(markdown, markup),
+  );
   markdown.disable('image');
   markdown.validateLink = (url) => /^(?:https?:|mailto:|\/|#)/i.test(url);
   const defaultLinkOpen = markdown.renderer.rules.link_open;
@@ -101,39 +111,27 @@ export const renderCardMarkupHtml = (
 const protectReferences = (
   markup: string,
   symbolByKey: ReadonlyMap<string, SymbolFilterOption>,
+  protectedLines: ReadonlySet<number>,
 ): { markup: string; references: Map<string, string> } => {
   const output: string[] = [];
   const references = new Map<string, string>();
   let position = 0;
-  let fenceMarker: { marker: '`' | '~'; length: number } | null = null;
+  let lineIndex = 0;
   let inlineTicks = 0;
   let atLineStart = true;
   while (position < markup.length) {
-    const remaining = markup.slice(position);
-    if (atLineStart && inlineTicks === 0) {
-      const fence = remaining.match(/^( {0,3})(`{3,}|~{3,})([^\n]*)/);
-      const delimiter = fence?.[2];
-      if (fence && delimiter) {
-        const marker = delimiter[0] as '`' | '~';
-        const trailingText = fence[3] ?? '';
-        const opensFence: boolean =
-          fenceMarker === null && !(marker === '`' && trailingText.includes('`'));
-        const closesFence: boolean =
-          fenceMarker !== null &&
-          marker === fenceMarker.marker &&
-          delimiter.length >= fenceMarker.length &&
-          trailingText.trim() === '';
-        if (opensFence || closesFence) {
-          fenceMarker = opensFence ? { marker, length: delimiter.length } : null;
-          const prefix = `${fence[1] ?? ''}${delimiter}`;
-          output.push(prefix);
-          position += prefix.length;
-          atLineStart = false;
-          continue;
-        }
-      }
+    if (atLineStart && protectedLines.has(lineIndex)) {
+      const newline = markup.indexOf('\n', position);
+      const lineEnd = newline < 0 ? markup.length : newline + 1;
+      output.push(markup.slice(position, lineEnd));
+      position = lineEnd;
+      lineIndex += 1;
+      inlineTicks = 0;
+      atLineStart = true;
+      continue;
     }
-    if (fenceMarker === null && markup[position] === '`') {
+    const remaining = markup.slice(position);
+    if (markup[position] === '`') {
       const ticks = remaining.match(/^`+/)?.[0] ?? '`';
       inlineTicks =
         inlineTicks === 0 ? ticks.length : ticks.length === inlineTicks ? 0 : inlineTicks;
@@ -142,7 +140,7 @@ const protectReferences = (
       atLineStart = false;
       continue;
     }
-    if (fenceMarker === null && inlineTicks === 0) {
+    if (inlineTicks === 0) {
       const cardMatch = remaining.match(cardReferencePattern);
       const symbolMatch = remaining.match(symbolReferencePattern);
       const match = cardMatch ?? symbolMatch;
@@ -173,16 +171,30 @@ const protectReferences = (
     output.push(character);
     position += 1;
     atLineStart = character === '\n';
+    if (atLineStart) lineIndex += 1;
   }
   return { markup: output.join(''), references };
 };
 
 const isInsideCode = (value: string, position: number): boolean => {
   const before = value.slice(0, position);
-  const fenceMatches = before.match(/(^|\n) {0,3}(`{3,}|~{3,})/g) ?? [];
-  if (fenceMatches.length % 2 === 1) return true;
+  const lineIndex = (before.match(/\n/g) ?? []).length;
+  const markdown = new MarkdownIt('commonmark', { html: false });
+  if (codeBlockLines(markdown, value).has(lineIndex)) return true;
   const line = before.slice(before.lastIndexOf('\n') + 1);
   return (line.match(/`+/g)?.length ?? 0) % 2 === 1;
+};
+
+const codeBlockLines = (
+  markdown: InstanceType<typeof MarkdownIt>,
+  markup: string,
+): Set<number> => {
+  const lines = new Set<number>();
+  for (const token of markdown.parse(markup, {})) {
+    if (!['code_block', 'fence'].includes(token.type) || !token.map) continue;
+    for (let line = token.map[0]; line < token.map[1]; line += 1) lines.add(line);
+  }
+  return lines;
 };
 
 const escapeHtml = (value: string): string =>

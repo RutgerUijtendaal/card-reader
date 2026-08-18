@@ -27,6 +27,14 @@ def test_render_markup_plain_keeps_code_references_literal() -> None:
     )
 
 
+def test_render_markup_plain_keeps_indented_code_references_literal() -> None:
+    markup = "    [[card:card-1|Hero]]\n\t[[symbol:fire]]"
+
+    assert render_markup_plain(markup, symbol_tokens_by_key={"fire": "{F}"}) == (
+        "[[card:card-1|Hero]]\n[[symbol:fire]]"
+    )
+
+
 def test_render_markup_plain_resumes_references_after_closing_fence() -> None:
     markup = "```\n[[card:inside|Inside]]\n```\n\n[[card:outside|Outside]]"
 
@@ -60,10 +68,13 @@ def test_card_reference_builder_escapes_reserved_label_characters() -> None:
 
 
 def test_symbol_key_refresh_ignores_inline_and_fenced_code() -> None:
-    markup = "[[symbol:old]] `[[symbol:old]]`\n```\n[[symbol:old]]\n```"
+    markup = (
+        "[[symbol:old]] `[[symbol:old]]`\n```\n[[symbol:old]]\n```\n"
+        "    [[symbol:old]]"
+    )
 
     assert replace_symbol_placeholder_key(
         markup,
         old_symbol_key="old",
         new_symbol_key="new",
-    ) == "[[symbol:new]] `[[symbol:old]]`\n```\n[[symbol:old]]\n```"
+    ) == "[[symbol:new]] `[[symbol:old]]`\n```\n[[symbol:old]]\n```\n    [[symbol:old]]"

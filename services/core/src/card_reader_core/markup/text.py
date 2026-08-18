@@ -99,33 +99,21 @@ def _protect_references(
     output: list[str] = []
     values: dict[str, str] = {}
     position = 0
-    fence_marker: tuple[str, int] | None = None
+    protected_lines = _code_block_lines(markup)
+    line_index = 0
     inline_ticks = 0
     at_line_start = True
     while position < len(markup):
-        if at_line_start and inline_ticks == 0:
-            fence = re.match(r"( {0,3})(`{3,}|~{3,})([^\n]*)", markup[position:])
-            if fence is not None:
-                delimiter = fence.group(2)
-                marker = delimiter[0]
-                trailing_text = fence.group(3)
-                opens_fence = fence_marker is None and not (
-                    marker == "`" and "`" in trailing_text
-                )
-                closes_fence = (
-                    fence_marker is not None
-                    and marker == fence_marker[0]
-                    and len(delimiter) >= fence_marker[1]
-                    and not trailing_text.strip()
-                )
-                if opens_fence or closes_fence:
-                    fence_marker = (marker, len(delimiter)) if opens_fence else None
-                    prefix = f"{fence.group(1)}{delimiter}"
-                    output.append(prefix)
-                    position += len(prefix)
-                    at_line_start = False
-                    continue
-        if fence_marker is None and markup[position] == "`":
+        if at_line_start and line_index in protected_lines:
+            newline = markup.find("\n", position)
+            line_end = len(markup) if newline < 0 else newline + 1
+            output.append(markup[position:line_end])
+            position = line_end
+            line_index += 1
+            inline_ticks = 0
+            at_line_start = True
+            continue
+        if markup[position] == "`":
             tick_match = re.match(r"`+", markup[position:])
             assert tick_match is not None
             tick_count = len(tick_match.group(0))
@@ -137,7 +125,7 @@ def _protect_references(
             position += tick_count
             at_line_start = False
             continue
-        if fence_marker is None and inline_ticks == 0:
+        if inline_ticks == 0:
             card_match = CARD_REFERENCE_PATTERN.match(markup, position)
             symbol_match = SYMBOL_PLACEHOLDER_PATTERN.match(markup, position)
             match = card_match or symbol_match
@@ -158,6 +146,8 @@ def _protect_references(
         output.append(character)
         position += 1
         at_line_start = character == "\n"
+        if at_line_start:
+            line_index += 1
     return "".join(output), values
 
 
@@ -172,18 +162,33 @@ def _transform_markup_text(markup: str, transform: Callable[[str], str]) -> str:
     # sentinels while applying this narrowly scoped token replacement.
     protected: dict[str, str] = {}
 
-    def protect(match: re.Match[str]) -> str:
+    def protect_value(value: str) -> str:
         key = f"\x00card-reader-code-{len(protected)}\x00"
-        protected[key] = match.group(0)
+        protected[key] = value
         return key
 
+    code_lines = _code_block_lines(markup)
+    protected_markup = "".join(
+        protect_value(line) if index in code_lines else line
+        for index, line in enumerate(markup.splitlines(keepends=True))
+    )
     protected_markup = re.sub(
-        r"(^|\n)(`{3,}|~{3,})[^\n]*\n.*?(?:\n\2[ \t]*(?=\n|$)|$)|(`+)(.*?)\3",
-        protect,
-        markup,
+        r"(`+)(.*?)\1",
+        lambda match: protect_value(match.group(0)),
+        protected_markup,
         flags=re.DOTALL,
     )
     transformed = transform(protected_markup)
     for key, original in protected.items():
         transformed = transformed.replace(key, original)
     return transformed
+
+
+def _code_block_lines(markup: str) -> set[int]:
+    parser = MarkdownIt("commonmark", {"html": False})
+    lines: set[int] = set()
+    for token in parser.parse(markup):
+        if token.type not in {"code_block", "fence"} or token.map is None:
+            continue
+        lines.update(range(token.map[0], token.map[1]))
+    return lines
