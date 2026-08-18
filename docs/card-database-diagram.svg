@@ -257,8 +257,10 @@
   <path class="bus" d="M1060 320 L1060 384"/>
   <path class="bus" d="M1060 396 L1060 420 L1304 420"/>
   <path class="bus" d="M1316 420 L1319 420"/>
-  <path class="bus" d="M1331 420 L1390 420 L1390 644"/>
-  <path class="line" d="M1390 656 L1390 680 L1420 680"/>
+  <path class="bus" d="M1331 420 L1384 420"/>
+  <path class="bus" d="M1396 420 L1405 420 L1405 559"/>
+  <path class="bus" d="M1405 571 L1405 644"/>
+  <path class="line" d="M1405 656 L1405 680 L1420 680"/>
   <text class="label" x="1080" y="415">target_card_version</text>
   <path class="line" d="M970 320 L970 390 L1310 390 L1310 785 L1290 785"/>
   <text class="label" x="1160" y="388">target_card</text>
