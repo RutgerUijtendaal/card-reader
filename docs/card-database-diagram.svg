@@ -30,7 +30,9 @@
       .small { font: 15px Inter, Arial, sans-serif; fill: #475569; text-anchor: middle; }
       .line { stroke: #334155; stroke-width: 2.2; fill: none; stroke-linejoin: miter; marker-end: url(#arrow); }
       .thin { stroke: #64748b; stroke-width: 1.8; fill: none; stroke-linejoin: miter; marker-end: url(#arrow); }
+      .thin-travel { stroke: #64748b; stroke-width: 1.8; fill: none; stroke-linejoin: miter; }
       .soft { stroke: #64748b; stroke-width: 2; fill: none; stroke-dasharray: 8 6; stroke-linejoin: miter; marker-end: url(#arrow); }
+      .soft-travel { stroke: #64748b; stroke-width: 2; fill: none; stroke-dasharray: 8 6; stroke-linejoin: miter; }
       .bus { stroke: #475569; stroke-width: 2.2; fill: none; stroke-linejoin: miter; }
       .label { font: 700 15px Inter, Arial, sans-serif; fill: #1e293b; paint-order: stroke; stroke: #f8fafc; stroke-width: 7; stroke-linejoin: round; }
       .port-label { text-anchor: end; }
@@ -238,7 +240,8 @@
   <path class="bus" d="M1015 320 L1015 365 L1054 365"/>
   <path class="bus" d="M1066 365 L1384 365"/>
   <path class="bus" d="M1396 365 L1574 365"/>
-  <path class="line" d="M1586 365 L1600 365 L1600 275 L1640 275"/>
+  <path class="bus" d="M1586 365 L1600 365 L1600 306"/>
+  <path class="line" d="M1600 294 L1600 275 L1640 275"/>
   <text class="label" x="1100" y="356">classification review item</text>
   <path class="soft" d="M2020 290 L2240 290"/>
   <text class="label" x="2030" y="280">reviewed_by (nullable)</text>
@@ -246,9 +249,16 @@
   <text class="label" x="2545" y="250" text-anchor="middle">recipient</text>
   <path class="soft" d="M2460 295 L2630 295"/>
   <text class="label" x="2545" y="315" text-anchor="middle">actor (nullable)</text>
-  <path class="line" d="M220 320 L220 440 L1375 440 L1375 650 L1420 650"/>
+  <path class="bus" d="M220 320 L220 440 L609 440"/>
+  <path class="bus" d="M621 440 L1304 440"/>
+  <path class="bus" d="M1316 440 L1319 440"/>
+  <path class="line" d="M1331 440 L1375 440 L1375 650 L1420 650"/>
   <text class="label" x="630" y="430">CardVersion.content_version</text>
-  <path class="line" d="M1060 320 L1060 420 L1390 420 L1390 680 L1420 680"/>
+  <path class="bus" d="M1060 320 L1060 384"/>
+  <path class="bus" d="M1060 396 L1060 420 L1304 420"/>
+  <path class="bus" d="M1316 420 L1319 420"/>
+  <path class="bus" d="M1331 420 L1390 420 L1390 644"/>
+  <path class="line" d="M1390 656 L1390 680 L1420 680"/>
   <text class="label" x="1080" y="415">target_card_version</text>
   <path class="line" d="M970 320 L970 390 L1310 390 L1310 785 L1290 785"/>
   <text class="label" x="1160" y="388">target_card</text>
@@ -256,13 +266,25 @@
   <text class="label" x="1435" y="556">CardVersion.template</text>
   <path class="thin" d="M1780 320 L1780 610"/>
   <text class="label" x="1792" y="555">reviewed version</text>
-  <path class="thin" d="M1640 300 L1580 300 L1580 405 L1325 405 L1325 875 L1290 875"/>
+  <path class="bus" d="M1640 300 L1580 300 L1580 405 L1396 405"/>
+  <path class="bus" d="M1384 405 L1325 405 L1325 814"/>
+  <path class="thin" d="M1325 826 L1325 875 L1290 875"/>
   <text class="label" x="1410" y="397">reviewed Card</text>
-  <path class="thin" d="M2280 320 L2280 455 L2040 455 L2040 850 L1710 850 L1710 925 L1690 925"/>
+  <path class="bus" d="M2280 320 L2280 409"/>
+  <path class="bus" d="M2280 421 L2280 455 L2040 455 L2040 754"/>
+  <path class="bus" d="M2040 766 L2040 850 L2021 850"/>
+  <path class="thin" d="M2004 850 L1710 850 L1710 925 L1690 925"/>
   <text class="label" x="2080" y="447">submitted_by</text>
-  <path class="soft" d="M2340 320 L2340 415 L2015 415 L2015 955 L2000 955"/>
+  <path class="soft-travel" d="M2340 320 L2340 415 L2015 415 L2015 754"/>
+  <path class="soft" d="M2015 766 L2015 955 L2000 955"/>
   <text class="label" x="2040" y="407">reviewed_by</text>
-  <path class="soft" d="M615 320 L615 445 L1305 445 L1305 1790 L1500 1790 L1500 1360"/>
+  <path class="soft-travel" d="M615 320 L615 445 L1305 445 L1305 779"/>
+  <path class="soft-travel" d="M1305 791 L1305 814"/>
+  <path class="soft-travel" d="M1305 826 L1305 869"/>
+  <path class="soft-travel" d="M1305 881 L1305 939"/>
+  <path class="soft-travel" d="M1305 951 L1305 1544"/>
+  <path class="soft-travel" d="M1305 1556 L1305 1614"/>
+  <path class="soft" d="M1305 1626 L1305 1790 L1500 1790 L1500 1360"/>
   <text class="label" x="1318" y="1768">immutable rule snapshot</text>
 
   <!-- Relationships within the card consumer band -->
@@ -273,7 +295,8 @@
   <path class="line" d="M350 1080 L450 1080"/>
   <path class="line" d="M450 1445 L350 1445"/>
   <path class="line" d="M350 1645 L450 1645"/>
-  <path class="thin" d="M100 1425 L55 1425 L55 690 L100 690"/>
+  <path class="thin-travel" d="M100 1425 L81 1425"/>
+  <path class="thin" d="M69 1425 L55 1425 L55 690 L100 690"/>
   <text class="label" x="110" y="1378">assignment deck</text>
   <path class="thin" d="M100 1600 L75 1600 L75 720 L100 720"/>
   <text class="label" x="88" y="1580" transform="rotate(-90 88 1580)">suggested deck</text>
@@ -287,13 +310,16 @@
   <text class="label" x="700" y="982" text-anchor="end">sideboard card</text>
   <path class="line" d="M710 1080 L750 1080 L750 850 L850 850"/>
   <text class="label" x="700" y="1016" text-anchor="end">member card</text>
-  <path class="line" d="M365 780 L365 810 L760 810 L760 880 L850 880"/>
-  <text class="label" x="390" y="814">hero_card</text>
+  <path class="bus" d="M365 780 L365 810 L760 810 L760 814"/>
+  <path class="bus" d="M760 826 L760 844"/>
+  <path class="line" d="M760 856 L760 880 L850 880"/>
+  <text class="label" x="270" y="814">hero_card</text>
   <path class="line" d="M225 1130 L225 1170 L770 1170 L770 910 L850 910"/>
   <text class="label" x="500" y="1163">anchor_card</text>
   <path class="line" d="M225 1305 L225 1340 L780 1340 L780 940 L850 940"/>
   <text class="label" x="610" y="1330">alias card</text>
-  <path class="line" d="M710 1260 L790 1260 L790 955 L850 955"/>
+  <path class="bus" d="M710 1260 L774 1260"/>
+  <path class="line" d="M786 1260 L790 1260 L790 955 L850 955"/>
   <text class="label" x="700" y="1198" text-anchor="end">target_card</text>
 
   <!-- Stable identity and TTS relationships -->
@@ -307,9 +333,14 @@
   <text class="label" x="1183" y="1028">mana</text>
   <path class="line" d="M1070 1510 L1070 1400"/>
   <text class="label" x="1084" y="1460">sheet</text>
-  <path class="line" d="M850 1570 L820 1570 L820 925 L850 925"/>
+  <path class="bus" d="M850 1570 L820 1570 L820 961"/>
+  <path class="bus" d="M820 949 L820 946"/>
+  <path class="line" d="M820 934 L820 925 L850 925"/>
   <text class="label" x="808" y="1490" transform="rotate(-90 808 1490)">resolved_card</text>
-  <path class="line" d="M1290 1550 L1350 1550 L1350 790 L1420 790"/>
+  <path class="bus" d="M1290 1550 L1350 1550 L1350 951"/>
+  <path class="bus" d="M1350 939 L1350 790 L1354 790"/>
+  <path class="bus" d="M1366 790 L1389 790"/>
+  <path class="line" d="M1401 790 L1420 790"/>
   <text class="label" x="1338" y="1520" transform="rotate(-90 1338 1520)">card_version</text>
   <path class="line" d="M1290 1620 L1365 1620 L1365 1130 L1420 1130"/>
   <text class="label" x="1375" y="1600">image</text>
@@ -324,7 +355,9 @@
   <path class="line" d="M1540 820 L1540 870 L1555 870 L1555 900"/>
   <path class="line" d="M1690 945 L1730 945"/>
   <path class="line" d="M1420 770 L1395 770 L1395 1105 L1420 1105"/>
-  <path class="line" d="M1980 780 L2010 780 L2010 1105 L2000 1105"/>
+  <path class="bus" d="M1980 780 L2010 780 L2010 844"/>
+  <path class="bus" d="M2010 856 L2010 949"/>
+  <path class="line" d="M2010 961 L2010 1105 L2000 1105"/>
 
   <!-- CardVersion metadata collector and dedicated row attachments -->
   <path class="bus" d="M1980 760 L2080 760"/>
@@ -341,9 +374,12 @@
   <path class="line" d="M2510 1375 L2660 1375"/>
 
   <!-- Classification rules use lower perimeter lanes to reach canonical metadata -->
-  <path class="thin" d="M2000 1270 L2040 1270 L2040 1560 L2960 1560 L2960 640 L2900 640"/>
+  <path class="thin-travel" d="M2000 1270 L2040 1270 L2040 1560 L2914 1560"/>
+  <path class="thin-travel" d="M2926 1560 L2934 1560"/>
+  <path class="thin" d="M2946 1560 L2960 1560 L2960 640 L2900 640"/>
   <text class="label" x="2240" y="1548">rule type source</text>
-  <path class="thin" d="M2000 1300 L2035 1300 L2035 1590 L2940 1590 L2940 820 L2900 820"/>
+  <path class="thin-travel" d="M2000 1300 L2035 1300 L2035 1590 L2914 1590"/>
+  <path class="thin" d="M2926 1590 L2940 1590 L2940 820 L2900 820"/>
   <text class="label" x="2240" y="1580">rule symbol source</text>
   <path class="thin" d="M2000 1330 L2030 1330 L2030 1620 L2920 1620 L2920 1180 L2900 1180"/>
   <text class="label" x="2240" y="1610">rule tag source</text>
