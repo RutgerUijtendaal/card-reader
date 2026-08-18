@@ -81,6 +81,16 @@ describe('card markup', () => {
     expect(html).toContain('rel="noopener noreferrer"');
   });
 
+  it('renders card references as plain labels inside Markdown links', () => {
+    const html = renderCardMarkupHtml(
+      '[see [[card:card-1|Card One]]](https://example.com)',
+    );
+
+    expect(html).toContain('<a href="https://example.com"');
+    expect(html).toContain('see Card One</a>');
+    expect(html).not.toContain('data-card-reference-id');
+  });
+
   it('uses CommonMark without default-preset extensions', () => {
     expect(renderCardMarkupHtml('~~literal~~')).toContain('~~literal~~');
   });

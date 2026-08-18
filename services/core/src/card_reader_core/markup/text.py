@@ -122,20 +122,21 @@ def _reference_rule(state: StateInline, silent: bool) -> bool:
     match = card_match or symbol_match
     if match is None:
         return False
-    if not silent:
-        if card_match is not None:
-            token = state.push("card_reference", "", 0)
-            token.meta = {
-                "id": card_match.group(1),
-                "label": _ESCAPED_CARD_CHARACTER_PATTERN.sub(r"\1", card_match.group(2)),
-                "source_start": state.pos,
-            }
-        else:
-            token = state.push("symbol_reference", "", 0)
-            token.meta = {
-                "key": symbol_match.group(1) if symbol_match else "",
-                "source_start": state.pos,
-            }
+    if silent:
+        return False
+    if card_match is not None:
+        token = state.push("card_reference", "", 0)
+        token.meta = {
+            "id": card_match.group(1),
+            "label": _ESCAPED_CARD_CHARACTER_PATTERN.sub(r"\1", card_match.group(2)),
+            "source_start": state.pos,
+        }
+    else:
+        token = state.push("symbol_reference", "", 0)
+        token.meta = {
+            "key": symbol_match.group(1) if symbol_match else "",
+            "source_start": state.pos,
+        }
     state.pos = match.end()
     return True
 

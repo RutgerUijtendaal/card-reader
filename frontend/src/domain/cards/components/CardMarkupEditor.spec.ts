@@ -215,4 +215,22 @@ describe('CardMarkupEditor', () => {
     expect(mounted.container.textContent).not.toContain('Card One');
     mounted.app.unmount();
   });
+
+  test('reports a failed card search without an unhandled rejection', async () => {
+    vi.useFakeTimers();
+    fetchCardsMock.mockRejectedValue(new Error('Search unavailable'));
+    const mounted = await mountEditor('[[card:one');
+    const textarea = mounted.container.querySelector('textarea');
+    if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Expected textarea.');
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    textarea.dispatchEvent(new KeyboardEvent('keyup', { key: 'e', bubbles: true }));
+
+    await vi.advanceTimersByTimeAsync(200);
+    await nextTick();
+
+    expect(mounted.container.textContent).toContain('Card search is unavailable. Try again.');
+    expect(mounted.container.textContent).not.toContain('No matching references.');
+    mounted.app.unmount();
+  });
 });

@@ -54,6 +54,12 @@
           >
             Searching…
           </p>
+          <p
+            v-else-if="searchError"
+            class="theme-section-muted px-2 py-2 text-sm"
+          >
+            Card search is unavailable. Try again.
+          </p>
           <template v-if="visibleCards.length">
             <p class="theme-kicker px-2 pt-1 text-xs font-semibold uppercase tracking-wide">
               Cards
@@ -86,7 +92,7 @@
             </button>
           </template>
           <p
-            v-if="!searching && visibleCards.length === 0 && filteredSymbols.length === 0"
+            v-if="!searching && !searchError && visibleCards.length === 0 && filteredSymbols.length === 0"
             class="theme-section-muted px-2 py-3 text-sm"
           >
             No matching references.
@@ -166,7 +172,7 @@ const cardSearch = useCardSearchResults(() => ({
   lifecycleStatus: props.includeDeprecatedCards ? 'all' : 'active',
   pageSize: 8,
 }));
-const { results: cards, searching } = cardSearch;
+const { results: cards, searching, searchError } = cardSearch;
 const showsCards = computed(() => trigger.value?.kind !== 'symbol');
 const showsSymbols = computed(() => props.allowSymbols && trigger.value?.kind !== 'card');
 const visibleCards = computed(() => (showsCards.value ? cards.value : []));

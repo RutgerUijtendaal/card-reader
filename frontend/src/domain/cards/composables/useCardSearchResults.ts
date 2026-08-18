@@ -13,12 +13,14 @@ type CardSearchOptions = {
 export const useCardSearchResults = (getOptions: () => CardSearchOptions) => {
   const results = ref<CardListItem[]>([]);
   const searching = ref(false);
+  const searchError = ref(false);
   let requestId = 0;
 
   const clear = (): void => {
     requestId += 1;
     results.value = [];
     searching.value = false;
+    searchError.value = false;
   };
 
   const search = async (query: string, { allowEmpty = false } = {}): Promise<void> => {
@@ -30,6 +32,7 @@ export const useCardSearchResults = (getOptions: () => CardSearchOptions) => {
     const currentRequest = ++requestId;
     const options = getOptions();
     searching.value = true;
+    searchError.value = false;
     try {
       const response = await fetchCards<CardListItem>({
         q: term || undefined,
@@ -43,10 +46,15 @@ export const useCardSearchResults = (getOptions: () => CardSearchOptions) => {
           (item): item is CardListItem => item.result_type === 'card',
         );
       }
+    } catch {
+      if (currentRequest === requestId) {
+        results.value = [];
+        searchError.value = true;
+      }
     } finally {
       if (currentRequest === requestId) searching.value = false;
     }
   };
 
-  return { results, searching, search, clear };
+  return { results, searching, searchError, search, clear };
 };

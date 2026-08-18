@@ -146,18 +146,18 @@ const createMarkupParser = (
     const symbolMatch = remaining.match(symbolReferencePattern);
     const match = cardMatch ?? symbolMatch;
     if (!match) return false;
-    if (!silent) {
-      if (cardMatch) {
-        const token = state.push('card_reference', '', 0);
-        token.meta = {
-          kind: 'card',
-          id: cardMatch[1] ?? '',
-          label: (cardMatch[2] ?? '').replace(escapedCardCharacterPattern, '$1'),
-        } satisfies CardReferenceMeta;
-      } else {
-        const token = state.push('symbol_reference', '', 0);
-        token.meta = { kind: 'symbol', key: symbolMatch?.[1] ?? '' } satisfies SymbolReferenceMeta;
-      }
+    // Let Markdown count the token's brackets while it scans a surrounding link label.
+    if (silent) return false;
+    if (cardMatch) {
+      const token = state.push(state.linkLevel > 0 ? 'card_reference_label' : 'card_reference', '', 0);
+      token.meta = {
+        kind: 'card',
+        id: cardMatch[1] ?? '',
+        label: (cardMatch[2] ?? '').replace(escapedCardCharacterPattern, '$1'),
+      } satisfies CardReferenceMeta;
+    } else {
+      const token = state.push('symbol_reference', '', 0);
+      token.meta = { kind: 'symbol', key: symbolMatch?.[1] ?? '' } satisfies SymbolReferenceMeta;
     }
     state.pos += match[0].length;
     return true;
@@ -166,6 +166,10 @@ const createMarkupParser = (
     const meta = tokens[index]?.meta as ReferenceMeta | null;
     if (meta?.kind !== 'card') return '';
     return `<a class="card-markup-reference" data-card-reference-id="${escapeHtml(meta.id)}" href="/cards/${encodeURIComponent(meta.id)}">${escapeHtml(meta.label)}</a>`;
+  };
+  markdown.renderer.rules.card_reference_label = (tokens, index) => {
+    const meta = tokens[index]?.meta as ReferenceMeta | null;
+    return meta?.kind === 'card' ? escapeHtml(meta.label) : '';
   };
   markdown.renderer.rules.symbol_reference = (tokens, index) => {
     const meta = tokens[index]?.meta as ReferenceMeta | null;

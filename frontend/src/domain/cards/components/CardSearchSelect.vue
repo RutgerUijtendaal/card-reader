@@ -35,6 +35,12 @@
             Searching...
           </p>
           <p
+            v-else-if="searchError"
+            class="theme-section-muted px-2 py-3 text-sm"
+          >
+            Card search is unavailable. Try again.
+          </p>
+          <p
             v-else-if="results.length === 0"
             class="theme-section-muted px-2 py-3 text-sm"
           >
@@ -98,7 +104,7 @@ const cardSearch = useCardSearchResults(() => ({
   lifecycleStatus: 'all',
   pageSize: props.pageSize,
 }));
-const { results, searching } = cardSearch;
+const { results, searching, searchError } = cardSearch;
 const disabledCardIdsSet = computed(() => new Set(props.disabledCardIds));
 const floating = useFloating(triggerRef, panelRef, {
   open: isOpen,

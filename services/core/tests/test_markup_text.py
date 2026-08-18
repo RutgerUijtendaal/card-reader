@@ -35,6 +35,12 @@ def test_render_markup_plain_keeps_escaped_references_literal() -> None:
     )
 
 
+def test_render_markup_plain_resolves_card_labels_inside_markdown_links() -> None:
+    assert render_markup_plain(
+        "[see [[card:card-1|Card One]]](https://example.com)"
+    ) == "see Card One"
+
+
 def test_render_markup_plain_avoids_authored_placeholder_collisions() -> None:
     markup = "CARDREADERREFERENCETOKEN0X [[card:card-1|Hero]]"
 
