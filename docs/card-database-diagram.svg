@@ -25,6 +25,7 @@
       .model-name { font: 700 11px Inter, Arial, sans-serif; fill: #0f172a; text-anchor: middle; }
       .model-name-small { font: 700 10px Inter, Arial, sans-serif; fill: #0f172a; text-anchor: middle; }
       .field { font: 18px Inter, Arial, sans-serif; fill: #334155; text-anchor: middle; }
+      .field-compact { font: 13px Inter, Arial, sans-serif; fill: #334155; text-anchor: middle; }
       .small { font: 15px Inter, Arial, sans-serif; fill: #475569; text-anchor: middle; }
       .line { stroke: #334155; stroke-width: 2.2; fill: none; stroke-linejoin: miter; marker-end: url(#arrow); }
       .thin { stroke: #64748b; stroke-width: 1.8; fill: none; stroke-linejoin: miter; marker-end: url(#arrow); }
@@ -80,13 +81,14 @@
   <text class="small" x="2760" y="314">event • subject • read</text>
 
   <!-- Card consumer entities -->
-  <rect class="box left" x="100" y="570" width="250" height="170"/>
-  <text class="title" x="225" y="606">Deck</text>
-  <text class="field" x="225" y="632">name</text>
-  <text class="field" x="225" y="655">description markup → plain</text>
-  <text class="field" x="225" y="678">difficulty (nullable)</text>
-  <text class="field" x="225" y="701">hero_card, owner, visibility</text>
-  <text class="small" x="225" y="725">client_creation_id (nullable)</text>
+  <rect class="box left" x="100" y="570" width="290" height="210"/>
+  <text class="title" x="245" y="606">Deck</text>
+  <text class="field" x="245" y="632">name</text>
+  <text class="field-compact" x="245" y="655">description_markup → description</text>
+  <text class="field-compact" x="245" y="678">long_description_markup → long_description</text>
+  <text class="field" x="245" y="701">difficulty (nullable)</text>
+  <text class="field" x="245" y="724">hero_card, owner, visibility</text>
+  <text class="small" x="245" y="752">client_creation_id (nullable)</text>
   <rect class="box left" x="450" y="570" width="260" height="120"/>
   <text class="title" x="580" y="607">DeckEntry</text>
   <text class="field" x="580" y="635">deck + card</text>
@@ -226,8 +228,8 @@
   <text class="field" x="2780" y="1397">accepted tag/type</text>
 
   <!-- Top-band and cross-band relationships -->
-  <path class="line" d="M340 275 L480 275"/>
-  <text class="label" x="375" y="260">content_version</text>
+  <path class="line" d="M340 275 L370 275 L370 215 L460 215 L460 275 L480 275"/>
+  <text class="label" x="415" y="207" text-anchor="middle">content_version</text>
   <path class="line" d="M750 275 L880 275"/>
   <text class="label" x="785" y="260">items</text>
   <path class="line" d="M615 230 L615 195 L1390 195 L1390 230"/>
@@ -258,9 +260,9 @@
   <text class="label" x="1318" y="1768">immutable rule snapshot</text>
 
   <!-- Relationships within the card consumer band -->
-  <path class="line" d="M350 625 L450 625"/>
-  <path class="thin" d="M350 715 L400 715 L400 755 L450 755"/>
-  <path class="line" d="M225 840 L225 740"/>
+  <path class="line" d="M390 625 L450 625"/>
+  <path class="thin" d="M390 715 L420 715 L420 755 L450 755"/>
+  <path class="line" d="M225 840 L225 780"/>
   <path class="line" d="M350 885 L450 885"/>
   <path class="line" d="M350 1080 L450 1080"/>
   <path class="line" d="M450 1445 L350 1445"/>
@@ -274,15 +276,15 @@
 
   <!-- Consumer relationships routed through the Card attachment lanes -->
   <path class="line" d="M710 650 L730 650 L730 790 L850 790"/>
-  <text class="label port-label" x="838" y="782">entry card</text>
+  <text class="label" x="700" y="711" text-anchor="end">entry card</text>
   <path class="line" d="M710 900 L740 900 L740 820 L850 820"/>
-  <text class="label port-label" x="838" y="813">sideboard card</text>
+  <text class="label" x="700" y="982" text-anchor="end">sideboard card</text>
   <path class="line" d="M710 1080 L750 1080 L750 850 L850 850"/>
-  <text class="label port-label" x="838" y="844">member card</text>
-  <path class="line" d="M325 740 L325 810 L760 810 L760 880 L850 880"/>
-  <text class="label port-label" x="838" y="874">hero_card</text>
+  <text class="label" x="700" y="1016" text-anchor="end">member card</text>
+  <path class="line" d="M365 780 L365 810 L760 810 L760 880 L850 880"/>
+  <text class="label" x="390" y="814">hero_card</text>
   <path class="line" d="M225 1130 L225 1170 L770 1170 L770 910 L850 910"/>
-  <text class="label port-label" x="838" y="904">anchor_card</text>
+  <text class="label" x="500" y="1163">anchor_card</text>
   <path class="line" d="M225 1305 L225 1340 L780 1340 L780 940 L850 940"/>
   <text class="label" x="610" y="1330">alias card</text>
   <path class="line" d="M710 1260 L790 1260 L790 955 L850 955"/>
