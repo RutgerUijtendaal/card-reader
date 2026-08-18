@@ -8,6 +8,13 @@
         >
           {{ card.name }}
         </p>
+        <span
+          v-if="showContextualMetadata"
+          class="theme-pill theme-pill-accent shrink-0 px-1.5 py-0.5 text-[9px] font-semibold"
+          data-testid="row-card-pool"
+        >
+          {{ cardPoolLabel(card.card_pool) }}
+        </span>
         <p
           v-if="cardIsDeprecated(card)"
           class="theme-pill theme-pill-warning inline-flex shrink-0 items-center gap-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
@@ -76,6 +83,7 @@ import { toAbsoluteApiUrl } from '@/shared/api/client';
 import SymbolizedText from '@/domain/cards/components/SymbolizedText.vue';
 import type { CardHoverTooltipModel } from '@/domain/cards/types/cardModels';
 import { cardIsDeprecated } from '@/domain/cards/utils/filters/cardLifecycle';
+import { cardPoolLabel } from '@/domain/cards/cardPools';
 import { cardRoleLabel } from '@/domain/cards/cardRoles';
 import { cardFactionLabel } from '@/domain/cards/cardFactions';
 import { manaFamilyLabel } from '@/domain/cards/manaFamilies';
@@ -112,11 +120,17 @@ const props = withDefaults(defineProps<{
 const manaSymbolByKey = computed(() =>
   Object.fromEntries(props.card.symbols.map((symbol) => [symbol.key, symbol])),
 );
-const hasManaSymbols = computed(() => props.card.mana_symbols.length > 0);
+const hasRenderableManaSymbols = computed(() => {
+  const symbolKeys = props.card.mana_symbols
+    .map((symbolKey) => symbolKey.trim())
+    .filter((symbolKey) => symbolKey.length > 0);
+  return symbolKeys.length > 0
+    && symbolKeys.every((symbolKey) => Boolean(manaSymbolByKey.value[symbolKey]?.asset_url));
+});
 const showContextualManaSymbols = computed(() =>
   props.showContextualMetadata
   && props.card.card_pool === 'player'
-  && hasManaSymbols.value,
+  && hasRenderableManaSymbols.value,
 );
 const showManaSymbols = computed(() =>
   showContextualManaSymbols.value
