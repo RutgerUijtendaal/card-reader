@@ -12,7 +12,7 @@
     <CardCompactRowContent
       :card="card"
       art-width="5.5rem"
-      show-classification
+      show-contextual-metadata
     />
 
     <div
@@ -45,7 +45,7 @@
     <CardCompactRowContent
       :card="card"
       art-width="5.5rem"
-      show-classification
+      show-contextual-metadata
     />
 
     <div
