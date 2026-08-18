@@ -235,23 +235,23 @@
   <path class="line" d="M615 230 L615 195 L1390 195 L1390 230"/>
   <text class="label" x="935" y="188">ImportJob.template</text>
   <path class="line" d="M1015 320 L1015 365 L1600 365 L1600 275 L1640 275"/>
-  <text class="label" x="1240" y="356">classification review item</text>
+  <text class="label" x="1100" y="356">classification review item</text>
   <path class="thin" d="M2020 290 L2240 290"/>
   <text class="label" x="2070" y="280">reviewed_by</text>
   <path class="thin" d="M2460 275 L2630 275"/>
-  <text class="label" x="2488" y="260">recipient / actor</text>
+  <text class="label" x="2470" y="260">recipient / actor</text>
   <path class="line" d="M220 320 L220 440 L1375 440 L1375 650 L1420 650"/>
-  <text class="label" x="540" y="430">CardVersion.content_version</text>
+  <text class="label" x="630" y="430">CardVersion.content_version</text>
   <path class="line" d="M1060 320 L1060 420 L1390 420 L1390 680 L1420 680"/>
-  <text class="label" x="1080" y="410">target_card_version</text>
+  <text class="label" x="1080" y="415">target_card_version</text>
   <path class="line" d="M970 320 L970 390 L1310 390 L1310 785 L1290 785"/>
-  <text class="label" x="1075" y="380">target_card</text>
+  <text class="label" x="1160" y="388">target_card</text>
   <path class="line" d="M1390 320 L1390 565 L1700 565 L1700 610"/>
   <text class="label" x="1435" y="556">CardVersion.template</text>
   <path class="thin" d="M1780 320 L1780 610"/>
   <text class="label" x="1792" y="555">reviewed version</text>
   <path class="thin" d="M1640 300 L1580 300 L1580 405 L1325 405 L1325 875 L1290 875"/>
-  <text class="label" x="1370" y="397">reviewed Card</text>
+  <text class="label" x="1410" y="397">reviewed Card</text>
   <path class="thin" d="M2280 320 L2280 430 L1405 430 L1405 955 L1420 955"/>
   <text class="label" x="1880" y="422">submitted_by</text>
   <path class="thin" d="M2340 320 L2340 415 L2015 415 L2015 955 L2000 955"/>
@@ -268,11 +268,11 @@
   <path class="line" d="M450 1445 L350 1445"/>
   <path class="line" d="M350 1645 L450 1645"/>
   <path class="thin" d="M100 1425 L75 1425 L75 690 L100 690"/>
-  <text class="label" x="83" y="1378" transform="rotate(-90 83 1378)">assignment deck</text>
+  <text class="label" x="110" y="1378">assignment deck</text>
   <path class="thin" d="M100 1600 L65 1600 L65 720 L100 720"/>
   <text class="label" x="55" y="1545" transform="rotate(-90 55 1545)">suggested deck</text>
   <path class="thin" d="M710 1605 L740 1605 L740 1465 L710 1465"/>
-  <text class="label" x="746" y="1538">accepted_tag</text>
+  <text class="label" x="728" y="1538" text-anchor="end">accepted_tag</text>
 
   <!-- Consumer relationships routed through the Card attachment lanes -->
   <path class="line" d="M710 650 L730 650 L730 790 L850 790"/>
@@ -288,11 +288,11 @@
   <path class="line" d="M225 1305 L225 1340 L780 1340 L780 940 L850 940"/>
   <text class="label" x="610" y="1330">alias card</text>
   <path class="line" d="M710 1260 L790 1260 L790 955 L850 955"/>
-  <text class="label" x="716" y="1248">target_card</text>
+  <text class="label" x="700" y="1198" text-anchor="end">target_card</text>
 
   <!-- Stable identity and TTS relationships -->
   <path class="soft" d="M1070 660 L1070 720 L1230 720 L1230 770"/>
-  <text class="label" x="1084" y="710">serialized identity writes</text>
+  <text class="label" x="1095" y="695" text-anchor="middle">serialized identity writes</text>
   <path class="line" d="M913 1050 L913 970"/>
   <text class="label" x="865" y="1028">roles</text>
   <path class="line" d="M1063 1050 L1063 970"/>
@@ -304,15 +304,15 @@
   <path class="line" d="M850 1570 L820 1570 L820 995 L1250 995 L1250 970"/>
   <text class="label" x="808" y="1490" transform="rotate(-90 808 1490)">resolved_card</text>
   <path class="line" d="M1290 1550 L1350 1550 L1350 790 L1420 790"/>
-  <text class="label" x="1360" y="1530">card_version</text>
+  <text class="label" x="1338" y="1520" transform="rotate(-90 1338 1520)">card_version</text>
   <path class="line" d="M1290 1620 L1365 1620 L1365 1105 L1420 1105"/>
   <text class="label" x="1375" y="1600">image</text>
 
   <!-- Card and CardVersion relationship lanes -->
   <path class="line" d="M1290 820 L1345 820 L1345 710 L1420 710"/>
-  <text class="label" x="1300" y="700">versions</text>
+  <text class="label" x="1215" y="755" text-anchor="end">versions</text>
   <path class="soft" d="M1420 750 L1360 750 L1360 945 L1290 945"/>
-  <text class="label" x="1300" y="935">latest_version</text>
+  <text class="label" x="1380" y="930" transform="rotate(-90 1380 930)">latest_version</text>
 
   <!-- Version/review relationships -->
   <path class="line" d="M1540 820 L1540 870 L1555 870 L1555 900"/>
@@ -338,9 +338,9 @@
   <path class="thin" d="M2000 1270 L2040 1270 L2040 1560 L2920 1560 L2920 640 L2900 640"/>
   <text class="label" x="2240" y="1548">rule type source</text>
   <path class="thin" d="M2000 1300 L2035 1300 L2035 1590 L2930 1590 L2930 820 L2900 820"/>
-  <text class="label" x="2240" y="1578">rule symbol source</text>
+  <text class="label" x="2240" y="1580">rule symbol source</text>
   <path class="thin" d="M2000 1330 L2030 1330 L2030 1620 L2940 1620 L2940 1180 L2900 1180"/>
-  <text class="label" x="2240" y="1608">rule tag source</text>
+  <text class="label" x="2240" y="1610">rule tag source</text>
 
   <!-- Accepted suggestion values approach their targets on separate final ports -->
   <path class="thin" d="M2900 1350 L2910 1350 L2910 680 L2900 680"/>

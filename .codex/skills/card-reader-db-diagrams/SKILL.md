@@ -58,11 +58,11 @@ Keep `Card` visually central. Decks and groups should point to `Card`, not to `C
 - Route metadata relationships from `CardVersion` into a clear collector lane, then branch horizontally into the metadata link rows. The collector is a travel trunk only; each metadata row keeps a separate final segment.
 - Put `CardVersionParseFlag` and `CardVersionParseFlagItem` above `CardVersionImage` and `ParseResult`; place the item box to the right of the parent flag.
 - Draw `ImportJob.template -> Template` as a solid FK relationship, not a dashed logical key reference.
-- Keep labels in open lane space and away from crossings. If a label overlaps, move the label within its lane before moving model boxes.
+- Treat a label and its background stroke as a routing obstacle. A label may mask its own connector for readability, but it must not cover an unrelated connector, entity border, arrowhead, or another label. Reserve a clear label shelf within the lane; if none exists, reroute the relationship or expand the layout.
 - Route long top-band relationships through the reserved upper, lower, or perimeter lanes. In particular, route `ImportJob.template -> Template` above the boxes with orthogonal segments.
 - Keep all boxes inside their container bands. If a box no longer fits, widen the band/canvas before accepting overflow.
 
-Before finishing, inspect a rendered raster copy at a readable scale in addition to validating the XML. Check every connector end and every long lane for box intersections, merged final approaches, clipped labels, and accidental diagonal or curved segments.
+Before finishing, inspect a rendered raster copy at a readable scale in addition to validating the XML. Check every connector end and every long lane for box intersections, merged final approaches, clipped or colliding label backgrounds, and accidental diagonal or curved segments.
 
 ## Documentation
 
