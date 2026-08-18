@@ -1,8 +1,51 @@
+import json
+from pathlib import Path
+from typing import TypedDict, cast
+
+import pytest
+
 from card_reader_core.markup import (
     build_card_reference,
     render_markup_plain,
     replace_symbol_placeholder_key,
 )
+
+
+class SharedMarkupCase(TypedDict):
+    name: str
+    markup: str
+    plain: str
+    compact_plain: str
+    card_references: list[dict[str, str]]
+    symbol_references: list[str]
+    literal_text: list[str]
+
+
+class SharedMarkupFixture(TypedDict):
+    symbol_tokens: dict[str, str]
+    cases: list[SharedMarkupCase]
+
+
+SHARED_FIXTURE_PATH = (
+    Path(__file__).resolve().parents[3] / "test-fixtures" / "card-linked-markdown.json"
+)
+SHARED_FIXTURE = cast(
+    SharedMarkupFixture,
+    json.loads(SHARED_FIXTURE_PATH.read_text(encoding="utf-8")),
+)
+
+
+@pytest.mark.parametrize("fixture_case", SHARED_FIXTURE["cases"], ids=lambda case: case["name"])
+def test_render_markup_plain_matches_shared_fixture(fixture_case: SharedMarkupCase) -> None:
+    assert render_markup_plain(
+        fixture_case["markup"],
+        symbol_tokens_by_key=SHARED_FIXTURE["symbol_tokens"],
+    ) == fixture_case["plain"]
+    assert render_markup_plain(
+        fixture_case["markup"],
+        symbol_tokens_by_key=SHARED_FIXTURE["symbol_tokens"],
+        compact=True,
+    ) == fixture_case["compact_plain"]
 
 
 def test_render_markup_plain_preserves_structure_and_resolves_references() -> None:

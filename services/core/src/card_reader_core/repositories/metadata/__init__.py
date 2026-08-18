@@ -52,7 +52,7 @@ from .links import (
     replace_card_version_tags,
     replace_card_version_types,
 )
-from .rule_text import refresh_rule_text_for_symbol
+from .rule_text import refresh_rule_text_for_symbol, render_rule_text_for_card_version
 from .suggestions import (
     get_metadata_suggestion,
     get_or_create_metadata_suggestion,
@@ -113,6 +113,7 @@ __all__ = [
     "list_types_for_card_sort",
     "list_types_with_linked_card_counts",
     "refresh_rule_text_for_symbol",
+    "render_rule_text_for_card_version",
     "reject_metadata_suggestion",
     "replace_card_version_keywords",
     "replace_card_version_metadata_suggestions",

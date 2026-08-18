@@ -4710,6 +4710,160 @@ def test_ordinary_import_matching_latest_checksum_creates_new_content_version_sn
     assert [tag.id for tag in get_tags_for_card_version(version.id)] == [manual_tag.id]
 
 
+def test_new_card_version_derives_rule_text_from_enriched_source_and_linked_symbols() -> None:
+    symbol = _get_or_create_symbol(
+        key="rule-persistence-new",
+        label="Rule Persistence New",
+        symbol_type="misc",
+    )
+    symbol.text_token = "{NEW}"
+    symbol.save(update_fields=["text_token"])
+    item = _create_rule_text_import_item("rule-persistence-new.png")
+
+    version = _save_rule_text_import(
+        item=item,
+        name="Rule Persistence New",
+        checksum="rule-persistence-new-checksum",
+        enriched_text=(
+            "Deal **two** [[symbol:rule-persistence-new]] and "
+            "[[symbol:rule-persistence-missing]]."
+        ),
+        symbol_ids=[symbol.id],
+    )
+
+    assert version.rules_text_enriched == (
+        "Deal **two** [[symbol:rule-persistence-new]] and "
+        "[[symbol:rule-persistence-missing]]."
+    )
+    assert version.rules_text == "Deal two {NEW} and rule-persistence-missing."
+    assert version.parse_result is not None
+    assert version.parse_result.normalized_fields_json["rules_text"] == (
+        "stale parser plain text"
+    )
+
+
+def test_reparse_derives_rule_text_from_symbols_that_remain_linked() -> None:
+    card, target_version = _create_editable_card_version(name="Rule Persistence Reparse")
+    linked_symbol = _get_or_create_symbol(
+        key="rule-persistence-linked",
+        label="Rule Persistence Linked",
+        symbol_type="misc",
+    )
+    linked_symbol.text_token = "{LINKED}"
+    linked_symbol.save(update_fields=["text_token"])
+    incoming_symbol = _get_or_create_symbol(
+        key="rule-persistence-incoming",
+        label="Rule Persistence Incoming",
+        symbol_type="misc",
+    )
+    incoming_symbol.text_token = "{INCOMING}"
+    incoming_symbol.save(update_fields=["text_token"])
+    update_latest_card_version(
+        card_id=card.id,
+        updates={"symbol_ids": [linked_symbol.id]},
+        restore_fields=[],
+        restore_metadata_groups=[],
+        unlock_fields=[],
+        unlock_metadata_groups=[],
+    )
+    item = _create_rule_text_import_item(
+        "rule-persistence-reparse.png",
+        target_card=card,
+        target_version=target_version,
+    )
+
+    version = _save_rule_text_import(
+        item=item,
+        name="Rule Persistence Reparse",
+        checksum="rule-persistence-reparse-checksum",
+        enriched_text=(
+            "Keep [[symbol:rule-persistence-linked]] but "
+            "[[symbol:rule-persistence-incoming]] is not linked."
+        ),
+        symbol_ids=[incoming_symbol.id],
+    )
+
+    assert version.id == target_version.id
+    assert version.rules_text == (
+        "Keep {LINKED} but rule-persistence-incoming is not linked."
+    )
+
+
+def test_content_version_snapshot_derives_rule_text_from_enriched_source() -> None:
+    card, source_version = _create_editable_card_version(name="Rule Persistence Snapshot")
+    source_version.image_hash = "rule-persistence-snapshot-checksum"
+    source_version.content_version = ContentVersion.objects.create(
+        version_number="272.1.0",
+        base_version="272.1",
+        major=272,
+        minor=1,
+        patch=0,
+        description="Original rule persistence snapshot.",
+    )
+    source_version.save(update_fields=["image_hash", "content_version"])
+    symbol = _get_or_create_symbol(
+        key="rule-persistence-snapshot",
+        label="Rule Persistence Snapshot",
+        symbol_type="misc",
+    )
+    symbol.text_token = "{SNAPSHOT}"
+    symbol.save(update_fields=["text_token"])
+    next_content_version = ContentVersion.objects.create(
+        version_number="272.1.1",
+        base_version="272.1",
+        major=272,
+        minor=1,
+        patch=1,
+        description="Next rule persistence snapshot.",
+    )
+    item = _create_rule_text_import_item(
+        "rule-persistence-snapshot.png",
+        content_version=next_content_version,
+    )
+
+    version = _save_rule_text_import(
+        item=item,
+        name="Rule Persistence Snapshot",
+        checksum="rule-persistence-snapshot-checksum",
+        enriched_text="Use [[symbol:rule-persistence-snapshot]].",
+        symbol_ids=[symbol.id],
+        reparse_existing=True,
+    )
+
+    assert version.card == card
+    assert version.id != source_version.id
+    assert version.content_version == next_content_version
+    assert version.rules_text == "Use {SNAPSHOT}."
+
+
+def test_reparse_preserves_manually_owned_rule_text_pair() -> None:
+    card, target_version = _create_editable_card_version(name="Rule Persistence Manual")
+    update_latest_card_version(
+        card_id=card.id,
+        updates={"rules_text": "Manual **rule** text."},
+        restore_fields=[],
+        restore_metadata_groups=[],
+        unlock_fields=[],
+        unlock_metadata_groups=[],
+    )
+    item = _create_rule_text_import_item(
+        "rule-persistence-manual.png",
+        target_card=card,
+        target_version=target_version,
+    )
+
+    version = _save_rule_text_import(
+        item=item,
+        name="Rule Persistence Manual",
+        checksum="rule-persistence-manual-checksum",
+        enriched_text="Incoming **parser** rules.",
+    )
+
+    assert version.rules_text_enriched == "Manual **rule** text."
+    assert version.rules_text == "Manual rule text."
+    assert version.field_sources_json["fields"]["rules_text"] == "manual"
+
+
 def test_import_matching_deprecated_card_keeps_card_deprecated_and_warns() -> None:
     target_card, target_version = _create_editable_card_version(name="Deprecated Import Card")
     target_card.lifecycle_status = "deprecated"
@@ -5515,6 +5669,57 @@ def _get_or_create_symbol(*, key: str, label: str, symbol_type: str) -> Symbol:
         },
     )
     return symbol
+
+
+def _create_rule_text_import_item(
+    filename: str,
+    *,
+    content_version: ContentVersion | None = None,
+    target_card: Card | None = None,
+    target_version: CardVersion | None = None,
+) -> ImportJobItem:
+    source_path = build_storage_relative_path("uploads", filename)
+    resolved_source_path = resolve_storage_path(source_path)
+    resolved_source_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_test_png(resolved_source_path)
+    job = ImportJob.objects.create(
+        source_path=source_path,
+        template=Template.objects.get(key="mtg-like-v1"),
+        content_version=content_version,
+        total_items=1,
+    )
+    return ImportJobItem.objects.create(
+        job=job,
+        source_file=source_path,
+        target_card=target_card,
+        target_card_version=target_version,
+    )
+
+
+def _save_rule_text_import(
+    *,
+    item: ImportJobItem,
+    name: str,
+    checksum: str,
+    enriched_text: str,
+    symbol_ids: list[str] | None = None,
+    reparse_existing: bool = False,
+) -> CardVersion:
+    return save_parsed_card(
+        item=item,
+        template_id="mtg-like-v1",
+        checksum=checksum,
+        normalized_fields={
+            "name": name,
+            "rules_text_raw": "Detected rules",
+            "rules_text_enriched": enriched_text,
+            "rules_text": "stale parser plain text",
+        },
+        confidence={"overall": 0.8},
+        raw_ocr={},
+        symbol_ids=symbol_ids,
+        reparse_existing=reparse_existing,
+    )
 
 
 def _create_editable_card_version(

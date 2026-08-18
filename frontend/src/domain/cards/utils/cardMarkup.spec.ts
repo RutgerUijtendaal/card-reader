@@ -1,11 +1,68 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import type { SymbolFilterOption } from '@/domain/cards/types';
 import {
   buildCardReference,
+  extractSymbolReferenceKeys,
   findCardMarkupTrigger,
   renderCardMarkupHtml,
 } from '@/domain/cards/utils/cardMarkup';
 
+type SharedMarkupCase = {
+  name: string;
+  markup: string;
+  plain: string;
+  compact_plain: string;
+  card_references: Array<{ id: string; label: string }>;
+  symbol_references: string[];
+  literal_text: string[];
+};
+
+type SharedMarkupFixture = {
+  symbol_tokens: Record<string, string>;
+  cases: SharedMarkupCase[];
+};
+
+const sharedFixture = JSON.parse(
+  readFileSync(
+    resolve(process.cwd(), '../test-fixtures/card-linked-markdown.json'),
+    'utf8',
+  ),
+) as SharedMarkupFixture;
+const sharedSymbols: SymbolFilterOption[] = Object.entries(sharedFixture.symbol_tokens).map(
+  ([key, textToken]) => ({
+    id: key,
+    key,
+    label: key,
+    symbol_type: 'rules',
+    text_token: textToken,
+    asset_url: null,
+  }),
+);
+
 describe('card markup', () => {
+  it.each(sharedFixture.cases)('matches shared parsing behavior: $name', (fixtureCase) => {
+    const html = renderCardMarkupHtml(fixtureCase.markup, sharedSymbols);
+    const container = document.createElement('div');
+    container.innerHTML = html;
+
+    const references = Array.from(
+      container.querySelectorAll<HTMLElement>('[data-card-reference-id]'),
+      (element) => ({
+        id: element.dataset.cardReferenceId ?? '',
+        label: element.textContent ?? '',
+      }),
+    );
+    expect(references).toEqual(fixtureCase.card_references);
+    expect(extractSymbolReferenceKeys(fixtureCase.markup)).toEqual(
+      fixtureCase.symbol_references,
+    );
+    for (const literalText of fixtureCase.literal_text) {
+      expect(container.textContent).toContain(literalText);
+    }
+  });
+
   it('renders Markdown and sanitized card references', () => {
     const source = `## Plan\n\nPlay **${buildCardReference('card-1', 'Hero | One]')}**.`;
 

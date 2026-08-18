@@ -6,6 +6,20 @@ from card_reader_core.rules import render_enriched_rule_text, replace_symbol_pla
 from .links import get_symbols_for_card_version
 
 
+def render_rule_text_for_card_version(
+    *,
+    card_version_id: str,
+    enriched_text: str,
+) -> str:
+    return render_enriched_rule_text(
+        enriched_text,
+        symbol_tokens_by_key={
+            symbol.key: symbol.text_token
+            for symbol in get_symbols_for_card_version(card_version_id)
+        },
+    )
+
+
 def refresh_rule_text_for_symbol(
     *,
     symbol_id: str,
@@ -27,13 +41,9 @@ def refresh_rule_text_for_symbol(
                 new_symbol_key=new_key,
             )
 
-        symbol_tokens_by_key = {
-            symbol.key: symbol.text_token
-            for symbol in get_symbols_for_card_version(version.id)
-        }
-        rendered_text = render_enriched_rule_text(
-            enriched_text,
-            symbol_tokens_by_key=symbol_tokens_by_key,
+        rendered_text = render_rule_text_for_card_version(
+            card_version_id=version.id,
+            enriched_text=enriched_text,
         )
         if enriched_text == version.rules_text_enriched and rendered_text == version.rules_text:
             continue

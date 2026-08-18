@@ -1,0 +1,115 @@
+{
+  "symbol_tokens": {
+    "fire": "{F}"
+  },
+  "cases": [
+    {
+      "name": "markdown structure and references",
+      "markup": "# Opening\n\nPlay **[[card:card-1|Bold Hero]]** with [[symbol:fire]].\n\n- First\n- Second",
+      "plain": "Opening\n\nPlay Bold Hero with {F}.\n\nFirst\nSecond",
+      "compact_plain": "Opening Play Bold Hero with {F}. First Second",
+      "card_references": [{ "id": "card-1", "label": "Bold Hero" }],
+      "symbol_references": ["fire"],
+      "literal_text": ["Opening", "{F}", "First", "Second"]
+    },
+    {
+      "name": "inline fenced and indented code",
+      "markup": "Use `[[card:inline|Inline]]`.\n\n```text\n[[symbol:fire]]\n```\n\n    [[card:indented|Indented]]",
+      "plain": "Use [[card:inline|Inline]].\n\n[[symbol:fire]]\n\n[[card:indented|Indented]]",
+      "compact_plain": "Use [[card:inline|Inline]]. [[symbol:fire]] [[card:indented|Indented]]",
+      "card_references": [],
+      "symbol_references": [],
+      "literal_text": ["[[card:inline|Inline]]", "[[symbol:fire]]", "[[card:indented|Indented]]"]
+    },
+    {
+      "name": "references resume after a closing fence",
+      "markup": "```\n[[card:inside|Inside]]\n```\n\n[[card:outside|Outside]]",
+      "plain": "[[card:inside|Inside]]\n\nOutside",
+      "compact_plain": "[[card:inside|Inside]] Outside",
+      "card_references": [{ "id": "outside", "label": "Outside" }],
+      "symbol_references": [],
+      "literal_text": ["[[card:inside|Inside]]"]
+    },
+    {
+      "name": "short and decorated fences do not close a longer fence",
+      "markup": "````\n[[card:inside-1|Inside one]]\n```\n[[card:inside-2|Inside two]]\n```` not closed\n[[card:inside-3|Inside three]]\n````\n\n[[card:outside|Outside]]",
+      "plain": "[[card:inside-1|Inside one]]\n```\n[[card:inside-2|Inside two]]\n```` not closed\n[[card:inside-3|Inside three]]\n\nOutside",
+      "compact_plain": "[[card:inside-1|Inside one]] ``` [[card:inside-2|Inside two]] ```` not closed [[card:inside-3|Inside three]] Outside",
+      "card_references": [{ "id": "outside", "label": "Outside" }],
+      "symbol_references": [],
+      "literal_text": ["[[card:inside-1|Inside one]]", "[[card:inside-2|Inside two]]", "[[card:inside-3|Inside three]]"]
+    },
+    {
+      "name": "escaped references stay literal",
+      "markup": "\\[[card:card-1|Hero]] \\[[symbol:fire]]",
+      "plain": "[[card:card-1|Hero]] [[symbol:fire]]",
+      "compact_plain": "[[card:card-1|Hero]] [[symbol:fire]]",
+      "card_references": [],
+      "symbol_references": [],
+      "literal_text": ["[[card:card-1|Hero]]", "[[symbol:fire]]"]
+    },
+    {
+      "name": "unmatched backticks do not hide references",
+      "markup": "`note [[card:card-1|Hero]]",
+      "plain": "`note Hero",
+      "compact_plain": "`note Hero",
+      "card_references": [{ "id": "card-1", "label": "Hero" }],
+      "symbol_references": [],
+      "literal_text": ["`note"]
+    },
+    {
+      "name": "backticks do not span CommonMark blocks",
+      "markup": "`note\n\n[[card:card-1|Hero]]`",
+      "plain": "`note\n\nHero`",
+      "compact_plain": "`note Hero`",
+      "card_references": [{ "id": "card-1", "label": "Hero" }],
+      "symbol_references": [],
+      "literal_text": ["`note", "Hero`"]
+    },
+    {
+      "name": "card references inside markdown links become labels",
+      "markup": "[see [[card:card-1|Card One]]](https://example.com)",
+      "plain": "see Card One",
+      "compact_plain": "see Card One",
+      "card_references": [],
+      "symbol_references": [],
+      "literal_text": ["see Card One"]
+    },
+    {
+      "name": "reserved label characters are unescaped",
+      "markup": "[[card:card-1|A \\| B\\] \\\\]]",
+      "plain": "A | B] \\",
+      "compact_plain": "A | B] \\",
+      "card_references": [{ "id": "card-1", "label": "A | B] \\" }],
+      "symbol_references": [],
+      "literal_text": ["A | B] \\"]
+    },
+    {
+      "name": "malformed references remain literal",
+      "markup": "**A**\n\n[[card:missing-label]] [[symbol:UPPER]]  B",
+      "plain": "A\n\n[[card:missing-label]] [[symbol:UPPER]]  B",
+      "compact_plain": "A [[card:missing-label]] [[symbol:UPPER]] B",
+      "card_references": [],
+      "symbol_references": [],
+      "literal_text": ["[[card:missing-label]]", "[[symbol:UPPER]]"]
+    },
+    {
+      "name": "missing symbol mappings fall back to the key",
+      "markup": "Known [[symbol:fire]], missing [[symbol:unknown]].",
+      "plain": "Known {F}, missing unknown.",
+      "compact_plain": "Known {F}, missing unknown.",
+      "card_references": [],
+      "symbol_references": ["fire", "unknown"],
+      "literal_text": ["{F}", "unknown"]
+    },
+    {
+      "name": "authored placeholder-like text does not collide",
+      "markup": "CARDREADERREFERENCETOKEN0X [[card:card-1|Hero]]",
+      "plain": "CARDREADERREFERENCETOKEN0X Hero",
+      "compact_plain": "CARDREADERREFERENCETOKEN0X Hero",
+      "card_references": [{ "id": "card-1", "label": "Hero" }],
+      "symbol_references": [],
+      "literal_text": ["CARDREADERREFERENCETOKEN0X"]
+    }
+  ]
+}
