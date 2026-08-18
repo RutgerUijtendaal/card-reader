@@ -503,6 +503,15 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         monkeypatch.setattr(settings, "app_data_dir", source_storage)
         selection = _build_synthetic_source(source_storage)
         selection["include_all_cards"] = True
+        source_hero = Card.objects.get(key="synthetic-hero")
+        assert source_hero.latest_version is not None
+        source_hero.latest_version.rules_text_enriched = (
+            "Deal **five** [[symbol:arcane-mana]]."
+        )
+        source_hero.latest_version.rules_text = "Legacy stale plain text"
+        source_hero.latest_version.save(
+            update_fields=["rules_text_enriched", "rules_text"]
+        )
         selection_path.write_text(json.dumps(selection), encoding="utf-8")
 
         manifest = export_developer_data(
@@ -630,6 +639,8 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         latest = Card.objects.get(key="synthetic-hero").latest_version
         assert latest is not None
         assert latest.version_number == 2
+        assert latest.rules_text_enriched == "Deal **five** [[symbol:arcane-mana]]."
+        assert latest.rules_text == "Deal five {AM}."
         assert latest.card_version_keywords.filter(keyword__key="arrival").exists()
         assert latest.card_version_tags.filter(tag__key="synthetic").exists()
         assert latest.card_version_symbols.filter(symbol__key="arcane-mana").exists()

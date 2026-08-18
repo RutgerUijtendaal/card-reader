@@ -40,6 +40,9 @@ the default Player mana and affinity Symbol rules without creating placeholder S
 Import reconstructs the
 pool-plus-faction natural identity namespace rather than trusting a serialized internal key. This
 compatibility keeps older immutable bundles usable without making current classification fields optional.
+For every supported bundle version, import also rebuilds derived plain rules text from the enriched
+source and the version's imported Symbols, so clean-checkout search and later exports use the same
+rendering semantics as ordinary card saves.
 
 Selection coverage is evaluated by pool, role, faction, and mana family through `min_cards_by_pool`,
 `min_cards_by_role`, `min_cards_by_faction`, and `min_cards_by_mana_family`. The existing Hero minimum is retained under the Hero
