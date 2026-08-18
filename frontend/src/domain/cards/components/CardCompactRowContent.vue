@@ -8,6 +8,13 @@
         >
           {{ card.name }}
         </p>
+        <span
+          v-if="showContextualMetadata"
+          class="theme-pill theme-pill-accent shrink-0 px-1.5 py-0.5 text-[9px] font-semibold"
+          data-testid="row-card-identity"
+        >
+          {{ contextualIdentityLabel }}
+        </span>
         <p
           v-if="cardIsDeprecated(card)"
           class="theme-pill theme-pill-warning inline-flex shrink-0 items-center gap-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
@@ -24,37 +31,22 @@
       >
         <SymbolizedText
           :tokens="card.mana_symbols"
-          :text="card.mana_cost || '-'"
+          :text="showContextualManaSymbols ? '' : card.mana_cost"
           :symbol-by-key="manaSymbolByKey"
         />
       </div>
       <div
-        v-if="showClassification"
-        class="flex min-w-0 flex-wrap gap-1 overflow-hidden"
+        v-else-if="contextualMetadataLabels.length > 0"
+        data-testid="row-contextual-metadata"
+        class="flex min-w-0 flex-nowrap gap-1 overflow-hidden"
       >
-        <span class="theme-pill theme-pill-accent px-1.5 py-0.5 text-[9px] font-semibold">
-          {{ cardPoolLabel(card.card_pool) }}
-        </span>
         <span
-          v-for="role in displayCardRoleLabels(card.card_roles)"
-          :key="`role-${role}`"
-          class="theme-pill theme-pill-neutral px-1.5 py-0.5 text-[9px] font-semibold"
+          v-for="label in contextualMetadataLabels"
+          :key="label"
+          class="theme-pill px-1.5 py-0.5 text-[9px] font-semibold"
+          :class="contextualMetadataPillClass"
         >
-          {{ role }}
-        </span>
-        <span
-          v-for="faction in displayCardFactionLabels(card.card_factions ?? [])"
-          :key="`faction-${faction}`"
-          class="theme-pill theme-pill-success px-1.5 py-0.5 text-[9px] font-semibold"
-        >
-          {{ faction }}
-        </span>
-        <span
-          v-for="family in displayManaFamilyLabels(card.card_mana_families ?? [])"
-          :key="`mana-${family}`"
-          class="theme-pill theme-pill-warning px-1.5 py-0.5 text-[9px] font-semibold"
-        >
-          {{ family }}
+          {{ label }}
         </span>
       </div>
     </div>
@@ -92,9 +84,9 @@ import SymbolizedText from '@/domain/cards/components/SymbolizedText.vue';
 import type { CardHoverTooltipModel } from '@/domain/cards/types/cardModels';
 import { cardIsDeprecated } from '@/domain/cards/utils/filters/cardLifecycle';
 import { cardPoolLabel } from '@/domain/cards/cardPools';
-import { displayCardRoleLabels } from '@/domain/cards/cardRoles';
-import { displayCardFactionLabels } from '@/domain/cards/cardFactions';
-import { displayManaFamilyLabels } from '@/domain/cards/manaFamilies';
+import { cardRoleLabel } from '@/domain/cards/cardRoles';
+import { cardFactionLabel } from '@/domain/cards/cardFactions';
+import { manaFamilyLabel } from '@/domain/cards/manaFamilies';
 
 type CardCompactRowCard = Pick<
   CardHoverTooltipModel,
@@ -117,18 +109,70 @@ const props = withDefaults(defineProps<{
   artWidth?: string;
   artObjectPosition?: string;
   artTransform?: string;
-  showClassification?: boolean;
+  showContextualMetadata?: boolean;
 }>(), {
   artWidth: '6rem',
   artObjectPosition: '52% 5%',
   artTransform: 'scale(1.4)',
-  showClassification: false,
+  showContextualMetadata: false,
 });
 
 const manaSymbolByKey = computed(() =>
   Object.fromEntries(props.card.symbols.map((symbol) => [symbol.key, symbol])),
 );
-const showManaSymbols = computed(() => props.card.mana_value !== 0 && props.card.mana_cost !== '0');
+const hasRenderableManaSymbols = computed(() => {
+  const symbolKeys = props.card.mana_symbols
+    .map((symbolKey) => symbolKey.trim())
+    .filter((symbolKey) => symbolKey.length > 0);
+  return symbolKeys.length > 0
+    && symbolKeys.every((symbolKey) => Boolean(manaSymbolByKey.value[symbolKey]?.asset_url));
+});
+const showContextualManaSymbols = computed(() =>
+  props.showContextualMetadata
+  && props.card.card_pool === 'player'
+  && hasRenderableManaSymbols.value,
+);
+const showManaSymbols = computed(() =>
+  showContextualManaSymbols.value
+  || (
+    !props.showContextualMetadata
+    && props.card.mana_value !== 0
+    && props.card.mana_cost !== '0'
+  ),
+);
+const contextualMetadataLabels = computed<string[]>(() => {
+  if (!props.showContextualMetadata) {
+    return [];
+  }
+
+  if (props.card.card_pool === 'player') {
+    return (props.card.card_mana_families ?? []).map(manaFamilyLabel);
+  }
+  if (props.card.card_pool === 'evil') {
+    return (props.card.card_factions ?? []).map(cardFactionLabel);
+  }
+  return props.card.card_roles.map(cardRoleLabel);
+});
+const contextualIdentityLabel = computed(() => {
+  const poolLabel = cardPoolLabel(props.card.card_pool);
+  if (props.card.card_pool === 'evil') {
+    return poolLabel;
+  }
+
+  const factionLabels = (props.card.card_factions ?? []).map(cardFactionLabel);
+  return factionLabels.length > 0
+    ? `${poolLabel} · ${factionLabels.join(', ')}`
+    : poolLabel;
+});
+const contextualMetadataPillClass = computed(() => {
+  if (props.card.card_pool === 'player') {
+    return 'theme-pill-warning';
+  }
+  if (props.card.card_pool === 'evil') {
+    return 'theme-pill-success';
+  }
+  return 'theme-pill-neutral';
+});
 </script>
 
 <style scoped>

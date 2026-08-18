@@ -87,23 +87,132 @@ describe('SmallCardSearchResultRow', () => {
     document.body.innerHTML = '';
   });
 
-  test('renders card name, mana cost, and image when present', async () => {
-    const mounted = await mountRow();
+  test('renders card name, rendered player mana symbols, and image when present', async () => {
+    const mounted = await mountRow({
+      card: buildCard({
+        mana_symbols: ['arcane'],
+        card_mana_families: ['primal'],
+        symbols: [{
+          id: 'symbol-1',
+          key: 'arcane',
+          label: 'Arcane',
+          symbol_type: 'mana',
+          text_token: '{A}',
+          asset_url: '/arcane.svg',
+        }],
+      }),
+    });
 
     expect(mounted.container.textContent).toContain('Card 1');
-    expect(mounted.container.querySelector('[data-testid="row-mana-symbols"]')?.textContent).toContain('1');
+    expect(mounted.container.querySelector('[data-testid="row-card-identity"]')?.textContent).toContain('Player');
+    expect(mounted.container.querySelector('[data-testid="row-mana-symbols"] img[alt="{A}"]')).not.toBeNull();
+    expect(mounted.container.querySelector('[data-testid="row-contextual-metadata"]')).toBeNull();
     expect(mounted.container.querySelector('img[alt="Card 1"]')).not.toBeNull();
 
     mounted.unmount();
   });
 
-  test('hides mana row for zero-cost cards', async () => {
+  test('uses player mana families when rendered mana symbols are unavailable', async () => {
     const mounted = await mountRow({
-      card: buildCard({ mana_cost: '0', mana_value: 0 }),
+      card: buildCard({
+        mana_symbols: ['missing-symbol'],
+        card_factions: ['order', 'dark'],
+        card_mana_families: ['arcane', 'primal'],
+      }),
+    });
+
+    const identity = mounted.container.querySelector('[data-testid="row-card-identity"]');
+    expect(identity?.textContent).toContain('Player');
+    expect(identity?.textContent).toContain('Order');
+    expect(identity?.textContent).toContain('Dark');
+    expect(mounted.container.querySelector('[data-testid="row-mana-symbols"]')).toBeNull();
+    expect(mounted.container.querySelector('[data-testid="row-contextual-metadata"]')?.textContent).toContain('Arcane');
+    expect(mounted.container.querySelector('[data-testid="row-contextual-metadata"]')?.textContent).toContain('Primal');
+
+    mounted.unmount();
+  });
+
+  test('uses player mana families when a linked symbol has no renderable asset', async () => {
+    const mounted = await mountRow({
+      card: buildCard({
+        mana_symbols: ['arcane'],
+        card_mana_families: ['arcane'],
+        symbols: [{
+          id: 'symbol-1',
+          key: 'arcane',
+          label: 'Arcane',
+          symbol_type: 'mana',
+          text_token: '{A}',
+          asset_url: null,
+        }],
+      }),
     });
 
     expect(mounted.container.querySelector('[data-testid="row-mana-symbols"]')).toBeNull();
-    expect(mounted.container.textContent).toContain('Card 1');
+    expect(mounted.container.querySelector('[data-testid="row-contextual-metadata"]')?.textContent).toContain('Arcane');
+
+    mounted.unmount();
+  });
+
+  test('uses evil factions as the single metadata row', async () => {
+    const mounted = await mountRow({
+      card: buildCard({
+        card_pool: 'evil',
+        card_roles: ['boss'],
+        card_factions: ['order', 'dark'],
+        card_mana_families: ['occult'],
+      }),
+    });
+
+    expect(mounted.container.querySelector('[data-testid="row-card-identity"]')?.textContent).toBe('Evil');
+    const metadata = mounted.container.querySelector('[data-testid="row-contextual-metadata"]');
+    expect(metadata?.textContent).toContain('Order');
+    expect(metadata?.textContent).toContain('Dark');
+    expect(metadata?.textContent).not.toContain('Boss');
+    expect(metadata?.textContent).not.toContain('Occult');
+
+    mounted.unmount();
+  });
+
+  test('uses neutral roles as the single metadata row', async () => {
+    const mounted = await mountRow({
+      card: buildCard({
+        card_pool: 'neutral',
+        card_roles: ['boon', 'event'],
+        card_factions: ['blood'],
+        card_mana_families: ['divine'],
+      }),
+    });
+
+    const identity = mounted.container.querySelector('[data-testid="row-card-identity"]');
+    expect(identity?.textContent).toContain('Neutral');
+    expect(identity?.textContent).toContain('Blood');
+    const metadata = mounted.container.querySelector('[data-testid="row-contextual-metadata"]');
+    expect(metadata?.textContent).toContain('Boon');
+    expect(metadata?.textContent).toContain('Event');
+    expect(metadata?.textContent).not.toContain('Blood');
+    expect(metadata?.textContent).not.toContain('Divine');
+
+    mounted.unmount();
+  });
+
+  test('does not render synthetic empty metadata labels', async () => {
+    const mounted = await mountRow({
+      card: buildCard({
+        mana_cost: '',
+        mana_symbols: [],
+        mana_value: null,
+        card_roles: [],
+        card_factions: [],
+        card_mana_families: [],
+      }),
+    });
+
+    expect(mounted.container.querySelector('[data-testid="row-mana-symbols"]')).toBeNull();
+    expect(mounted.container.querySelector('[data-testid="row-contextual-metadata"]')).toBeNull();
+    expect(mounted.container.textContent).not.toContain('Colorless');
+    expect(mounted.container.textContent).not.toContain('No faction');
+    expect(mounted.container.textContent).not.toContain('Normal');
 
     mounted.unmount();
   });
