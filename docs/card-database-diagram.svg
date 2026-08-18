@@ -60,11 +60,11 @@
   <rect class="box import" x="480" y="230" width="270" height="90"/>
   <text class="title" x="615" y="263">ImportJob</text>
   <text class="field" x="615" y="290">source, template, status</text>
-  <text class="small" x="615" y="311">creation key • classification snapshots</text>
+  <text class="small" x="615" y="311">creation key • classification</text>
   <rect class="box import" x="880" y="230" width="270" height="90"/>
   <text class="title" x="1015" y="263">ImportJobItem</text>
-  <text class="field" x="1015" y="290">target • resolved classification</text>
-  <text class="small" x="1015" y="311">ordered warnings + audit</text>
+  <text class="field" x="1015" y="290">target • classification result</text>
+  <text class="small" x="1015" y="311">warnings • audit</text>
   <rect class="box version" x="1270" y="230" width="240" height="90"/>
   <text class="title" x="1390" y="268">Template</text>
   <text class="field" x="1390" y="296">parser definition</text>
@@ -255,9 +255,9 @@
   <text class="label" x="1792" y="555">reviewed version</text>
   <path class="thin" d="M1640 300 L1580 300 L1580 405 L1325 405 L1325 875 L1290 875"/>
   <text class="label" x="1410" y="397">reviewed Card</text>
-  <path class="thin" d="M2280 320 L2280 430 L1405 430 L1405 955 L1420 955"/>
-  <text class="label" x="1880" y="422">submitted_by</text>
-  <path class="thin" d="M2340 320 L2340 415 L2015 415 L2015 955 L2000 955"/>
+  <path class="thin" d="M2280 320 L2280 455 L2040 455 L2040 850 L1710 850 L1710 925 L1690 925"/>
+  <text class="label" x="2080" y="447">submitted_by</text>
+  <path class="soft" d="M2340 320 L2340 415 L2015 415 L2015 955 L2000 955"/>
   <text class="label" x="2040" y="407">reviewed_by</text>
   <path class="soft" d="M615 320 L615 445 L1305 445 L1305 1790 L1500 1790 L1500 1360"/>
   <text class="label" x="1318" y="1768">immutable rule snapshot</text>
