@@ -105,20 +105,32 @@ const protectReferences = (
   const output: string[] = [];
   const references = new Map<string, string>();
   let position = 0;
-  let fenceMarker: '`' | '~' | null = null;
+  let fenceMarker: { marker: '`' | '~'; length: number } | null = null;
   let inlineTicks = 0;
   let atLineStart = true;
   while (position < markup.length) {
     const remaining = markup.slice(position);
     if (atLineStart && inlineTicks === 0) {
-      const fence = remaining.match(/^ {0,3}(`{3,}|~{3,})/);
-      if (fence?.[1]) {
-        const marker = fence[1][0] as '`' | '~';
-        fenceMarker = fenceMarker === null ? marker : marker === fenceMarker ? null : fenceMarker;
-        output.push(fence[0]);
-        position += fence[0].length;
-        atLineStart = false;
-        continue;
+      const fence = remaining.match(/^( {0,3})(`{3,}|~{3,})([^\n]*)/);
+      const delimiter = fence?.[2];
+      if (fence && delimiter) {
+        const marker = delimiter[0] as '`' | '~';
+        const trailingText = fence[3] ?? '';
+        const opensFence: boolean =
+          fenceMarker === null && !(marker === '`' && trailingText.includes('`'));
+        const closesFence: boolean =
+          fenceMarker !== null &&
+          marker === fenceMarker.marker &&
+          delimiter.length >= fenceMarker.length &&
+          trailingText.trim() === '';
+        if (opensFence || closesFence) {
+          fenceMarker = opensFence ? { marker, length: delimiter.length } : null;
+          const prefix = `${fence[1] ?? ''}${delimiter}`;
+          output.push(prefix);
+          position += prefix.length;
+          atLineStart = false;
+          continue;
+        }
       }
     }
     if (fenceMarker === null && markup[position] === '`') {

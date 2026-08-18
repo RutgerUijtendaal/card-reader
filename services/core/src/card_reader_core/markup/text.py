@@ -99,23 +99,32 @@ def _protect_references(
     output: list[str] = []
     values: dict[str, str] = {}
     position = 0
-    fence_marker: str | None = None
+    fence_marker: tuple[str, int] | None = None
     inline_ticks = 0
     at_line_start = True
     while position < len(markup):
         if at_line_start and inline_ticks == 0:
-            fence = re.match(r" {0,3}(`{3,}|~{3,})", markup[position:])
+            fence = re.match(r"( {0,3})(`{3,}|~{3,})([^\n]*)", markup[position:])
             if fence is not None:
-                delimiter = fence.group(0)
-                marker = fence.group(1)[0]
-                if fence_marker is None:
-                    fence_marker = marker
-                elif marker == fence_marker:
-                    fence_marker = None
-                output.append(delimiter)
-                position += len(delimiter)
-                at_line_start = False
-                continue
+                delimiter = fence.group(2)
+                marker = delimiter[0]
+                trailing_text = fence.group(3)
+                opens_fence = fence_marker is None and not (
+                    marker == "`" and "`" in trailing_text
+                )
+                closes_fence = (
+                    fence_marker is not None
+                    and marker == fence_marker[0]
+                    and len(delimiter) >= fence_marker[1]
+                    and not trailing_text.strip()
+                )
+                if opens_fence or closes_fence:
+                    fence_marker = (marker, len(delimiter)) if opens_fence else None
+                    prefix = f"{fence.group(1)}{delimiter}"
+                    output.append(prefix)
+                    position += len(prefix)
+                    at_line_start = False
+                    continue
         if fence_marker is None and markup[position] == "`":
             tick_match = re.match(r"`+", markup[position:])
             assert tick_match is not None

@@ -36,6 +36,17 @@ describe('card markup', () => {
     expect(html).toContain('data-card-reference-id="card-2"');
   });
 
+  it('requires a sufficiently long, otherwise empty closing fence', () => {
+    const html = renderCardMarkupHtml(
+      '````\n[[card:card-1|Inside one]]\n```\n[[card:card-2|Inside two]]\n```` not closed\n[[card:card-3|Inside three]]\n````\n\n[[card:card-4|Outside]]',
+    );
+
+    expect(html).not.toContain('data-card-reference-id="card-1"');
+    expect(html).not.toContain('data-card-reference-id="card-2"');
+    expect(html).not.toContain('data-card-reference-id="card-3"');
+    expect(html).toContain('data-card-reference-id="card-4"');
+  });
+
   it('disables raw HTML, images, and unsafe URL protocols', () => {
     const html = renderCardMarkupHtml(
       '<script>alert(1)</script> ![alt](https://example.com/a.png) [bad](javascript:alert(1))',

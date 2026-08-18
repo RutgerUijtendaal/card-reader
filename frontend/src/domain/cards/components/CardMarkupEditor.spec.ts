@@ -184,4 +184,35 @@ describe('CardMarkupEditor', () => {
     expect(mounted.value.value).toBe('[[symbol:fire]]');
     mounted.app.unmount();
   });
+
+  test('invalidates visible card results as soon as the query changes', async () => {
+    vi.useFakeTimers();
+    fetchCardsMock.mockResolvedValue({
+      count: 1,
+      next_page: null,
+      previous_page: null,
+      page: 1,
+      page_size: 8,
+      results: [card],
+    });
+    const mounted = await mountEditor('[[card:one');
+    const textarea = mounted.container.querySelector('textarea');
+    if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Expected textarea.');
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    textarea.dispatchEvent(new KeyboardEvent('keyup', { key: 'e', bubbles: true }));
+    await vi.advanceTimersByTimeAsync(200);
+    await nextTick();
+    expect(mounted.container.textContent).toContain('Card One');
+
+    textarea.value = '[[card:two';
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await nextTick();
+
+    expect(mounted.value.value).toBe('[[card:two');
+    expect(mounted.container.textContent).not.toContain('Card One');
+    mounted.app.unmount();
+  });
 });

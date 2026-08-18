@@ -200,8 +200,12 @@ const debouncedSearch = useDebounceFn(() => void runSearch(), 200);
 const refreshTrigger = (): void => {
   const textarea = textareaRef.value;
   if (!textarea) return;
-  trigger.value = findCardMarkupTrigger(textarea.value, textarea.selectionStart);
+  const nextTrigger = findCardMarkupTrigger(textarea.value, textarea.selectionStart);
+  const previousCardQuery = trigger.value?.kind === 'symbol' ? null : trigger.value?.query ?? null;
+  const nextCardQuery = nextTrigger?.kind === 'symbol' ? null : nextTrigger?.query ?? null;
+  trigger.value = nextTrigger;
   selectedIndex.value = 0;
+  if (previousCardQuery !== nextCardQuery) cardSearch.clear();
   if (!trigger.value) {
     cardSearch.clear();
     return;
