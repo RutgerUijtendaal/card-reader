@@ -29,6 +29,13 @@ Use a banded linear schematic:
 
 Keep `Card` visually central. Decks and groups should point to `Card`, not to `CardVersion` metadata. Avoid adding a deck-to-version-metadata callout; explain that relationship in prose if needed. Preserve these semantic groupings while they remain useful, but split, resize, or rename bands when a group can no longer provide clear routing space.
 
+## Readability And Abstraction
+
+- Treat the diagram as an explanatory map, not an exhaustive serialization of the database. Readability and useful system understanding take priority over showing every persisted field or relationship.
+- Include a model, field, or connector when it clarifies ownership, stable identity, lifecycle, lineage, cardinality, or an important workflow boundary. Omit routine implementation detail such as timestamps and low-value fields; summarize related fields when their individual distinction does not help the reader.
+- Be exact about every detail that is shown: use real model/field names or an explicitly explanatory phrase, and never invent schema. If two relationships differ in a way readers need to understand, such as ownership or nullability, keep them distinct; otherwise a clear summary may be more useful than parallel detail.
+- When additional schema fidelity would materially crowd the diagram, keep the schematic readable and put the exhaustive detail in nearby prose or model documentation instead.
+
 ## Current Model Semantics
 
 - `Card` is the stable identity used by decks, groups, aliases, merge redirects, imports, and parsed versions.
@@ -48,7 +55,7 @@ Keep `Card` visually central. Decks and groups should point to `Card`, not to `C
 - Keep visible clearance between parallel lanes, box edges, labels, and arrowheads. Prefer a longer perimeter route over a tight path through a populated group.
 - Expand the canvas, band, or inter-band gutter before shrinking boxes, reducing readable text, or accepting crowded routing.
 - Reserve box sides intentionally: use distinct ports for multiple incoming relationships, and prefer the side that faces the connector's owning lane.
-- Use exact model names in boxes, including long names such as `CardVersionMetadataSuggestion`; reduce label font size instead of abbreviating when needed.
+- Use exact model names in boxes, including long names such as `CardVersionMetadataSuggestion`; reduce label font size instead of abbreviating when needed. Size long titles against the widest supported fallback font, not only the preferred local font.
 - Prefer straight, aligned pairs for metadata rows:
   - `CardVersionType -> Type`
   - `CardVersionSymbol -> Symbol`

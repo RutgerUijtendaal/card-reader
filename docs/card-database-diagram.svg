@@ -22,10 +22,10 @@
       .tts { fill: #ecfeff; stroke: #0e7490; }
       .title { font: 700 24px Inter, Arial, sans-serif; fill: #0f172a; text-anchor: middle; }
       .title-small { font: 700 20px Inter, Arial, sans-serif; fill: #0f172a; text-anchor: middle; }
+      .title-tight { font: 700 16px Inter, Arial, sans-serif; fill: #0f172a; text-anchor: middle; }
       .model-name { font: 700 11px Inter, Arial, sans-serif; fill: #0f172a; text-anchor: middle; }
       .model-name-small { font: 700 10px Inter, Arial, sans-serif; fill: #0f172a; text-anchor: middle; }
       .field { font: 18px Inter, Arial, sans-serif; fill: #334155; text-anchor: middle; }
-      .field-compact { font: 13px Inter, Arial, sans-serif; fill: #334155; text-anchor: middle; }
       .small { font: 15px Inter, Arial, sans-serif; fill: #475569; text-anchor: middle; }
       .line { stroke: #334155; stroke-width: 2.2; fill: none; stroke-linejoin: miter; marker-end: url(#arrow); }
       .thin { stroke: #64748b; stroke-width: 1.8; fill: none; stroke-linejoin: miter; marker-end: url(#arrow); }
@@ -84,8 +84,8 @@
   <rect class="box left" x="100" y="570" width="290" height="210"/>
   <text class="title" x="245" y="606">Deck</text>
   <text class="field" x="245" y="632">name</text>
-  <text class="field-compact" x="245" y="655">description_markup → description</text>
-  <text class="field-compact" x="245" y="678">long_description_markup → long_description</text>
+  <text class="small" x="245" y="655">description (markup + rendered)</text>
+  <text class="small" x="245" y="678">long description (markup + rendered)</text>
   <text class="field" x="245" y="701">difficulty (nullable)</text>
   <text class="field" x="245" y="724">hero_card, owner, visibility</text>
   <text class="small" x="245" y="752">client_creation_id (nullable)</text>
@@ -178,7 +178,7 @@
   <text class="title-small" x="1555" y="938">CardVersionParseFlag</text>
   <text class="field" x="1555" y="967">review note • submitted_by</text>
   <rect class="box review" x="1730" y="900" width="270" height="90"/>
-  <text class="title-small" x="1865" y="938">CardVersionParseFlagItem</text>
+  <text class="title-tight" x="1865" y="938">CardVersionParseFlagItem</text>
   <text class="field" x="1865" y="967">field issue • reviewed_by</text>
   <rect class="box version" x="1420" y="1060" width="270" height="90"/>
   <text class="title-small" x="1555" y="1098">CardVersionImage</text>
@@ -238,8 +238,10 @@
   <text class="label" x="1100" y="356">classification review item</text>
   <path class="thin" d="M2020 290 L2240 290"/>
   <text class="label" x="2070" y="280">reviewed_by</text>
-  <path class="thin" d="M2460 275 L2630 275"/>
-  <text class="label" x="2470" y="260">recipient / actor</text>
+  <path class="line" d="M2460 260 L2630 260"/>
+  <text class="label" x="2545" y="250" text-anchor="middle">recipient</text>
+  <path class="soft" d="M2460 295 L2630 295"/>
+  <text class="label" x="2545" y="315" text-anchor="middle">actor (nullable)</text>
   <path class="line" d="M220 320 L220 440 L1375 440 L1375 650 L1420 650"/>
   <text class="label" x="630" y="430">CardVersion.content_version</text>
   <path class="line" d="M1060 320 L1060 420 L1390 420 L1390 680 L1420 680"/>
@@ -305,7 +307,7 @@
   <text class="label" x="808" y="1490" transform="rotate(-90 808 1490)">resolved_card</text>
   <path class="line" d="M1290 1550 L1350 1550 L1350 790 L1420 790"/>
   <text class="label" x="1338" y="1520" transform="rotate(-90 1338 1520)">card_version</text>
-  <path class="line" d="M1290 1620 L1365 1620 L1365 1105 L1420 1105"/>
+  <path class="line" d="M1290 1620 L1365 1620 L1365 1130 L1420 1130"/>
   <text class="label" x="1375" y="1600">image</text>
 
   <!-- Card and CardVersion relationship lanes -->
