@@ -98,6 +98,7 @@ def _protect_references(
 ) -> tuple[str, dict[str, str]]:
     output: list[str] = []
     values: dict[str, str] = {}
+    placeholder_prefix = _unused_placeholder_prefix(markup)
     position = 0
     protected_lines = _code_block_lines(markup)
     line_index = 0
@@ -117,7 +118,9 @@ def _protect_references(
             tick_match = re.match(r"`+", markup[position:])
             assert tick_match is not None
             tick_count = len(tick_match.group(0))
-            if inline_ticks == 0:
+            if inline_ticks == 0 and _matching_backtick_run(
+                markup, position + tick_count, tick_count
+            ) >= 0:
                 inline_ticks = tick_count
             elif tick_count == inline_ticks:
                 inline_ticks = 0
@@ -130,7 +133,7 @@ def _protect_references(
             symbol_match = SYMBOL_PLACEHOLDER_PATTERN.match(markup, position)
             match = card_match or symbol_match
             if match is not None:
-                placeholder = f"CARDREADERREFERENCETOKEN{len(values)}X"
+                placeholder = f"{placeholder_prefix}{len(values)}X"
                 if card_match is not None:
                     value = _ESCAPED_CARD_CHARACTER_PATTERN.sub(r"\1", card_match.group(2))
                 else:
@@ -152,9 +155,32 @@ def _protect_references(
 
 
 def _restore_references(value: str, references: Mapping[str, str]) -> str:
-    for placeholder, rendered in references.items():
-        value = value.replace(placeholder, rendered)
-    return value
+    if not references:
+        return value
+    pattern = re.compile("|".join(re.escape(key) for key in references))
+    return pattern.sub(lambda match: references[match.group(0)], value)
+
+
+def _matching_backtick_run(value: str, start: int, length: int) -> int:
+    cursor = start
+    while cursor < len(value):
+        candidate = value.find("`", cursor)
+        if candidate < 0:
+            return -1
+        match = re.match(r"`+", value[candidate:])
+        assert match is not None
+        candidate_length = len(match.group(0))
+        if candidate_length == length:
+            return candidate
+        cursor = candidate + candidate_length
+    return -1
+
+
+def _unused_placeholder_prefix(markup: str) -> str:
+    prefix = "CARDREADERREFERENCETOKEN"
+    while prefix in markup:
+        prefix += "X"
+    return prefix
 
 
 def _transform_markup_text(markup: str, transform: Callable[[str], str]) -> str:

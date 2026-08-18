@@ -16,6 +16,15 @@ describe('card markup', () => {
     expect(html).toContain('Hero | One]');
   });
 
+  it('avoids collisions with authored placeholder-like text', () => {
+    const html = renderCardMarkupHtml(
+      'CARDREADERREFERENCETOKEN0X [[card:card-1|Hero]]',
+    );
+
+    expect(html).toContain('CARDREADERREFERENCETOKEN0X');
+    expect(html.match(/data-card-reference-id/g)).toHaveLength(1);
+  });
+
   it('keeps references in inline and fenced code literal', () => {
     const html = renderCardMarkupHtml(
       '`[[card:card-1|Hero]]`\n\n```\n[[card:card-2|Villain]]\n```',
@@ -82,7 +91,11 @@ describe('card markup', () => {
       kind: 'card',
       query: 'hero',
     });
-    expect(findCardMarkupTrigger('`[[card:hero', 13)).toBeNull();
+    expect(findCardMarkupTrigger('`[[card:hero`', 13)).toBeNull();
+    expect(findCardMarkupTrigger('`[[card:hero', 13)).toMatchObject({
+      kind: 'card',
+      query: 'hero',
+    });
   });
 
   it('ignores autocomplete inside completed references and indented code', () => {
@@ -90,5 +103,20 @@ describe('card markup', () => {
 
     expect(findCardMarkupTrigger(completed, completed.indexOf('old') + 2)).toBeNull();
     expect(findCardMarkupTrigger('    [[card:hero', 15)).toBeNull();
+  });
+
+  it('scopes completion detection to the active trigger', () => {
+    const value = '[[new before [[card:id|Existing]]';
+
+    expect(findCardMarkupTrigger(value, '[[new'.length)).toMatchObject({
+      kind: 'all',
+      query: 'new',
+    });
+  });
+
+  it('resolves references after unmatched backticks', () => {
+    const html = renderCardMarkupHtml('`note [[card:card-1|Hero]]');
+
+    expect(html).toContain('data-card-reference-id="card-1"');
   });
 });

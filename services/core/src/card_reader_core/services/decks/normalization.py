@@ -299,8 +299,8 @@ class DeckPayloadNormalizer:
     def normalize_markup(self, markup: str | None) -> str | None:
         if markup is None:
             return None
-        normalized = markup.replace("\r\n", "\n").replace("\r", "\n").strip()
-        return normalized or None
+        normalized = markup.replace("\r\n", "\n").replace("\r", "\n")
+        return normalized if normalized.strip() else None
 
     def normalize_long_description(self, description: str | None) -> str | None:
         if description is None:

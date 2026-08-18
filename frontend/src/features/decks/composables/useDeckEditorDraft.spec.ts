@@ -123,7 +123,7 @@ describe('useDeckEditorDraft', () => {
     controller.setDeckLongDescription('  Updated plan\n\nMore notes  ');
     controller.setDeckDifficulty('hard');
 
-    expect(controller.buildPayload().long_description_markup).toBe('Updated plan\n\nMore notes');
+    expect(controller.buildPayload().long_description_markup).toBe('  Updated plan\n\nMore notes  ');
     expect(controller.buildPayload().difficulty).toBe('hard');
   });
 

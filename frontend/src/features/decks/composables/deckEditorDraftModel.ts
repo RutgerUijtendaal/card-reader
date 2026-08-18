@@ -64,8 +64,8 @@ export const buildDeckCardLookup = (
 
 export const buildDeckUpsertPayload = (form: DeckForm): DeckUpsertRequest => ({
   name: form.name.trim(),
-  description_markup: form.description.trim() || null,
-  long_description_markup: form.long_description.trim() || null,
+  description_markup: markupOrNull(form.description),
+  long_description_markup: markupOrNull(form.long_description),
   difficulty: form.difficulty,
   visibility: form.visibility,
   hero_card_id: form.hero_card_id,
@@ -78,6 +78,8 @@ export const buildDeckUpsertPayload = (form: DeckForm): DeckUpsertRequest => ({
   tag_ids: [...form.tag_ids],
   suggested_type_labels: [...form.suggested_type_labels],
 });
+
+const markupOrNull = (value: string): string | null => value.trim() ? value : null;
 
 export const reconcilePersistedSideboardSourceIds = (
   form: DeckForm,

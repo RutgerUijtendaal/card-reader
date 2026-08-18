@@ -19,6 +19,16 @@ Play **[[card:card-1|Bold Hero]]** with [[symbol:fire]].
     )
 
 
+def test_render_markup_plain_resolves_references_after_unmatched_backticks() -> None:
+    assert render_markup_plain("`note [[card:card-1|Hero]]") == "`note Hero"
+
+
+def test_render_markup_plain_avoids_authored_placeholder_collisions() -> None:
+    markup = "CARDREADERREFERENCETOKEN0X [[card:card-1|Hero]]"
+
+    assert render_markup_plain(markup) == "CARDREADERREFERENCETOKEN0X Hero"
+
+
 def test_render_markup_plain_keeps_code_references_literal() -> None:
     markup = "Use `[[card:card-1|Hero]]` and:\n\n```text\n[[symbol:fire]]\n```"
 

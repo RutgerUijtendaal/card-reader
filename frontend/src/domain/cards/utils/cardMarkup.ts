@@ -27,7 +27,10 @@ export const buildSymbolReference = (key: string): string =>
 export const findCardMarkupTrigger = (value: string, caret: number): CardMarkupTrigger | null => {
   const beforeCaret = value.slice(0, caret);
   const start = beforeCaret.lastIndexOf('[[');
-  const completedAfterCaret = start >= 0 && value.indexOf(']]', Math.max(caret, start + 2)) >= 0;
+  const closeAfterCaret = start >= 0 ? value.indexOf(']]', Math.max(caret, start + 2)) : -1;
+  const nextOpenAfterCaret = start >= 0 ? value.indexOf('[[', Math.max(caret, start + 2)) : -1;
+  const completedAfterCaret =
+    closeAfterCaret >= 0 && (nextOpenAfterCaret < 0 || closeAfterCaret < nextOpenAfterCaret);
   if (
     start < 0 ||
     beforeCaret.slice(start).includes(']]') ||
@@ -80,8 +83,12 @@ export const renderCardMarkupHtml = (
       : renderer.renderToken(tokens, index, options);
   };
   let html = markdown.render(protectedMarkup);
-  for (const [placeholder, rendered] of references) {
-    html = html.replaceAll(placeholder, rendered);
+  if (references.size > 0) {
+    const placeholders = new RegExp(
+      [...references.keys()].map(escapeRegExp).join('|'),
+      'g',
+    );
+    html = html.replace(placeholders, (placeholder) => references.get(placeholder) ?? placeholder);
   }
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: [
@@ -115,6 +122,7 @@ const protectReferences = (
 ): { markup: string; references: Map<string, string> } => {
   const output: string[] = [];
   const references = new Map<string, string>();
+  const placeholderPrefix = unusedPlaceholderPrefix(markup);
   let position = 0;
   let lineIndex = 0;
   let inlineTicks = 0;
@@ -133,8 +141,14 @@ const protectReferences = (
     const remaining = markup.slice(position);
     if (markup[position] === '`') {
       const ticks = remaining.match(/^`+/)?.[0] ?? '`';
-      inlineTicks =
-        inlineTicks === 0 ? ticks.length : ticks.length === inlineTicks ? 0 : inlineTicks;
+      if (
+        inlineTicks === 0 &&
+        hasMatchingBacktickRun(markup, position + ticks.length, ticks.length)
+      ) {
+        inlineTicks = ticks.length;
+      } else if (ticks.length === inlineTicks) {
+        inlineTicks = 0;
+      }
       output.push(ticks);
       position += ticks.length;
       atLineStart = false;
@@ -145,7 +159,7 @@ const protectReferences = (
       const symbolMatch = remaining.match(symbolReferencePattern);
       const match = cardMatch ?? symbolMatch;
       if (match) {
-        const placeholder = `CARDREADERREFERENCETOKEN${references.size}X`;
+        const placeholder = `${placeholderPrefix}${references.size}X`;
         if (cardMatch) {
           const id = cardMatch[1] ?? '';
           const label = (cardMatch[2] ?? '').replace(escapedCardCharacterPattern, '$1');
@@ -181,8 +195,45 @@ const isInsideCode = (value: string, position: number): boolean => {
   const lineIndex = (before.match(/\n/g) ?? []).length;
   const markdown = new MarkdownIt('commonmark', { html: false });
   if (codeBlockLines(markdown, value).has(lineIndex)) return true;
-  const line = before.slice(before.lastIndexOf('\n') + 1);
-  return (line.match(/`+/g)?.length ?? 0) % 2 === 1;
+  return codeSpanContainsPosition(value, position);
+};
+
+const codeSpanContainsPosition = (value: string, position: number): boolean => {
+  let cursor = 0;
+  while (cursor < position) {
+    const opening = value.indexOf('`', cursor);
+    if (opening < 0 || opening >= position) return false;
+    const length = backtickRunLength(value, opening);
+    const closing = matchingBacktickRun(value, opening + length, length);
+    if (closing < 0) {
+      cursor = opening + length;
+      continue;
+    }
+    if (position > opening && position < closing + length) return true;
+    cursor = closing + length;
+  }
+  return false;
+};
+
+const hasMatchingBacktickRun = (value: string, start: number, length: number): boolean =>
+  matchingBacktickRun(value, start, length) >= 0;
+
+const matchingBacktickRun = (value: string, start: number, length: number): number => {
+  let cursor = start;
+  while (cursor < value.length) {
+    const candidate = value.indexOf('`', cursor);
+    if (candidate < 0) return -1;
+    const candidateLength = backtickRunLength(value, candidate);
+    if (candidateLength === length) return candidate;
+    cursor = candidate + candidateLength;
+  }
+  return -1;
+};
+
+const backtickRunLength = (value: string, start: number): number => {
+  let end = start;
+  while (value[end] === '`') end += 1;
+  return end - start;
 };
 
 const codeBlockLines = (
@@ -197,6 +248,12 @@ const codeBlockLines = (
   return lines;
 };
 
+const unusedPlaceholderPrefix = (markup: string): string => {
+  let prefix = 'CARDREADERREFERENCETOKEN';
+  while (markup.includes(prefix)) prefix += 'X';
+  return prefix;
+};
+
 const escapeHtml = (value: string): string =>
   value
     .replace(/&/g, '&amp;')
@@ -204,3 +261,5 @@ const escapeHtml = (value: string): string =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
