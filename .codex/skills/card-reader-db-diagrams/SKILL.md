@@ -52,6 +52,7 @@ Keep `Card` visually central. Decks and groups should point to `Card`, not to `C
 - Use orthogonal connectors only: every relationship segment must be horizontal or vertical. Do not use curves, arcs, or diagonal segments.
 - Treat the open space between boxes and bands as explicit routing lanes. A connector must travel through those lanes and must never cross an entity box, even when a more direct route would be shorter.
 - Give every relationship its own final attachment segment and its own attachment point on the destination box. Relationships may share a trunk while travelling, but they must split before approaching a box; do not stack arrowheads or merge the final stretch.
+- Avoid intersections between independent relationship lanes. When the graph forces a crossover, keep both lanes orthogonal and split the lower visual lane with a small, consistent gap so the crossing cannot be mistaken for a relationship junction; prefer rerouting when a clear lane is available.
 - Keep visible clearance between parallel lanes, box edges, labels, and arrowheads. Prefer a longer perimeter route over a tight path through a populated group.
 - Expand the canvas, band, or inter-band gutter before shrinking boxes, reducing readable text, or accepting crowded routing.
 - Reserve box sides intentionally: use distinct ports for multiple incoming relationships, and prefer the side that faces the connector's owning lane.

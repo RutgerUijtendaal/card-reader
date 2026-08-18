@@ -235,10 +235,13 @@
   <text class="label" x="785" y="260">items</text>
   <path class="line" d="M615 230 L615 195 L1390 195 L1390 230"/>
   <text class="label" x="935" y="188">ImportJob.template</text>
-  <path class="line" d="M1015 320 L1015 365 L1600 365 L1600 275 L1640 275"/>
+  <path class="bus" d="M1015 320 L1015 365 L1054 365"/>
+  <path class="bus" d="M1066 365 L1384 365"/>
+  <path class="bus" d="M1396 365 L1574 365"/>
+  <path class="line" d="M1586 365 L1600 365 L1600 275 L1640 275"/>
   <text class="label" x="1100" y="356">classification review item</text>
-  <path class="thin" d="M2020 290 L2240 290"/>
-  <text class="label" x="2070" y="280">reviewed_by</text>
+  <path class="soft" d="M2020 290 L2240 290"/>
+  <text class="label" x="2030" y="280">reviewed_by (nullable)</text>
   <path class="line" d="M2460 260 L2630 260"/>
   <text class="label" x="2545" y="250" text-anchor="middle">recipient</text>
   <path class="soft" d="M2460 295 L2630 295"/>
@@ -270,10 +273,10 @@
   <path class="line" d="M350 1080 L450 1080"/>
   <path class="line" d="M450 1445 L350 1445"/>
   <path class="line" d="M350 1645 L450 1645"/>
-  <path class="thin" d="M100 1425 L75 1425 L75 690 L100 690"/>
+  <path class="thin" d="M100 1425 L55 1425 L55 690 L100 690"/>
   <text class="label" x="110" y="1378">assignment deck</text>
-  <path class="thin" d="M100 1600 L65 1600 L65 720 L100 720"/>
-  <text class="label" x="55" y="1545" transform="rotate(-90 55 1545)">suggested deck</text>
+  <path class="thin" d="M100 1600 L75 1600 L75 720 L100 720"/>
+  <text class="label" x="88" y="1580" transform="rotate(-90 88 1580)">suggested deck</text>
   <path class="thin" d="M710 1605 L740 1605 L740 1465 L710 1465"/>
   <text class="label" x="728" y="1538" text-anchor="end">accepted_tag</text>
 
@@ -304,7 +307,7 @@
   <text class="label" x="1183" y="1028">mana</text>
   <path class="line" d="M1070 1510 L1070 1400"/>
   <text class="label" x="1084" y="1460">sheet</text>
-  <path class="line" d="M850 1570 L820 1570 L820 995 L1250 995 L1250 970"/>
+  <path class="line" d="M850 1570 L820 1570 L820 925 L850 925"/>
   <text class="label" x="808" y="1490" transform="rotate(-90 808 1490)">resolved_card</text>
   <path class="line" d="M1290 1550 L1350 1550 L1350 790 L1420 790"/>
   <text class="label" x="1338" y="1520" transform="rotate(-90 1338 1520)">card_version</text>
@@ -338,18 +341,21 @@
   <path class="line" d="M2510 1375 L2660 1375"/>
 
   <!-- Classification rules use lower perimeter lanes to reach canonical metadata -->
-  <path class="thin" d="M2000 1270 L2040 1270 L2040 1560 L2920 1560 L2920 640 L2900 640"/>
+  <path class="thin" d="M2000 1270 L2040 1270 L2040 1560 L2960 1560 L2960 640 L2900 640"/>
   <text class="label" x="2240" y="1548">rule type source</text>
-  <path class="thin" d="M2000 1300 L2035 1300 L2035 1590 L2930 1590 L2930 820 L2900 820"/>
+  <path class="thin" d="M2000 1300 L2035 1300 L2035 1590 L2940 1590 L2940 820 L2900 820"/>
   <text class="label" x="2240" y="1580">rule symbol source</text>
-  <path class="thin" d="M2000 1330 L2030 1330 L2030 1620 L2940 1620 L2940 1180 L2900 1180"/>
+  <path class="thin" d="M2000 1330 L2030 1330 L2030 1620 L2920 1620 L2920 1180 L2900 1180"/>
   <text class="label" x="2240" y="1610">rule tag source</text>
 
   <!-- Accepted suggestion values approach their targets on separate final ports -->
-  <path class="thin" d="M2900 1350 L3000 1350 L3000 565 L2780 565 L2780 610"/>
+  <path class="bus" d="M2900 1350 L2914 1350"/>
+  <path class="bus" d="M2926 1350 L2934 1350"/>
+  <path class="bus" d="M2946 1350 L2954 1350"/>
+  <path class="thin" d="M2966 1350 L3000 1350 L3000 565 L2780 565 L2780 610"/>
   <text class="label" x="2810" y="555">accepted type</text>
-  <path class="thin" d="M2900 1390 L2980 1390 L2980 1120 L2780 1120 L2780 1150"/>
-  <text class="label" x="2795" y="1110">accepted tag</text>
+  <path class="thin" d="M2780 1330 L2780 1240"/>
+  <text class="label" x="2795" y="1292">accepted tag</text>
 
-  <text class="lane-note" x="60" y="1880">Relationship geometry: orthogonal lanes only • no entity-box crossings • dedicated destination attachment segments</text>
+  <text class="lane-note" x="60" y="1880">Relationship geometry: orthogonal lanes only • no entity-box crossings • dedicated destination attachments • small gaps mark independent lane crossovers</text>
 </svg>
