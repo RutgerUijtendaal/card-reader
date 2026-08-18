@@ -11,9 +11,9 @@
         <span
           v-if="showContextualMetadata"
           class="theme-pill theme-pill-accent shrink-0 px-1.5 py-0.5 text-[9px] font-semibold"
-          data-testid="row-card-pool"
+          data-testid="row-card-identity"
         >
-          {{ cardPoolLabel(card.card_pool) }}
+          {{ contextualIdentityLabel }}
         </span>
         <p
           v-if="cardIsDeprecated(card)"
@@ -152,6 +152,17 @@ const contextualMetadataLabels = computed<string[]>(() => {
     return (props.card.card_factions ?? []).map(cardFactionLabel);
   }
   return props.card.card_roles.map(cardRoleLabel);
+});
+const contextualIdentityLabel = computed(() => {
+  const poolLabel = cardPoolLabel(props.card.card_pool);
+  if (props.card.card_pool === 'evil') {
+    return poolLabel;
+  }
+
+  const factionLabels = (props.card.card_factions ?? []).map(cardFactionLabel);
+  return factionLabels.length > 0
+    ? `${poolLabel} · ${factionLabels.join(', ')}`
+    : poolLabel;
 });
 const contextualMetadataPillClass = computed(() => {
   if (props.card.card_pool === 'player') {

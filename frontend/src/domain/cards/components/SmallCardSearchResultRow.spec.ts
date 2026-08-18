@@ -104,7 +104,7 @@ describe('SmallCardSearchResultRow', () => {
     });
 
     expect(mounted.container.textContent).toContain('Card 1');
-    expect(mounted.container.querySelector('[data-testid="row-card-pool"]')?.textContent).toContain('Player');
+    expect(mounted.container.querySelector('[data-testid="row-card-identity"]')?.textContent).toContain('Player');
     expect(mounted.container.querySelector('[data-testid="row-mana-symbols"] img[alt="{A}"]')).not.toBeNull();
     expect(mounted.container.querySelector('[data-testid="row-contextual-metadata"]')).toBeNull();
     expect(mounted.container.querySelector('img[alt="Card 1"]')).not.toBeNull();
@@ -116,10 +116,15 @@ describe('SmallCardSearchResultRow', () => {
     const mounted = await mountRow({
       card: buildCard({
         mana_symbols: ['missing-symbol'],
+        card_factions: ['order', 'dark'],
         card_mana_families: ['arcane', 'primal'],
       }),
     });
 
+    const identity = mounted.container.querySelector('[data-testid="row-card-identity"]');
+    expect(identity?.textContent).toContain('Player');
+    expect(identity?.textContent).toContain('Order');
+    expect(identity?.textContent).toContain('Dark');
     expect(mounted.container.querySelector('[data-testid="row-mana-symbols"]')).toBeNull();
     expect(mounted.container.querySelector('[data-testid="row-contextual-metadata"]')?.textContent).toContain('Arcane');
     expect(mounted.container.querySelector('[data-testid="row-contextual-metadata"]')?.textContent).toContain('Primal');
@@ -159,7 +164,7 @@ describe('SmallCardSearchResultRow', () => {
       }),
     });
 
-    expect(mounted.container.querySelector('[data-testid="row-card-pool"]')?.textContent).toContain('Evil');
+    expect(mounted.container.querySelector('[data-testid="row-card-identity"]')?.textContent).toBe('Evil');
     const metadata = mounted.container.querySelector('[data-testid="row-contextual-metadata"]');
     expect(metadata?.textContent).toContain('Order');
     expect(metadata?.textContent).toContain('Dark');
@@ -179,7 +184,9 @@ describe('SmallCardSearchResultRow', () => {
       }),
     });
 
-    expect(mounted.container.querySelector('[data-testid="row-card-pool"]')?.textContent).toContain('Neutral');
+    const identity = mounted.container.querySelector('[data-testid="row-card-identity"]');
+    expect(identity?.textContent).toContain('Neutral');
+    expect(identity?.textContent).toContain('Blood');
     const metadata = mounted.container.querySelector('[data-testid="row-contextual-metadata"]');
     expect(metadata?.textContent).toContain('Boon');
     expect(metadata?.textContent).toContain('Event');
