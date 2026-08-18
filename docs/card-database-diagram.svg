@@ -1,370 +1,399 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1250" viewBox="0 0 2000 1250" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="3100" height="1900" viewBox="0 0 3100 1900" role="img" aria-labelledby="title desc">
   <title id="title">Card Reader card database relationships</title>
-  <desc id="desc">Linear database diagram with Card pool, role, faction, mana-family classification, identity namespace, and persistent TTS sheet assignments in the center, card consumers and deck tags on the left, parsed version data and review records on the right, and import lineage above.</desc>
+  <desc id="desc">Orthogonal database diagram with import lineage across the top and separate bands for card consumers, stable card identity, version and review lineage, and version metadata. Relationship lines use open routing lanes around entity boxes and separate attachment segments at every destination. Small gaps mark independent lane crossovers.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
-      <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
+      <path d="M0 0 L0 6 L9 3 Z" fill="#334155"/>
     </marker>
     <style>
       .bg { fill: #f8fafc; }
-      .band { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; rx: 18; }
-      .band-title { font: 700 22px Arial, sans-serif; fill: #0f172a; }
-      .box { fill: #ffffff; stroke: #334155; stroke-width: 2; rx: 12; }
-      .card { fill: #dbeafe; stroke: #1d4ed8; }
+      .band { fill: #ffffff; stroke: #cbd5e1; stroke-width: 3; rx: 24; }
+      .band-title { font: 700 25px Inter, Arial, sans-serif; fill: #0f172a; }
+      .band-title-tight { font: 700 22px Inter, Arial, sans-serif; fill: #0f172a; }
+      .box { stroke-width: 3; rx: 17; }
+      .card { fill: #dbeafe; stroke: #2563eb; }
       .left { fill: #fef9c3; stroke: #a16207; }
-      .group { fill: #f5f3ff; stroke: #6d28d9; }
+      .group { fill: #f5f3ff; stroke: #7c3aed; }
       .version { fill: #dcfce7; stroke: #15803d; }
       .meta { fill: #fff7ed; stroke: #c2410c; }
+      .import { fill: #e2e8f0; stroke: #475569; }
       .review { fill: #fce7f3; stroke: #be185d; }
+      .external { fill: #f1f5f9; stroke: #64748b; stroke-dasharray: 8 7; }
       .notify { fill: #e0f2fe; stroke: #0369a1; }
       .tts { fill: #ecfeff; stroke: #0e7490; }
-      .import { fill: #e2e8f0; stroke: #475569; }
-      .external { fill: #f1f5f9; stroke: #64748b; stroke-dasharray: 6 5; }
-      .title { font: 700 18px Arial, sans-serif; fill: #0f172a; }
-      .title-small { font: 700 15px Arial, sans-serif; fill: #0f172a; }
-      .field { font: 14px Arial, sans-serif; fill: #334155; }
-      .small { font: 13px Arial, sans-serif; fill: #475569; }
-      .label { font: 13px Arial, sans-serif; fill: #1e293b; font-weight: 700; }
-      .bus { stroke: #334155; stroke-width: 2; fill: none; }
-      .line { stroke: #334155; stroke-width: 2; fill: none; marker-end: url(#arrow); }
-      .soft { stroke: #64748b; stroke-width: 2; fill: none; stroke-dasharray: 8 6; marker-end: url(#arrow); }
-      .thin { stroke: #64748b; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+      .title { font: 700 24px Inter, Arial, sans-serif; fill: #0f172a; text-anchor: middle; }
+      .title-small { font: 700 20px Inter, Arial, sans-serif; fill: #0f172a; text-anchor: middle; }
+      .title-tight { font: 700 16px Inter, Arial, sans-serif; fill: #0f172a; text-anchor: middle; }
+      .model-name { font: 700 11px Inter, Arial, sans-serif; fill: #0f172a; text-anchor: middle; }
+      .model-name-small { font: 700 10px Inter, Arial, sans-serif; fill: #0f172a; text-anchor: middle; }
+      .field { font: 18px Inter, Arial, sans-serif; fill: #334155; text-anchor: middle; }
+      .small { font: 15px Inter, Arial, sans-serif; fill: #475569; text-anchor: middle; }
+      .line { stroke: #334155; stroke-width: 2.2; fill: none; stroke-linejoin: miter; marker-end: url(#arrow); }
+      .thin { stroke: #64748b; stroke-width: 1.8; fill: none; stroke-linejoin: miter; marker-end: url(#arrow); }
+      .thin-travel { stroke: #64748b; stroke-width: 1.8; fill: none; stroke-linejoin: miter; }
+      .soft { stroke: #64748b; stroke-width: 2; fill: none; stroke-dasharray: 8 6; stroke-linejoin: miter; marker-end: url(#arrow); }
+      .soft-travel { stroke: #64748b; stroke-width: 2; fill: none; stroke-dasharray: 8 6; stroke-linejoin: miter; }
+      .bus { stroke: #475569; stroke-width: 2.2; fill: none; stroke-linejoin: miter; }
+      .label { font: 700 15px Inter, Arial, sans-serif; fill: #1e293b; paint-order: stroke; stroke: #f8fafc; stroke-width: 7; stroke-linejoin: round; }
+      .port-label { text-anchor: end; }
+      .lane-note { font: 600 13px Inter, Arial, sans-serif; fill: #64748b; letter-spacing: .03em; }
     </style>
   </defs>
 
-  <rect class="bg" width="2000" height="1250"/>
-  <text x="70" y="58" style="font: 800 34px Arial, sans-serif; fill: #0f172a;">Card Reader: card model relationships</text>
-  <text x="70" y="88" class="small">Left: structures built from cards. Center: stable identity, pool/role/faction/mana-family classification, and TTS sheets. Right: parsed versions, metadata, images, parse results, and review records. Top: import lineage, auth, and notifications.</text>
+  <rect class="bg" width="3100" height="1900"/>
+  <text x="70" y="75" style="font: 700 42px Inter, Arial, sans-serif; fill: #0f172a;">Card Reader: card model relationships</text>
+  <text x="70" y="112" style="font: 18px Inter, Arial, sans-serif; fill: #475569;">Orthogonal routing keeps every relationship outside entity boxes. Shared travel trunks split into dedicated attachment segments before reaching a model.</text>
 
-  <rect class="band" x="55" y="130" width="1890" height="225"/>
-  <text class="band-title" x="80" y="162">Import lineage / parser output</text>
+  <rect class="band" x="50" y="135" width="3000" height="315"/>
+  <text class="band-title" x="80" y="177">Import lineage / parser output / external actors</text>
+  <rect class="band" x="50" y="480" width="720" height="1370"/>
+  <text class="band-title" x="80" y="525">Built from cards</text>
+  <rect class="band" x="800" y="480" width="540" height="1370"/>
+  <text class="band-title" x="830" y="525">Stable identity</text>
+  <rect class="band" x="1370" y="480" width="660" height="1370"/>
+  <text class="band-title-tight" x="1450" y="525">Version and review lineage</text>
+  <rect class="band" x="2060" y="480" width="990" height="1370"/>
+  <text class="band-title" x="2090" y="525">Version metadata</text>
 
-  <rect class="box import" x="160" y="195" width="215" height="86"/>
-  <text class="title" x="205" y="230">ContentVersion</text>
-  <text class="field" x="185" y="256">release/version marker</text>
+  <!-- Top band entities -->
+  <rect class="box import" x="100" y="230" width="240" height="90"/>
+  <text class="title" x="220" y="268">ContentVersion</text>
+  <text class="field" x="220" y="298">release/version marker</text>
+  <rect class="box import" x="480" y="230" width="270" height="90"/>
+  <text class="title" x="615" y="263">ImportJob</text>
+  <text class="field" x="615" y="290">source, template, status</text>
+  <text class="small" x="615" y="311">creation key • classification</text>
+  <rect class="box import" x="880" y="230" width="270" height="90"/>
+  <text class="title" x="1015" y="263">ImportJobItem</text>
+  <text class="field" x="1015" y="290">target • classification result</text>
+  <text class="small" x="1015" y="311">warnings • audit</text>
+  <rect class="box version" x="1270" y="230" width="240" height="90"/>
+  <text class="title" x="1390" y="268">Template</text>
+  <text class="field" x="1390" y="296">parser definition</text>
+  <text class="small" x="1390" y="314">parsing regions only</text>
+  <rect class="box review" x="1640" y="230" width="380" height="90"/>
+  <text class="title-small" x="1830" y="266">CardClassificationReviewItem</text>
+  <text class="field" x="1830" y="294">import item • Card/version • evidence</text>
+  <text class="small" x="1830" y="314">status • reviewer</text>
+  <rect class="box external" x="2240" y="230" width="220" height="90"/>
+  <text class="title" x="2350" y="268">Auth User</text>
+  <text class="field" x="2350" y="298">Django auth user</text>
+  <rect class="box notify" x="2630" y="230" width="260" height="90"/>
+  <text class="title-small" x="2760" y="266">UserNotification</text>
+  <text class="field" x="2760" y="294">recipient/actor</text>
+  <text class="small" x="2760" y="314">event • subject • read</text>
 
-  <rect class="box import" x="500" y="195" width="215" height="86"/>
-  <text class="title" x="558" y="230">ImportJob</text>
-  <text class="field" x="525" y="252">source, template, status</text>
-  <text class="small" x="507" y="272">creation key • classification snapshots</text>
+  <!-- Card consumer entities -->
+  <rect class="box left" x="100" y="570" width="290" height="210"/>
+  <text class="title" x="245" y="606">Deck</text>
+  <text class="field" x="245" y="632">name</text>
+  <text class="small" x="245" y="655">description (markup + rendered)</text>
+  <text class="small" x="245" y="678">long description (markup + rendered)</text>
+  <text class="field" x="245" y="701">difficulty (nullable)</text>
+  <text class="field" x="245" y="724">hero_card, owner, visibility</text>
+  <text class="small" x="245" y="752">client_creation_id (nullable)</text>
+  <rect class="box left" x="450" y="570" width="260" height="120"/>
+  <text class="title" x="580" y="607">DeckEntry</text>
+  <text class="field" x="580" y="635">deck + card</text>
+  <text class="field" x="580" y="660">quantity • position</text>
+  <rect class="box left" x="450" y="720" width="260" height="70"/>
+  <text class="title-small" x="580" y="749">DeckCreation</text>
+  <text class="small" x="580" y="774">owner + key, deck (nullable)</text>
+  <rect class="box left" x="100" y="840" width="250" height="90"/>
+  <text class="title" x="225" y="878">DeckSideboard</text>
+  <text class="field" x="225" y="907">deck + name</text>
+  <rect class="box left" x="450" y="830" width="260" height="120"/>
+  <text class="title-small" x="580" y="868">DeckSideboardEntry</text>
+  <text class="field" x="580" y="897">sideboard + card</text>
+  <text class="field" x="580" y="923">quantity • position</text>
+  <rect class="box group" x="100" y="1030" width="250" height="100"/>
+  <text class="title" x="225" y="1069">CardGroup</text>
+  <text class="field" x="225" y="1096">anchor_card</text>
+  <text class="small" x="225" y="1118">key • name</text>
+  <rect class="box group" x="450" y="1030" width="260" height="100"/>
+  <text class="title-small" x="580" y="1069">CardGroupMember</text>
+  <text class="field" x="580" y="1096">group + card</text>
+  <text class="small" x="580" y="1118">position</text>
+  <rect class="box group" x="100" y="1215" width="250" height="90"/>
+  <text class="title" x="225" y="1251">CardAlias</text>
+  <text class="field" x="225" y="1277">card + pool + faction key</text>
+  <text class="small" x="225" y="1297">key unique per pool/factions</text>
+  <rect class="box group" x="450" y="1215" width="260" height="90"/>
+  <text class="title-small" x="580" y="1251">CardMergeRedirect</text>
+  <text class="field" x="580" y="1279">old card → target</text>
+  <rect class="box left" x="100" y="1400" width="250" height="90"/>
+  <text class="title-small" x="225" y="1437">DeckTagAssignment</text>
+  <text class="field" x="225" y="1466">deck + tag</text>
+  <rect class="box left" x="450" y="1400" width="260" height="90"/>
+  <text class="title" x="580" y="1437">DeckTag</text>
+  <text class="field" x="580" y="1466">kind • key • label</text>
+  <rect class="box left" x="100" y="1580" width="250" height="90"/>
+  <text class="title-tight" x="225" y="1607"><tspan x="225">DeckTagSuggestion</tspan><tspan x="225" dy="17">Deck</tspan></text>
+  <text class="small" x="225" y="1652">suggestion + deck • active</text>
+  <rect class="box left" x="450" y="1580" width="260" height="90"/>
+  <text class="title-small" x="580" y="1617">DeckTagSuggestion</text>
+  <text class="field" x="580" y="1646">value/status/target/retries</text>
 
-  <rect class="box import" x="850" y="195" width="225" height="86"/>
-  <text class="title" x="900" y="230">ImportJobItem</text>
-  <text class="field" x="868" y="252">target • resolved classification</text>
-  <text class="small" x="886" y="272">ordered warnings + audit</text>
+  <!-- Stable identity entities -->
+  <rect class="box card" x="850" y="570" width="440" height="90"/>
+  <text class="title-small" x="1070" y="606">CardIdentityPoolLock</text>
+  <text class="field" x="1070" y="634">card_pool (primary key)</text>
+  <text class="small" x="1070" y="653">serializes name/alias writes</text>
+  <rect class="box card" x="850" y="770" width="440" height="200"/>
+  <text class="title" x="1070" y="808">Card</text>
+  <text class="field" x="1070" y="840">id, label; key unique per pool/factions</text>
+  <text class="field" x="1070" y="871">card_pool (Player / Evil / Neutral)</text>
+  <text class="field" x="1070" y="902">faction_identity_key</text>
+  <text class="field" x="1070" y="929">mana_family_sort_key</text>
+  <text class="small" x="1070" y="954">lifecycle + deck config • latest_version</text>
+  <rect class="box card" x="850" y="1050" width="125" height="110"/>
+  <text class="model-name" x="913" y="1078"><tspan x="913">CardRole</tspan><tspan x="913" dy="13">Assignment</tspan></text>
+  <text class="small" x="913" y="1122">role key</text>
+  <text class="small" x="913" y="1148">none = Normal</text>
+  <rect class="box card" x="990" y="1050" width="145" height="110"/>
+  <text class="model-name" x="1063" y="1078"><tspan x="1063">CardFaction</tspan><tspan x="1063" dy="13">Assignment</tspan></text>
+  <text class="small" x="1063" y="1122">faction key</text>
+  <text class="small" x="1063" y="1148">identity input</text>
+  <rect class="box card" x="1150" y="1050" width="140" height="110"/>
+  <text class="model-name-small" x="1220" y="1078"><tspan x="1220">CardManaFamily</tspan><tspan x="1220" dy="13">Assignment</tspan></text>
+  <text class="small" x="1220" y="1122">family key</text>
+  <text class="small" x="1220" y="1148">none = Colorless</text>
+  <rect class="box tts" x="850" y="1290" width="440" height="110"/>
+  <text class="title" x="1070" y="1330">TtsCardSheet</text>
+  <text class="field" x="1070" y="1358">card_pool + allocation cursor</text>
+  <text class="small" x="1070" y="1383">layout + desired/rendered revision</text>
+  <rect class="box tts" x="850" y="1510" width="440" height="160"/>
+  <text class="title-small" x="1070" y="1548">TtsCardSheetSlot</text>
+  <text class="field" x="1070" y="1578">sheet + pool + permanent slot</text>
+  <text class="field" x="1070" y="1607">identity unique per pool</text>
+  <text class="field" x="1070" y="1636">resolved_card + card_version</text>
+  <text class="small" x="1070" y="1658">image snapshot</text>
 
-  <rect class="box version" x="1245" y="195" width="205" height="86"/>
-  <text class="title" x="1285" y="230">Template</text>
-  <text class="field" x="1269" y="252">parser definition</text>
-  <text class="small" x="1254" y="272">parsing regions only</text>
+  <!-- Version and review entities -->
+  <rect class="box version" x="1420" y="610" width="560" height="210"/>
+  <text class="title" x="1700" y="652">CardVersion</text>
+  <text class="field" x="1700" y="684">parsed card snapshot</text>
+  <text class="field" x="1700" y="716">name, type_line, rules_text</text>
+  <text class="field" x="1700" y="748">printed mana, value + symbols</text>
+  <text class="field" x="1700" y="780">previous_version • content_version</text>
+  <text class="small" x="1700" y="805">card • template • parse_result</text>
+  <rect class="box review" x="1420" y="900" width="270" height="90"/>
+  <text class="title-small" x="1555" y="938">CardVersionParseFlag</text>
+  <text class="field" x="1555" y="967">review note • submitted_by</text>
+  <rect class="box review" x="1730" y="900" width="270" height="90"/>
+  <text class="title-tight" x="1865" y="938">CardVersionParseFlagItem</text>
+  <text class="field" x="1865" y="967">field issue • reviewed_by</text>
+  <rect class="box version" x="1420" y="1060" width="270" height="90"/>
+  <text class="title-small" x="1555" y="1098">CardVersionImage</text>
+  <text class="field" x="1555" y="1127">stored image data</text>
+  <rect class="box version" x="1730" y="1060" width="270" height="90"/>
+  <text class="title" x="1865" y="1098">ParseResult</text>
+  <text class="field" x="1865" y="1127">OCR/raw fields</text>
+  <rect class="box meta" x="1420" y="1240" width="580" height="120"/>
+  <text class="title-small" x="1710" y="1278">CardClassificationRule</text>
+  <text class="field" x="1710" y="1307">pool + role/faction/mana target</text>
+  <text class="field" x="1710" y="1334">exactly one Tag, Type, or Symbol source</text>
+  <text class="small" x="1710" y="1353">enabled • protected source</text>
+  <rect class="box version" x="1730" y="1430" width="270" height="90"/>
+  <text class="title" x="1865" y="1468">CardBack</text>
+  <text class="field" x="1865" y="1497">global back history</text>
 
-  <rect class="box external" x="1540" y="195" width="185" height="86"/>
-  <text class="title" x="1585" y="230">Auth User</text>
-  <text class="field" x="1565" y="256">Django auth user</text>
+  <!-- Metadata entities -->
+  <rect class="box meta" x="2120" y="610" width="390" height="90"/>
+  <text class="title" x="2315" y="648">CardVersionType</text>
+  <text class="field" x="2315" y="677">version + type</text>
+  <rect class="box meta" x="2660" y="610" width="240" height="90"/>
+  <text class="title" x="2780" y="648">Type</text>
+  <text class="field" x="2780" y="677">key • label</text>
+  <rect class="box meta" x="2120" y="790" width="390" height="90"/>
+  <text class="title" x="2315" y="828">CardVersionSymbol</text>
+  <text class="field" x="2315" y="857">version + symbol</text>
+  <rect class="box meta" x="2660" y="790" width="240" height="90"/>
+  <text class="title" x="2780" y="828">Symbol</text>
+  <text class="field" x="2780" y="857">key • assets</text>
+  <rect class="box meta" x="2120" y="970" width="390" height="90"/>
+  <text class="title" x="2315" y="1008">CardVersionKeyword</text>
+  <text class="field" x="2315" y="1037">version + keyword</text>
+  <rect class="box meta" x="2660" y="970" width="240" height="90"/>
+  <text class="title" x="2780" y="1008">Keyword</text>
+  <text class="field" x="2780" y="1037">key • label</text>
+  <rect class="box meta" x="2120" y="1150" width="390" height="90"/>
+  <text class="title" x="2315" y="1188">CardVersionTag</text>
+  <text class="field" x="2315" y="1217">version + tag</text>
+  <rect class="box meta" x="2660" y="1150" width="240" height="90"/>
+  <text class="title" x="2780" y="1188">Tag</text>
+  <text class="field" x="2780" y="1217">key • label</text>
+  <rect class="box meta" x="2120" y="1330" width="390" height="90"/>
+  <text class="title-small" x="2315" y="1368">CardVersionMetadataSuggestion</text>
+  <text class="field" x="2315" y="1397">version + proposed metadata</text>
+  <rect class="box meta" x="2660" y="1330" width="240" height="90"/>
+  <text class="title-small" x="2780" y="1368">MetadataSuggestion</text>
+  <text class="field" x="2780" y="1397">accepted tag/type</text>
 
-  <rect class="box notify" x="1765" y="195" width="160" height="86"/>
-  <text class="title-small" x="1781" y="230">UserNotification</text>
-  <text class="field" x="1788" y="256">recipient/actor</text>
-  <text class="field" x="1788" y="276">event, subject, read</text>
+  <!-- Top-band and cross-band relationships -->
+  <path class="line" d="M340 275 L370 275 L370 215 L460 215 L460 275 L480 275"/>
+  <text class="label" x="415" y="207" text-anchor="middle">content_version</text>
+  <path class="line" d="M750 275 L880 275"/>
+  <text class="label" x="785" y="260">items</text>
+  <path class="line" d="M615 230 L615 195 L1390 195 L1390 230"/>
+  <text class="label" x="935" y="188">ImportJob.template</text>
+  <path class="bus" d="M1015 320 L1015 365 L1054 365"/>
+  <path class="bus" d="M1066 365 L1384 365"/>
+  <path class="bus" d="M1396 365 L1574 365"/>
+  <path class="bus" d="M1586 365 L1600 365 L1600 306"/>
+  <path class="line" d="M1600 294 L1600 275 L1640 275"/>
+  <text class="label" x="1100" y="356">classification review item</text>
+  <path class="soft" d="M2020 290 L2240 290"/>
+  <text class="label" x="2030" y="280">reviewed_by (nullable)</text>
+  <path class="line" d="M2460 260 L2630 260"/>
+  <text class="label" x="2545" y="250" text-anchor="middle">recipient</text>
+  <path class="soft" d="M2460 295 L2630 295"/>
+  <text class="label" x="2545" y="315" text-anchor="middle">actor (nullable)</text>
+  <path class="bus" d="M220 320 L220 440 L609 440"/>
+  <path class="bus" d="M621 440 L1304 440"/>
+  <path class="bus" d="M1316 440 L1319 440"/>
+  <path class="line" d="M1331 440 L1375 440 L1375 650 L1420 650"/>
+  <text class="label" x="630" y="430">CardVersion.content_version</text>
+  <path class="bus" d="M1060 320 L1060 384"/>
+  <path class="bus" d="M1060 396 L1060 420 L1304 420"/>
+  <path class="bus" d="M1316 420 L1319 420"/>
+  <path class="bus" d="M1331 420 L1384 420"/>
+  <path class="bus" d="M1396 420 L1405 420 L1405 559"/>
+  <path class="bus" d="M1405 571 L1405 644"/>
+  <path class="line" d="M1405 656 L1405 680 L1420 680"/>
+  <text class="label" x="1080" y="415">target_card_version</text>
+  <path class="line" d="M970 320 L970 390 L1310 390 L1310 785 L1290 785"/>
+  <text class="label" x="1160" y="388">target_card</text>
+  <path class="line" d="M1390 320 L1390 565 L1700 565 L1700 610"/>
+  <text class="label" x="1435" y="556">CardVersion.template</text>
+  <path class="thin" d="M1780 320 L1780 610"/>
+  <text class="label" x="1792" y="555">reviewed version</text>
+  <path class="bus" d="M1640 300 L1580 300 L1580 405 L1396 405"/>
+  <path class="bus" d="M1384 405 L1325 405 L1325 814"/>
+  <path class="thin" d="M1325 826 L1325 875 L1290 875"/>
+  <text class="label" x="1410" y="397">reviewed Card</text>
+  <path class="bus" d="M2280 320 L2280 409"/>
+  <path class="bus" d="M2280 421 L2280 455 L2040 455 L2040 754"/>
+  <path class="bus" d="M2040 766 L2040 850 L2021 850"/>
+  <path class="thin" d="M2004 850 L1710 850 L1710 925 L1690 925"/>
+  <text class="label" x="2080" y="447">submitted_by</text>
+  <path class="soft-travel" d="M2340 320 L2340 415 L2015 415 L2015 754"/>
+  <path class="soft" d="M2015 766 L2015 955 L2000 955"/>
+  <text class="label" x="2040" y="407">reviewed_by</text>
+  <path class="soft-travel" d="M615 320 L615 445 L1305 445 L1305 779"/>
+  <path class="soft-travel" d="M1305 791 L1305 814"/>
+  <path class="soft-travel" d="M1305 826 L1305 869"/>
+  <path class="soft-travel" d="M1305 881 L1305 939"/>
+  <path class="soft-travel" d="M1305 951 L1305 1544"/>
+  <path class="soft-travel" d="M1305 1556 L1305 1614"/>
+  <path class="soft" d="M1305 1626 L1305 1790 L1500 1790 L1500 1360"/>
+  <text class="label" x="1318" y="1768">immutable rule snapshot</text>
 
-  <rect class="box review" x="1095" y="288" width="300" height="60"/>
-  <text class="title-small" x="1120" y="313">CardClassificationReviewItem</text>
-  <text class="small" x="1120" y="335">import item • Card/version • evidence • status/reviewer</text>
+  <!-- Relationships within the card consumer band -->
+  <path class="line" d="M390 625 L450 625"/>
+  <path class="thin" d="M390 715 L420 715 L420 755 L450 755"/>
+  <path class="line" d="M225 840 L225 780"/>
+  <path class="line" d="M350 885 L450 885"/>
+  <path class="line" d="M350 1080 L450 1080"/>
+  <path class="line" d="M450 1445 L350 1445"/>
+  <path class="line" d="M350 1645 L450 1645"/>
+  <path class="thin-travel" d="M100 1425 L81 1425"/>
+  <path class="thin" d="M69 1425 L55 1425 L55 690 L100 690"/>
+  <text class="label" x="110" y="1378">assignment deck</text>
+  <path class="thin" d="M100 1600 L75 1600 L75 720 L100 720"/>
+  <text class="label" x="88" y="1580" transform="rotate(-90 88 1580)">suggested deck</text>
+  <path class="thin" d="M710 1605 L740 1605 L740 1465 L710 1465"/>
+  <text class="label" x="728" y="1538" text-anchor="end">accepted_tag</text>
 
-  <rect class="band" x="55" y="370" width="560" height="880"/>
-  <text class="band-title" x="80" y="402">Built from cards</text>
+  <!-- Consumer relationships routed through the Card attachment lanes -->
+  <path class="line" d="M710 650 L730 650 L730 790 L850 790"/>
+  <text class="label" x="700" y="711" text-anchor="end">entry card</text>
+  <path class="line" d="M710 900 L740 900 L740 820 L850 820"/>
+  <text class="label" x="700" y="982" text-anchor="end">sideboard card</text>
+  <path class="line" d="M710 1080 L750 1080 L750 850 L850 850"/>
+  <text class="label" x="700" y="1016" text-anchor="end">member card</text>
+  <path class="bus" d="M365 780 L365 810 L760 810 L760 814"/>
+  <path class="bus" d="M760 826 L760 844"/>
+  <path class="line" d="M760 856 L760 880 L850 880"/>
+  <text class="label" x="270" y="814">hero_card</text>
+  <path class="line" d="M225 1130 L225 1170 L770 1170 L770 910 L850 910"/>
+  <text class="label" x="500" y="1163">anchor_card</text>
+  <path class="line" d="M225 1305 L225 1340 L780 1340 L780 940 L850 940"/>
+  <text class="label" x="610" y="1330">alias card</text>
+  <path class="bus" d="M710 1260 L774 1260"/>
+  <path class="line" d="M786 1260 L790 1260 L790 955 L850 955"/>
+  <text class="label" x="700" y="1198" text-anchor="end">target_card</text>
 
-  <rect class="box left" x="95" y="445" width="210" height="154"/>
-  <text class="title" x="150" y="476">Deck</text>
-  <text class="field" x="122" y="493">name</text>
-  <text class="field" x="122" y="512">description_markup → description</text>
-  <text class="field" x="122" y="531">long_description_markup → plain</text>
-  <text class="field" x="122" y="550">difficulty (nullable)</text>
-  <text class="field" x="122" y="569">hero_card, owner, visibility</text>
-  <text class="field" x="122" y="588">client_creation_id (nullable)</text>
+  <!-- Stable identity and TTS relationships -->
+  <path class="soft" d="M1070 660 L1070 720 L1230 720 L1230 770"/>
+  <text class="label" x="1095" y="695" text-anchor="middle">serialized identity writes</text>
+  <path class="line" d="M913 1050 L913 970"/>
+  <text class="label" x="865" y="1028">roles</text>
+  <path class="line" d="M1063 1050 L1063 970"/>
+  <text class="label" x="1022" y="1028">factions</text>
+  <path class="line" d="M1220 1050 L1220 970"/>
+  <text class="label" x="1183" y="1028">mana</text>
+  <path class="line" d="M1070 1510 L1070 1400"/>
+  <text class="label" x="1084" y="1460">sheet</text>
+  <path class="bus" d="M850 1570 L820 1570 L820 961"/>
+  <path class="bus" d="M820 949 L820 946"/>
+  <path class="line" d="M820 934 L820 925 L850 925"/>
+  <text class="label" x="808" y="1490" transform="rotate(-90 808 1490)">resolved_card</text>
+  <path class="bus" d="M1290 1550 L1350 1550 L1350 951"/>
+  <path class="bus" d="M1350 939 L1350 790 L1354 790"/>
+  <path class="bus" d="M1366 790 L1389 790"/>
+  <path class="line" d="M1401 790 L1420 790"/>
+  <text class="label" x="1338" y="1520" transform="rotate(-90 1338 1520)">card_version</text>
+  <path class="line" d="M1290 1620 L1365 1620 L1365 1130 L1420 1130"/>
+  <text class="label" x="1375" y="1600">image</text>
 
-  <rect class="box left" x="360" y="445" width="210" height="116"/>
-  <text class="title" x="410" y="482">DeckEntry</text>
-  <text class="field" x="388" y="508">deck + card</text>
-  <text class="field" x="388" y="532">quantity</text>
-  <text class="field" x="388" y="556">position</text>
+  <!-- Card and CardVersion relationship lanes -->
+  <path class="line" d="M1290 820 L1345 820 L1345 710 L1420 710"/>
+  <text class="label" x="1215" y="755" text-anchor="end">versions</text>
+  <path class="soft" d="M1420 750 L1360 750 L1360 945 L1290 945"/>
+  <text class="label" x="1380" y="930" transform="rotate(-90 1380 930)">latest_version</text>
 
-  <rect class="box left" x="360" y="570" width="210" height="40"/>
-  <text class="title-small" x="410" y="587">DeckCreation</text>
-  <text class="field" x="378" y="604">owner + key, deck (nullable)</text>
+  <!-- Version/review relationships -->
+  <path class="line" d="M1540 820 L1540 870 L1555 870 L1555 900"/>
+  <path class="line" d="M1690 945 L1730 945"/>
+  <path class="line" d="M1420 770 L1395 770 L1395 1105 L1420 1105"/>
+  <path class="bus" d="M1980 780 L2010 780 L2010 844"/>
+  <path class="bus" d="M2010 856 L2010 949"/>
+  <path class="line" d="M2010 961 L2010 1105 L2000 1105"/>
 
-  <rect class="box left" x="95" y="619" width="210" height="86"/>
-  <text class="title" x="140" y="656">DeckSideboard</text>
-  <text class="field" x="122" y="680">deck + name</text>
+  <!-- CardVersion metadata collector and dedicated row attachments -->
+  <path class="bus" d="M1980 760 L2080 760"/>
+  <path class="bus" d="M2080 655 L2080 1375"/>
+  <path class="line" d="M2080 655 L2120 655"/>
+  <path class="line" d="M2080 835 L2120 835"/>
+  <path class="line" d="M2080 1015 L2120 1015"/>
+  <path class="line" d="M2080 1195 L2120 1195"/>
+  <path class="line" d="M2080 1375 L2120 1375"/>
+  <path class="line" d="M2510 655 L2660 655"/>
+  <path class="line" d="M2510 835 L2660 835"/>
+  <path class="line" d="M2510 1015 L2660 1015"/>
+  <path class="line" d="M2510 1195 L2660 1195"/>
+  <path class="line" d="M2510 1375 L2660 1375"/>
 
-  <rect class="box left" x="360" y="619" width="210" height="110"/>
-  <text class="title-small" x="380" y="656">DeckSideboardEntry</text>
-  <text class="field" x="388" y="680">sideboard + card</text>
-  <text class="field" x="388" y="704">quantity</text>
-  <text class="field" x="388" y="728">position</text>
+  <!-- Classification rules use lower perimeter lanes to reach canonical metadata -->
+  <path class="thin-travel" d="M2000 1270 L2040 1270 L2040 1560 L2914 1560"/>
+  <path class="thin-travel" d="M2926 1560 L2934 1560"/>
+  <path class="thin" d="M2946 1560 L2960 1560 L2960 640 L2900 640"/>
+  <text class="label" x="2240" y="1548">rule type source</text>
+  <path class="thin-travel" d="M2000 1300 L2035 1300 L2035 1590 L2914 1590"/>
+  <path class="thin" d="M2926 1590 L2940 1590 L2940 820 L2900 820"/>
+  <text class="label" x="2240" y="1580">rule symbol source</text>
+  <path class="thin" d="M2000 1330 L2030 1330 L2030 1620 L2920 1620 L2920 1180 L2900 1180"/>
+  <text class="label" x="2240" y="1610">rule tag source</text>
 
-  <rect class="box group" x="95" y="755" width="210" height="96"/>
-  <text class="title" x="140" y="792">CardGroup</text>
-  <text class="field" x="122" y="818">anchor_card</text>
-  <text class="field" x="122" y="842">key, name</text>
+  <!-- Accepted suggestion values approach their targets on separate final ports -->
+  <path class="bus" d="M2900 1350 L2914 1350"/>
+  <path class="bus" d="M2926 1350 L2934 1350"/>
+  <path class="bus" d="M2946 1350 L2954 1350"/>
+  <path class="thin" d="M2966 1350 L3000 1350 L3000 565 L2780 565 L2780 610"/>
+  <text class="label" x="2810" y="555">accepted type</text>
+  <path class="thin" d="M2780 1330 L2780 1240"/>
+  <text class="label" x="2795" y="1292">accepted tag</text>
 
-  <rect class="box group" x="360" y="755" width="210" height="96"/>
-  <text class="title" x="380" y="792">CardGroupMember</text>
-  <text class="field" x="388" y="818">group + card</text>
-  <text class="field" x="388" y="842">position</text>
-
-  <rect class="box group" x="95" y="930" width="210" height="86"/>
-  <text class="title" x="150" y="967">CardAlias</text>
-  <text class="field" x="122" y="986">card + pool + faction key</text>
-  <text class="field" x="112" y="1008">key unique per pool/factions</text>
-
-  <rect class="box group" x="360" y="930" width="210" height="86"/>
-  <text class="title" x="382" y="967">CardMergeRedirect</text>
-  <text class="field" x="388" y="991">old card -> target</text>
-
-  <rect class="box left" x="95" y="1040" width="210" height="80"/>
-  <text class="title-small" x="117" y="1072">DeckTagAssignment</text>
-  <text class="field" x="123" y="1097">deck + tag</text>
-
-  <rect class="box left" x="360" y="1040" width="210" height="80"/>
-  <text class="title" x="422" y="1072">DeckTag</text>
-  <text class="field" x="387" y="1097">kind, key, label</text>
-
-  <rect class="box left" x="95" y="1150" width="210" height="80"/>
-  <text class="title-small" x="105" y="1182">DeckTagSuggestionDeck</text>
-  <text class="field" x="115" y="1207">suggestion + deck, active</text>
-
-  <rect class="box left" x="360" y="1150" width="210" height="80"/>
-  <text class="title-small" x="377" y="1182">DeckTagSuggestion</text>
-  <text class="field" x="377" y="1207">value/status/target/retries</text>
-
-  <rect class="band" x="700" y="370" width="320" height="880"/>
-  <text class="band-title" x="735" y="402">Stable identity</text>
-
-  <rect class="box card" x="745" y="445" width="230" height="90"/>
-  <text class="title-small" x="773" y="477">CardIdentityPoolLock</text>
-  <text class="field" x="775" y="501">card_pool (primary key)</text>
-  <text class="small" x="775" y="522">serializes name/alias writes</text>
-
-  <rect class="box card" x="745" y="575" width="230" height="190"/>
-  <text class="title" x="812" y="615">Card</text>
-  <text class="field" x="763" y="645">id, label; key unique per pool/factions</text>
-  <text class="field" x="775" y="670">card_pool (Player / Evil / Neutral)</text>
-  <text class="field" x="775" y="695">faction_identity_key</text>
-  <text class="field" x="775" y="718">mana_family_sort_key</text>
-  <text class="field" x="775" y="741">lifecycle + deck config • latest_version</text>
-
-  <rect class="box card" x="705" y="805" width="95" height="92"/>
-  <text x="719" y="832" class="title-small">CardRole</text>
-  <text x="716" y="852" class="small">Assignment</text>
-  <text x="716" y="874" class="small">role key</text>
-  <text x="712" y="891" class="small">none=Normal</text>
-
-  <rect class="box card" x="815" y="805" width="95" height="92"/>
-  <text x="818" y="832" class="title-small">CardFaction</text>
-  <text x="826" y="852" class="small">Assignment</text>
-  <text x="826" y="874" class="small">faction key</text>
-  <text x="822" y="891" class="small">identity input</text>
-
-  <rect class="box card" x="925" y="805" width="80" height="92"/>
-  <text x="932" y="829" class="small">CardMana</text>
-  <text x="936" y="847" class="small">Family</text>
-  <text x="932" y="865" class="small">Assignment</text>
-  <text x="936" y="883" class="small">none =</text>
-  <text x="931" y="896" class="small">Colorless</text>
-
-  <rect class="box tts" x="725" y="935" width="270" height="104"/>
-  <text class="title" x="785" y="970">TtsCardSheet</text>
-  <text class="field" x="750" y="994">card_pool + allocation cursor</text>
-  <text class="field" x="750" y="1016">layout + desired/rendered revision</text>
-
-  <rect class="box tts" x="725" y="1070" width="270" height="142"/>
-  <text class="title-small" x="765" y="1105">TtsCardSheetSlot</text>
-  <text class="field" x="750" y="1131">sheet + pool + permanent slot</text>
-  <text class="field" x="750" y="1155">identity unique per pool</text>
-  <text class="field" x="750" y="1179">resolved_card + card_version</text>
-  <text class="field" x="750" y="1203">image snapshot</text>
-
-  <rect class="band" x="1095" y="370" width="850" height="880"/>
-  <text class="band-title" x="1120" y="402">What cards are made from</text>
-
-  <rect class="box version" x="1125" y="455" width="280" height="180"/>
-  <text class="title" x="1180" y="492">CardVersion</text>
-  <text class="field" x="1155" y="520">parsed card snapshot</text>
-  <text class="field" x="1155" y="545">name, type_line, rules_text</text>
-  <text class="field" x="1155" y="570">printed mana, value + symbols</text>
-  <text class="field" x="1155" y="595">previous_version</text>
-  <text class="field" x="1155" y="620">content_version</text>
-
-  <rect class="box review" x="1455" y="410" width="215" height="82"/>
-  <text class="title-small" x="1478" y="447">CardVersionParseFlag</text>
-  <text class="field" x="1482" y="471">review note/user</text>
-
-  <rect class="box review" x="1700" y="410" width="220" height="82"/>
-  <text class="title-small" x="1718" y="447">CardVersionParseFlagItem</text>
-  <text class="field" x="1728" y="471">field-level issue</text>
-
-  <rect class="box version" x="1455" y="545" width="215" height="82"/>
-  <text class="title" x="1483" y="582">CardVersionImage</text>
-  <text class="field" x="1482" y="606">stored image data</text>
-
-  <rect class="box version" x="1700" y="545" width="220" height="82"/>
-  <text class="title" x="1762" y="582">CardBack</text>
-  <text class="field" x="1728" y="606">global back history</text>
-
-  <rect class="box version" x="1455" y="660" width="215" height="82"/>
-  <text class="title" x="1500" y="697">ParseResult</text>
-  <text class="field" x="1482" y="721">OCR/raw fields</text>
-
-  <rect class="box meta" x="1125" y="660" width="250" height="100"/>
-  <text class="title-small" x="1150" y="690">CardClassificationRule</text>
-  <text class="field" x="1145" y="716">pool + role/faction/mana target</text>
-  <text class="field" x="1145" y="738">exactly one Tag, Type, or Symbol source</text>
-  <text class="small" x="1145" y="756">enabled • protected source</text>
-
-  <rect class="box meta" x="1350" y="775" width="260" height="66"/>
-  <text class="title" x="1375" y="804">CardVersionType</text>
-  <text class="field" x="1377" y="826">version + type</text>
-
-  <rect class="box meta" x="1350" y="865" width="260" height="66"/>
-  <text class="title" x="1371" y="894">CardVersionSymbol</text>
-  <text class="field" x="1377" y="916">version + symbol</text>
-
-  <rect class="box meta" x="1350" y="955" width="260" height="66"/>
-  <text class="title" x="1369" y="984">CardVersionKeyword</text>
-  <text class="field" x="1377" y="1006">version + keyword</text>
-
-  <rect class="box meta" x="1350" y="1045" width="260" height="66"/>
-  <text class="title" x="1375" y="1074">CardVersionTag</text>
-  <text class="field" x="1377" y="1096">version + tag</text>
-
-  <rect class="box meta" x="1350" y="1135" width="260" height="66"/>
-  <text class="title-small" x="1371" y="1164">CardVersionMetadataSuggestion</text>
-  <text class="field" x="1377" y="1186">version + proposed metadata</text>
-
-  <rect class="box meta" x="1665" y="775" width="185" height="66"/>
-  <text class="title" x="1717" y="804">Type</text>
-  <text class="field" x="1693" y="826">key, label</text>
-
-  <rect class="box meta" x="1665" y="865" width="185" height="66"/>
-  <text class="title" x="1705" y="894">Symbol</text>
-  <text class="field" x="1693" y="916">key, assets</text>
-
-  <rect class="box meta" x="1665" y="955" width="185" height="66"/>
-  <text class="title" x="1697" y="984">Keyword</text>
-  <text class="field" x="1693" y="1006">key, label</text>
-
-  <rect class="box meta" x="1665" y="1045" width="185" height="66"/>
-  <text class="title" x="1715" y="1074">Tag</text>
-  <text class="field" x="1693" y="1096">key, label</text>
-
-  <rect class="box meta" x="1665" y="1135" width="185" height="66"/>
-  <text class="title-small" x="1679" y="1164">MetadataSuggestion</text>
-  <text class="field" x="1693" y="1186">accepted tag/type</text>
-
-  <path class="line" d="M375 238 L500 238"/>
-  <text class="label" x="400" y="224">belongs to</text>
-  <path class="line" d="M715 238 L850 238"/>
-  <text class="label" x="742" y="224">has items</text>
-  <path class="line" d="M1000 281 C1035 300, 1060 315, 1095 318"/>
-  <path class="line" d="M715 205 C875 150, 1080 150, 1245 205"/>
-  <text class="label" x="930" y="154">ImportJob.template</text>
-  <path class="line" d="M607 281 C650 350, 760 425, 820 575"/>
-  <text class="label" x="642" y="360">job release context</text>
-  <path class="line" d="M962 281 C925 360, 880 450, 860 575"/>
-  <text class="label" x="902" y="365">target_card</text>
-  <path class="line" d="M1015 281 C1055 350, 1085 420, 1175 455"/>
-  <text class="label" x="1018" y="365">target_card_version</text>
-  <path class="line" d="M268 281 C420 360, 860 410, 1125 515"/>
-  <text class="label" x="610" y="378">content release marker</text>
-  <path class="line" d="M1245 255 C1430 285, 1430 400, 1325 455"/>
-  <text class="label" x="1350" y="430">CardVersion.template</text>
-  <path class="thin" d="M1245 348 L1245 455"/>
-  <text class="label" x="1255" y="440">reviewed version</text>
-  <path class="thin" d="M1120 348 C1030 410, 960 500, 900 575"/>
-  <text class="label" x="965" y="455">reviewed Card</text>
-  <path class="thin" d="M1395 318 C1470 310, 1540 292, 1600 281"/>
-  <text class="label" x="1450" y="300">reviewed_by</text>
-  <path class="soft" d="M610 281 C700 345, 900 510, 1125 690"/>
-  <text class="label" x="810" y="442">immutable rule snapshot</text>
-  <path class="thin" d="M1725 238 L1765 238"/>
-  <text class="label" x="1652" y="190">notification recipient/actor</text>
-
-  <path class="line" d="M305 493 L360 493"/>
-  <path class="thin" d="M305 588 L360 588"/>
-  <path class="line" d="M305 662 L360 662"/>
-  <path class="line" d="M305 803 L360 803"/>
-  <path class="line" d="M305 973 L360 973"/>
-  <path class="line" d="M360 1080 L305 1080"/>
-  <path class="line" d="M360 1190 L305 1190"/>
-
-  <path class="thin" d="M95 493 C70 493, 70 1080, 95 1080"/>
-  <text class="label" x="75" y="1020">deck assignments</text>
-  <path class="thin" d="M95 515 C58 515, 58 1190, 95 1190"/>
-  <text class="label" x="75" y="1132">deck suggestions</text>
-
-  <path class="line" d="M570 493 C635 500, 700 560, 745 625"/>
-  <text class="label" x="590" y="525">entry card</text>
-  <path class="line" d="M570 662 C650 662, 700 665, 745 672"/>
-  <text class="label" x="590" y="686">sideboard card</text>
-  <path class="line" d="M570 803 C645 780, 700 735, 745 710"/>
-  <text class="label" x="592" y="790">member card</text>
-  <path class="line" d="M305 493 C395 380, 645 420, 800 575"/>
-  <text class="label" x="420" y="412">hero_card</text>
-  <path class="line" d="M305 803 C430 650, 620 610, 745 635"/>
-  <text class="label" x="405" y="680">anchor_card</text>
-  <path class="line" d="M305 973 C475 900, 640 805, 745 735"/>
-  <path class="line" d="M570 973 C650 920, 710 840, 745 745"/>
-
-  <path class="line" d="M975 650 L1125 535"/>
-  <text class="label" x="1015" y="575">versions</text>
-  <path class="soft" d="M1125 595 C1048 645, 1040 725, 975 745"/>
-  <text class="label" x="1015" y="710">latest_version</text>
-
-  <path class="line" d="M820 765 L752 805"/>
-  <text class="label" x="748" y="792">roles</text>
-  <path class="line" d="M860 765 L862 805"/>
-  <text class="label" x="832" y="792">factions</text>
-  <path class="line" d="M900 765 L965 805"/>
-  <text class="label" x="922" y="792">mana</text>
-
-  <path class="line" d="M860 1070 L860 1039"/>
-  <text class="label" x="872" y="1058">sheet</text>
-  <path class="line" d="M725 1140 C665 1080, 670 850, 770 765"/>
-  <text class="label" x="628" y="968">resolved_card</text>
-  <path class="line" d="M995 1150 C1050 1080, 1070 750, 1175 635"/>
-  <text class="label" x="1005" y="1018">card_version</text>
-  <path class="line" d="M995 1188 C1190 1185, 1380 850, 1510 627"/>
-  <text class="label" x="1160" y="1118">image</text>
-
-  <path class="line" d="M1405 500 L1455 451"/>
-  <path class="line" d="M1405 540 L1455 586"/>
-  <path class="line" d="M1405 595 C1430 630, 1440 670, 1455 701"/>
-  <path class="line" d="M1670 451 L1700 451"/>
-
-  <path class="bus" d="M1265 635 L1265 1168"/>
-  <path class="line" d="M1265 808 L1350 808"/>
-  <path class="line" d="M1265 898 L1350 898"/>
-  <path class="line" d="M1265 988 L1350 988"/>
-  <path class="line" d="M1265 1078 L1350 1078"/>
-  <path class="line" d="M1265 1168 L1350 1168"/>
-
-  <path class="line" d="M1610 808 L1665 808"/>
-  <path class="line" d="M1610 898 L1665 898"/>
-  <path class="line" d="M1610 988 L1665 988"/>
-  <path class="line" d="M1610 1078 L1665 1078"/>
-  <path class="line" d="M1610 1168 L1665 1168"/>
-
-  <path class="thin" d="M1375 700 C1550 700, 1600 790, 1665 808"/>
-  <path class="thin" d="M1375 730 C1540 810, 1585 1015, 1665 1078"/>
-  <path class="thin" d="M1375 742 C1500 820, 1570 900, 1665 898"/>
-
-  <path class="thin" d="M1850 1155 C1965 1115, 1975 835, 1850 808"/>
-  <path class="thin" d="M1850 1175 C1955 1150, 1970 1090, 1850 1078"/>
-  <text class="label" x="1880" y="1138">accepted tag/type</text>
-
-  <path class="thin" d="M1600 281 C1560 335, 1515 385, 1455 451"/>
-  <text class="label" x="1465" y="350">submitted_by</text>
-  <path class="thin" d="M1650 281 C1710 330, 1745 375, 1810 410"/>
-  <text class="label" x="1710" y="340">reviewed_by</text>
+  <text class="lane-note" x="60" y="1880">Relationship geometry: orthogonal lanes only • no entity-box crossings • dedicated destination attachments • small gaps mark independent lane crossovers</text>
 </svg>

@@ -19,14 +19,22 @@ uv run --no-project python -c "import xml.etree.ElementTree as ET; ET.parse('doc
 
 ## Diagram Layout
 
-Use the established linear schematic:
+Use a banded linear schematic:
 
 - Top band: import/parser lineage and external auth/template context.
 - Left band: things built from `Card`, such as decks, sideboards, groups, aliases, and merge redirects.
 - Center band: `Card` as the stable identity.
-- Right band: what cards are made from, centered around `CardVersion`, images, parse results, parse flags, metadata link tables, and canonical metadata tables.
+- Right-center band: version and review lineage, centered around `CardVersion`, images, parse results, and parse flags.
+- Far-right band: metadata link tables and their aligned canonical metadata tables.
 
-Keep `Card` visually central. Decks and groups should point to `Card`, not to `CardVersion` metadata. Avoid adding a deck-to-version-metadata callout; explain that relationship in prose if needed.
+Keep `Card` visually central. Decks and groups should point to `Card`, not to `CardVersion` metadata. Avoid adding a deck-to-version-metadata callout; explain that relationship in prose if needed. Preserve these semantic groupings while they remain useful, but split, resize, or rename bands when a group can no longer provide clear routing space.
+
+## Readability And Abstraction
+
+- Treat the diagram as an explanatory map, not an exhaustive serialization of the database. Readability and useful system understanding take priority over showing every persisted field or relationship.
+- Include a model, field, or connector when it clarifies ownership, stable identity, lifecycle, lineage, cardinality, or an important workflow boundary. Omit routine implementation detail such as timestamps and low-value fields; summarize related fields when their individual distinction does not help the reader.
+- Be exact about every detail that is shown: use real model/field names or an explicitly explanatory phrase, and never invent schema. If two relationships differ in a way readers need to understand, such as ownership or nullability, keep them distinct; otherwise a clear summary may be more useful than parallel detail.
+- When additional schema fidelity would materially crowd the diagram, keep the schematic readable and put the exhaustive detail in nearby prose or model documentation instead.
 
 ## Current Model Semantics
 
@@ -41,19 +49,28 @@ Keep `Card` visually central. Decks and groups should point to `Card`, not to `C
 
 ## SVG Style Rules
 
-- Use exact model names in boxes, including long names such as `CardVersionMetadataSuggestion`; reduce label font size instead of abbreviating when needed.
+- Use orthogonal connectors only: every relationship segment must be horizontal or vertical. Do not use curves, arcs, or diagonal segments.
+- Treat the open space between boxes and bands as explicit routing lanes. A connector must travel through those lanes and must never cross an entity box, even when a more direct route would be shorter.
+- Give every relationship its own final attachment segment and its own attachment point on the destination box. Relationships may share a trunk while travelling, but they must split before approaching a box; do not stack arrowheads or merge the final stretch.
+- Avoid intersections between independent relationship lanes. When the graph forces a crossover, keep both lanes orthogonal and split the lower visual lane with a small, consistent gap so the crossing cannot be mistaken for a relationship junction; prefer rerouting when a clear lane is available.
+- Keep visible clearance between parallel lanes, box edges, labels, and arrowheads. Prefer a longer perimeter route over a tight path through a populated group.
+- Expand the canvas, band, or inter-band gutter before shrinking boxes, reducing readable text, or accepting crowded routing.
+- Reserve box sides intentionally: use distinct ports for multiple incoming relationships, and prefer the side that faces the connector's owning lane.
+- Use exact model names in boxes, including long names such as `CardVersionMetadataSuggestion`; reduce label font size instead of abbreviating when needed. Size long titles against the widest supported fallback font, not only the preferred local font.
 - Prefer straight, aligned pairs for metadata rows:
   - `CardVersionType -> Type`
   - `CardVersionSymbol -> Symbol`
   - `CardVersionKeyword -> Keyword`
   - `CardVersionTag -> Tag`
   - `CardVersionMetadataSuggestion -> MetadataSuggestion`
-- Route metadata relationships from the bottom-center of `CardVersion`, then branch horizontally into the metadata link rows.
+- Route metadata relationships from `CardVersion` into a clear collector lane, then branch horizontally into the metadata link rows. The collector is a travel trunk only; each metadata row keeps a separate final segment.
 - Put `CardVersionParseFlag` and `CardVersionParseFlagItem` above `CardVersionImage` and `ParseResult`; place the item box to the right of the parent flag.
 - Draw `ImportJob.template -> Template` as a solid FK relationship, not a dashed logical key reference.
-- Keep labels away from arrow crossings. If labels overlap, move the label before moving model boxes.
-- Route long top-band arrows through open space. The `ImportJob.template -> Template` arrow should arc upward rather than pass through other boxes.
+- Treat a label and its background stroke as a routing obstacle. A label may mask its own connector for readability, but it must not cover an unrelated connector, entity border, arrowhead, or another label. Reserve a clear label shelf within the lane; if none exists, reroute the relationship or expand the layout.
+- Route long top-band relationships through the reserved upper, lower, or perimeter lanes. In particular, route `ImportJob.template -> Template` above the boxes with orthogonal segments.
 - Keep all boxes inside their container bands. If a box no longer fits, widen the band/canvas before accepting overflow.
+
+Before finishing, inspect a rendered raster copy at a readable scale in addition to validating the XML. Check every connector end and every long lane for box intersections, merged final approaches, clipped or colliding label backgrounds, and accidental diagonal or curved segments.
 
 ## Documentation
 
