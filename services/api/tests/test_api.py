@@ -4836,11 +4836,33 @@ def test_content_version_snapshot_derives_rule_text_from_enriched_source() -> No
     assert version.rules_text == "Use {SNAPSHOT}."
 
 
-def test_reparse_preserves_manually_owned_rule_text_pair() -> None:
+def test_reparse_preserves_manual_markup_and_refreshes_derived_rule_text() -> None:
     card, target_version = _create_editable_card_version(name="Rule Persistence Manual")
+    previous_symbol = _get_or_create_symbol(
+        key="rule-persistence-previous",
+        label="Rule Persistence Previous",
+        symbol_type="misc",
+    )
+    previous_symbol.text_token = "{PREVIOUS}"
+    previous_symbol.save(update_fields=["text_token"])
+    incoming_symbol = _get_or_create_symbol(
+        key="rule-persistence-replacement",
+        label="Rule Persistence Replacement",
+        symbol_type="misc",
+    )
+    incoming_symbol.text_token = "{REPLACEMENT}"
+    incoming_symbol.save(update_fields=["text_token"])
+    replace_card_version_symbols(
+        card_version_id=target_version.id,
+        symbol_ids=[previous_symbol.id],
+    )
     update_latest_card_version(
         card_id=card.id,
-        updates={"rules_text": "Manual **rule** text."},
+        updates={
+            "rules_text": (
+                "Manual **effect** uses [[symbol:rule-persistence-previous]]."
+            )
+        },
         restore_fields=[],
         restore_metadata_groups=[],
         unlock_fields=[],
@@ -4857,10 +4879,13 @@ def test_reparse_preserves_manually_owned_rule_text_pair() -> None:
         name="Rule Persistence Manual",
         checksum="rule-persistence-manual-checksum",
         enriched_text="Incoming **parser** rules.",
+        symbol_ids=[incoming_symbol.id],
     )
 
-    assert version.rules_text_enriched == "Manual **rule** text."
-    assert version.rules_text == "Manual rule text."
+    assert version.rules_text_enriched == (
+        "Manual **effect** uses [[symbol:rule-persistence-previous]]."
+    )
+    assert version.rules_text == "Manual effect uses rule-persistence-previous."
     assert version.field_sources_json["fields"]["rules_text"] == "manual"
 
 
@@ -5296,6 +5321,29 @@ def test_latest_version_patch_updates_manual_fields_and_metadata() -> None:
     assert latest.rules_text_enriched == "[[symbol:manual-symbol]]: Manual rules text"
     assert latest.rules_text == "manual-symbol: Manual rules text"
     assert [row.id for row in get_tags_for_card_version(latest.id)] == []
+
+
+def test_latest_version_patch_preserves_markdown_significant_whitespace() -> None:
+    username = "staff-card-markdown-whitespace-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+    card, _version = _create_editable_card_version(name="Markdown Whitespace Card")
+    markup = "    [[card:card-1|Indented reference]]\nHard break  \n\n"
+
+    response = client.patch(
+        f"/cards/{card.id}/latest-version",
+        data={"rules_text_enriched": markup},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["rules_text_enriched"] == markup
+    latest = get_latest_card_version(card.id)
+    assert latest is not None
+    assert latest.rules_text_enriched == markup
 
 
 def test_latest_version_patch_can_restore_and_unlock() -> None:

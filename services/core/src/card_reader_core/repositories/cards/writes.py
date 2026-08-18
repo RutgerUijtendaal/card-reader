@@ -1147,18 +1147,19 @@ def apply_parsed_output_to_version(
         replace_card_version_tags(card_version_id=version.id, tag_ids=tag_ids)
     if field_sources["metadata"]["types"] == FIELD_SOURCE_AUTO:
         replace_card_version_types(card_version_id=version.id, type_ids=type_ids)
-    if field_sources["metadata"]["symbols"] == FIELD_SOURCE_AUTO:
+    symbols_are_auto_owned = field_sources["metadata"]["symbols"] == FIELD_SOURCE_AUTO
+    if symbols_are_auto_owned:
         replace_card_version_symbols(
             card_version_id=version.id,
             symbol_ids=symbol_ids,
         )
 
     if field_sources["fields"]["rules_text"] == FIELD_SOURCE_AUTO:
-        enriched_text = normalized_fields.get("rules_text_enriched", "")
-        version.rules_text_enriched = enriched_text
+        version.rules_text_enriched = normalized_fields.get("rules_text_enriched", "")
+    if field_sources["fields"]["rules_text"] == FIELD_SOURCE_AUTO or symbols_are_auto_owned:
         version.rules_text = render_rule_text_for_card_version(
             card_version_id=version.id,
-            enriched_text=enriched_text,
+            enriched_text=version.rules_text_enriched,
         )
 
     version.confidence = float(confidence.get("overall", 0.0))

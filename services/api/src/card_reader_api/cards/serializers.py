@@ -513,8 +513,18 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
     mana_cost = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     attack = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     health = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    rules_text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    rules_text_enriched = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    rules_text = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        trim_whitespace=False,
+    )
+    rules_text_enriched = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        trim_whitespace=False,
+    )
     card_pool = serializers.ChoiceField(choices=CARD_POOLS, required=False)
     card_roles = serializers.ListField(
         child=serializers.ChoiceField(choices=CARD_ROLES),
