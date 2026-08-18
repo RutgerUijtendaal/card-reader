@@ -1350,6 +1350,75 @@ def test_deck_long_description_round_trips_normalizes_and_stays_out_of_summaries
     assert "long_description" not in summary
 
 
+def test_deck_markup_is_authoritative_and_summaries_remain_plain_only() -> None:
+    username = "deck-markup-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Markup Hero", hero=True)
+    linked_card = _create_card(name="Current Linked Name", hero=False)
+    mainboard_cards = _build_mainboard_cards()
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+    description_markup = f"    [[card:{linked_card.id}|Literal reference]]"
+    long_description_markup = f"# Plan\n\nUse [[card:{linked_card.id}|Saved Name]]  "
+
+    create_response = client.post(
+        "/my/decks",
+        data={
+            "name": "Markup Deck",
+            "description_markup": description_markup,
+            "long_description_markup": long_description_markup,
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": _valid_entries(mainboard_cards),
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert create_response.status_code == 201
+    payload = create_response.json()
+    assert payload["description_markup"] == description_markup
+    assert payload["description"] == f"[[card:{linked_card.id}|Literal reference]]"
+    assert payload["long_description_markup"] == long_description_markup
+    assert payload["long_description"] == "Plan\n\nUse Saved Name"
+    deck = Deck.objects.get(id=payload["id"])
+    assert deck.description_markup == description_markup
+    assert deck.description == f"[[card:{linked_card.id}|Literal reference]]"
+
+    summary_response = client.get("/my/decks", {"view": "summary"})
+    summary = next(row for row in summary_response.json() if row["id"] == deck.id)
+    assert summary["description"] == f"[[card:{linked_card.id}|Literal reference]]"
+    assert "description_markup" not in summary
+    assert "long_description_markup" not in summary
+
+
+def test_deck_writes_reject_legacy_and_markup_fields_together() -> None:
+    username = "deck-markup-conflict-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Conflict Hero", hero=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "Conflict Deck",
+            "description": "Legacy",
+            "description_markup": "**Markup**",
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": [],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert "description" in response.json()["detail"]
+
+
 def test_deck_patch_preserves_and_clears_long_description() -> None:
     username = "deck-long-description-patch-user"
     password = "password"

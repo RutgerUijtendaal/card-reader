@@ -1,9 +1,14 @@
 import type { DeckRecord, DeckUpsertRequest } from '@/domain/decks/types';
 
+const markupOrNull = (value: string | null | undefined): string | null =>
+  value?.trim() ? value : null;
+
 export const buildDeckUpsertRequestFromRecord = (deck: DeckRecord): DeckUpsertRequest => ({
   name: deck.name.trim(),
-  description: deck.description?.trim() || null,
-  long_description: deck.long_description?.trim() || null,
+  description_markup: markupOrNull(deck.description_markup ?? deck.description),
+  long_description_markup: markupOrNull(
+    deck.long_description_markup ?? deck.long_description,
+  ),
   difficulty: deck.difficulty,
   visibility: deck.visibility,
   hero_card_id: deck.hero_card.id,

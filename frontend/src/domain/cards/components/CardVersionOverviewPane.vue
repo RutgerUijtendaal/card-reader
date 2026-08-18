@@ -122,8 +122,17 @@
             <BookOpenText class="h-4 w-4 shrink-0 text-[var(--theme-accent)]" />
             <span>Rules Text</span>
           </div>
-          <p class="theme-card-frame-muted theme-section-muted whitespace-pre-line rounded-lg p-4 text-sm leading-6">
-            {{ version.rules_text || '-' }}
+          <CardMarkupText
+            v-if="version.rules_text_enriched"
+            class="theme-card-frame-muted rounded-lg p-4 text-sm"
+            :markup="version.rules_text_enriched"
+            :symbols="version.symbols"
+          />
+          <p
+            v-else
+            class="theme-card-frame-muted theme-section-muted rounded-lg p-4 text-sm"
+          >
+            -
           </p>
         </div>
 
@@ -203,6 +212,7 @@
 </template>
 
 <script setup lang="ts">
+import CardMarkupText from '@/domain/cards/components/CardMarkupText.vue';
 import { BookOpenText, Flag, Hash, HeartPulse, KeyRound, ScrollText, Sparkles, Swords, Tags } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import SymbolizedText from '@/domain/cards/components/SymbolizedText.vue';

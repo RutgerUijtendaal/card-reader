@@ -27,6 +27,27 @@ describe('ruleTextSymbols', () => {
     });
   });
 
+  it('ignores symbol-like literals in CommonMark code and escaped text', () => {
+    expect(
+      getRuleTextSymbolState(
+        [
+          '[[symbol:exhaust]]',
+          '`[[symbol:fire-mana]]`',
+          '```text',
+          '[[symbol:missing]]',
+          '```',
+          '    [[symbol:indented]]',
+          '\\[[symbol:escaped]]',
+        ].join('\n'),
+        symbols,
+      ),
+    ).toEqual({
+      referencedKeys: ['exhaust'],
+      referencedSymbolIds: ['sym-1'],
+      unknownKeys: [],
+    });
+  });
+
   it('deduplicates merged effective symbol ids', () => {
     expect(buildEffectiveSymbolIds(['sym-1'], ['sym-2', 'sym-1'])).toEqual(['sym-1', 'sym-2']);
   });

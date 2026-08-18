@@ -69,6 +69,7 @@ def test_reparse_preserves_manual_fields_and_metadata_groups(
     reparsed_state = load_db_state()
 
     assert reparsed.rules_text == "Manual lock text"
+    assert reparsed.rules_text_enriched == "Manual lock text"
     assert _state_metadata_tags(reparsed_state) == ["silver"]
     assert reparsed.field_sources_json["fields"]["rules_text"] == "manual"
     assert reparsed.field_sources_json["metadata"]["tags"] == "manual"

@@ -52,6 +52,7 @@ from ..metadata import (
     replace_card_version_symbols,
     replace_card_version_tags,
     replace_card_version_types,
+    render_rule_text_for_card_version,
 )
 from ..templates import get_template_by_key
 from .images import save_image_record
@@ -595,6 +596,11 @@ def create_parsed_card_version(
         card_version_id=version.id,
         symbol_ids=symbol_ids,
     )
+    version.rules_text = render_rule_text_for_card_version(
+        card_version_id=version.id,
+        enriched_text=version.rules_text_enriched,
+    )
+    version.save(update_fields=["rules_text"])
     parse_result = save_parse_result(version, raw_ocr, normalized_fields, confidence)
     replace_card_version_metadata_suggestions(
         card_version_id=version.id,
@@ -794,29 +800,6 @@ def reparse_target_version(
             template_id=template_id,
             reset_manual_state=reset_manual_state,
         )
-
-
-def apply_parsed_fields_to_version(
-    version: CardVersion,
-    *,
-    normalized_fields: dict[str, str],
-    confidence: dict[str, float],
-) -> None:
-    version.name = normalized_fields.get("name", "")
-    version.type_line = normalized_fields.get("type_line", "")
-    version.mana_cost = normalized_fields.get("mana_cost", "")
-    version.mana_symbols_json = extract_mana_symbols(normalized_fields)
-    version.mana_value = infer_mana_value(
-        mana_cost=version.mana_cost,
-        mana_symbols=version.mana_symbols_json,
-        mana_total=normalized_fields.get("mana_total"),
-    )
-    version.attack = to_int_or_none(normalized_fields.get("attack"))
-    version.health = to_int_or_none(normalized_fields.get("health"))
-    version.rules_text_raw = normalized_fields.get("rules_text_raw", "")
-    version.rules_text_enriched = normalized_fields.get("rules_text_enriched", "")
-    version.rules_text = normalized_fields.get("rules_text", "")
-    version.confidence = float(confidence.get("overall", 0.0))
 
 
 def update_existing_version(
@@ -1061,7 +1044,7 @@ def create_new_version(
         health=to_int_or_none(normalized_fields.get("health")),
         rules_text_raw=normalized_fields.get("rules_text_raw", ""),
         rules_text_enriched=normalized_fields.get("rules_text_enriched", ""),
-        rules_text=normalized_fields.get("rules_text", ""),
+        rules_text="",
         confidence=float(confidence.get("overall", 0.0)),
         field_sources_json=DEFAULT_FIELD_SOURCES,
         parsed_snapshot_json=build_parsed_snapshot(normalized_fields, [], [], [], []),
@@ -1156,12 +1139,7 @@ def apply_parsed_output_to_version(
         version.attack = to_int_or_none(normalized_fields.get("attack"))
     if field_sources["fields"]["health"] == FIELD_SOURCE_AUTO:
         version.health = to_int_or_none(normalized_fields.get("health"))
-    if field_sources["fields"]["rules_text"] == FIELD_SOURCE_AUTO:
-        version.rules_text_enriched = normalized_fields.get("rules_text_enriched", "")
-        version.rules_text = normalized_fields.get("rules_text", "")
     version.rules_text_raw = normalized_fields.get("rules_text_raw", "")
-    if field_sources["fields"]["rules_text"] == FIELD_SOURCE_AUTO:
-        version.rules_text_enriched = normalized_fields.get("rules_text_enriched", "")
 
     if field_sources["metadata"]["keywords"] == FIELD_SOURCE_AUTO:
         replace_card_version_keywords(card_version_id=version.id, keyword_ids=keyword_ids)
@@ -1169,10 +1147,19 @@ def apply_parsed_output_to_version(
         replace_card_version_tags(card_version_id=version.id, tag_ids=tag_ids)
     if field_sources["metadata"]["types"] == FIELD_SOURCE_AUTO:
         replace_card_version_types(card_version_id=version.id, type_ids=type_ids)
-    if field_sources["metadata"]["symbols"] == FIELD_SOURCE_AUTO:
+    symbols_are_auto_owned = field_sources["metadata"]["symbols"] == FIELD_SOURCE_AUTO
+    if symbols_are_auto_owned:
         replace_card_version_symbols(
             card_version_id=version.id,
             symbol_ids=symbol_ids,
+        )
+
+    if field_sources["fields"]["rules_text"] == FIELD_SOURCE_AUTO:
+        version.rules_text_enriched = normalized_fields.get("rules_text_enriched", "")
+    if field_sources["fields"]["rules_text"] == FIELD_SOURCE_AUTO or symbols_are_auto_owned:
+        version.rules_text = render_rule_text_for_card_version(
+            card_version_id=version.id,
+            enriched_text=version.rules_text_enriched,
         )
 
     version.confidence = float(confidence.get("overall", 0.0))

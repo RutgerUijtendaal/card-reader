@@ -19,6 +19,7 @@ type LegacyGalleryOptionsState = {
 
 type HoverModePreferencesState = {
   defaultHoverMode: WritableComputedRef<HoverMode>;
+  hasSavedDefaultHoverMode: ComputedRef<boolean>;
   hoverPreviewScale: WritableComputedRef<number>;
   getOverrideHoverMode: (surface: HoverModeSurface) => WritableComputedRef<HoverMode | null>;
   getEffectiveHoverMode: (surface: HoverModeSurface) => ComputedRef<HoverMode>;
@@ -75,10 +76,10 @@ export const handleHoverPreviewScaleWheel = (
   return true;
 };
 
-const readLegacyDefaultHoverMode = (): HoverMode => {
+const readLegacyDefaultHoverMode = (): HoverMode | null => {
   const stored = localStorage.getItem(GALLERY_OPTIONS_STORAGE_KEY);
   if (!stored) {
-    return DEFAULT_HOVER_MODE;
+    return null;
   }
 
   try {
@@ -86,9 +87,9 @@ const readLegacyDefaultHoverMode = (): HoverMode => {
     if (typeof parsed.tooltipEnabled === 'boolean') {
       return parsed.tooltipEnabled ? 'details' : 'none';
     }
-    return normalizeHoverMode(parsed.hoverMode);
+    return isHoverMode(parsed.hoverMode) ? parsed.hoverMode : null;
   } catch {
-    return DEFAULT_HOVER_MODE;
+    return null;
   }
 };
 
@@ -100,11 +101,16 @@ const createHoverModePreferencesState = (): HoverModePreferencesState => {
   });
 
   const defaultHoverMode = computed<HoverMode>({
-    get: () => normalizeHoverMode(storedDefaultHoverMode.value ?? readLegacyDefaultHoverMode()),
+    get: () => normalizeHoverMode(
+      storedDefaultHoverMode.value ?? readLegacyDefaultHoverMode() ?? DEFAULT_HOVER_MODE,
+    ),
     set: (value) => {
       storedDefaultHoverMode.value = normalizeHoverMode(value);
     },
   });
+  const hasSavedDefaultHoverMode = computed(
+    () => storedDefaultHoverMode.value !== null || readLegacyDefaultHoverMode() !== null,
+  );
 
   const getOverrideHoverMode = (surface: HoverModeSurface) =>
     computed<HoverMode | null>({
@@ -134,6 +140,7 @@ const createHoverModePreferencesState = (): HoverModePreferencesState => {
 
   return {
     defaultHoverMode,
+    hasSavedDefaultHoverMode,
     hoverPreviewScale,
     getOverrideHoverMode,
     getEffectiveHoverMode,

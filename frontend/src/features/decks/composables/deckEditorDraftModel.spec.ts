@@ -8,6 +8,16 @@ import {
 } from '@/features/decks/composables/deckEditorDraftModel';
 
 describe('deckEditorDraftModel', () => {
+  test('preserves Markdown-significant whitespace in submission payloads', () => {
+    const form = createEmptyDeckForm();
+    form.description = '    [[card:id|Literal]]\n';
+    form.long_description = 'Line with a hard break  \nNext';
+
+    expect(buildDeckUpsertPayload(form)).toMatchObject({
+      description_markup: '    [[card:id|Literal]]\n',
+      long_description_markup: 'Line with a hard break  \nNext',
+    });
+  });
   test('preserves source sideboard ids in update payloads', () => {
     const form = createEmptyDeckForm();
     form.sideboards = [

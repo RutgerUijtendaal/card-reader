@@ -167,8 +167,17 @@
           <p class="theme-kicker mb-2 text-xs font-semibold uppercase tracking-wide">
             Rules Text
           </p>
-          <p class="theme-card-frame-muted theme-section-muted whitespace-pre-line rounded-lg p-3 text-sm">
-            {{ version.rules_text || '-' }}
+          <CardMarkupText
+            v-if="version.rules_text_enriched"
+            class="theme-card-frame-muted rounded-lg p-3 text-sm"
+            :markup="version.rules_text_enriched"
+            :symbols="version.symbols"
+          />
+          <p
+            v-else
+            class="theme-card-frame-muted theme-section-muted rounded-lg p-3 text-sm"
+          >
+            -
           </p>
         </div>
       </div>
@@ -177,6 +186,7 @@
 </template>
 
 <script setup lang="ts">
+import CardMarkupText from '@/domain/cards/components/CardMarkupText.vue';
 import SymbolizedText from '@/domain/cards/components/SymbolizedText.vue';
 import { formatCardContentVersion, type SymbolLookupMap, type CardVersionDetail } from '@/domain/cards/types';
 

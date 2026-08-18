@@ -1,6 +1,5 @@
 import type { SymbolFilterOption } from '@/domain/cards/types';
-
-const SYMBOL_PLACEHOLDER_PATTERN = /\[\[symbol:([a-z0-9-]+)\]\]/g;
+import { extractSymbolReferenceKeys } from '@/domain/cards/utils/cardMarkup';
 
 export type RuleTextSymbolState = {
   referencedKeys: string[];
@@ -29,8 +28,8 @@ export const getRuleTextSymbolState = (
   const seenIds = new Set<string>();
   const seenUnknownKeys = new Set<string>();
 
-  for (const match of enrichedText.matchAll(SYMBOL_PLACEHOLDER_PATTERN)) {
-    const symbolKey = String(match[1] ?? '').trim().toLowerCase();
+  for (const referencedKey of extractSymbolReferenceKeys(enrichedText)) {
+    const symbolKey = referencedKey.trim().toLowerCase();
     if (!symbolKey || seenKeys.has(symbolKey)) {
       continue;
     }

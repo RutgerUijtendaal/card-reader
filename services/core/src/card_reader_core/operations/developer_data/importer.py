@@ -39,6 +39,7 @@ from card_reader_core.models import (
     card_faction_identity_key,
 )
 from card_reader_core.repositories.cards import lock_card_identity_pools, set_card_mana_families
+from card_reader_core.rules import render_enriched_rule_text
 from card_reader_core.services.classification_rules import (
     ClassificationRuleService,
     ensure_default_mana_family_classification_rules,
@@ -514,6 +515,9 @@ def _import_payload(
         )
         version_models: dict[int, CardVersion] = {}
         for version in card_record.versions:
+            symbol_tokens_by_key = {
+                key: symbols[key].text_token for key in version.symbol_keys
+            }
             version_models[version.version_number] = CardVersion.objects.create(
                 card=card,
                 version_number=version.version_number,
@@ -528,7 +532,10 @@ def _import_payload(
                 health=version.health,
                 rules_text_raw=version.rules_text_raw,
                 rules_text_enriched=version.rules_text_enriched,
-                rules_text=version.rules_text,
+                rules_text=render_enriched_rule_text(
+                    version.rules_text_enriched,
+                    symbol_tokens_by_key=symbol_tokens_by_key,
+                ),
                 confidence=version.confidence,
                 field_sources_json=version.field_sources,
                 parsed_snapshot_json=version.parsed_snapshot,

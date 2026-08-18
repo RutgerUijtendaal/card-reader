@@ -526,9 +526,9 @@ describe('DeckDetailPage type grouping', () => {
     expect(manaSection.getAttribute('aria-expanded')).toBe('false');
     expect(mounted.container.querySelector('.deck-detail-layout-expanded')).not.toBeNull();
     expect(longDescription?.textContent).toContain('About this deck');
-    expect(longDescription?.textContent).toContain('Opening plan\n\nSideboard notes');
-    expect(longDescription?.querySelector('p')?.classList.contains('whitespace-pre-wrap')).toBe(true);
-    expect(longDescription?.querySelector('p')?.classList.contains('break-words')).toBe(true);
+    expect(longDescription?.textContent).toContain('Opening plan');
+    expect(longDescription?.textContent).toContain('Sideboard notes');
+    expect(longDescription?.querySelector('.card-markup-text')?.classList.contains('break-words')).toBe(true);
     expect(mounted.container.querySelector('[data-testid="mana-distribution"]')).toBeNull();
     expect(mounted.container.querySelector('[data-testid="deck-detail-close-button"]')).not.toBeNull();
 

@@ -113,7 +113,9 @@ def deck_payload(
     return {
         "id": deck.id,
         "name": deck.name,
+        "description_markup": deck.description_markup,
         "description": deck.description,
+        "long_description_markup": deck.long_description_markup,
         "long_description": deck.long_description,
         "difficulty": deck.difficulty,
         "visibility": deck.visibility,
@@ -383,7 +385,19 @@ class DeckSideboardWriteSerializer(serializers.Serializer[dict[str, object]]):
 class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
     name = serializers.CharField(required=True, allow_blank=False)
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    description_markup = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        trim_whitespace=False,
+    )
     long_description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    long_description_markup = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        trim_whitespace=False,
+    )
     difficulty = serializers.ChoiceField(
         choices=cast(tuple[DeckDifficulty, ...], ("easy", "medium", "hard")),
         required=False,
@@ -400,6 +414,18 @@ class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
         allow_empty=True,
         default=list,
     )
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        conflicts: dict[str, str] = {}
+        if "description" in self.initial_data and "description_markup" in self.initial_data:
+            conflicts["description_markup"] = "Supply either description or description_markup, not both."
+        if "long_description" in self.initial_data and "long_description_markup" in self.initial_data:
+            conflicts["long_description_markup"] = (
+                "Supply either long_description or long_description_markup, not both."
+            )
+        if conflicts:
+            raise serializers.ValidationError(conflicts)
+        return attrs
 
     def validate_sideboards(
         self,

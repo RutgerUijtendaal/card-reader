@@ -257,6 +257,8 @@ const normalizeCards = (value: unknown): Record<string, DeckCardSummary> | null 
 
 const normalizePayload = (value: unknown): DeckUpsertRequest | null => {
   if (!isRecord(value)) return null;
+  const descriptionMarkup = value.description_markup ?? value.description ?? null;
+  const longDescriptionMarkup = value.long_description_markup ?? value.long_description ?? null;
   const entries = normalizeEntries(value.entries);
   if (entries === null || !Array.isArray(value.sideboards)) return null;
   const sideboards = value.sideboards.map((sideboard) => {
@@ -267,8 +269,8 @@ const normalizePayload = (value: unknown): DeckUpsertRequest | null => {
   if (
     !sideboards.every((sideboard): sideboard is DeckUpsertRequest['sideboards'][number] => sideboard !== null)
     || typeof value.name !== 'string'
-    || (value.description !== null && typeof value.description !== 'string')
-    || (value.long_description !== null && typeof value.long_description !== 'string')
+    || (descriptionMarkup !== null && typeof descriptionMarkup !== 'string')
+    || (longDescriptionMarkup !== null && typeof longDescriptionMarkup !== 'string')
     || (value.difficulty !== null && !['easy', 'medium', 'hard'].includes(String(value.difficulty)))
     || !['private', 'unlisted', 'public'].includes(String(value.visibility))
     || typeof value.hero_card_id !== 'string'
@@ -277,8 +279,8 @@ const normalizePayload = (value: unknown): DeckUpsertRequest | null => {
   ) return null;
   return {
     name: value.name,
-    description: value.description,
-    long_description: value.long_description,
+    description_markup: descriptionMarkup,
+    long_description_markup: longDescriptionMarkup,
     difficulty: value.difficulty as DeckUpsertRequest['difficulty'],
     visibility: value.visibility as DeckUpsertRequest['visibility'],
     hero_card_id: value.hero_card_id,
@@ -292,8 +294,12 @@ const normalizePayload = (value: unknown): DeckUpsertRequest | null => {
 const normalizeAttempt = (value: unknown): StoredCreateAttempt | null => {
   if (value === null) return null;
   if (!isRecord(value) || typeof value.signature !== 'string' || typeof value.startedAt !== 'string') return null;
-  const payload = normalizePayload(value.payload);
-  return payload === null ? null : { payload, signature: value.signature, startedAt: value.startedAt };
+  if (normalizePayload(value.payload) === null) return null;
+  return {
+    payload: value.payload as DeckUpsertRequest,
+    signature: value.signature,
+    startedAt: value.startedAt,
+  };
 };
 
 const cloneForm = (form: DeckForm): DeckForm => ({

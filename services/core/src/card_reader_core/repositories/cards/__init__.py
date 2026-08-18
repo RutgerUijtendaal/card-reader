@@ -72,10 +72,9 @@ from .types import (
 
 if TYPE_CHECKING:
     from .edits import promote_card_version, update_latest_card_version
-    from .writes import apply_parsed_fields_to_version, save_parsed_card, save_parsed_card_result
+    from .writes import save_parsed_card, save_parsed_card_result
 
 _LAZY_MUTATION_EXPORTS = {
-    "apply_parsed_fields_to_version": ".writes",
     "promote_card_version": ".edits",
     "save_parsed_card": ".writes",
     "save_parsed_card_result": ".writes",
@@ -111,7 +110,6 @@ __all__ = [
     "ParsedCardSaveResult",
     "ParsedSnapshotPayload",
     "SCALAR_FIELD_NAMES",
-    "apply_parsed_fields_to_version",
     "CARD_SORT_MANA_ASC",
     "CARD_SORT_DEFAULT",
     "CARD_SORT_MANA_DESC",

@@ -1,4 +1,4 @@
-import { fetchCardVersions } from '@/domain/cards/api';
+import { fetchCard } from '@/domain/cards/api';
 import type { CardListItem, CardVersionDetail } from '@/domain/cards/types';
 
 const hoverCardCache = new Map<string, CardListItem>();
@@ -20,14 +20,11 @@ export const fetchHoverPreviewCard = async (cardId: string): Promise<CardListIte
     return inFlight;
   }
 
-  const request = fetchCardVersions(cardId)
-    .then((versions) => {
-      const version = versions.find((item) => item.is_latest) ?? versions[0] ?? null;
-      if (!version) {
-        return null;
-      }
+  const request = fetchCard<CardVersionDetail>(cardId)
+    .then((version) => {
       const card = toCardListItem(version);
       hoverCardCache.set(cardId, card);
+      hoverCardCache.set(card.id, card);
       return card;
     })
     .catch(() => null)

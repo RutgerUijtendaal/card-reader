@@ -288,7 +288,9 @@ class OwnerDeckListCreateView(APIView):
                 owner_id=owner_id,
                 name=serializer.validated_data["name"],
                 description=serializer.validated_data.get("description"),
+                description_markup=serializer.validated_data.get("description_markup"),
                 long_description=serializer.validated_data.get("long_description"),
+                long_description_markup=serializer.validated_data.get("long_description_markup"),
                 difficulty=serializer.validated_data.get("difficulty"),
                 visibility=serializer.validated_data["visibility"],
                 hero_card_id=serializer.validated_data["hero_card_id"],
@@ -388,7 +390,9 @@ class OwnerDeckDetailView(APIView):
                 updates=DeckUpdateInput(
                     name=serializer.validated_data.get("name"),
                     description=serializer.validated_data.get("description"),
+                    description_markup=serializer.validated_data.get("description_markup"),
                     long_description=serializer.validated_data.get("long_description"),
+                    long_description_markup=serializer.validated_data.get("long_description_markup"),
                     difficulty=serializer.validated_data.get("difficulty"),
                     visibility=serializer.validated_data.get("visibility"),
                     hero_card_id=serializer.validated_data.get("hero_card_id"),
@@ -421,7 +425,11 @@ class OwnerDeckDetailView(APIView):
                     ),
                     update_name="name" in serializer.validated_data,
                     update_description="description" in serializer.validated_data,
+                    update_description_markup="description_markup" in serializer.validated_data,
                     update_long_description="long_description" in serializer.validated_data,
+                    update_long_description_markup=(
+                        "long_description_markup" in serializer.validated_data
+                    ),
                     update_difficulty="difficulty" in serializer.validated_data,
                     update_visibility="visibility" in serializer.validated_data,
                     update_hero_card_id="hero_card_id" in serializer.validated_data,

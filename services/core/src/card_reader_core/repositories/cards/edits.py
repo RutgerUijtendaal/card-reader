@@ -15,13 +15,12 @@ from card_reader_core.models import (
     is_card_lifecycle_status,
     now_utc,
 )
-from card_reader_core.rules import render_enriched_rule_text
 from card_reader_core.metadata import MANA_FAMILY_BY_KEY
 
 from ..card_groups import card_is_group_anchor
 from ..helpers import infer_mana_value
 from ..metadata import (
-    get_symbols_for_card_version,
+    render_rule_text_for_card_version,
     replace_card_version_keywords,
     replace_card_version_symbols,
     replace_card_version_tags,
@@ -259,10 +258,7 @@ def promote_card_version(
 def apply_manual_rule_text(version: CardVersion, value: object) -> None:
     enriched_text = str(value or "")
     version.rules_text_enriched = enriched_text
-    version.rules_text = render_enriched_rule_text(
-        enriched_text,
-        symbol_tokens_by_key={
-            symbol.key: symbol.text_token
-            for symbol in get_symbols_for_card_version(version.id)
-        },
+    version.rules_text = render_rule_text_for_card_version(
+        card_version_id=version.id,
+        enriched_text=enriched_text,
     )

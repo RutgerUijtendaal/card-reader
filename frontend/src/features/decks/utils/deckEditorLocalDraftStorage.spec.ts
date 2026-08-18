@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import type { DeckCardSummary } from '@/domain/decks/types';
+import type { DeckCardSummary, DeckUpsertRequest } from '@/domain/decks/types';
 import { createEmptyDeckForm } from '@/features/decks/composables/deckEditorDraftModel';
 import {
   buildStoredDeckEditorDraft,
   createDeckEditorLocalDraftStorage,
   deckEditorDraftSlotToken,
   DECK_EDITOR_LOCAL_DRAFT_VERSION,
+  parseDeckEditorDraftSlotValue,
   type DeckEditorDraftLockManager,
 } from '@/features/decks/utils/deckEditorLocalDraftStorage';
 
@@ -157,6 +158,39 @@ describe('deckEditorLocalDraftStorage', () => {
       card_pool: 'player',
       card_roles: ['hero'],
     });
+  });
+
+  test('preserves an idempotent legacy create payload byte-for-byte while hydrating it', () => {
+    const legacyPayload: DeckUpsertRequest = {
+      name: 'Legacy retry',
+      description: '**Keep these literal markers**',
+      long_description: 'Original long description',
+      difficulty: null,
+      visibility: 'private',
+      hero_card_id: 'hero-1',
+      entries: [],
+      sideboards: [],
+      tag_ids: [],
+      suggested_type_labels: [],
+    };
+    const draft = buildStoredDeckEditorDraft(
+      'user-1',
+      'draft-1',
+      { ...createEmptyDeckForm(), hero_card_id: 'hero-1' },
+      { 'hero-1': buildCard('hero-1', true) },
+      {
+        payload: legacyPayload,
+        signature: 'signature-for-original-payload',
+        startedAt: '2026-01-01T00:00:00Z',
+      },
+    );
+
+    const parsed = parseDeckEditorDraftSlotValue(draft, 'user-1');
+
+    expect(parsed?.kind).toBe('draft');
+    if (parsed?.kind !== 'draft') throw new Error('Expected a parsed draft.');
+    expect(parsed.draft.pendingCreateAttempt?.payload).toEqual(legacyPayload);
+    expect(parsed.draft.pendingCreateAttempt?.payload).not.toHaveProperty('description_markup');
   });
 
   test('rejects cached card snapshots with noncanonical classification values', () => {

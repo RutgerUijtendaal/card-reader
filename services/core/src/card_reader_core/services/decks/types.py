@@ -48,7 +48,9 @@ class DeckTotals:
 class DeckUpdateInput:
     name: str | None = None
     description: str | None = None
+    description_markup: str | None = None
     long_description: str | None = None
+    long_description_markup: str | None = None
     difficulty: DeckDifficulty | None = None
     visibility: DeckVisibility | None = None
     hero_card_id: str | None = None
@@ -58,7 +60,9 @@ class DeckUpdateInput:
     suggested_type_labels: list[str] | None = None
     update_name: bool = False
     update_description: bool = False
+    update_description_markup: bool = False
     update_long_description: bool = False
+    update_long_description_markup: bool = False
     update_difficulty: bool = False
     update_visibility: bool = False
     update_hero_card_id: bool = False

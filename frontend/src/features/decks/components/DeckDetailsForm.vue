@@ -25,31 +25,27 @@
         >
       </label>
 
-      <label
-        for="deck-summary-field"
-        class="field-label"
-      >
-        Summary
-        <textarea
-          id="deck-summary-field"
+      <div class="field-label">
+        <span>Summary</span>
+        <CardMarkupEditor
           v-model="deckDescription"
-          class="input-base min-h-20 resize-y"
+          label="Deck summary"
+          textarea-id="deck-summary-field"
+          min-height-class="min-h-20"
           placeholder="A short summary shown in deck lists"
         />
-      </label>
+      </div>
 
-      <label
-        for="deck-long-description-field"
-        class="field-label"
-      >
-        Long description
-        <textarea
-          id="deck-long-description-field"
+      <div class="field-label">
+        <span>Long description</span>
+        <CardMarkupEditor
           v-model="deckLongDescription"
-          class="input-base min-h-64 resize-y"
+          label="Deck long description"
+          textarea-id="deck-long-description-field"
+          min-height-class="min-h-64"
           placeholder="Optional notes, strategy, matchups, or other deck information"
         />
-      </label>
+      </div>
     </section>
 
     <section class="space-y-5">
@@ -135,6 +131,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { ArrowRight } from 'lucide-vue-next';
+import CardMarkupEditor from '@/domain/cards/components/CardMarkupEditor.vue';
 import DeckTagPicker from '@/domain/decks/components/DeckTagPicker.vue';
 import AppFormSection from '@/shared/components/app/AppFormSection.vue';
 import { deckDifficultyOptions } from '@/domain/decks/utils/difficulty';

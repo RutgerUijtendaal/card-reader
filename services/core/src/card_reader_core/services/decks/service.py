@@ -6,6 +6,7 @@ from uuid import UUID
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from card_reader_core.markup import render_markup_plain
 from card_reader_core.models import Deck, DeckDifficulty, DeckVisibility
 from card_reader_core.services.deck_tags import DeckTagService
 from card_reader_core.repositories.decks import (
@@ -312,7 +313,9 @@ class DeckService:
         hero_card_id: str,
         entries: list[DeckEntryInput],
         sideboards: list[DeckSideboardInput],
+        description_markup: str | None = None,
         long_description: str | None = None,
+        long_description_markup: str | None = None,
         difficulty: DeckDifficulty | None = None,
         tag_ids: list[str] | None = None,
         suggested_type_labels: list[str] | None = None,
@@ -325,7 +328,9 @@ class DeckService:
             hero_card_id=hero_card_id,
             entries=entries,
             sideboards=sideboards,
+            description_markup=description_markup,
             long_description=long_description,
+            long_description_markup=long_description_markup,
             difficulty=difficulty,
             tag_ids=tag_ids,
             suggested_type_labels=suggested_type_labels,
@@ -342,7 +347,9 @@ class DeckService:
         hero_card_id: str,
         entries: list[DeckEntryInput],
         sideboards: list[DeckSideboardInput],
+        description_markup: str | None = None,
         long_description: str | None = None,
+        long_description_markup: str | None = None,
         difficulty: DeckDifficulty | None = None,
         tag_ids: list[str] | None = None,
         suggested_type_labels: list[str] | None = None,
@@ -363,7 +370,9 @@ class DeckService:
                     hero_card_id=hero_card_id,
                     entries=entries,
                     sideboards=sideboards,
+                    description_markup=description_markup,
                     long_description=long_description,
+                    long_description_markup=long_description_markup,
                     difficulty=difficulty,
                     tag_ids=tag_ids,
                     suggested_type_labels=suggested_type_labels,
@@ -393,15 +402,31 @@ class DeckService:
         hero_card_id: str,
         entries: list[DeckEntryInput],
         sideboards: list[DeckSideboardInput],
+        description_markup: str | None = None,
         long_description: str | None = None,
+        long_description_markup: str | None = None,
         difficulty: DeckDifficulty | None = None,
         tag_ids: list[str] | None = None,
         suggested_type_labels: list[str] | None = None,
         client_creation_id: UUID | None = None,
     ) -> Deck:
         normalized_name = self._normalizer.normalize_name(name)
-        normalized_description = self._normalizer.normalize_description(description)
-        normalized_long_description = self._normalizer.normalize_long_description(long_description)
+        normalized_description_markup = self._normalizer.normalize_markup(
+            description_markup if description_markup is not None else description
+        )
+        normalized_long_description_markup = self._normalizer.normalize_markup(
+            long_description_markup if long_description_markup is not None else long_description
+        )
+        normalized_description = (
+            render_markup_plain(normalized_description_markup, compact=True)
+            if normalized_description_markup is not None
+            else None
+        )
+        normalized_long_description = (
+            render_markup_plain(normalized_long_description_markup)
+            if normalized_long_description_markup is not None
+            else None
+        )
         hero_card, normalized_entries, normalized_sideboards = self._normalizer.normalize_deck_payload(
             hero_card_id=hero_card_id,
             entries=entries,
@@ -410,7 +435,9 @@ class DeckService:
         deck = create_deck(
             owner_id=owner_id,
             name=normalized_name,
+            description_markup=normalized_description_markup,
             description=normalized_description,
+            long_description_markup=normalized_long_description_markup,
             long_description=normalized_long_description,
             difficulty=difficulty,
             visibility=visibility,
@@ -454,12 +481,24 @@ class DeckService:
     def _update_deck(self, *, existing_deck: Deck, updates: DeckUpdateInput) -> Deck | None:
         deck_id = existing_deck.id
         effective_name = existing_deck.name if not updates.update_name else updates.name
-        effective_description = existing_deck.description if not updates.update_description else updates.description
-        effective_long_description = (
-            existing_deck.long_description
-            if not updates.update_long_description
-            else updates.long_description
+        effective_description_markup = (
+            existing_deck.description_markup
+            if existing_deck.description_markup is not None
+            else existing_deck.description
         )
+        if updates.update_description_markup:
+            effective_description_markup = updates.description_markup
+        elif updates.update_description:
+            effective_description_markup = updates.description
+        effective_long_description_markup = (
+            existing_deck.long_description_markup
+            if existing_deck.long_description_markup is not None
+            else existing_deck.long_description
+        )
+        if updates.update_long_description_markup:
+            effective_long_description_markup = updates.long_description_markup
+        elif updates.update_long_description:
+            effective_long_description_markup = updates.long_description
         effective_difficulty = (
             existing_deck.difficulty if not updates.update_difficulty else updates.difficulty
         )
@@ -500,8 +539,22 @@ class DeckService:
             raise ValueError("Sideboards are required.")
 
         normalized_name = self._normalizer.normalize_name(effective_name)
-        normalized_description = self._normalizer.normalize_description(effective_description)
-        normalized_long_description = self._normalizer.normalize_long_description(effective_long_description)
+        normalized_description_markup = self._normalizer.normalize_markup(
+            effective_description_markup
+        )
+        normalized_long_description_markup = self._normalizer.normalize_markup(
+            effective_long_description_markup
+        )
+        normalized_description = (
+            render_markup_plain(normalized_description_markup, compact=True)
+            if normalized_description_markup is not None
+            else None
+        )
+        normalized_long_description = (
+            render_markup_plain(normalized_long_description_markup)
+            if normalized_long_description_markup is not None
+            else None
+        )
         updates_card_references = (
             updates.update_hero_card_id or updates.update_entries or updates.update_sideboards
         )
@@ -523,7 +576,9 @@ class DeckService:
             deck_id=deck_id,
             updates={
                 "name": normalized_name,
+                "description_markup": normalized_description_markup,
                 "description": normalized_description,
+                "long_description_markup": normalized_long_description_markup,
                 "long_description": normalized_long_description,
                 "difficulty": effective_difficulty,
                 "visibility": effective_visibility,

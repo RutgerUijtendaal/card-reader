@@ -19,9 +19,10 @@ describe('useHoverModePreferences', () => {
   });
 
   test('defaults to the shared hover mode default', () => {
-    const { defaultHoverMode, hoverPreviewScale } = useHoverModePreferences();
+    const { defaultHoverMode, hasSavedDefaultHoverMode, hoverPreviewScale } = useHoverModePreferences();
 
     expect(defaultHoverMode.value).toBe(DEFAULT_HOVER_MODE);
+    expect(hasSavedDefaultHoverMode.value).toBe(false);
     expect(hoverPreviewScale.value).toBe(DEFAULT_HOVER_PREVIEW_SCALE);
   });
 
@@ -60,9 +61,10 @@ describe('useHoverModePreferences', () => {
       }),
     );
 
-    const { defaultHoverMode } = useHoverModePreferences();
+    const { defaultHoverMode, hasSavedDefaultHoverMode } = useHoverModePreferences();
 
     expect(defaultHoverMode.value).toBe('details');
+    expect(hasSavedDefaultHoverMode.value).toBe(true);
   });
 
   test('maps legacy tooltipEnabled=false to none', () => {
@@ -76,9 +78,10 @@ describe('useHoverModePreferences', () => {
       }),
     );
 
-    const { defaultHoverMode } = useHoverModePreferences();
+    const { defaultHoverMode, hasSavedDefaultHoverMode } = useHoverModePreferences();
 
     expect(defaultHoverMode.value).toBe('none');
+    expect(hasSavedDefaultHoverMode.value).toBe(true);
   });
 
   test('surface override falls back to the global default when unset', async () => {
