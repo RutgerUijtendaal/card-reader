@@ -210,10 +210,11 @@ curl http://127.0.0.1:8000/health
 
 Successful `master` CI runs publish commit-addressed API and parser images to GHCR and package the
 frontend, Compose definition, backup scripts, and exact image digests as one release artifact.
-Production deployment uses the GitHub `production` environment with:
+Production deployment uses:
 
-- variables `DEPLOY_HOST`, `DEPLOY_USER=deployer`, and `AUTO_DEPLOY_ENABLED=false`
-- secrets `DEPLOY_SSH_PRIVATE_KEY` and `DEPLOY_KNOWN_HOSTS`
+- repository variable `AUTO_DEPLOY_ENABLED=false`
+- `production` environment variables `DEPLOY_HOST` and `DEPLOY_USER=deployer`
+- `production` environment secrets `DEPLOY_SSH_PRIVATE_KEY` and `DEPLOY_KNOWN_HOSTS`
 
 A manual workflow run from `master` deploys even while automatic deployment is disabled. After the
 first release is verified, setting `AUTO_DEPLOY_ENABLED=true` deploys each successful `master` push.
