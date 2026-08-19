@@ -317,15 +317,16 @@ const uploadSelectedCardBack = async (payload: { file: File; label: string }): P
   uploadErrorMessage.value = '';
   try {
     await uploadCardBack(payload.file, payload.label);
-    uploadModalOpen.value = false;
-    toast.success('Card-back asset uploaded.');
-    await loadCardBackData();
   } catch (error) {
     uploadErrorMessage.value = extractErrorMessage(error, 'Card back could not be uploaded.');
     toast.error(uploadErrorMessage.value);
+    return;
   } finally {
     uploading.value = false;
   }
+  uploadModalOpen.value = false;
+  toast.success('Card-back asset uploaded.');
+  await loadCardBackData();
 };
 
 const setDefault = async (cardPool: CardPool, cardBackId: string | null): Promise<void> => {

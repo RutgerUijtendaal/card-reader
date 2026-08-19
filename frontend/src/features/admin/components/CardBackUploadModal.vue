@@ -4,7 +4,7 @@
     :aria-labelledby="titleId"
     :aria-describedby="descriptionId"
     :close-disabled="uploading"
-    panel-class="theme-popover w-full max-w-2xl shadow-xl"
+    panel-class="theme-popover app-scrollbar max-h-[90vh] w-full max-w-2xl overflow-y-auto shadow-xl"
     @close="requestClose"
   >
     <form @submit.prevent="submitUpload">
@@ -43,6 +43,7 @@
               class="input-base"
               placeholder="Card back name"
               autocomplete="off"
+              :disabled="uploading"
             >
           </label>
 

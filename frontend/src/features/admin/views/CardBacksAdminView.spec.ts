@@ -120,6 +120,10 @@ describe('CardBacksAdminView', () => {
     if (!openButton) throw new Error('expected add card back action');
     openButton.click();
     await nextTick();
+    const dialogPanel = document.body.querySelector('[role="dialog"] > div');
+    expect(dialogPanel?.className).toContain('app-scrollbar');
+    expect(dialogPanel?.className).toContain('max-h-[90vh]');
+    expect(dialogPanel?.className).toContain('overflow-y-auto');
     const labelInput = document.body.querySelector<HTMLInputElement>('input[placeholder="Card back name"]');
     const fileInput = document.body.querySelector<HTMLInputElement>('input[type="file"]');
     const submitButton = Array.from(document.body.querySelectorAll('button')).find((button) =>
@@ -143,6 +147,77 @@ describe('CardBacksAdminView', () => {
     await vi.waitFor(() => {
       expect(toastSuccess).toHaveBeenCalledWith('Card-back asset uploaded.');
     });
+    mounted.unmount();
+  });
+
+  test('locks every editable upload field to its submitted payload', async () => {
+    mockLoads([]);
+    let resolveUpload: ((value: unknown) => void) | undefined;
+    apiPost.mockImplementation(() => new Promise((resolve) => {
+      resolveUpload = resolve;
+    }));
+    const mounted = await mountView();
+    const openButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Add card back'),
+    );
+    if (!openButton) throw new Error('expected add card back action');
+    openButton.click();
+    await nextTick();
+    const labelInput = document.body.querySelector<HTMLInputElement>('input[placeholder="Card back name"]');
+    const fileInput = document.body.querySelector<HTMLInputElement>('input[type="file"]');
+    const submitButton = Array.from(document.body.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Add to library'),
+    );
+    if (!labelInput || !fileInput || !submitButton) throw new Error('expected upload dialog controls');
+    Object.defineProperty(fileInput, 'files', {
+      value: [new File(['image'], 'uploaded.png', { type: 'image/png' })],
+      configurable: true,
+    });
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+    submitButton.click();
+    await nextTick();
+    expect(labelInput.disabled).toBe(true);
+
+    resolveUpload?.({ data: buildCardBack() });
+    await flushPromises();
+    mounted.unmount();
+  });
+
+  test('releases the upload lock before the library refresh settles', async () => {
+    mockLoads([]);
+    apiPost.mockResolvedValue({ data: buildCardBack() });
+    const mounted = await mountView();
+    apiGet.mockImplementation(() => new Promise(() => {}));
+    const openButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Add card back'),
+    );
+    if (!openButton) throw new Error('expected add card back action');
+    openButton.click();
+    await nextTick();
+    const fileInput = document.body.querySelector<HTMLInputElement>('input[type="file"]');
+    const submitButton = Array.from(document.body.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Add to library'),
+    );
+    if (!fileInput || !submitButton) throw new Error('expected upload dialog controls');
+    Object.defineProperty(fileInput, 'files', {
+      value: [new File(['image'], 'uploaded.png', { type: 'image/png' })],
+      configurable: true,
+    });
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+    submitButton.click();
+    await flushPromises();
+
+    openButton.click();
+    await nextTick();
+    const reopenedLabel = document.body.querySelector<HTMLInputElement>('input[placeholder="Card back name"]');
+    const closeButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="Close add card back dialog"]');
+    expect(reopenedLabel?.disabled).toBe(false);
+    expect(closeButton?.disabled).toBe(false);
+    closeButton?.click();
+    await nextTick();
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
     mounted.unmount();
   });
 
