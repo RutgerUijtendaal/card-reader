@@ -260,7 +260,7 @@ const uploadSelectedCardBack = async (): Promise<void> => {
 };
 
 const setDefault = async (cardPool: CardPool, cardBackId: string | null): Promise<void> => {
-  if (!cardBackId || settingPool.value !== null || defaults.value[cardPool]?.id === cardBackId) return;
+  if (settingPool.value !== null || (defaults.value[cardPool]?.id ?? null) === cardBackId) return;
   settingPool.value = cardPool;
   errorMessage.value = '';
   try {

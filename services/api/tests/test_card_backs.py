@@ -135,6 +135,29 @@ def test_staff_sets_one_pool_default_without_changing_other_pools() -> None:
     assert CardBackPoolDefault.objects.get(card_pool="evil").card_back_id == second.id
 
 
+def test_staff_clears_one_pool_default_without_changing_other_pools() -> None:
+    client, csrf_token = _staff_client("staff-card-back-clear-default-user")
+    card_back = _create_card_back(label="Shared Back", write_image=True)
+    CardBackPoolDefault.objects.bulk_create(
+        [
+            CardBackPoolDefault(card_pool="player", card_back=card_back),
+            CardBackPoolDefault(card_pool="evil", card_back=card_back),
+        ]
+    )
+
+    response = client.put(
+        "/admin/card-backs/defaults/evil",
+        data={"card_back_id": None},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    assert response.json() is None
+    assert CardBackPoolDefault.objects.get(card_pool="player").card_back_id == card_back.id
+    assert not CardBackPoolDefault.objects.filter(card_pool="evil").exists()
+
+
 def test_staff_cannot_assign_card_back_with_missing_image() -> None:
     client, csrf_token = _staff_client("staff-card-back-missing-image-user")
     missing = _create_card_back(label="Missing Back", write_image=False)

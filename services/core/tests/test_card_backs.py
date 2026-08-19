@@ -8,6 +8,7 @@ from PIL import Image
 from card_reader_core.config.settings import settings
 from card_reader_core.models import Card, CardBack
 from card_reader_core.services.card_backs import (
+    clear_pool_default,
     get_pool_card_back_defaults,
     resolve_effective_card_backs,
     select_card_back_override,
@@ -109,6 +110,20 @@ def test_defaults_explicitly_include_missing_pools() -> None:
         "evil": None,
         "neutral": None,
     }
+
+
+@pytest.mark.django_db
+def test_pool_default_can_be_cleared(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+    card_back = _create_usable_card_back("default")
+    set_pool_default("player", card_back.id)
+
+    clear_pool_default("player")
+
+    assert get_pool_card_back_defaults()["player"] is None
 
 
 @pytest.mark.django_db

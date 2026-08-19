@@ -35,9 +35,9 @@ export const uploadCardBack = async (file: File, label: string): Promise<CardBac
 
 export const setPoolCardBackDefault = async (
   cardPool: CardPool,
-  cardBackId: string,
-): Promise<PublicCardBackRecord> => {
-  const response = await api.put<PublicCardBackRecord>(`/admin/card-backs/defaults/${cardPool}`, {
+  cardBackId: string | null,
+): Promise<PublicCardBackRecord | null> => {
+  const response = await api.put<PublicCardBackRecord | null>(`/admin/card-backs/defaults/${cardPool}`, {
     card_back_id: cardBackId,
   });
   return response.data;

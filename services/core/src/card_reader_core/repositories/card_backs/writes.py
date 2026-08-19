@@ -34,3 +34,7 @@ def upsert_pool_default(*, card_pool: CardPool, card_back: CardBack) -> CardBack
             defaults={"card_back": card_back, "updated_at": now_utc()},
         )
         return row
+
+
+def delete_pool_default(*, card_pool: CardPool) -> None:
+    CardBackPoolDefault.objects.filter(card_pool=card_pool).delete()

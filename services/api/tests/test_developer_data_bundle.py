@@ -518,6 +518,19 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         monkeypatch.setattr(settings, "app_data_dir", source_storage)
         selection = _build_synthetic_source(source_storage)
         selection["include_all_cards"] = True
+        source_card_back = CardBack.objects.get(label="Synthetic Card Back")
+        duplicate_card_back = CardBack.objects.create(
+            label="Duplicate Synthetic Card Back",
+            original_filename="duplicate-card-back.webp",
+            source_file="private/source/duplicate-card-back.png",
+            stored_path=source_card_back.stored_path,
+            width=source_card_back.width,
+            height=source_card_back.height,
+            checksum=source_card_back.checksum,
+        )
+        evil_default = CardBackPoolDefault.objects.get(card_pool="evil")
+        evil_default.card_back = duplicate_card_back
+        evil_default.save(update_fields=["card_back", "updated_at"])
         source_hero = Card.objects.get(key="synthetic-hero")
         assert source_hero.latest_version is not None
         source_hero.latest_version.rules_text_enriched = (
@@ -546,6 +559,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
             and set(card.card_factions) == {"order", "blood"}
         )
         assert mainboard_record.card_back_override_checksum == validated_payload.card_backs[0].checksum
+        assert len(validated_payload.card_backs) == 1
         assert {row.card_pool for row in validated_payload.card_back_pool_defaults} == {
             "player",
             "evil",

@@ -5,7 +5,7 @@
         :model-value="modelValue"
         :options="options"
         :placeholder="placeholderLabel"
-        :placeholder-disabled="selectionKind === 'default'"
+        :placeholder-disabled="false"
         :disabled="disabled"
         wrapper-class="w-full"
         :aria-label="ariaLabel"
@@ -82,7 +82,7 @@ const poolLabel = computed(() =>
 );
 const placeholderLabel = computed(() =>
   props.selectionKind === 'default'
-    ? `Select ${poolLabel.value} default`
+    ? `No ${poolLabel.value} default`
     : `Use ${poolLabel.value} default`,
 );
 const selectedAsset = computed<PublicCardBackRecord | null>(() =>

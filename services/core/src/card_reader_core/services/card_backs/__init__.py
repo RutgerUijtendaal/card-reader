@@ -4,7 +4,7 @@ from .assets import (
     resolve_card_back_image_asset_path,
     upload_card_back_asset,
 )
-from .assignments import select_card_back_override, set_pool_default
+from .assignments import clear_pool_default, select_card_back_override, set_pool_default
 from .resolution import (
     CardBackResolutionSource,
     ResolvedCardBack,
@@ -16,6 +16,7 @@ __all__ = [
     "ALLOWED_CARD_BACK_UPLOAD_SUFFIXES",
     "CardBackResolutionSource",
     "ResolvedCardBack",
+    "clear_pool_default",
     "get_pool_card_back_defaults",
     "list_card_back_assets",
     "resolve_card_back_image_asset_path",

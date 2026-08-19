@@ -115,4 +115,17 @@ describe('CardBacksAdminView', () => {
     expect(apiPut).toHaveBeenCalledWith('/admin/card-backs/defaults/player', { card_back_id: second.id });
     mounted.unmount();
   });
+
+  test('clears a pool default with the same authoritative mutation', async () => {
+    mockLoads();
+    apiPut.mockResolvedValue({ data: null });
+    const mounted = await mountView();
+    const playerSelect = mounted.container.querySelector<HTMLSelectElement>('select[aria-label="Player default card back"]');
+    if (!playerSelect) throw new Error('expected Player default selector');
+    playerSelect.value = '__placeholder__';
+    playerSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushPromises();
+    expect(apiPut).toHaveBeenCalledWith('/admin/card-backs/defaults/player', { card_back_id: null });
+    mounted.unmount();
+  });
 });

@@ -205,9 +205,12 @@ def _build_payload(*, cards: list[Card], groups: list[CardGroup]) -> DeveloperDa
         for card in cards
         if card.card_back_override is not None
     )
-    card_backs = list(
-        CardBack.objects.filter(id__in=referenced_card_back_ids).order_by("checksum", "id")
-    )
+    card_backs_by_checksum: dict[str, CardBack] = {}
+    for card_back in CardBack.objects.filter(id__in=referenced_card_back_ids).order_by(
+        "checksum", "id"
+    ):
+        card_backs_by_checksum.setdefault(card_back.checksum, card_back)
+    card_backs = list(card_backs_by_checksum.values())
     return DeveloperDataPayload(
         keywords=[_catalog_record(row) for row in Keyword.objects.order_by("key")],
         tags=[_catalog_record(row) for row in Tag.objects.order_by("key")],

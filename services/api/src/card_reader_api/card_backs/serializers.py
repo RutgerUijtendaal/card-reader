@@ -68,4 +68,4 @@ class CardBackUploadSerializer(serializers.Serializer[dict[str, object]]):
 
 
 class CardBackDefaultUpdateSerializer(serializers.Serializer[dict[str, object]]):
-    card_back_id = serializers.CharField(allow_blank=False)
+    card_back_id = serializers.CharField(allow_blank=False, allow_null=True)

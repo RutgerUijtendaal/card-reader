@@ -16,6 +16,7 @@ from card_reader_api.card_backs.serializers import (
 from card_reader_api.common.responses import bad_request, serializer_error
 from card_reader_core.models import PLAYER_CARD_POOL
 from card_reader_core.services.card_backs import (
+    clear_pool_default,
     get_pool_card_back_defaults,
     list_card_back_assets,
     set_pool_default,
@@ -77,8 +78,12 @@ class AdminCardBackDefaultView(APIView):
         serializer = CardBackDefaultUpdateSerializer(data=request.data)
         if not serializer.is_valid():
             return serializer_error(serializer)
+        card_back_id = serializer.validated_data["card_back_id"]
         try:
-            row = set_pool_default(card_pool, str(serializer.validated_data["card_back_id"]))
+            if card_back_id is None:
+                clear_pool_default(card_pool)
+                return Response(None)
+            row = set_pool_default(card_pool, str(card_back_id))
         except ValueError as exc:
             return bad_request(str(exc))
         return Response(public_card_back_payload(row.card_back))
