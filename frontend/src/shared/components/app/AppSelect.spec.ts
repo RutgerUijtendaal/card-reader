@@ -7,7 +7,7 @@ describe('AppSelect', () => {
     document.body.innerHTML = '';
   });
 
-  test('uses an animated shared chevron while the native select is open', async () => {
+  test('rotates the chevron glyph around its own center and emits the selected value', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const updateModelValue = vi.fn();
@@ -26,8 +26,11 @@ describe('AppSelect', () => {
     await nextTick();
 
     const select = container.querySelector('select');
-    const chevron = container.querySelector('.app-select-chevron');
+    const chevronWrapper = container.querySelector('.app-select-chevron');
+    const chevron = chevronWrapper?.querySelector('svg');
     expect(select).toBeInstanceOf(HTMLSelectElement);
+    expect(chevronWrapper?.classList.contains('rotate-180')).toBe(false);
+    expect(chevron?.classList.contains('origin-center')).toBe(true);
     expect(chevron?.classList.contains('rotate-180')).toBe(false);
 
     select?.dispatchEvent(new Event('pointerdown', { bubbles: true }));
