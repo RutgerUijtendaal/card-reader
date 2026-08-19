@@ -3,6 +3,15 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import CardBacksAdminView from '@/features/admin/views/CardBacksAdminView.vue';
 import type { CardBackRecord } from '@/domain/card-backs/types';
 
+Object.defineProperty(URL, 'createObjectURL', {
+  configurable: true,
+  value: vi.fn(() => 'blob:card-back-preview'),
+});
+Object.defineProperty(URL, 'revokeObjectURL', {
+  configurable: true,
+  value: vi.fn(),
+});
+
 const { apiGet, apiPost, apiPut, toastSuccess } = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
@@ -71,6 +80,14 @@ describe('CardBacksAdminView', () => {
     expect(apiGet).toHaveBeenCalledWith('/card-backs/defaults');
     expect(mounted.container.textContent).toContain('Default Back');
     expect(mounted.container.textContent).toContain('2 card overrides');
+    expect(mounted.container.textContent).not.toContain('back.png');
+    expect(mounted.container.textContent).not.toContain('card-back-1');
+    expect(mounted.container.textContent).not.toContain('checksum');
+    expect(mounted.container.textContent).not.toContain('63 × 88');
+    const assetGrid = mounted.container.querySelector('[role="list"][aria-label="Card-back assets"]');
+    expect(assetGrid?.className).toContain('2xl:grid-cols-6');
+    expect(assetGrid?.querySelectorAll('[role="listitem"]')).toHaveLength(1);
+    expect(assetGrid?.querySelector('img')?.getAttribute('src')).toBe('/card-images/images/back.webp');
     mounted.unmount();
   });
 
@@ -78,12 +95,18 @@ describe('CardBacksAdminView', () => {
     mockLoads([]);
     apiPost.mockResolvedValue({ data: buildCardBack({ label: 'Uploaded Back' }) });
     const mounted = await mountView();
-    const labelInput = mounted.container.querySelector<HTMLInputElement>('input[placeholder="Card back name"]');
-    const fileInput = mounted.container.querySelector<HTMLInputElement>('input[type="file"]');
-    const submitButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Upload asset'),
+    const openButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Add card back'),
     );
-    if (!labelInput || !fileInput || !submitButton) throw new Error('expected upload controls');
+    if (!openButton) throw new Error('expected add card back action');
+    openButton.click();
+    await nextTick();
+    const labelInput = document.body.querySelector<HTMLInputElement>('input[placeholder="Card back name"]');
+    const fileInput = document.body.querySelector<HTMLInputElement>('input[type="file"]');
+    const submitButton = Array.from(document.body.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Add to library'),
+    );
+    if (!labelInput || !fileInput || !submitButton) throw new Error('expected upload dialog controls');
     labelInput.value = 'Uploaded Back';
     labelInput.dispatchEvent(new Event('input', { bubbles: true }));
     Object.defineProperty(fileInput, 'files', {
@@ -92,6 +115,8 @@ describe('CardBacksAdminView', () => {
     });
     fileInput.dispatchEvent(new Event('change', { bubbles: true }));
     await nextTick();
+    expect(document.body.querySelector('img[alt="Selected card back preview"]')?.getAttribute('src'))
+      .toBe('blob:card-back-preview');
     submitButton.click();
     await flushPromises();
     expect(apiPost).toHaveBeenCalledWith('/admin/card-backs/upload', expect.any(FormData));

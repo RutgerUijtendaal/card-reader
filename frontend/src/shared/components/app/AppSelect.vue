@@ -30,14 +30,14 @@
       </option>
     </select>
     <span
-      class="app-select-chevron transition-transform duration-150"
-      :class="{ 'rotate-180': isExpanded }"
+      class="app-select-chevron"
       aria-hidden="true"
     >
       <svg
         viewBox="0 0 20 20"
         fill="none"
-        class="h-4 w-4"
+        class="h-4 w-4 origin-center transition-transform duration-150"
+        :class="{ 'rotate-180': isExpanded }"
       >
         <path
           d="M5 7.5L10 12.5L15 7.5"
