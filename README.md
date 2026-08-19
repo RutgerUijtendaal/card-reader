@@ -163,13 +163,11 @@ Auth is always enabled.
   account or an active account assigned the Developer role
 - Maintenance endpoints require a superuser
 
-Local user seed data lives at:
+Create the first administrator for a fresh installation explicitly:
 
-```text
-services/api/src/card_reader_api/seeds/seed-users.local.json
+```bash
+uv run --project . --package card-reader-api python services/api/manage.py createsuperuser
 ```
-
-That file is gitignored. Use `seed-users.example.json` in the same directory as the format reference.
 
 ## Docker
 
@@ -181,7 +179,7 @@ docker compose up -d --build
 
 Current container behavior:
 
-- `api`: runs migrations, seeds users/default data, then starts Gunicorn
+- `api`: runs migrations, then starts Gunicorn
 - `parser`: starts the background parser and waits for the API health check
 - `developer-data-builder`: processes queued staff builds outside Gunicorn
 - `tts-sheet-renderer`: processes the durable TTS card-sheet render queue
@@ -207,6 +205,19 @@ Health check:
 ```bash
 curl http://127.0.0.1:8000/health
 ```
+
+### Production releases
+
+Successful `master` CI runs publish commit-addressed API and parser images to GHCR and package the
+frontend, Compose definition, backup scripts, and exact image digests as one release artifact.
+Production deployment uses the GitHub `production` environment with:
+
+- variables `DEPLOY_HOST`, `DEPLOY_USER=deployer`, and `AUTO_DEPLOY_ENABLED=false`
+- secrets `DEPLOY_SSH_PRIVATE_KEY` and `DEPLOY_KNOWN_HOSTS`
+
+A manual workflow run from `master` deploys even while automatic deployment is disabled. After the
+first release is verified, setting `AUTO_DEPLOY_ENABLED=true` deploys each successful `master` push.
+Runtime application secrets stay in the server-managed env file and are not stored in GitHub.
 
 Staff can monitor parser, developer-data, and TTS worker heartbeats plus recent queue activity from
 the `/operations` page. Import creation and active import cancellation live at `/imports`.

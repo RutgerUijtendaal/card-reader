@@ -12,7 +12,7 @@
 - Public visibility-aware deck and sideboard TTS exports using the shared persistent-sheet payload
 - Superuser-protected maintenance endpoints
 - Docker API entrypoint and health endpoint
-- Startup orchestration for migrations and seed commands
+- Startup orchestration for migrations
 
 Domain models, migrations, repositories, and shared business services live in `services/core`.
 
@@ -30,10 +30,10 @@ Adopt and verify an existing database:
 uv run --project . python manage.py adopt_schema
 ```
 
-Seed configured users:
+Create the first administrator for a fresh installation:
 
 ```bash
-uv run --project . python manage.py seed_users
+uv run --project . python manage.py createsuperuser
 ```
 
 Run the API locally:
@@ -86,27 +86,8 @@ Catalog seed fixtures used by the integration suite live in
 - `seed-templates.json`
 - `seed-types.json`
 
-The example users file instead lives at
-`src/card_reader_api/seeds/seed-users.example.json`. Private local users live at
-`src/card_reader_api/seeds/seed-users.local.json`; that local file is gitignored and read by
-`python manage.py seed_users`.
-
-Re-running `seed_users` updates existing configured users, including their password and staff flags.
-
-User seed format:
-
-```json
-{
-  "users": [
-    {
-      "username": "admin",
-      "password": "change-me",
-      "is_staff": true,
-      "is_superuser": true
-    }
-  ]
-}
-```
+Fresh installations create their first administrator explicitly with `createsuperuser`. Further
+accounts and permissions are managed through the application.
 
 ## Developer data
 
@@ -129,7 +110,6 @@ The API container runs:
 
 ```bash
 python manage.py migrate_card_reader
-python manage.py seed_users
 gunicorn card_reader_api.project.wsgi:application --pythonpath src --bind 0.0.0.0:8000
 ```
 

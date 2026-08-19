@@ -3,10 +3,21 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+const apiPackageJson = JSON.parse(
+  await readFile(new URL('../services/api/package.json', import.meta.url), 'utf8'),
+);
 
 test('bootstrap invokes the repository dependency setup script explicitly', () => {
   assert.equal(packageJson.scripts.setup, undefined);
   assert.equal(packageJson.scripts['setup:deps'], 'pnpm deps:js && pnpm deps:py');
   assert.match(packageJson.scripts['bootstrap:dev'], /^pnpm run setup:deps && /);
   assert.match(packageJson.scripts['bootstrap:dev:reset'], /^pnpm run setup:deps && /);
+});
+
+test('API development preparation migrates and seeds notification examples without seed users', () => {
+  assert.equal(apiPackageJson.scripts.seed, undefined);
+  assert.match(apiPackageJson.scripts['prepare:dev'], /^pnpm run migrate && /);
+  assert.match(apiPackageJson.scripts['prepare:dev'], /manage\.py seed_notification_examples$/);
+  assert.match(apiPackageJson.scripts.dev, /^pnpm run prepare:dev && /);
+  assert.doesNotMatch(JSON.stringify(apiPackageJson.scripts), /seed_users/);
 });

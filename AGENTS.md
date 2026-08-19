@@ -206,10 +206,6 @@ Core stack:
   - `seed-tags.json`
   - `seed-templates.json`
   - `seed-types.json`
-- The example and local development users live in:
-  - `services/api/src/card_reader_api/seeds/seed-users.example.json`
-  - `services/api/src/card_reader_api/seeds/seed-users.local.json`
-- `seed-users.local.json` is gitignored.
 
 ## Developer Data
 - `dev-data/selection.json` owns the reviewed public selection keys and coverage requirements;
@@ -257,7 +253,7 @@ Core stack:
   Python 3.12 or 3.13; `.python-version` pins the default environment to Python 3.12.
 - On unsupported non-x64 native hosts, preflight verifies the container fallback by running an
   `alpine:3.21` probe as `linux/amd64`; keep this aligned with the parser service platform.
-- API container startup runs migrations, user seeds, default seeds, then Gunicorn.
+- API container startup runs migrations, then Gunicorn.
 - Parser container waits for the API health check and assumes the schema is ready.
 - Parser container uses `DJANGO_SETTINGS_MODULE=card_reader_core.django_settings`.
 - Runtime settings are provided through `CARD_READER_*` environment variables.
@@ -344,7 +340,6 @@ Local app URL:
 - Treat the backend as Django/DRF with Django-owned models and migrations.
 - Keep README files declarative and current-state focused.
 - Do not store real credentials in the app repo.
-- Do not read or expose private seed user files unless the user explicitly asks.
 - Do not run service/integration tests
 
 ## Ad hoc commands
