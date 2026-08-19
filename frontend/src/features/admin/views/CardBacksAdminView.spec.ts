@@ -91,6 +91,25 @@ describe('CardBacksAdminView', () => {
     mounted.unmount();
   });
 
+  test('filters the library by its user-facing label rather than stored identifiers', async () => {
+    mockLoads();
+    const mounted = await mountView();
+    const filterInput = mounted.container.querySelector<HTMLInputElement>('input[aria-label="Filter card backs"]');
+    if (!filterInput) throw new Error('expected card-back filter');
+
+    filterInput.value = 'back.png';
+    filterInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+    expect(mounted.container.querySelectorAll('[role="listitem"]')).toHaveLength(0);
+    expect(mounted.container.textContent).toContain('No matching card backs');
+
+    filterInput.value = 'default';
+    filterInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+    expect(mounted.container.querySelectorAll('[role="listitem"]')).toHaveLength(1);
+    mounted.unmount();
+  });
+
   test('uploads an asset without changing a default', async () => {
     mockLoads([]);
     apiPost.mockResolvedValue({ data: buildCardBack({ label: 'Uploaded Back' }) });
