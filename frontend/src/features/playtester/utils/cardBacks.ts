@@ -11,9 +11,12 @@ export const buildCardBackUrlsByCardId = (deck: DeckRecord | null): CardBackUrls
     ...deck.mainboard.entries.map((entry) => entry.card),
     ...deck.sideboards.flatMap((sideboard) => sideboard.entries.map((entry) => entry.card)),
   ];
-  return Object.fromEntries(cards.map((card) => {
+  return Object.fromEntries(cards.flatMap((card) => {
+    if (!Object.prototype.hasOwnProperty.call(card, 'effective_card_back')) {
+      return [];
+    }
     const imageUrl = card.effective_card_back?.asset.image_url;
-    return [card.id, imageUrl ? toAbsoluteApiUrl(imageUrl) : null];
+    return [[card.id, imageUrl ? toAbsoluteApiUrl(imageUrl) : null]];
   }));
 };
 
