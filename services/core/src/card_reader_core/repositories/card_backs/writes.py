@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.db import transaction
 
-from card_reader_core.models import CardBack, now_utc
+from card_reader_core.models import CardBack, CardBackPoolDefault, CardPool, now_utc
 
 
 def create_card_back_record(
@@ -23,24 +23,14 @@ def create_card_back_record(
         width=width,
         height=height,
         checksum=checksum,
-        is_current=False,
         updated_at=now_utc(),
     )
 
 
-def activate_card_back(card_back_id: str) -> CardBack | None:
+def upsert_pool_default(*, card_pool: CardPool, card_back: CardBack) -> CardBackPoolDefault:
     with transaction.atomic():
-        target = CardBack.objects.select_for_update().filter(id=card_back_id).first()
-        if target is None:
-            return None
-
-        timestamp = now_utc()
-        CardBack.objects.filter(is_current=True).exclude(id=target.id).update(
-            is_current=False,
-            updated_at=timestamp,
+        row, _created = CardBackPoolDefault.objects.update_or_create(
+            card_pool=card_pool,
+            defaults={"card_back": card_back, "updated_at": now_utc()},
         )
-        if not target.is_current:
-            target.is_current = True
-            target.updated_at = timestamp
-            target.save(update_fields=["is_current", "updated_at"])
-        return target
+        return row

@@ -123,6 +123,10 @@ import type {
   PlaytestHoverTarget,
 } from '@/features/playtester/types';
 import { getCardZoomOverlayStyle } from '@/features/playtester/utils/zoom';
+import {
+  resolvePlaytestCardBackUrl,
+  type CardBackUrlsByCardId,
+} from '@/features/playtester/utils/cardBacks';
 
 const props = withDefaults(
   defineProps<{
@@ -134,7 +138,8 @@ const props = withDefaults(
     pileMember?: boolean;
     selected?: boolean;
     showName?: boolean;
-    cardBackUrl?: string | null;
+    cardBackUrlsByCardId?: CardBackUrlsByCardId;
+    defaultCardBackUrl?: string | null;
   }>(),
   {
     compact: false,
@@ -144,7 +149,8 @@ const props = withDefaults(
     pileMember: false,
     selected: false,
     showName: false,
-    cardBackUrl: null,
+    cardBackUrlsByCardId: () => ({}),
+    defaultCardBackUrl: null,
   },
 );
 
@@ -159,6 +165,9 @@ const middleZoomActive = ref(false);
 const middleZoomStyle = ref<Record<string, string>>({});
 const faceAnimationActive = ref(false);
 const canActivate = computed(() => props.interactive && props.activatable);
+const cardBackUrl = computed(() =>
+  resolvePlaytestCardBackUrl(props.instance, props.cardBackUrlsByCardId, props.defaultCardBackUrl),
+);
 const { hoverPreviewScale } = useHoverModePreferences();
 let faceAnimationTimer: number | null = null;
 

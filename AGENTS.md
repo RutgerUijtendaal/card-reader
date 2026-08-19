@@ -236,8 +236,14 @@ Core stack:
   public derived artifact for every pool. Slots are append-only: never move, compact, delete, or
   reuse a Card identity's assigned sheet coordinate; merges preserve source slots and resolve them
   to the target Card.
+- Card-back assets are immutable and globally reusable. `CardBackPoolDefault` owns one optional
+  assignment per code-owned pool, while `Card.card_back_override` owns an explicit per-Card choice.
+  Effective resolution is always `Card override -> pool default -> unavailable`; consumers must use
+  the bulk card-back resolver and must not reproduce this precedence in serializers, exports, or UI.
+  Broken explicit overrides remain explicit and never silently inherit. Card override writes stay in
+  the atomic Card edit workflow; card-back repositories own only assets and pool-default assignments.
 - Website TTS exports for decks, sideboards, gallery selections, and content versions all use the
-  `card-reader.tts-cards.v2` persistent-sheet payload. The object importer spawns those sheets directly and must not
+  `card-reader.tts-cards.v3` persistent-sheet payload. The object importer spawns those sheets directly and must not
   depend on scripting regions, preloaded card libraries, name matching, or automatic library synchronization.
 - TTS deck exports preserve saved quantities and order, mark hero/mainboard/sideboard roles, include deprecated
   Cards still referenced by decks, and require usable hero artwork for main-deck exports.

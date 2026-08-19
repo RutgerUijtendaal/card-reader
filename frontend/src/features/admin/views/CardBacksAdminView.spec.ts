@@ -3,26 +3,18 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import CardBacksAdminView from '@/features/admin/views/CardBacksAdminView.vue';
 import type { CardBackRecord } from '@/domain/card-backs/types';
 
-const { apiGet, apiPost, toastSuccess } = vi.hoisted(() => ({
+const { apiGet, apiPost, apiPut, toastSuccess } = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
+  apiPut: vi.fn(),
   toastSuccess: vi.fn(),
 }));
 
 vi.mock('@/shared/api/client', () => ({
-  api: {
-    get: apiGet,
-    post: apiPost,
-  },
+  api: { get: apiGet, post: apiPost, put: apiPut },
   toAbsoluteApiUrl: (url: string) => url,
 }));
-
-vi.mock('vue-sonner', () => ({
-  toast: {
-    error: vi.fn(),
-    success: toastSuccess,
-  },
-}));
+vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), success: toastSuccess } }));
 
 const buildCardBack = (overrides: Partial<CardBackRecord> = {}): CardBackRecord => ({
   id: 'card-back-1',
@@ -33,7 +25,9 @@ const buildCardBack = (overrides: Partial<CardBackRecord> = {}): CardBackRecord 
   width: 63,
   height: 88,
   checksum: 'checksum',
-  is_current: true,
+  default_for_pools: ['player'],
+  override_card_count: 2,
+  is_usable: true,
   image_url: '/card-images/images/back.webp',
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
@@ -44,25 +38,24 @@ const flushPromises = async (): Promise<void> => {
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
-  await Promise.resolve();
 };
 
 const mountView = async () => {
   const container = document.createElement('div');
   document.body.appendChild(container);
-
   const app = createApp(CardBacksAdminView);
   app.mount(container);
   await flushPromises();
   await nextTick();
+  return { container, unmount: () => { app.unmount(); container.remove(); } };
+};
 
-  return {
-    container,
-    unmount: () => {
-      app.unmount();
-      container.remove();
-    },
-  };
+const mockLoads = (assets = [buildCardBack()]): void => {
+  apiGet.mockImplementation((url: string) => Promise.resolve({
+    data: url === '/card-backs/defaults'
+      ? { player: assets[0] ?? null, evil: null, neutral: null }
+      : assets,
+  }));
 };
 
 describe('CardBacksAdminView', () => {
@@ -71,102 +64,55 @@ describe('CardBacksAdminView', () => {
     document.body.innerHTML = '';
   });
 
-  test('loads history and renders the current card back preview', async () => {
-    apiGet.mockResolvedValue({ data: [buildCardBack()] });
-
+  test('loads pool defaults and the reusable asset library', async () => {
+    mockLoads();
     const mounted = await mountView();
-
     expect(apiGet).toHaveBeenCalledWith('/admin/card-backs');
+    expect(apiGet).toHaveBeenCalledWith('/card-backs/defaults');
     expect(mounted.container.textContent).toContain('Default Back');
-    expect(mounted.container.textContent).toContain('Current');
-    expect(mounted.container.querySelector('img')?.getAttribute('src')).toBe('/card-images/images/back.webp');
-
+    expect(mounted.container.textContent).toContain('2 card overrides');
     mounted.unmount();
   });
 
-  test('uploads a selected card back and refreshes history', async () => {
-    apiGet
-      .mockResolvedValueOnce({ data: [] })
-      .mockResolvedValueOnce({ data: [buildCardBack({ label: 'Uploaded Back' })] });
+  test('uploads an asset without changing a default', async () => {
+    mockLoads([]);
     apiPost.mockResolvedValue({ data: buildCardBack({ label: 'Uploaded Back' }) });
-
     const mounted = await mountView();
-    const labelInput = mounted.container.querySelector<HTMLInputElement>('input[placeholder="Default card back"]');
+    const labelInput = mounted.container.querySelector<HTMLInputElement>('input[placeholder="Card back name"]');
     const fileInput = mounted.container.querySelector<HTMLInputElement>('input[type="file"]');
     const submitButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Upload And Set Current'),
+      button.textContent?.includes('Upload asset'),
     );
-    if (!(labelInput instanceof HTMLInputElement) || !(fileInput instanceof HTMLInputElement) || !(submitButton instanceof HTMLButtonElement)) {
-      throw new Error('expected upload controls');
-    }
-
+    if (!labelInput || !fileInput || !submitButton) throw new Error('expected upload controls');
     labelInput.value = 'Uploaded Back';
     labelInput.dispatchEvent(new Event('input', { bubbles: true }));
     Object.defineProperty(fileInput, 'files', {
       value: [new File(['image'], 'uploaded.png', { type: 'image/png' })],
       configurable: true,
     });
-    Object.defineProperty(fileInput, 'value', {
-      value: 'C:\\fakepath\\uploaded.png',
-      writable: true,
-      configurable: true,
-    });
     fileInput.dispatchEvent(new Event('change', { bubbles: true }));
     await nextTick();
-
     submitButton.click();
     await flushPromises();
-    await nextTick();
-
     expect(apiPost).toHaveBeenCalledWith('/admin/card-backs/upload', expect.any(FormData));
-    expect(apiGet).toHaveBeenCalledTimes(2);
-    expect(fileInput.value).toBe('');
-    expect(toastSuccess).toHaveBeenCalledWith('Card back uploaded.');
-
+    expect(apiPut).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(toastSuccess).toHaveBeenCalledWith('Card-back asset uploaded.');
+    });
     mounted.unmount();
   });
 
-  test('activates an older card back', async () => {
-    apiGet
-      .mockResolvedValueOnce({
-        data: [
-          buildCardBack(),
-          buildCardBack({
-            id: 'card-back-2',
-            label: 'Older Back',
-            is_current: false,
-            image_url: '/card-images/images/older.webp',
-          }),
-        ],
-      })
-      .mockResolvedValueOnce({
-        data: [
-          buildCardBack({ is_current: false }),
-          buildCardBack({
-            id: 'card-back-2',
-            label: 'Older Back',
-            is_current: true,
-            image_url: '/card-images/images/older.webp',
-          }),
-        ],
-      });
-    apiPost.mockResolvedValue({ data: buildCardBack({ id: 'card-back-2', is_current: true }) });
-
+  test('sets one pool default with the dedicated mutation', async () => {
+    const second = buildCardBack({ id: 'card-back-2', label: 'Second Back', default_for_pools: [] });
+    mockLoads([buildCardBack(), second]);
+    apiPut.mockResolvedValue({ data: second });
     const mounted = await mountView();
-    const activateButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Set Current') && !(button as HTMLButtonElement).disabled,
-    );
-    if (!(activateButton instanceof HTMLButtonElement)) {
-      throw new Error('expected activate button');
-    }
-
-    activateButton.click();
+    const playerSelect = mounted.container.querySelector<HTMLSelectElement>('select[aria-label="Player default card back"]');
+    if (!playerSelect) throw new Error('expected Player default selector');
+    playerSelect.value = second.id;
+    playerSelect.dispatchEvent(new Event('change', { bubbles: true }));
     await flushPromises();
-    await nextTick();
-
-    expect(apiPost).toHaveBeenCalledWith('/admin/card-backs/card-back-2/activate');
-    expect(toastSuccess).toHaveBeenCalledWith('Current card back updated.');
-
+    expect(apiPut).toHaveBeenCalledWith('/admin/card-backs/defaults/player', { card_back_id: second.id });
     mounted.unmount();
   });
 });

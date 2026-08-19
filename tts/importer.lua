@@ -62,7 +62,10 @@ function validateExportPayload(payload)
         or payload.schema == "card-reader.tts-cards.v1" then
         error("This export is outdated. Re-export it from Card Reader to use sheet-based cards.")
     end
-    if payload.schema ~= "card-reader.tts-cards.v2" then
+    if payload.schema == "card-reader.tts-cards.v2" then
+        normalizeV2Payload(payload)
+    end
+    if payload.schema ~= "card-reader.tts-cards.v3" then
         error("Unsupported payload schema: " .. tostring(payload.schema))
     end
 
@@ -78,14 +81,29 @@ function validateExportPayload(payload)
     if payload.collection.source ~= nil and type(payload.collection.source) ~= "table" then
         error("Payload collection source is invalid.")
     end
-    if type(payload.card_back_url) ~= "string" or trim(payload.card_back_url) == "" then
-        error("Payload card back URL is invalid.")
-    end
     if type(payload.sheets) ~= "table" or #payload.sheets == 0 then
         error("Payload sheets collection is invalid.")
     end
     if type(payload.cards) ~= "table" or #payload.cards == 0 then
         error("Payload cards collection is invalid.")
+    end
+    if type(payload.card_backs) ~= "table" or #payload.card_backs == 0 then
+        error("Payload card backs collection is invalid.")
+    end
+
+    local card_backs_by_id = {}
+    for index, card_back in ipairs(payload.card_backs) do
+        if type(card_back) ~= "table" then
+            error("Payload card back entry " .. tostring(index) .. " is invalid.")
+        end
+        local card_back_id = trim(card_back.card_back_id or "")
+        if card_back_id == ""
+            or trim(card_back.image_checksum or "") == ""
+            or trim(card_back.url or "") == ""
+            or card_backs_by_id[card_back_id] ~= nil then
+            error("Payload card back entry " .. tostring(index) .. " is invalid.")
+        end
+        card_backs_by_id[card_back_id] = card_back
     end
 
     local sheets_by_id = {}
@@ -117,6 +135,7 @@ function validateExportPayload(payload)
         if trim(entry.card_id or "") == ""
             or trim(entry.card_version_id or "") == ""
             or trim(entry.name or "") == ""
+            or card_backs_by_id[trim(entry.card_back_id or "")] == nil
             or sheet == nil
             or slot_index < 0
             or slot_index >= (tonumber(sheet.columns) * tonumber(sheet.rows))
@@ -131,26 +150,61 @@ function validateExportPayload(payload)
     end
 end
 
+function normalizeV2Payload(payload)
+    if type(payload.card_back_url) ~= "string" or trim(payload.card_back_url) == "" then
+        error("Payload card back URL is invalid.")
+    end
+    payload.card_backs = {
+        {
+            card_back_id = "legacy-v2",
+            image_checksum = "legacy-v2",
+            url = trim(payload.card_back_url),
+        },
+    }
+    if type(payload.cards) == "table" then
+        for _, entry in ipairs(payload.cards) do
+            entry.card_back_id = "legacy-v2"
+        end
+    end
+    payload.card_back_url = nil
+    payload.schema = "card-reader.tts-cards.v3"
+end
+
 function spawnCardReaderSheetDeck(payload)
     local custom_deck = {}
-    local sheet_keys = {}
-    for index, sheet in ipairs(payload.sheets) do
-        sheet_keys[sheet.sheet_id] = index
-        custom_deck[index] = buildCustomDeckState(sheet, payload.card_back_url)
+    local sheets_by_id = {}
+    for _, sheet in ipairs(payload.sheets) do
+        sheets_by_id[sheet.sheet_id] = sheet
+    end
+    local card_backs_by_id = {}
+    for _, card_back in ipairs(payload.card_backs) do
+        card_backs_by_id[card_back.card_back_id] = card_back
     end
 
     local contained = {}
     local deck_ids = {}
+    local custom_deck_keys = {}
+    local next_custom_deck_key = 1
     for _, entry in ipairs(payload.cards) do
-        local sheet_key = sheet_keys[entry.sheet_id]
-        local card_id = (sheet_key * 100) + math.floor(tonumber(entry.slot_index))
+        local definition_key = entry.sheet_id .. "::" .. entry.card_back_id
+        local custom_deck_key = custom_deck_keys[definition_key]
+        if custom_deck_key == nil then
+            custom_deck_key = next_custom_deck_key
+            next_custom_deck_key = next_custom_deck_key + 1
+            custom_deck_keys[definition_key] = custom_deck_key
+            custom_deck[custom_deck_key] = buildCustomDeckState(
+                sheets_by_id[entry.sheet_id],
+                card_backs_by_id[entry.card_back_id].url
+            )
+        end
+        local card_id = (custom_deck_key * 100) + math.floor(tonumber(entry.slot_index))
         local quantity = math.floor(tonumber(entry.quantity))
         for _ = 1, quantity do
             table.insert(deck_ids, card_id)
             table.insert(contained, buildSheetContainedCardData(
                 entry,
                 card_id,
-                payload.sheets[sheet_key].face_url
+                sheets_by_id[entry.sheet_id].face_url
             ))
         end
     end
@@ -201,7 +255,7 @@ end
 
 function buildSheetContainedCardData(entry, card_id, sheet_url)
     local metadata = {
-        schema = "card-reader.tts-card.v2",
+        schema = "card-reader.tts-card.v3",
         card_id = trim(entry.card_id),
         card_version_id = trim(entry.card_version_id),
         name = trim(entry.name),
@@ -210,6 +264,7 @@ function buildSheetContainedCardData(entry, card_id, sheet_url)
         slot_index = math.floor(tonumber(entry.slot_index)),
         stable_sheet_url = trim(sheet_url),
         lifecycle_status = trim(entry.lifecycle_status or ""),
+        card_back_id = trim(entry.card_back_id),
     }
     if type(entry.role) == "string" and trim(entry.role) ~= "" then
         metadata.role = trim(entry.role)

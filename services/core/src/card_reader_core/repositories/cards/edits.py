@@ -7,6 +7,7 @@ from card_reader_core.models import (
     CARD_FACTIONS,
     DEPRECATED_CARD_LIFECYCLE_STATUS,
     Card,
+    CardBack,
     CardFaction,
     CardPool,
     CardRoleAssignment,
@@ -183,6 +184,11 @@ def update_latest_card_version(
             if lifecycle_status == DEPRECATED_CARD_LIFECYCLE_STATUS and card_is_group_anchor(card.id):
                 raise ValueError("Card group anchors cannot be deprecated.")
             card.lifecycle_status = lifecycle_status
+        if "card_back_override" in updates:
+            card_back_override = updates["card_back_override"]
+            if card_back_override is not None and not isinstance(card_back_override, CardBack):
+                raise ValueError("Invalid card-back override.")
+            card.card_back_override = card_back_override
 
         if symbol_links_changed:
             apply_manual_rule_text(version, version.rules_text_enriched)
@@ -206,6 +212,7 @@ def update_latest_card_version(
             or classification_changed
             or "deck_building_config" in updates
             or "lifecycle_status" in updates
+            or "card_back_override" in updates
         ):
             card.updated_at = now_utc()
             update_fields = ["updated_at"]
@@ -213,6 +220,8 @@ def update_latest_card_version(
                 update_fields = ["deck_building_config_json", *update_fields]
             if "lifecycle_status" in updates:
                 update_fields = ["lifecycle_status", *update_fields]
+            if "card_back_override" in updates:
+                update_fields = ["card_back_override", *update_fields]
             card.save(update_fields=list(dict.fromkeys(update_fields)))
 
         version.mana_value = infer_mana_value(

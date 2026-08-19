@@ -1,15 +1,29 @@
 from __future__ import annotations
 
-from card_reader_core.models import CardBack
+from django.db.models import Count
+
+from card_reader_core.models import Card, CardBack, CardBackPoolDefault
 
 
 def list_card_backs() -> list[CardBack]:
-    return list(CardBack.objects.order_by("-created_at", "-id"))
+    return list(
+        CardBack.objects.annotate(override_card_count=Count("card_overrides", distinct=True))
+        .prefetch_related("pool_defaults")
+        .order_by("-created_at", "-id")
+    )
 
 
-def get_current_card_back() -> CardBack | None:
-    return CardBack.objects.filter(is_current=True).order_by("-updated_at", "-created_at", "-id").first()
+def get_pool_default_rows() -> list[CardBackPoolDefault]:
+    return list(CardBackPoolDefault.objects.select_related("card_back").order_by("card_pool"))
 
 
 def get_card_back(card_back_id: str) -> CardBack | None:
     return CardBack.objects.filter(id=card_back_id).first()
+
+
+def get_cards_for_card_back_resolution(card_ids: list[str]) -> list[Card]:
+    return list(
+        Card.objects.filter(id__in=card_ids)
+        .select_related("card_back_override")
+        .only("id", "card_pool", "card_back_override_id", "card_back_override")
+    )

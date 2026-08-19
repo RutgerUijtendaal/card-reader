@@ -13,7 +13,7 @@ import { serializePlaytestDraft } from '@/features/playtester/playtestDraftPersi
 
 const {
   authState,
-  fetchCurrentCardBackMock,
+  fetchCardBackDefaultsMock,
   fetchDeckDetailMock,
   fetchMyDeckMock,
   fetchMyDeckSummariesMock,
@@ -22,7 +22,7 @@ const {
   authState: {
     authenticated: true,
   },
-  fetchCurrentCardBackMock: vi.fn(),
+  fetchCardBackDefaultsMock: vi.fn(),
   fetchDeckDetailMock: vi.fn(),
   fetchMyDeckMock: vi.fn(),
   fetchMyDeckSummariesMock: vi.fn(),
@@ -45,7 +45,7 @@ vi.mock('@/domain/decks/api', () => ({
 }));
 
 vi.mock('@/domain/card-backs/api', () => ({
-  fetchCurrentCardBack: fetchCurrentCardBackMock,
+  fetchCardBackDefaults: fetchCardBackDefaultsMock,
 }));
 
 vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
@@ -318,8 +318,8 @@ describe('PlaytesterPage', () => {
     fetchDeckDetailMock.mockResolvedValue(deckRecord);
     fetchMyDeckSummariesMock.mockResolvedValue([]);
     fetchPublicDeckSummariesMock.mockResolvedValue([]);
-    fetchCurrentCardBackMock.mockResolvedValue({
-      current: {
+    fetchCardBackDefaultsMock.mockResolvedValue({
+      player: {
         id: 'card-back-1',
         label: 'Current Back',
         width: 630,
@@ -328,6 +328,8 @@ describe('PlaytesterPage', () => {
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       },
+      evil: null,
+      neutral: null,
     });
   });
 

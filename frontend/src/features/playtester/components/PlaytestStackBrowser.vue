@@ -41,7 +41,8 @@
           :instance="group.instances[0]"
           compact
           :activatable="false"
-          :card-back-url="cardBackUrl"
+          :card-back-urls-by-card-id="cardBackUrlsByCardId"
+          :default-card-back-url="defaultCardBackUrl"
           :dragging="group.instances.some((instance) => draggingInstanceIds.includes(instance.instanceId))"
           :interactive="cardInteractive"
           @pointer-card="handleCardPointer"
@@ -93,6 +94,7 @@ import type {
   PlaytestHoverTarget,
   PlaytestZoneId,
 } from '@/features/playtester/types';
+import type { CardBackUrlsByCardId } from '@/features/playtester/utils/cardBacks';
 
 export type PlaytestStackBrowserGroup = {
   cardId: string;
@@ -104,7 +106,8 @@ const props = withDefaults(defineProps<{
   title: string;
   subtitle: string;
   instances: PlaytestCardInstance[];
-  cardBackUrl?: string | null;
+  cardBackUrlsByCardId?: CardBackUrlsByCardId;
+  defaultCardBackUrl?: string | null;
   cardInteractive?: boolean;
   closable?: boolean;
   draggingInstanceIds?: string[];
@@ -115,7 +118,8 @@ const props = withDefaults(defineProps<{
   searchPlaceholder?: string;
   testId?: string;
 }>(), {
-  cardBackUrl: null,
+  cardBackUrlsByCardId: () => ({}),
+  defaultCardBackUrl: null,
   cardInteractive: false,
   closable: false,
   draggingInstanceIds: () => [],

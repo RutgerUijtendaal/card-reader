@@ -45,8 +45,8 @@ export const fetchCard = async <TCard>(cardId: string): Promise<TCard> => {
   return response.data;
 };
 
-export const fetchCardVersions = async (cardId: string): Promise<CardVersionDetail[]> => {
-  const response = await api.get<CardVersionDetail[]>(`/cards/${cardId}/generations`);
+export const fetchCardVersions = async <TCardVersion = CardVersionDetail>(cardId: string): Promise<TCardVersion[]> => {
+  const response = await api.get<TCardVersion[]>(`/cards/${cardId}/generations`);
   return response.data;
 };
 

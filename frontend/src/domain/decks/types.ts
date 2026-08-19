@@ -1,5 +1,6 @@
 import type { CardHoverTooltipModel } from '@/domain/cards/types/cardModels';
 import type { DeckBuildingRules } from '@/domain/deck-building/types';
+import type { CardBackSelectionFields } from '@/domain/card-backs/types';
 
 export type DeckMetadataOption = {
   id: string;
@@ -38,7 +39,7 @@ export type DeckTagSuggestionResult = {
 export type DeckVisibility = 'private' | 'unlisted' | 'public';
 export type DeckDifficulty = 'easy' | 'medium' | 'hard';
 
-export type DeckCardSummary = CardHoverTooltipModel & {
+export type DeckCardSummary = CardHoverTooltipModel & Partial<CardBackSelectionFields> & {
   result_type: 'card';
   image_url: string | null;
 };

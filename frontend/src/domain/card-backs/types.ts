@@ -1,3 +1,5 @@
+import type { CardPool } from '@/domain/cards/cardPools';
+
 export type CardBackRecord = {
   id: string;
   label: string;
@@ -7,7 +9,9 @@ export type CardBackRecord = {
   width: number;
   height: number;
   checksum: string;
-  is_current: boolean;
+  default_for_pools: CardPool[];
+  override_card_count: number;
+  is_usable: boolean;
   image_url: string | null;
   created_at: string;
   updated_at: string;
@@ -20,4 +24,16 @@ export type PublicCardBackRecord = Pick<
 
 export type CardBackCurrentResponse = {
   current: PublicCardBackRecord | null;
+};
+
+export type CardBackDefaults = Record<CardPool, PublicCardBackRecord | null>;
+
+export type ResolvedCardBackPayload = {
+  source: 'override' | 'pool_default';
+  asset: PublicCardBackRecord;
+} | null;
+
+export type CardBackSelectionFields = {
+  card_back_override_id: string | null;
+  effective_card_back: ResolvedCardBackPayload;
 };

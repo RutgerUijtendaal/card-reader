@@ -109,7 +109,8 @@
       :instances="pile.instances"
       :dragged-instance-ids="activeDraggedInstanceIds"
       :selected-instance-ids="selectedBoardInstanceIds"
-      :card-back-url="currentCardBackUrl"
+      :card-back-urls-by-card-id="cardBackUrlsByCardId"
+      :default-card-back-url="defaultCardBackUrl"
       @activate="(instanceId, event) => emit('activate-card', instanceId, event)"
       @pointer-card="(instanceId, source, event) => emit('pointer-card', instanceId, source, event)"
       @context-menu="(instanceId, event) => emit('context-card', instanceId, event)"
@@ -127,7 +128,8 @@
         :instance="instance"
         :dragging="activeDraggedInstanceIds.includes(instance.instanceId)"
         :selected="selectedBoardInstanceIds.includes(instance.instanceId)"
-        :card-back-url="currentCardBackUrl"
+        :card-back-urls-by-card-id="cardBackUrlsByCardId"
+        :default-card-back-url="defaultCardBackUrl"
         @activate="(instanceId, event) => emit('activate-card', instanceId, event)"
         @pointer-card="(instanceId, source, event) => emit('pointer-card', instanceId, source, event)"
         @context-menu="(instanceId, event) => emit('context-card', instanceId, event)"
@@ -147,7 +149,8 @@
     :hand-instances="handInstances"
     :hand-title="`Cards in hand: ${handInstances.length}`"
     :stack-zones="stackZones"
-    :card-back-url="currentCardBackUrl"
+    :card-back-urls-by-card-id="cardBackUrlsByCardId"
+    :default-card-back-url="defaultCardBackUrl"
     :dragging-instance-ids="activeDraggedInstanceIds"
     :dragging-top-instance-id="activeDragInstanceId"
     :shuffling-stack-zone="shufflingStackZone"
@@ -175,6 +178,7 @@ import type {
   PlaytestHoverTarget,
   PlaytestZoneId,
 } from '@/features/playtester/types';
+import type { CardBackUrlsByCardId } from '@/features/playtester/utils/cardBacks';
 
 export type PlaytestActiveVisualPile = {
   groupId: string;
@@ -187,7 +191,8 @@ defineProps<{
   boardSelectionActive: boolean;
   canResetSetup: boolean;
   cardScale: number;
-  currentCardBackUrl: string | null;
+  cardBackUrlsByCardId: CardBackUrlsByCardId;
+  defaultCardBackUrl: string | null;
   handInstances: PlaytestCardInstance[];
   loosePlayInstances: PlaytestCardInstance[];
   playInstances: PlaytestCardInstance[];

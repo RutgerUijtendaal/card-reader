@@ -149,7 +149,8 @@
       :hand-title="selectedPlaytest ? `Opening hand: ${selectorHandInstances.length}` : 'Opening hand'"
       :hand-subtitle="selectedPlaytest ? 'Middle-click a card to inspect.' : 'Select a deck to draw a preview hand.'"
       :stack-zones="selectorStackZones"
-      :card-back-url="currentCardBackUrl"
+      :card-back-urls-by-card-id="cardBackUrlsByCardId"
+      :default-card-back-url="defaultCardBackUrl"
       :card-interactive="false"
       :placeholder-hand-size="7"
       :stack-draggable="false"
@@ -163,7 +164,8 @@
       :title="openStackLabel"
       :instances="stackOverlayInstances"
       :dragging-instance-ids="[]"
-      :card-back-url="currentCardBackUrl"
+      :card-back-urls-by-card-id="cardBackUrlsByCardId"
+      :default-card-back-url="defaultCardBackUrl"
       :card-interactive="false"
       :bottom-offset-px="stackPopoverBottomOffsetPx"
       test-id="playtester-selector-stack-overlay"
@@ -187,10 +189,12 @@ import type {
   PlaytestZoneId,
 } from '@/features/playtester/types';
 import { suggestionKey } from '@/features/playtester/composables/usePlaytestDeckSelection';
+import type { CardBackUrlsByCardId } from '@/features/playtester/utils/cardBacks';
 
 defineProps<{
   cardScaleStyle: Record<string, string>;
-  currentCardBackUrl: string | null;
+  cardBackUrlsByCardId: CardBackUrlsByCardId;
+  defaultCardBackUrl: string | null;
   emptyMessage: string;
   filteredSuggestions: PlaytestDeckSuggestion[];
   hasOngoingPlaytest: boolean;

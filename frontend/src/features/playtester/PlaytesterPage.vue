@@ -40,7 +40,8 @@
       v-else-if="isPreSetupStage"
       v-model:search-query="deckSelection.searchQuery.value"
       :card-scale-style="cardScaleStyle"
-      :current-card-back-url="currentCardBackUrl"
+      :card-back-urls-by-card-id="cardBackUrlsByCardId"
+      :default-card-back-url="defaultCardBackUrl"
       :empty-message="deckSelection.emptyMessage.value"
       :filtered-suggestions="deckSelection.filteredSuggestions.value"
       :has-ongoing-playtest="deckSelection.hasOngoingPlaytest.value"
@@ -118,6 +119,8 @@
         :hand-size="playtest.handSize"
         :mulligan-count="playtest.openingSetup.mulliganCount"
         :dragging-instance-ids="activeDraggedInstanceIds"
+        :card-back-urls-by-card-id="cardBackUrlsByCardId"
+        :default-card-back-url="defaultCardBackUrl"
         @continue-mana="continueOpeningMana"
         @continue-setup="continueOpeningSetup"
         @draw-hand="continueOpeningSetup"
@@ -147,7 +150,8 @@
               :label="zone.label"
               :instances="zone.instances"
               :face="zone.face"
-              :card-back-url="currentCardBackUrl"
+              :card-back-urls-by-card-id="cardBackUrlsByCardId"
+              :default-card-back-url="defaultCardBackUrl"
               :collapsed="zone.collapsed"
               :default-action="zone.defaultAction"
               :interactive="zone.interactive"
@@ -171,7 +175,8 @@
         :board-selection-active="Boolean(boardSelection)"
         :can-reset-setup="Boolean(playtest?.setupSnapshot)"
         :card-scale="cardScale"
-        :current-card-back-url="currentCardBackUrl"
+        :card-back-urls-by-card-id="cardBackUrlsByCardId"
+        :default-card-back-url="defaultCardBackUrl"
         :hand-instances="handInstances"
         :loose-play-instances="loosePlayInstances"
         :play-instances="playInstances"
@@ -209,7 +214,8 @@
         :instances="stackOverlayInstances"
         :drop-zone-id="openStackZone"
         :dragging-instance-ids="activeDraggedInstanceIds"
-        :card-back-url="currentCardBackUrl"
+        :card-back-urls-by-card-id="cardBackUrlsByCardId"
+        :default-card-back-url="defaultCardBackUrl"
         :card-interactive="true"
         :bottom-offset-px="stackPopoverBottomOffsetPx"
         test-id="playtest-stack-overlay"
@@ -235,7 +241,8 @@
       :key="overlay.instance.instanceId"
       :drag="overlay.drag"
       :instance="overlay.instance"
-      :card-back-url="currentCardBackUrl"
+      :card-back-urls-by-card-id="cardBackUrlsByCardId"
+      :default-card-back-url="defaultCardBackUrl"
     />
 
     <PlaytestContextMenu
@@ -262,7 +269,7 @@ import ConfirmModal from '@/shared/components/modals/ConfirmModal.vue';
 import { useAuthStore } from '@/domain/session/store';
 import { fetchDeckDetail, fetchMyDeck } from '@/domain/decks/api';
 import type { DeckRecord } from '@/domain/decks/types';
-import { fetchCurrentCardBack } from '@/domain/card-backs/api';
+import { fetchCardBackDefaults } from '@/domain/card-backs/api';
 import PlaytestActiveStage, { type PlaytestActiveVisualPile } from '@/features/playtester/components/PlaytestActiveStage.vue';
 import PlaytestContextMenu from '@/features/playtester/components/PlaytestContextMenu.vue';
 import PlaytestDraggedCardOverlay from '@/features/playtester/components/PlaytestDraggedCard.vue';
@@ -337,6 +344,7 @@ import {
   PLAYTEST_STACK_PLAY_BUDGET_RATIO,
 } from '@/features/playtester/utils/stacks';
 import { isPlaytestDeckEligible } from '@/features/playtester/utils/deckEligibility';
+import { buildCardBackUrlsByCardId } from '@/features/playtester/utils/cardBacks';
 
 type PointerDragStart = {
   instanceId: string;
@@ -391,7 +399,7 @@ const suppressClickUntil = ref(0);
 const restartConfirmOpen = ref(false);
 const saveSuspended = ref(false);
 const cardScale = ref(loadPlaytestCardScale());
-const currentCardBackUrl = ref<string | null>(null);
+const defaultCardBackUrl = ref<string | null>(null);
 const openStackZone = ref<PlaytestZoneId | null>(null);
 const copiedCards = ref<PlaytestCardInstance[]>([]);
 const lastBoardPointer = ref<{ x: number; y: number } | null>(null);
@@ -410,6 +418,9 @@ const deckSelection = usePlaytestDeckSelection({
   cardScale,
   storage,
 });
+const cardBackUrlsByCardId = computed(() =>
+  buildCardBackUrlsByCardId(deck.value ?? deckSelection.selectedDeck.value),
+);
 
 const setLowerBarWidth = (width: number, height = 0): void => {
   lowerBarWidth.value = width;
@@ -1785,12 +1796,14 @@ const restartPlaytest = (): void => {
   replacePlaytestState(createInitialPlaytestState(deck.value));
 };
 
-const loadCurrentCardBack = async (): Promise<void> => {
+const loadDefaultCardBack = async (): Promise<void> => {
   try {
-    const response = await fetchCurrentCardBack();
-    currentCardBackUrl.value = response.current?.image_url ? toAbsoluteApiUrl(response.current.image_url) : null;
+    const defaults = await fetchCardBackDefaults();
+    defaultCardBackUrl.value = defaults.player?.image_url
+      ? toAbsoluteApiUrl(defaults.player.image_url)
+      : null;
   } catch {
-    currentCardBackUrl.value = null;
+    defaultCardBackUrl.value = null;
   }
 };
 
@@ -1903,7 +1916,7 @@ watch(
 );
 
 onMounted(() => {
-  void loadCurrentCardBack();
+  void loadDefaultCardBack();
 });
 </script>
 

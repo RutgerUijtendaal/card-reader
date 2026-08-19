@@ -12,7 +12,6 @@ import { useGalleryCardNavigation } from '@/domain/cards/utils/gallery/galleryNa
 import type {
   CardFiltersResponse,
   CardGroupSummary,
-  CardVersionDetail,
   FieldSourceValue,
   MetadataGroupName,
   MetadataOption,
@@ -23,10 +22,13 @@ import type {
 import type { CardPool } from '@/domain/cards/cardPools';
 import type {
   CardDetail,
+  CardDetailVersion,
   EditorForm,
   MetadataSearchState,
   ReparseTemplateOption,
 } from '@/features/card-detail/types';
+import { fetchCardBackDefaults, fetchCardBacks } from '@/domain/card-backs/api';
+import type { CardBackDefaults, CardBackRecord } from '@/domain/card-backs/types';
 import { metadataGroups, scalarFields } from '@/features/card-detail/types';
 import { formatCardDetailDate } from '@/features/card-detail/utils/cardDetailFormatters';
 import { fetchTemplates } from '@/domain/templates/api';
@@ -48,7 +50,7 @@ export const useCardDetailState = () => {
   const route = useRoute();
   const router = useRouter();
   const card = ref<CardDetail | null>(null);
-  const versions = ref<CardVersionDetail[]>([]);
+  const versions = ref<CardDetailVersion[]>([]);
   const selectedVersionId = ref<string>('');
   const filterOptions = ref<CardFiltersResponse>({ keywords: [], tags: [], symbols: [], types: [] });
   const symbolByKey = ref<SymbolLookupMap>({});
@@ -62,6 +64,9 @@ export const useCardDetailState = () => {
   const promotingVersionId = ref<string | null>(null);
   const saveMessage = ref('');
   const saveError = ref('');
+  const cardBackAssets = ref<CardBackRecord[]>([]);
+  const cardBackDefaults = ref<CardBackDefaults>({ player: null, evil: null, neutral: null });
+  const cardBackControlError = ref('');
   let loadRequestId = 0;
 
   const form = reactive<EditorForm>({
@@ -77,6 +82,7 @@ export const useCardDetailState = () => {
     card_mana_families: [],
     deck_building_config: formatDeckBuildingConfigJson(fallbackDeckBuildingDefaultConfig),
     lifecycle_status: ACTIVE_CARD_LIFECYCLE_STATUS,
+    card_back_override_id: null,
     keyword_ids: [],
     tag_ids: [],
     type_ids: [],
@@ -89,7 +95,7 @@ export const useCardDetailState = () => {
     symbols: '',
   });
 
-  const selectedVersion = computed<CardVersionDetail | null>(
+  const selectedVersion = computed<CardDetailVersion | null>(
     () => versions.value.find((version) => version.version_id === selectedVersionId.value) ?? null,
   );
 
@@ -135,6 +141,19 @@ export const useCardDetailState = () => {
     void router.push(buildCardReturnLocation(route.query));
   };
 
+  const loadCardBackCatalog = async (): Promise<void> => {
+    cardBackControlError.value = '';
+    try {
+      [cardBackAssets.value, cardBackDefaults.value] = await Promise.all([
+        fetchCardBacks(),
+        fetchCardBackDefaults(),
+      ]);
+    } catch (error) {
+      console.error('Load card-back catalog failed', error);
+      cardBackControlError.value = 'Card-back choices are temporarily unavailable.';
+    }
+  };
+
   const loadCard = async (): Promise<void> => {
     const requestId = ++loadRequestId;
     const cardId = String(route.params.id);
@@ -142,10 +161,11 @@ export const useCardDetailState = () => {
     try {
       const [cardResponse, versionsResponse, filtersResponse, templates, deckRulesMetadata] = await Promise.all([
         fetchCard<CardDetail>(cardId),
-        fetchCardVersions(cardId),
+        fetchCardVersions<CardDetailVersion>(cardId),
         fetchCardFilters(),
         fetchTemplates(),
         fetchDeckRulesMetadata().catch(() => null),
+        loadCardBackCatalog(),
       ]);
 
       if (requestId !== loadRequestId) {
@@ -200,6 +220,7 @@ export const useCardDetailState = () => {
         : fallbackDeckBuildingDefaultConfig,
     );
     form.lifecycle_status = normalizeCardLifecycleStatus(version.lifecycle_status);
+    form.card_back_override_id = version.card_back_override_id;
     form.keyword_ids = [...version.keyword_ids];
     form.tag_ids = [...version.tag_ids];
     form.type_ids = [...version.type_ids];
@@ -213,7 +234,7 @@ export const useCardDetailState = () => {
     selectedVersionId.value = versionId;
   };
 
-  const applyUpdatedVersion = (updated: CardVersionDetail): boolean => {
+  const applyUpdatedVersion = (updated: CardDetailVersion): boolean => {
     const previousVersion = versions.value.find((version) => version.version_id === updated.version_id);
     const poolChanged = previousVersion?.card_pool !== updated.card_pool;
     versions.value = synchronizeCardClassification(versions.value, updated);
@@ -243,7 +264,7 @@ export const useCardDetailState = () => {
     saveMessage.value = '';
     saveError.value = '';
     try {
-      const updatedVersion = await patchLatestCardVersion(version.id, payload);
+      const updatedVersion = await patchLatestCardVersion<CardDetailVersion>(version.id, payload);
       const poolChanged = applyUpdatedVersion(updatedVersion);
       if (poolChanged) {
         try {
@@ -363,7 +384,7 @@ export const useCardDetailState = () => {
     saveMessage.value = '';
     saveError.value = '';
     try {
-      const promotedVersion = await promoteCardVersion(targetCard.id, versionId);
+      const promotedVersion = await promoteCardVersion<CardDetailVersion>(targetCard.id, versionId);
       versions.value = versions.value.map((item) =>
         item.version_id === promotedVersion.version_id
           ? promotedVersion
@@ -481,6 +502,9 @@ export const useCardDetailState = () => {
     promotingVersionId,
     saveMessage,
     saveError,
+    cardBackAssets,
+    cardBackDefaults,
+    cardBackControlError,
     deckBuildingConfigExample,
     form,
     metadataSearch,
@@ -534,7 +558,7 @@ export const cardSaveErrorMessage = (error: unknown): string => {
   return `${message} Merge the duplicate cards before changing this card's name, pool, or factions.`;
 };
 
-const normalizeFieldValue = (version: CardVersionDetail, fieldName: ScalarFieldName): string => {
+const normalizeFieldValue = (version: CardDetailVersion, fieldName: ScalarFieldName): string => {
   if (fieldName === 'rules_text') {
     return String(version.rules_text_enriched ?? '');
   }
@@ -544,13 +568,13 @@ const normalizeFieldValue = (version: CardVersionDetail, fieldName: ScalarFieldN
   return String(version[fieldName] ?? '');
 };
 
-const normalizeParsedFieldValue = (version: CardVersionDetail, fieldName: ScalarFieldName): string => {
+const normalizeParsedFieldValue = (version: CardDetailVersion, fieldName: ScalarFieldName): string => {
   const value = version.parsed_snapshot.fields[fieldName];
   return String(value ?? '');
 };
 
 const selectedIdsFromVersion = (
-  version: CardVersionDetail,
+  version: CardDetailVersion,
   groupName: MetadataGroupName,
   effectiveSymbolIds: string[],
 ): string[] => {
@@ -560,7 +584,7 @@ const selectedIdsFromVersion = (
   return effectiveSymbolIds;
 };
 
-const parsedIds = (groupName: MetadataGroupName, selectedVersion?: CardVersionDetail | null): string[] => {
+const parsedIds = (groupName: MetadataGroupName, selectedVersion?: CardDetailVersion | null): string[] => {
   if (!selectedVersion) return [];
   if (groupName === 'keywords') return selectedVersion.parsed_snapshot.metadata.keyword_ids;
   if (groupName === 'tags') return selectedVersion.parsed_snapshot.metadata.tag_ids;
@@ -572,7 +596,7 @@ const sortedIds = (ids: string[]): string[] => [...ids].sort((a, b) => a.localeC
 
 const buildCardUpdatePayload = (
   form: EditorForm,
-  version: CardVersionDetail,
+  version: CardDetailVersion,
 ): Record<string, unknown> => {
   const updates: Record<string, unknown> = {};
 
@@ -601,13 +625,16 @@ const buildCardUpdatePayload = (
   if (form.lifecycle_status !== normalizeCardLifecycleStatus(version.lifecycle_status)) {
     updates.lifecycle_status = form.lifecycle_status;
   }
+  if ((form.card_back_override_id ?? null) !== version.card_back_override_id) {
+    updates.card_back_override_id = form.card_back_override_id ?? null;
+  }
 
   return updates;
 };
 
 const buildVersionUpdatePayload = (
   form: EditorForm,
-  version: CardVersionDetail,
+  version: CardDetailVersion,
   effectiveSymbolIds: string[],
 ): Record<string, unknown> => {
   const updates: Record<string, unknown> = {};
@@ -650,7 +677,7 @@ export const reconcileCardGroupsAfterPoolChange = (
 );
 
 export type CardClassificationFields = Pick<
-  CardVersionDetail,
+  CardDetailVersion,
   | 'version_id'
   | 'card_pool'
   | 'card_roles'
@@ -658,7 +685,7 @@ export type CardClassificationFields = Pick<
   | 'card_mana_families'
   | 'deck_building_config'
   | 'lifecycle_status'
->;
+> & Partial<Pick<CardDetailVersion, 'card_back_override_id' | 'effective_card_back'>>;
 
 export const synchronizeCardClassification = <T extends CardClassificationFields>(
   versions: T[],
@@ -675,6 +702,8 @@ export const synchronizeCardClassification = <T extends CardClassificationFields
           card_mana_families: [...(updated.card_mana_families ?? [])],
           deck_building_config: updated.deck_building_config,
           lifecycle_status: updated.lifecycle_status,
+          card_back_override_id: updated.card_back_override_id,
+          effective_card_back: updated.effective_card_back,
         },
   );
 

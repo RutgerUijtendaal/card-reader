@@ -160,6 +160,26 @@
           </div>
         </div>
 
+        <div class="theme-muted-panel p-4">
+          <div class="mb-3">
+            <p class="theme-section-title text-sm font-semibold">
+              Card Back
+            </p>
+            <p class="theme-section-muted text-xs">
+              Leave this inherited to follow the selected pool's default.
+            </p>
+          </div>
+          <CardBackSelect
+            :model-value="form.card_back_override_id ?? null"
+            :card-pool="form.card_pool"
+            :assets="cardBackAssets"
+            :defaults="cardBackDefaults"
+            :error="cardBackControlError"
+            :disabled="!version.editable || isBusy || Boolean(cardBackControlError)"
+            @update:model-value="$emit('update-card-back-override', $event)"
+          />
+        </div>
+
         <div class="theme-muted-panel p-3">
           <JsonEditorField
             :model-value="form.deck_building_config"
@@ -597,6 +617,8 @@ import AppSelect from '@/shared/components/app/AppSelect.vue';
 import CardMarkupEditor from '@/domain/cards/components/CardMarkupEditor.vue';
 import SymbolToken from '@/domain/cards/components/SymbolToken.vue';
 import JsonEditorField from '@/shared/components/forms/JsonEditorField.vue';
+import CardBackSelect from '@/domain/card-backs/components/CardBackSelect.vue';
+import type { CardBackDefaults, CardBackRecord } from '@/domain/card-backs/types';
 import {
   ACTIVE_CARD_LIFECYCLE_STATUS,
   DEPRECATED_CARD_LIFECYCLE_STATUS,
@@ -617,7 +639,7 @@ import { MANA_FAMILY_OPTIONS, type ManaFamily } from '@/domain/cards/manaFamilie
 import type { EditorForm, MetadataSearchState, ReparseTemplateOption } from '@/features/card-detail/types';
 import { metadataGroups, scalarFields } from '@/features/card-detail/types';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   version: CardVersionDetail;
   form: EditorForm;
   reparseTemplates: ReparseTemplateOption[];
@@ -628,6 +650,9 @@ const props = defineProps<{
   saveMessage: string;
   saveError: string;
   deckBuildingConfigExample: string;
+  cardBackAssets?: CardBackRecord[];
+  cardBackDefaults?: CardBackDefaults;
+  cardBackControlError?: string;
   fieldSource: (fieldName: ScalarFieldName) => 'auto' | 'manual';
   metadataSource: (groupName: MetadataGroupName) => 'auto' | 'manual';
   fieldSourceLabel: (fieldName: ScalarFieldName) => string;
@@ -645,7 +670,13 @@ const props = defineProps<{
   deprecatedStatusDisabled?: boolean;
   reviewFocusPropertyKey?: string | null;
   initialTab?: 'card' | 'version';
-}>();
+}>(), {
+  cardBackAssets: () => [],
+  cardBackDefaults: () => ({ player: null, evil: null, neutral: null }),
+  cardBackControlError: '',
+  reviewFocusPropertyKey: null,
+  initialTab: 'version',
+});
 
 const emit = defineEmits<{
   (e: 'save-card'): void;
@@ -667,6 +698,7 @@ const emit = defineEmits<{
   (e: 'toggle-card-mana-family', manaFamily: ManaFamily, checked: boolean): void;
   (e: 'update-deck-building-config', value: string): void;
   (e: 'update-lifecycle-status', value: CardLifecycleStatus): void;
+  (e: 'update-card-back-override', value: string | null): void;
 }>();
 
 const activeEditorTab = ref<'card' | 'version'>(props.initialTab ?? 'version');

@@ -13,7 +13,6 @@ from card_reader_core.models import (
     HERO_CARD_ROLE,
     PLAYER_CARD_POOL,
     Card,
-    CardBack,
     CardClassificationRule,
     CardGroup,
     CardVersionImage,
@@ -24,6 +23,7 @@ from card_reader_core.models import (
     Template,
     Type,
 )
+from card_reader_core.services.card_backs import get_pool_card_back_defaults
 from card_reader_core.operations.developer_data.schema import (
     DEVELOPER_DATA_FORMAT_VERSION,
     SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS,
@@ -146,7 +146,7 @@ class Command(BaseCommand):
             .exists()
         ):
             issues.append("an active local admin user is missing")
-        card_back = CardBack.objects.filter(is_current=True).first()
+        card_back = get_pool_card_back_defaults()["player"]
         if card_back is None:
             issues.append("the current card back is missing")
         elif not resolve_storage_path(card_back.stored_path).is_file():

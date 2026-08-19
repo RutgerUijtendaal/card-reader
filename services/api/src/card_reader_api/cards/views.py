@@ -57,6 +57,7 @@ from card_reader_core.services.cards import (
     resolve_card_image_path,
     update_latest_card_version_with_notifications,
 )
+from card_reader_core.services.card_backs import resolve_effective_card_backs
 from card_reader_core.services.parse_flags import create_parse_flag_for_card_version
 
 
@@ -214,6 +215,7 @@ class CardDetailView(APIView):
             card.id,
             viewer_id=viewer_id,
         )
+        resolved_card_back = resolve_effective_card_backs([card.id]).get(card.id)
         return Response(
             card_payload(
                 card,
@@ -223,6 +225,7 @@ class CardDetailView(APIView):
                 edit_state=edit_state,
                 card_groups=card_groups,
                 deck_references=deck_references,
+                resolved_card_back=resolved_card_back,
             )
         )
 
@@ -239,6 +242,7 @@ class CardGenerationsView(APIView):
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
 
         payloads = []
+        resolved_card_back = resolve_effective_card_backs([card.id]).get(card.id)
         for version in versions:
             image = get_card_image(version.id)
             metadata = get_card_version_metadata(version.id)
@@ -250,6 +254,7 @@ class CardGenerationsView(APIView):
                     image_url=card_image_asset_url(image, fallback_url=f"/cards/{card_id}/versions/{version.id}/image"),
                     metadata=metadata,
                     edit_state=edit_state,
+                    resolved_card_back=resolved_card_back,
                 )
             )
         return Response(payloads)
@@ -280,6 +285,7 @@ class LatestCardVersionUpdateView(APIView):
         image = get_card_image(version.id)
         metadata = get_card_version_metadata(version.id)
         edit_state = get_card_version_edit_state(version)
+        resolved_card_back = resolve_effective_card_backs([card.id]).get(card.id)
         return Response(
             card_payload(
                 card,
@@ -287,6 +293,7 @@ class LatestCardVersionUpdateView(APIView):
                 image_url=card_image_asset_url(image, fallback_url=f"/cards/{card_id}/versions/{version.id}/image"),
                 metadata=metadata,
                 edit_state=edit_state,
+                resolved_card_back=resolved_card_back,
             )
         )
 
@@ -308,6 +315,7 @@ class CardVersionPromoteView(APIView):
         image = get_card_image(version.id)
         metadata = get_card_version_metadata(version.id)
         edit_state = get_card_version_edit_state(version)
+        resolved_card_back = resolve_effective_card_backs([card.id]).get(card.id)
         return Response(
             card_payload(
                 card,
@@ -315,6 +323,7 @@ class CardVersionPromoteView(APIView):
                 image_url=card_image_asset_url(image, fallback_url=f"/cards/{card.id}/versions/{version.id}/image"),
                 metadata=metadata,
                 edit_state=edit_state,
+                resolved_card_back=resolved_card_back,
             )
         )
 

@@ -16,7 +16,8 @@
         pile-member
         :dragging="draggedInstanceIds.includes(instance.instanceId)"
         :selected="selectedInstanceIds.includes(instance.instanceId)"
-        :card-back-url="cardBackUrl"
+        :card-back-urls-by-card-id="cardBackUrlsByCardId"
+        :default-card-back-url="defaultCardBackUrl"
         @activate="(instanceId, event) => emit('activate', instanceId, event)"
         @pointer-card="handlePointerCard"
         @context-menu="handleContextMenu"
@@ -34,13 +35,15 @@ import type {
   PlaytestCardSource,
   PlaytestHoverTarget,
 } from '@/features/playtester/types';
+import type { CardBackUrlsByCardId } from '@/features/playtester/utils/cardBacks';
 
 const props = defineProps<{
   groupId: string;
   instances: PlaytestCardInstance[];
   draggedInstanceIds: string[];
   selectedInstanceIds: string[];
-  cardBackUrl: string | null;
+  cardBackUrlsByCardId: CardBackUrlsByCardId;
+  defaultCardBackUrl: string | null;
 }>();
 
 const emit = defineEmits<{

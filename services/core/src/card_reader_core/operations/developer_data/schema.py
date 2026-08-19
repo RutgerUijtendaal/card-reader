@@ -23,8 +23,8 @@ from card_reader_core.metadata import (
     normalize_mana_family_keys,
 )
 
-DEVELOPER_DATA_FORMAT_VERSION = 4
-SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, 3, DEVELOPER_DATA_FORMAT_VERSION)
+DEVELOPER_DATA_FORMAT_VERSION = 5
+SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, 3, 4, DEVELOPER_DATA_FORMAT_VERSION)
 TYPE_INFERRED_ROLE_POOLS: tuple[tuple[CardRole, frozenset[CardPool]], ...] = (
     ("directive", frozenset({"evil"})),
     ("reminder", frozenset({"evil"})),
@@ -226,6 +226,7 @@ class CardRecord(StrictModel):
     card_mana_families: list[ManaFamily]
     deck_building_config: dict[str, Any]
     lifecycle_status: str
+    card_back_override_checksum: str | None
     latest_version_number: int | None
     aliases: list[CardAliasRecord]
     versions: list[CardVersionRecord]
@@ -281,6 +282,11 @@ class CardBackRecord(StrictModel):
     checksum: str
 
 
+class CardBackPoolDefaultRecord(StrictModel):
+    card_pool: CardPool
+    card_back_checksum: str | None
+
+
 class DeveloperDataPayload(StrictModel):
     keywords: list[CatalogRecord]
     tags: list[CatalogRecord]
@@ -292,7 +298,8 @@ class DeveloperDataPayload(StrictModel):
     content_versions: list[ContentVersionRecord]
     cards: list[CardRecord]
     card_groups: list[CardGroupRecord]
-    current_card_back: CardBackRecord | None
+    card_backs: list[CardBackRecord]
+    card_back_pool_defaults: list[CardBackPoolDefaultRecord]
 
 
 class BundleFileRecord(StrictModel):
@@ -381,12 +388,38 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
     if format_version == DEVELOPER_DATA_FORMAT_VERSION:
         return value
     adopted = dict(value)
+    legacy_current_card_back = adopted.pop("current_card_back", None)
+    adopted["card_backs"] = (
+        [legacy_current_card_back] if isinstance(legacy_current_card_back, dict) else []
+    )
+    legacy_checksum = (
+        legacy_current_card_back.get("checksum")
+        if isinstance(legacy_current_card_back, dict)
+        else None
+    )
+    adopted["card_back_pool_defaults"] = [
+        {"card_pool": card_pool, "card_back_checksum": legacy_checksum}
+        for card_pool in ("player", "evil", "neutral")
+    ]
     cards = adopted.get("cards")
     if not isinstance(cards, list):
         return adopted
     if format_version == 3:
         adopted["cards"] = [
-            _adopt_type_inferred_roles(card) if isinstance(card, dict) else card
+            {
+                **_adopt_type_inferred_roles(card),
+                "card_back_override_checksum": None,
+            }
+            if isinstance(card, dict)
+            else card
+            for card in cards
+        ]
+        return adopted
+    if format_version == 4:
+        adopted["cards"] = [
+            {**card, "card_back_override_checksum": None}
+            if isinstance(card, dict)
+            else card
             for card in cards
         ]
         return adopted
@@ -398,6 +431,7 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
             adopted_cards.append(card)
             continue
         adopted_card = dict(card)
+        adopted_card["card_back_override_checksum"] = None
         if format_version == 1:
             if "is_hero" not in adopted_card or type(adopted_card["is_hero"]) is not bool:
                 raise ValueError("Legacy developer-data card is_hero must be a Boolean.")

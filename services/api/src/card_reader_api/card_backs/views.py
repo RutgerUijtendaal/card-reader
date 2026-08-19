@@ -8,23 +8,44 @@ from rest_framework.views import APIView
 
 from card_reader_api.card_backs.serializers import (
     CardBackUploadSerializer,
+    CardBackDefaultUpdateSerializer,
     card_back_payload,
     current_card_back_payload,
+    public_card_back_payload,
 )
-from card_reader_api.common.responses import bad_request, not_found, serializer_error
-from card_reader_core.services.card_backs import CardBackService
+from card_reader_api.common.responses import bad_request, serializer_error
+from card_reader_core.models import PLAYER_CARD_POOL
+from card_reader_core.services.card_backs import (
+    get_pool_card_back_defaults,
+    list_card_back_assets,
+    set_pool_default,
+    upload_card_back_asset,
+)
 
 
 class CurrentCardBackView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, _request: Request) -> Response:
-        return Response(current_card_back_payload(CardBackService().get_current()))
+        return Response(current_card_back_payload(get_pool_card_back_defaults()[PLAYER_CARD_POOL]))
+
+
+class CardBackDefaultsView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, _request: Request) -> Response:
+        defaults = get_pool_card_back_defaults()
+        return Response(
+            {
+                card_pool: None if card_back is None else public_card_back_payload(card_back)
+                for card_pool, card_back in defaults.items()
+            }
+        )
 
 
 class AdminCardBackListView(APIView):
     def get(self, _request: Request) -> Response:
-        return Response([card_back_payload(card_back) for card_back in CardBackService().list_history()])
+        return Response([card_back_payload(card_back) for card_back in list_card_back_assets()])
 
 
 class AdminCardBackUploadView(APIView):
@@ -40,7 +61,7 @@ class AdminCardBackUploadView(APIView):
 
         upload = serializer.validated_data["file"]
         try:
-            card_back = CardBackService().upload(
+            card_back = upload_card_back_asset(
                 filename=upload.name,
                 chunks=upload.chunks(),
                 label=serializer.validated_data.get("label"),
@@ -51,12 +72,13 @@ class AdminCardBackUploadView(APIView):
         return Response(card_back_payload(card_back), status=status.HTTP_201_CREATED)
 
 
-class AdminCardBackActivateView(APIView):
-    def post(self, _request: Request, card_back_id: str) -> Response:
+class AdminCardBackDefaultView(APIView):
+    def put(self, request: Request, card_pool: str) -> Response:
+        serializer = CardBackDefaultUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return serializer_error(serializer)
         try:
-            card_back = CardBackService().activate(card_back_id)
+            row = set_pool_default(card_pool, str(serializer.validated_data["card_back_id"]))
         except ValueError as exc:
             return bad_request(str(exc))
-        if card_back is None:
-            return not_found("Card back not found")
-        return Response(card_back_payload(card_back))
+        return Response(public_card_back_payload(row.card_back))
