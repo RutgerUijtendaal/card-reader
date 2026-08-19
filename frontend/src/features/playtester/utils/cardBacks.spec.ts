@@ -58,6 +58,16 @@ describe('resolvePlaytestCardBackUrl', () => {
     ).toBe('https://cards.example/stored.webp');
   });
 
+  it('does not inherit when the current deck resolution is explicitly unavailable', () => {
+    expect(
+      resolvePlaytestCardBackUrl(
+        instance('broken-override'),
+        { 'broken-override': null },
+        'https://cards.example/default.webp',
+      ),
+    ).toBeNull();
+  });
+
   it('falls back to the pool default when no card resolution remains', () => {
     expect(
       resolvePlaytestCardBackUrl(
