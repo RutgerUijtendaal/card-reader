@@ -33,6 +33,8 @@ services/*/build/
 .vscode/
 .idea/
 .codex/config.toml
+/.agents/
+/.agents-location
 .tmp/
 services/integration/.runtime/
 *.spec
