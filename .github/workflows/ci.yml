@@ -242,6 +242,7 @@ jobs:
   publish_api:
     needs: checks
     if: >-
+      github.repository == 'RutgerUijtendaal/card-reader' &&
       github.ref == 'refs/heads/master' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
@@ -275,6 +276,7 @@ jobs:
   publish_parser:
     needs: checks
     if: >-
+      github.repository == 'RutgerUijtendaal/card-reader' &&
       github.ref == 'refs/heads/master' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
@@ -365,22 +367,19 @@ jobs:
           retention-days: 7
           compression-level: 0
 
-  deploy_production:
+  production_deploy_gate:
     needs: release
     if: >-
+      github.repository == 'RutgerUijtendaal/card-reader' &&
       github.ref == 'refs/heads/master' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment:
-      name: production
-      url: https://maityscardgame.com
-    concurrency:
-      group: production-card-reader
-      cancel-in-progress: false
+    timeout-minutes: 5
+    outputs:
+      enabled: ${{ steps.gate.outputs.enabled }}
     steps:
       - name: Resolve production deployment gate
-        id: deploy_gate
+        id: gate
         env:
           AUTO_DEPLOY_ENABLED: ${{ vars.AUTO_DEPLOY_ENABLED }}
         run: |
@@ -390,13 +389,40 @@ jobs:
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "Automatic production deployment is disabled."
           fi
+
+  deploy_production:
+    needs:
+      - release
+      - production_deploy_gate
+    if: needs.production_deploy_gate.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://maityscardgame.com
+    concurrency:
+      group: production-card-reader
+      cancel-in-progress: false
+    steps:
+      - name: Confirm revision is still current master
+        id: current_revision
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          current_revision="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/master" --jq .object.sha)"
+          if [[ "$current_revision" == "$GITHUB_SHA" ]]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping superseded revision $GITHUB_SHA; current master is $current_revision."
+          fi
       - name: Download release artifact
-        if: steps.deploy_gate.outputs.enabled == 'true'
+        if: steps.current_revision.outputs.current == 'true'
         uses: actions/download-artifact@v7
         with:
           name: card-reader-release-${{ github.sha }}
       - name: Configure deployment SSH identity
-        if: steps.deploy_gate.outputs.enabled == 'true'
+        if: steps.current_revision.outputs.current == 'true'
         env:
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
           DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
@@ -413,7 +439,7 @@ jobs:
           ssh-keygen -y -f "$HOME/.ssh/card-reader-deploy" >/dev/null
           ssh-keygen -F "$DEPLOY_HOST" -f "$HOME/.ssh/known_hosts" >/dev/null
       - name: Upload and deploy release
-        if: steps.deploy_gate.outputs.enabled == 'true'
+        if: steps.current_revision.outputs.current == 'true'
         env:
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
           DEPLOY_USER: ${{ vars.DEPLOY_USER }}
