@@ -152,8 +152,8 @@ def test_staff_clears_one_pool_default_without_changing_other_pools() -> None:
         HTTP_X_CSRFTOKEN=csrf_token,
     )
 
-    assert response.status_code == 200
-    assert response.json() is None
+    assert response.status_code == 204
+    assert response.content == b""
     assert CardBackPoolDefault.objects.get(card_pool="player").card_back_id == card_back.id
     assert not CardBackPoolDefault.objects.filter(card_pool="evil").exists()
 

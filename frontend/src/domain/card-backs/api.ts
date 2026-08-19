@@ -4,7 +4,6 @@ import type {
   CardBackCurrentResponse,
   CardBackDefaults,
   CardBackRecord,
-  PublicCardBackRecord,
 } from '@/domain/card-backs/types';
 
 export const fetchCurrentCardBack = async (): Promise<CardBackCurrentResponse> => {
@@ -36,9 +35,8 @@ export const uploadCardBack = async (file: File, label: string): Promise<CardBac
 export const setPoolCardBackDefault = async (
   cardPool: CardPool,
   cardBackId: string | null,
-): Promise<PublicCardBackRecord | null> => {
-  const response = await api.put<PublicCardBackRecord | null>(`/admin/card-backs/defaults/${cardPool}`, {
+): Promise<void> => {
+  await api.put(`/admin/card-backs/defaults/${cardPool}`, {
     card_back_id: cardBackId,
   });
-  return response.data;
 };

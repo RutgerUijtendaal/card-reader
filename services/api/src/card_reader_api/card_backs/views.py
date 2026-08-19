@@ -82,7 +82,7 @@ class AdminCardBackDefaultView(APIView):
         try:
             if card_back_id is None:
                 clear_pool_default(card_pool)
-                return Response(None)
+                return Response(status=status.HTTP_204_NO_CONTENT)
             row = set_pool_default(card_pool, str(card_back_id))
         except ValueError as exc:
             return bad_request(str(exc))
