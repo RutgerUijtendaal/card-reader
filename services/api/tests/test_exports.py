@@ -11,8 +11,10 @@ from PIL import Image
 
 from card_reader_core.config.settings import settings
 from card_reader_core.models import (
+    CARD_POOLS,
     Card,
     CardBack,
+    CardBackPoolDefault,
     CardVersion,
     CardVersionImage,
     ContentVersion,
@@ -53,7 +55,7 @@ def test_public_deck_tts_export_returns_sheet_payload_with_metadata() -> None:
     assert response_payload["skipped_count"] == 0
     assert response_payload["sheet_count"] == 1
     payload = _decode_tts_card_export(response_payload["encoded_payload"])
-    assert payload["schema"] == "card-reader.tts-cards.v2"
+    assert payload["schema"] == "card-reader.tts-cards.v3"
     assert payload["collection"] == {
         "name": "TTS Export Deck",
         "description": "Export me",
@@ -81,6 +83,52 @@ def test_public_deck_tts_export_returns_sheet_payload_with_metadata() -> None:
     assert all(card["role"] == "mainboard" for card in payload["cards"][1:])
     assert all(card["quantity"] == 4 for card in payload["cards"][1:])
     assert payload["sheets"][0]["face_url"].startswith("http://cards.example/tts/card-sheets/")
+
+
+def test_deck_tts_export_supports_multiple_backs_on_one_face_sheet() -> None:
+    TtsCardSheet.objects.all().delete()
+    owner = _create_user("tts-export-mixed-back-owner", "password")
+    hero = _create_card(name="TTS Mixed Back Hero", hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="TTS Mixed Back Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+    default_back = _create_current_card_back("mixed-default")
+    for card in [hero, *mainboard_cards]:
+        assert card.latest_version is not None
+        _create_card_image(card.latest_version, content=f"mixed-{card.id}".encode("utf-8"))
+    override_path = build_storage_relative_path("images", "tts-card-back-mixed-override.webp")
+    override_file = settings.storage_root_dir / override_path
+    override_file.parent.mkdir(parents=True, exist_ok=True)
+    override_file.write_bytes(b"override-card-back")
+    override = CardBack.objects.create(
+        label="Mixed override",
+        original_filename="mixed-override.png",
+        source_file="uploads/card-backs/mixed-override.png",
+        stored_path=override_path,
+        width=63,
+        height=88,
+        checksum="mixed-override-checksum",
+    )
+    hero.card_back_override = override
+    hero.save(update_fields=["card_back_override", "updated_at"])
+
+    response = Client(HTTP_HOST="cards.example").get(f"/decks/{deck.id}/exports/tts")
+
+    assert response.status_code == 200
+    payload = _decode_tts_card_export(response.json()["encoded_payload"])
+    assert {resource["card_back_id"] for resource in payload["card_backs"]} == {
+        default_back.id,
+        override.id,
+    }
+    assert len({entry["sheet_id"] for entry in payload["cards"]}) == 1
+    assert len({entry["card_back_id"] for entry in payload["cards"]}) == 2
 
 
 def test_private_deck_tts_export_is_hidden_from_non_owner_but_visible_to_owner() -> None:
@@ -445,7 +493,7 @@ def test_deck_tts_export_returns_retryable_pending_sheet_response(monkeypatch) -
 
 def test_deck_tts_export_requires_a_current_card_back() -> None:
     TtsCardSheet.objects.all().delete()
-    CardBack.objects.filter(is_current=True).update(is_current=False)
+    CardBackPoolDefault.objects.all().delete()
     owner = _create_user("tts-export-no-back-owner", "password")
     hero = _create_card(name="TTS Export No Back Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
@@ -465,9 +513,8 @@ def test_deck_tts_export_requires_a_current_card_back() -> None:
     response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
 
     assert response.status_code == 409
-    assert response.json()["detail"] == (
-        "A usable current card back is required before exporting TTS cards."
-    )
+    assert "TTS Export No Back Hero" in response.json()["detail"]
+    assert "pool 'player' has no usable effective card back" in response.json()["detail"]
 
 
 def test_tts_export_preserves_saved_entry_order() -> None:
@@ -550,7 +597,7 @@ def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_ima
     assert response_payload["skipped_count"] == 1
     assert response_payload["sheet_count"] == 1
     payload = _decode_tts_card_export(response_payload["encoded_payload"])
-    assert payload["schema"] == "card-reader.tts-cards.v2"
+    assert payload["schema"] == "card-reader.tts-cards.v3"
     assert payload["collection"]["name"] == "Card Reader Gallery"
     assert payload["collection"]["source"]["filters"]["sort"] == "name_asc"
     assert "page" not in payload["collection"]["source"]["filters"]
@@ -563,7 +610,10 @@ def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_ima
     assert payload["cards"][0]["sheet_id"] == payload["sheets"][0]["sheet_id"]
     assert {card["slot_index"] for card in payload["cards"]} == {0, 1}
     assert payload["cards"][0]["quantity"] == 1
-    assert payload["card_back_url"].startswith("https://cards.example/api/card-images/images/")
+    assert payload["card_backs"][0]["url"].startswith("https://cards.example/api/card-images/images/")
+    assert {card["card_back_id"] for card in payload["cards"]} == {
+        payload["card_backs"][0]["card_back_id"]
+    }
     assert payload["skipped"] == [
         {
             "card_id": missing.id,
@@ -674,6 +724,7 @@ def test_content_version_tts_card_export_deduplicates_identity_and_uses_latest_a
             "sheet_id": payload["sheets"][0]["sheet_id"],
             "slot_index": 0,
             "lifecycle_status": "active",
+            "card_back_id": payload["card_backs"][0]["card_back_id"],
         }
     ]
 
@@ -736,21 +787,22 @@ def test_tts_card_export_requires_staff_and_a_current_card_back() -> None:
         == 403
     )
 
-    CardBack.objects.filter(is_current=True).update(is_current=False)
+    CardBackPoolDefault.objects.all().delete()
+    missing_back_card = _create_card(name="TTS Card Missing Back", hero=False)
+    assert missing_back_card.latest_version is not None
+    _create_card_image(missing_back_card.latest_version, content=b"missing-back")
     staff = _create_user("tts-card-no-back-staff", "password", is_staff=True)
     staff_client = Client(HTTP_HOST="cards.example")
     staff_client.force_login(staff)
     response = staff_client.post(
         "/exports/tts/cards",
-        data=request_payload,
+        data={"source": {"type": "gallery", "filters": {"q": "TTS Card Missing Back"}}},
         content_type="application/json",
     )
 
     assert response.status_code == 409
-    assert (
-        response.json()["detail"]
-        == "A usable current card back is required before exporting TTS cards."
-    )
+    assert "TTS Card Missing Back" in response.json()["detail"]
+    assert "pool 'player' has no usable effective card back" in response.json()["detail"]
 
 
 def test_tts_card_export_rejects_a_selection_without_usable_images() -> None:
@@ -782,12 +834,12 @@ def _prepare_tts_export(label: str, cards: list[Card]) -> None:
 
 
 def _create_current_card_back(label: str) -> CardBack:
-    CardBack.objects.filter(is_current=True).update(is_current=False)
+    CardBackPoolDefault.objects.all().delete()
     stored_path = build_storage_relative_path("images", f"tts-card-back-{label}.webp")
     path = settings.storage_root_dir / stored_path
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"card-back")
-    return CardBack.objects.create(
+    card_back = CardBack.objects.create(
         label=f"TTS {label}",
         original_filename=f"{label}.png",
         source_file=f"uploads/card-backs/{label}.png",
@@ -795,8 +847,11 @@ def _create_current_card_back(label: str) -> CardBack:
         width=63,
         height=88,
         checksum=f"card-back-{label}",
-        is_current=True,
     )
+    CardBackPoolDefault.objects.bulk_create(
+        [CardBackPoolDefault(card_pool=card_pool, card_back=card_back) for card_pool in CARD_POOLS]
+    )
+    return card_back
 
 
 def _create_card_image(version: CardVersion, *, content: bytes) -> CardVersionImage:

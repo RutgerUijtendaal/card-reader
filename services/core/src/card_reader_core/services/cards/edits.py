@@ -14,6 +14,7 @@ from card_reader_core.services.notifications import (
     DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
     NotificationService,
 )
+from card_reader_core.services.card_backs import select_card_back_override
 from card_reader_core.services.tts_card_sheets import TtsCardSheetService
 
 logger = logging.getLogger(__name__)
@@ -47,15 +48,21 @@ def update_latest_card_version_with_notifications(
     unlock_metadata_groups: list[str],
     actor_id: str | None = None,
 ) -> tuple[Card, CardVersion] | None:
+    resolved_updates = dict(updates)
+    if "card_back_override_id" in resolved_updates:
+        raw_card_back_id = resolved_updates.pop("card_back_override_id")
+        resolved_updates["card_back_override"] = select_card_back_override(
+            str(raw_card_back_id) if raw_card_back_id is not None else None
+        )
     updated = update_latest_card_version(
         card_id=card_id,
-        updates=updates,
+        updates=resolved_updates,
         restore_fields=restore_fields,
         restore_metadata_groups=restore_metadata_groups,
         unlock_fields=unlock_fields,
         unlock_metadata_groups=unlock_metadata_groups,
     )
-    if updated is not None and "card_pool" in updates:
+    if updated is not None and "card_pool" in resolved_updates:
         card, _version = updated
         transaction.on_commit(
             lambda: _reconcile_card_classification(

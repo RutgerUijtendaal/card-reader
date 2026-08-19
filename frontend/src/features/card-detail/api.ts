@@ -2,11 +2,11 @@ import { api } from '@/shared/api/client';
 import type { CardVersionDetail } from '@/domain/cards/types';
 import type { ParseFlagCreatePayload } from '@/domain/review/types';
 
-export const patchLatestCardVersion = async (
+export const patchLatestCardVersion = async <TCardVersion = CardVersionDetail>(
   cardId: string,
   payload: Record<string, unknown>,
-): Promise<CardVersionDetail> => {
-  const response = await api.patch<CardVersionDetail>(`/cards/${cardId}/latest-version`, payload);
+): Promise<TCardVersion> => {
+  const response = await api.patch<TCardVersion>(`/cards/${cardId}/latest-version`, payload);
   return response.data;
 };
 
@@ -17,11 +17,11 @@ export const queueCardReparse = async (cardId: string, templateId: string): Prom
   return response.data.message;
 };
 
-export const promoteCardVersion = async (
+export const promoteCardVersion = async <TCardVersion = CardVersionDetail>(
   cardId: string,
   versionId: string,
-): Promise<CardVersionDetail> => {
-  const response = await api.post<CardVersionDetail>(`/cards/${cardId}/versions/${versionId}/promote`);
+): Promise<TCardVersion> => {
+  const response = await api.post<TCardVersion>(`/cards/${cardId}/versions/${versionId}/promote`);
   return response.data;
 };
 

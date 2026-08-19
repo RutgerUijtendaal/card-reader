@@ -3,11 +3,12 @@ from __future__ import annotations
 from django.core.files.uploadedfile import UploadedFile
 from rest_framework import serializers
 
-from card_reader_core.models import CardBack
-from card_reader_core.services.card_backs import resolve_card_back_image_asset_path
+from card_reader_core.models import CARD_POOLS, CardBack
+from card_reader_core.services.card_backs import ResolvedCardBack, resolve_card_back_image_asset_path
 
 
 def card_back_payload(card_back: CardBack) -> dict[str, object]:
+    pool_defaults = list(card_back.pool_defaults.all())
     return {
         "id": card_back.id,
         "label": card_back.label,
@@ -17,7 +18,9 @@ def card_back_payload(card_back: CardBack) -> dict[str, object]:
         "width": card_back.width,
         "height": card_back.height,
         "checksum": card_back.checksum,
-        "is_current": card_back.is_current,
+        "default_for_pools": [pool for pool in CARD_POOLS if any(row.card_pool == pool for row in pool_defaults)],
+        "override_card_count": int(getattr(card_back, "override_card_count", 0)),
+        "is_usable": resolve_card_back_image_asset_path(card_back) is not None,
         "image_url": card_back_image_url(card_back),
         "created_at": card_back.created_at.isoformat(),
         "updated_at": card_back.updated_at.isoformat(),
@@ -40,6 +43,15 @@ def current_card_back_payload(card_back: CardBack | None) -> dict[str, object]:
     return {"current": None if card_back is None else public_card_back_payload(card_back)}
 
 
+def resolved_card_back_payload(resolved: ResolvedCardBack | None) -> dict[str, object] | None:
+    if resolved is None or resolved.source is None or resolved.card_back is None:
+        return None
+    return {
+        "source": resolved.source,
+        "asset": public_card_back_payload(resolved.card_back),
+    }
+
+
 def card_back_image_url(card_back: CardBack) -> str | None:
     asset_path = resolve_card_back_image_asset_path(card_back)
     return None if asset_path is None else f"/card-images/{asset_path}"
@@ -53,3 +65,7 @@ class CardBackUploadSerializer(serializers.Serializer[dict[str, object]]):
         if not value.name:
             raise serializers.ValidationError("file is required")
         return value
+
+
+class CardBackDefaultUpdateSerializer(serializers.Serializer[dict[str, object]]):
+    card_back_id = serializers.CharField(allow_blank=False, allow_null=True)

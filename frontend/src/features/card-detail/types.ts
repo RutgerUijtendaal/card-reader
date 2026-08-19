@@ -5,8 +5,10 @@ import type { CardRole } from '@/domain/cards/cardRoles';
 import type { CardFaction } from '@/domain/cards/cardFactions';
 import type { CardPool } from '@/domain/cards/cardPools';
 import type { ManaFamily } from '@/domain/cards/manaFamilies';
+import type { CardBackSelectionFields } from '@/domain/card-backs/types';
+import type { CardVersionDetail } from '@/domain/cards/types';
 
-export type CardDetail = {
+export type CardDetail = CardBackSelectionFields & {
   id: string;
   label: string;
   name: string;
@@ -18,6 +20,8 @@ export type CardDetail = {
   card_groups: CardGroupSummary[];
   deck_references: CardDeckReferenceSummary[];
 };
+
+export type CardDetailVersion = CardVersionDetail & CardBackSelectionFields;
 
 export type MetadataSearchState = Record<MetadataGroupName, string>;
 
@@ -34,6 +38,7 @@ export type EditorForm = {
   card_mana_families: ManaFamily[];
   deck_building_config: string;
   lifecycle_status: CardLifecycleStatus;
+  card_back_override_id?: string | null;
   keyword_ids: string[];
   tag_ids: string[];
   type_ids: string[];

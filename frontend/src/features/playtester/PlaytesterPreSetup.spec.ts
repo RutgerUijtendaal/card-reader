@@ -9,7 +9,7 @@ import { serializePlaytestDraft } from '@/features/playtester/playtestDraftPersi
 const {
   authState,
   fetchDeckDetailMock,
-  fetchCurrentCardBackMock,
+  fetchCardBackDefaultsMock,
   fetchMyDeckMock,
   fetchMyDeckSummariesMock,
   fetchPublicDeckSummariesMock,
@@ -18,7 +18,7 @@ const {
     authenticated: true,
   },
   fetchDeckDetailMock: vi.fn(),
-  fetchCurrentCardBackMock: vi.fn(),
+  fetchCardBackDefaultsMock: vi.fn(),
   fetchMyDeckMock: vi.fn(),
   fetchMyDeckSummariesMock: vi.fn(),
   fetchPublicDeckSummariesMock: vi.fn(),
@@ -40,7 +40,7 @@ vi.mock('@/domain/decks/api', () => ({
 }));
 
 vi.mock('@/domain/card-backs/api', () => ({
-  fetchCurrentCardBack: fetchCurrentCardBackMock,
+  fetchCardBackDefaults: fetchCardBackDefaultsMock,
 }));
 
 vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
@@ -232,7 +232,11 @@ describe('PlaytesterPage pre-setup stage', () => {
   beforeEach(() => {
     localStorage.clear();
     authState.authenticated = true;
-    fetchCurrentCardBackMock.mockResolvedValue({ current: { image_url: '/card-backs/current.webp' } });
+    fetchCardBackDefaultsMock.mockResolvedValue({
+      player: { image_url: '/card-backs/current.webp' },
+      evil: null,
+      neutral: null,
+    });
     fetchMyDeckMock.mockImplementation((deckId: string) =>
       Promise.resolve(buildDeckDetail(deckId, deckId === 'owned' ? 'Owned Tempo' : 'Public Control', deckId === 'owned' ? 'Owned Hero' : 'Public Hero', deckId === 'owned' ? 'me' : 'other')),
     );
@@ -254,7 +258,7 @@ describe('PlaytesterPage pre-setup stage', () => {
 
     expect(mounted.container.querySelector('[data-testid="playtester-pre-setup-surface"]')).not.toBeNull();
     expect(mounted.container.textContent).toContain('Opening hand');
-    expect(fetchCurrentCardBackMock).toHaveBeenCalledTimes(1);
+    expect(fetchCardBackDefaultsMock).toHaveBeenCalledTimes(1);
     expect(mounted.container.querySelectorAll<HTMLImageElement>('.playtester-hand-placeholder-card img')).toHaveLength(7);
     expect(mounted.container.querySelector<HTMLImageElement>('.playtester-hand-placeholder-card img')?.src).toContain('/card-backs/current.webp');
     expect(mounted.container.querySelector('[data-testid="playtest-hero-zone"]')?.textContent).toContain('Hero');

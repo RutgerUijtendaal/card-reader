@@ -14,6 +14,8 @@
         <PlaytestCard
           :instance="instance"
           :interactive="false"
+          :card-back-urls-by-card-id="cardBackUrlsByCardId"
+          :default-card-back-url="defaultCardBackUrl"
         />
       </div>
       <div
@@ -56,8 +58,15 @@
 <script setup lang="ts">
 import PlaytestCard from '@/features/playtester/components/PlaytestCard.vue';
 import type { PlaytestCardInstance } from '@/features/playtester/types';
+import type { CardBackUrlsByCardId } from '@/features/playtester/utils/cardBacks';
 
-defineProps<{ handInstances: PlaytestCardInstance[]; handSize: number; mulliganCount: number }>();
+defineProps<{
+  handInstances: PlaytestCardInstance[];
+  handSize: number;
+  mulliganCount: number;
+  cardBackUrlsByCardId: CardBackUrlsByCardId;
+  defaultCardBackUrl: string | null;
+}>();
 const emit = defineEmits<{
   (e: 'keep'): void;
   (e: 'mulligan'): void;

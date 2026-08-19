@@ -1,5 +1,10 @@
 import { api } from '@/shared/api/client';
-import type { CardBackCurrentResponse, CardBackRecord } from '@/domain/card-backs/types';
+import type { CardPool } from '@/domain/cards/cardPools';
+import type {
+  CardBackCurrentResponse,
+  CardBackDefaults,
+  CardBackRecord,
+} from '@/domain/card-backs/types';
 
 export const fetchCurrentCardBack = async (): Promise<CardBackCurrentResponse> => {
   const response = await api.get<CardBackCurrentResponse>('/card-backs/current');
@@ -8,6 +13,11 @@ export const fetchCurrentCardBack = async (): Promise<CardBackCurrentResponse> =
 
 export const fetchCardBacks = async (): Promise<CardBackRecord[]> => {
   const response = await api.get<CardBackRecord[]>('/admin/card-backs');
+  return response.data;
+};
+
+export const fetchCardBackDefaults = async (): Promise<CardBackDefaults> => {
+  const response = await api.get<CardBackDefaults>('/card-backs/defaults');
   return response.data;
 };
 
@@ -22,7 +32,11 @@ export const uploadCardBack = async (file: File, label: string): Promise<CardBac
   return response.data;
 };
 
-export const activateCardBack = async (cardBackId: string): Promise<CardBackRecord> => {
-  const response = await api.post<CardBackRecord>(`/admin/card-backs/${cardBackId}/activate`);
-  return response.data;
+export const setPoolCardBackDefault = async (
+  cardPool: CardPool,
+  cardBackId: string | null,
+): Promise<void> => {
+  await api.put(`/admin/card-backs/defaults/${cardPool}`, {
+    card_back_id: cardBackId,
+  });
 };

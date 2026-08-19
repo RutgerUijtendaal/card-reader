@@ -104,6 +104,9 @@
             :save-message="saveMessage"
             :save-error="saveError"
             :deck-building-config-example="deckBuildingConfigExample"
+            :card-back-assets="cardBackAssets"
+            :card-back-defaults="cardBackDefaults"
+            :card-back-control-error="cardBackControlError"
             :field-source="fieldSource"
             :metadata-source="metadataSource"
             :field-source-label="fieldSourceLabel"
@@ -139,6 +142,7 @@
             @toggle-card-mana-family="toggleCardManaFamily"
             @update-deck-building-config="updateDeckBuildingConfig"
             @update-lifecycle-status="updateLifecycleStatus"
+            @update-card-back-override="updateCardBackOverride"
           />
         </aside>
       </div>
@@ -198,6 +202,9 @@ const {
   saveMessage,
   saveError,
   deckBuildingConfigExample,
+  cardBackAssets,
+  cardBackDefaults,
+  cardBackControlError,
   form,
   selectedVersion,
   isBusy,
@@ -274,6 +281,10 @@ const updateDeckBuildingConfig = (value: string): void => {
 const updateLifecycleStatus = (value: CardLifecycleStatus): void => {
   if (value === 'deprecated' && cardIsGroupAnchor.value) return;
   form.lifecycle_status = value;
+};
+
+const updateCardBackOverride = (value: string | null): void => {
+  form.card_back_override_id = value;
 };
 
 const updateReparseTemplate = (value: string): void => {

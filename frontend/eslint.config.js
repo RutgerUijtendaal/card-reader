@@ -7,12 +7,12 @@ const frontendRoot = fileURLToPath(new URL('.', import.meta.url));
 
 export const domainDependencies = {
   'access-requests': ['session'],
-  'card-backs': [],
+  'card-backs': ['cards'],
   'card-deck-references': ['card-navigation', 'decks'],
   'card-navigation': ['cards', 'decks', 'notifications'],
   cards: ['deck-building'],
   'deck-building': [],
-  decks: ['cards', 'deck-building'],
+  decks: ['card-backs', 'cards', 'deck-building'],
   'developer-data': [],
   maintenance: [],
   notifications: ['session'],

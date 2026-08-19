@@ -51,8 +51,8 @@
             {{ topInstance?.card.name ?? 'No cards' }}
           </div>
           <img
-            v-else-if="cardBackUrl"
-            :src="cardBackUrl"
+            v-else-if="topCardBackUrl"
+            :src="topCardBackUrl"
             :alt="`${label} card back`"
             draggable="false"
           >
@@ -94,8 +94,8 @@
             {{ topInstance.card.name }}
           </div>
           <img
-            v-else-if="cardBackUrl"
-            :src="cardBackUrl"
+            v-else-if="topCardBackUrl"
+            :src="topCardBackUrl"
             :alt="`${label} top card`"
             draggable="false"
           >
@@ -122,13 +122,18 @@ import type {
   PlaytestZoneId,
 } from '@/features/playtester/types';
 import { getCardZoomOverlayStyle } from '@/features/playtester/utils/zoom';
+import {
+  resolvePlaytestCardBackUrl,
+  type CardBackUrlsByCardId,
+} from '@/features/playtester/utils/cardBacks';
 
 const props = withDefaults(defineProps<{
   zoneId: PlaytestZoneId;
   label: string;
   instances: PlaytestCardInstance[];
   face: PlaytestStackFace;
-  cardBackUrl: string | null;
+  cardBackUrlsByCardId?: CardBackUrlsByCardId;
+  defaultCardBackUrl?: string | null;
   collapsed: boolean;
   defaultAction: PlaytestStackDefaultAction;
   draggingTop: boolean;
@@ -137,6 +142,8 @@ const props = withDefaults(defineProps<{
   draggable?: boolean;
 }>(), {
   draggable: true,
+  cardBackUrlsByCardId: () => ({}),
+  defaultCardBackUrl: null,
   interactive: true,
   shuffling: false,
 });
@@ -153,6 +160,15 @@ const topInstance = computed(() =>
   props.zoneId === 'library' ? props.instances[0] : props.instances[props.instances.length - 1],
 );
 const showTopFace = computed(() => props.face === 'front' && topInstance.value?.face !== 'back');
+const topCardBackUrl = computed(() =>
+  topInstance.value
+    ? resolvePlaytestCardBackUrl(
+        topInstance.value,
+        props.cardBackUrlsByCardId,
+        props.defaultCardBackUrl,
+      )
+    : props.defaultCardBackUrl,
+);
 const middleZoomActive = ref(false);
 const middleZoomStyle = ref<Record<string, string>>({});
 const topCardRef = ref<HTMLElement | null>(null);

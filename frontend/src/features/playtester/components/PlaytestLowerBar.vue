@@ -22,7 +22,8 @@
           <PlaytestCard
             :instance="instance"
             :dragging="draggingInstanceIds.includes(instance.instanceId)"
-            :card-back-url="cardBackUrl"
+            :card-back-urls-by-card-id="cardBackUrlsByCardId"
+            :default-card-back-url="defaultCardBackUrl"
             :interactive="cardInteractive"
             @activate="(instanceId, event) => emit('activate-card', instanceId, event)"
             @pointer-card="handleCardPointer"
@@ -36,12 +37,12 @@
             v-for="index in placeholderHandSize"
             :key="`hand-placeholder-${index}`"
             class="playtester-hand-placeholder-card"
-            :class="cardBackUrl ? 'playtester-hand-placeholder-card-image' : ''"
+            :class="defaultCardBackUrl ? 'playtester-hand-placeholder-card-image' : ''"
             :style="handCardStyle(index - 1, placeholderHandSize)"
           >
             <img
-              v-if="cardBackUrl"
-              :src="cardBackUrl"
+              v-if="defaultCardBackUrl"
+              :src="defaultCardBackUrl"
               alt=""
               draggable="false"
             >
@@ -58,7 +59,8 @@
         :label="zone.label"
         :instances="zone.instances"
         :face="zone.face"
-        :card-back-url="cardBackUrl"
+        :card-back-urls-by-card-id="cardBackUrlsByCardId"
+        :default-card-back-url="defaultCardBackUrl"
         :collapsed="zone.collapsed"
         :default-action="zone.defaultAction"
         :dragging-top="draggingTopInstanceId === stackTopInstanceId(zone)"
@@ -88,6 +90,7 @@ import type {
   PlaytestStackFace,
   PlaytestZoneId,
 } from '@/features/playtester/types';
+import type { CardBackUrlsByCardId } from '@/features/playtester/utils/cardBacks';
 
 export type PlaytestLowerBarStackZone = PlaytestStackDefinition & {
   instances: PlaytestCardInstance[];
@@ -98,7 +101,8 @@ export type PlaytestLowerBarStackZone = PlaytestStackDefinition & {
 withDefaults(defineProps<{
   handInstances: PlaytestCardInstance[];
   stackZones: PlaytestLowerBarStackZone[];
-  cardBackUrl: string | null;
+  cardBackUrlsByCardId: CardBackUrlsByCardId;
+  defaultCardBackUrl: string | null;
   handTitle?: string;
   handSubtitle?: string;
   placeholderHandSize?: number;

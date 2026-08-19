@@ -21,6 +21,7 @@ from .base import TimestampedModel, uuid_str
 if TYPE_CHECKING:
     from django.db.models.manager import Manager
 
+    from .card_back import CardBack
     from .card_group import CardGroup, CardGroupMember
     from .card_version import CardVersion
     from .deck import Deck, DeckEntry, DeckSideboardEntry
@@ -191,6 +192,7 @@ _ModelT = TypeVar("_ModelT", bound=models.Model)
 
 class Card(TimestampedModel):
     if TYPE_CHECKING:
+        card_back_override_id: str | None
         anchored_groups: Manager[CardGroup]
         card_group_memberships: Manager[CardGroupMember]
         aliases: Manager[CardAlias]
@@ -228,6 +230,15 @@ class Card(TimestampedModel):
         ],
         default=ACTIVE_CARD_LIFECYCLE_STATUS,
         db_index=True,
+    )
+    card_back_override: models.ForeignKey[CardBack | None, CardBack | None] = models.ForeignKey(
+        "CardBack",
+        on_delete=models.PROTECT,
+        related_name="card_overrides",
+        db_column="card_back_override_id",
+        default=None,
+        null=True,
+        blank=True,
     )
     latest_version: models.ForeignKey[CardVersion | None, CardVersion | None] = models.ForeignKey(
         "CardVersion",

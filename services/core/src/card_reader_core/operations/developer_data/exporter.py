@@ -49,6 +49,7 @@ from .schema import (
     BundleFileRecord,
     CardAliasRecord,
     CardBackRecord,
+    CardBackPoolDefaultRecord,
     CardGroupMemberRecord,
     CardGroupRecord,
     CardImageRecord,
@@ -65,6 +66,7 @@ from .schema import (
     SymbolRecord,
     TemplateRecord,
 )
+from card_reader_core.services.card_backs import get_pool_card_back_defaults
 
 DEVELOPER_DATA_CARD_POOL = PLAYER_CARD_POOL
 DEVELOPER_DATA_EXCLUDED_POOLS = tuple(
@@ -170,7 +172,7 @@ def _resolve_selection(
         selected_card_ids = group_card_ids | {card_ids[0] for card_ids in explicit_matches.values()}
         card_queryset = card_queryset.filter(id__in=selected_card_ids)
     cards = list(
-        card_queryset.prefetch_related(
+        card_queryset.select_related("card_back_override").prefetch_related(
             "role_assignments",
             "faction_assignments",
             "mana_family_assignments",
@@ -194,6 +196,21 @@ def _build_payload(*, cards: list[Card], groups: list[CardGroup]) -> DeveloperDa
         for version in card.versions.all()
         if version.content_version is not None
     }
+    pool_defaults = get_pool_card_back_defaults()
+    referenced_card_back_ids = {
+        card_back.id for card_back in pool_defaults.values() if card_back is not None
+    }
+    referenced_card_back_ids.update(
+        card.card_back_override.id
+        for card in cards
+        if card.card_back_override is not None
+    )
+    card_backs_by_checksum: dict[str, CardBack] = {}
+    for card_back in CardBack.objects.filter(id__in=referenced_card_back_ids).order_by(
+        "checksum", "id"
+    ):
+        card_backs_by_checksum.setdefault(card_back.checksum, card_back)
+    card_backs = list(card_backs_by_checksum.values())
     return DeveloperDataPayload(
         keywords=[_catalog_record(row) for row in Keyword.objects.order_by("key")],
         tags=[_catalog_record(row) for row in Tag.objects.order_by("key")],
@@ -235,7 +252,14 @@ def _build_payload(*, cards: list[Card], groups: list[CardGroup]) -> DeveloperDa
         ],
         cards=[_card_record(card) for card in cards],
         card_groups=[_group_record(group) for group in groups],
-        current_card_back=_card_back_record(CardBack.objects.filter(is_current=True).first()),
+        card_backs=[_card_back_record(card_back) for card_back in card_backs],
+        card_back_pool_defaults=[
+            CardBackPoolDefaultRecord(
+                card_pool=card_pool,
+                card_back_checksum=_optional_card_back_checksum(pool_defaults[card_pool]),
+            )
+            for card_pool in CARD_POOLS
+        ],
     )
 
 
@@ -339,6 +363,11 @@ def _card_record(card: Card) -> CardRecord:
         card_mana_families=list(card_mana_family_keys(card)),
         deck_building_config=dict(card.deck_building_config_json),
         lifecycle_status=card.lifecycle_status,
+        card_back_override_checksum=(
+            card.card_back_override.checksum
+            if card.card_back_override is not None
+            else None
+        ),
         latest_version_number=latest_number,
         aliases=[
             CardAliasRecord(key=alias.key, label=alias.label)
@@ -416,9 +445,7 @@ def _card_reference_record(card: Card) -> CardReferenceRecord:
     )
 
 
-def _card_back_record(card_back: CardBack | None) -> CardBackRecord | None:
-    if card_back is None:
-        return None
+def _card_back_record(card_back: CardBack) -> CardBackRecord:
     return CardBackRecord(
         label=card_back.label,
         stored_path=_validate_storage_asset_path(
@@ -429,6 +456,10 @@ def _card_back_record(card_back: CardBack | None) -> CardBackRecord | None:
         height=card_back.height,
         checksum=card_back.checksum,
     )
+
+
+def _optional_card_back_checksum(card_back: CardBack | None) -> str | None:
+    return card_back.checksum if card_back is not None else None
 
 
 def _validate_coverage(
@@ -524,8 +555,16 @@ def _validate_coverage(
                 for rule in missing_rules
             )
         )
-    if payload.current_card_back is None:
-        errors.append("requires a current card back")
+    player_default = next(
+        (
+            row.card_back_checksum
+            for row in payload.card_back_pool_defaults
+            if row.card_pool == PLAYER_CARD_POOL
+        ),
+        None,
+    )
+    if player_default is None:
+        errors.append("requires a Player pool default card back")
     if errors:
         raise DeveloperDataError("Developer-data coverage failed: " + "; ".join(errors))
 
@@ -594,8 +633,7 @@ def _copy_payload_assets(payload: DeveloperDataPayload, *, staging_root: Path) -
         for image in version.images
     }
     stored_paths.update(asset for symbol in payload.symbols for asset in symbol.reference_assets)
-    if payload.current_card_back is not None:
-        stored_paths.add(payload.current_card_back.stored_path)
+    stored_paths.update(card_back.stored_path for card_back in payload.card_backs)
     for stored_path in sorted(stored_paths):
         source = _resolve_storage_asset(stored_path)
         destination = staging_root / "assets" / Path(stored_path)
@@ -657,7 +695,7 @@ def _payload_counts(payload: DeveloperDataPayload) -> dict[str, int]:
             len(version.images) for card in payload.cards for version in card.versions
         ),
         "card_groups": len(payload.card_groups),
-        "card_backs": int(payload.current_card_back is not None),
+        "card_backs": len(payload.card_backs),
     }
 
 

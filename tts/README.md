@@ -1,7 +1,7 @@
 # Tabletop Simulator importer
 
 Card Reader uses one website-to-TTS import flow for decks, sideboards, gallery selections, and content versions.
-Every export is a Base64-encoded `card-reader.tts-cards.v2` payload that references persistent Card Reader sheet
+Every export is a Base64-encoded `card-reader.tts-cards.v3` payload that references persistent Card Reader sheet
 atlases. The scripted importer creates a native TTS custom deck directly from those sheets; it does not require a
 preloaded card library or scripting regions.
 
@@ -22,9 +22,9 @@ Global: its `onLoad()` callback uses `self.createInput` and `self.createButton`.
 2. Paste the copied Base64 string into the importer object's text input.
 3. Press **Import**.
 
-The importer validates the v2 payload, reports server-skipped cards in the TTS console, and spawns the collection
-at `CONFIG.spawn_position`. Legacy `card-reader.tts-deck.v1` and `card-reader.tts-cards.v1` strings are rejected with
-an instruction to re-export them.
+The importer validates the v3 payload, reports server-skipped cards in the TTS console, and spawns the collection
+at `CONFIG.spawn_position`. Version 2 is normalized internally to its collection-wide back for retained exports.
+Legacy `card-reader.tts-deck.v1` and `card-reader.tts-cards.v1` strings are rejected with an instruction to re-export them.
 
 ## Payload contract
 
@@ -32,7 +32,7 @@ All website exports share this shape:
 
 ```json
 {
-  "schema": "card-reader.tts-cards.v2",
+  "schema": "card-reader.tts-cards.v3",
   "collection": {
     "name": "Example collection",
     "description": "Optional deck description",
@@ -40,7 +40,13 @@ All website exports share this shape:
       "type": "deck"
     }
   },
-  "card_back_url": "https://cards.example/card-images/back.webp",
+  "card_backs": [
+    {
+      "card_back_id": "back-id",
+      "image_checksum": "back-checksum",
+      "url": "https://cards.example/card-images/back.webp"
+    }
+  ],
   "sheets": [
     {
       "sheet_id": "sheet-id",
@@ -62,14 +68,17 @@ All website exports share this shape:
       "sheet_id": "sheet-id",
       "slot_index": 12,
       "image_checksum": "image-checksum",
-      "lifecycle_status": "active"
+      "lifecycle_status": "active",
+      "card_back_id": "back-id"
     }
   ],
   "skipped": []
 }
 ```
 
-`collection.description` and `cards[].role` are optional so gallery and version exports remain compatible. Deck
+`collection.description` and `cards[].role` are optional so gallery and version exports remain compatible. Every
+card references one deduplicated `card_backs` resource. Native custom-deck definitions are deduplicated by
+`(sheet_id, card_back_id)`, so cards on one face sheet may use different backs. Deck
 exports store an export-time source snapshot with the deck ID, scope, hero ID, difficulty, tags, and optional
 sideboard identity. The imported deck receives the collection name and description plus structured collection GM
 Notes. Each card receives Card Reader identity GM Notes and its optional `hero`, `mainboard`, or `sideboard` role.
@@ -81,6 +90,7 @@ quantity and role.
 An export references the persistent sheets that already contain its Cards. It does not create a compact
 export-specific atlas, so a sparse selection may reference several sheets. Sheets are partitioned by
 `card_pool` (`player`, `evil`, or `neutral`); one sheet never mixes cards from different pools.
+Card-back assignment changes do not dirty, move, or rerender these face sheets.
 
 ## Artwork refresh and caching
 

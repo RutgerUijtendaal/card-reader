@@ -50,6 +50,13 @@ def preview_card_merge(*, target_card_id: str, source_card_ids: list[str]) -> Ca
         warnings.append(
             "Mana Families differ; the target Card's Mana Families will be preserved."
         )
+    if any(
+        source.card_back_override_id != target.card_back_override_id
+        for source in sources
+    ):
+        warnings.append(
+            "Card-back overrides differ; the target Card's override will be preserved."
+        )
     source_ids = [source.id for source in sources]
     return CardMergePreview(
         target=_card_summary(target),

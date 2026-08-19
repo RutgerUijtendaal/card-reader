@@ -101,7 +101,7 @@ if TYPE_CHECKING:
         normalize_card_factions,
         normalize_card_roles,
     )
-    from .card_back import CardBack
+    from .card_back import CardBack, CardBackPoolDefault
     from .card_group import CardGroup, CardGroupMember
     from .content_version import ContentVersion
     from .card_version import CardVersion, CardVersionImage, ParseResult
@@ -224,6 +224,7 @@ _EXPORTS = {
     "ImportJobItem": ".import_job",
     "Card": ".card",
     "CardBack": ".card_back",
+    "CardBackPoolDefault": ".card_back",
     "CardAlias": ".card",
     "BLOOD_CARD_FACTION": ".card",
     "BOON_CARD_ROLE": ".card",
@@ -390,6 +391,7 @@ __all__ = [
     "ImportJobItem",
     "Card",
     "CardBack",
+    "CardBackPoolDefault",
     "CardAlias",
     "CardIdentityPoolLock",
     "BLOOD_CARD_FACTION",

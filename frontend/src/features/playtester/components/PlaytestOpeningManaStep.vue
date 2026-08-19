@@ -24,6 +24,8 @@
         <PlaytestCard
           :instance="group.instances[0]"
           :interactive="false"
+          :card-back-urls-by-card-id="cardBackUrlsByCardId"
+          :default-card-back-url="defaultCardBackUrl"
         />
         <div class="playtest-opening-card-copy-actions">
           <button
@@ -76,6 +78,7 @@ import { computed } from 'vue';
 import PlaytestCard from '@/features/playtester/components/PlaytestCard.vue';
 import { STARTING_MANA_REQUIRED } from '@/features/playtester/playtestStateCore';
 import type { PlaytestCardInstance } from '@/features/playtester/types';
+import type { CardBackUrlsByCardId } from '@/features/playtester/utils/cardBacks';
 
 type CardInstanceGroup = { cardId: string; instances: PlaytestCardInstance[] };
 
@@ -83,6 +86,8 @@ const props = defineProps<{
   manaInstances: PlaytestCardInstance[];
   selectedManaIds: string[];
   hasSetupCards: boolean;
+  cardBackUrlsByCardId: CardBackUrlsByCardId;
+  defaultCardBackUrl: string | null;
 }>();
 const emit = defineEmits<{
   (e: 'continue-mana'): void;

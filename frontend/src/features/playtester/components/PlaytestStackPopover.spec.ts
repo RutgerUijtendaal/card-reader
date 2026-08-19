@@ -14,7 +14,8 @@ const mountPopover = (props: Partial<InstanceType<typeof PlaytestStackPopover>['
       open: true,
       title: 'Library',
       instances: [],
-      cardBackUrl: null,
+      cardBackUrlsByCardId: {},
+      defaultCardBackUrl: null,
       ...props,
     }),
   });

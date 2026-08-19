@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, cast
 from rest_framework import serializers
 
 from card_reader_api.cards.public_urls import card_image_asset_url
+from card_reader_api.card_backs.serializers import resolved_card_back_payload
 from card_reader_api.common.serializer_values import ValidatedStringValuesMixin
 from card_reader_core.metadata import MANA_FAMILIES
 from card_reader_core.models import (
@@ -43,12 +44,14 @@ from card_reader_core.services.decks import normalize_deck_building_config
 
 if TYPE_CHECKING:
     from card_reader_core.models import CardGroup, Deck
+    from card_reader_core.services.card_backs import ResolvedCardBack
     from card_reader_core.services.cards import CardEditState, CardMetadata
 
 MANA_FAMILY_KEYS = tuple(family.key for family in MANA_FAMILIES)
 MetadataOption = Keyword | Tag | Type
 SCALAR_FIELDS = {"name", "type_line", "mana_cost", "attack", "health", "rules_text"}
 METADATA_GROUPS = {"keywords", "tags", "types", "symbols"}
+_CARD_BACK_NOT_INCLUDED = object()
 
 
 class CardListFilterParams(CardFilterParams):
@@ -74,6 +77,7 @@ def card_payload(
     edit_state: CardEditState | None = None,
     card_groups: list[dict[str, object]] | None = None,
     deck_references: list[dict[str, object]] | None = None,
+    resolved_card_back: ResolvedCardBack | None | object = _CARD_BACK_NOT_INCLUDED,
 ) -> dict[str, object]:
     rendered_rule_text = _render_card_rule_text(version, metadata)
     payload: dict[str, object] = {
@@ -128,6 +132,11 @@ def card_payload(
         payload.update(metadata_payload(metadata))
     if edit_state is not None:
         payload.update(edit_state_payload(edit_state))
+    if resolved_card_back is not _CARD_BACK_NOT_INCLUDED:
+        payload["card_back_override_id"] = card.card_back_override_id
+        payload["effective_card_back"] = resolved_card_back_payload(
+            cast("ResolvedCardBack | None", resolved_card_back)
+        )
     return payload
 
 
@@ -543,6 +552,11 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
     )
     deck_building_config = serializers.JSONField(required=False)
     lifecycle_status = serializers.ChoiceField(choices=CARD_LIFECYCLE_STATUSES, required=False)
+    card_back_override_id = serializers.CharField(
+        required=False,
+        allow_blank=False,
+        allow_null=True,
+    )
     keyword_ids = serializers.ListField(child=serializers.CharField(), required=False)
     tag_ids = serializers.ListField(child=serializers.CharField(), required=False)
     type_ids = serializers.ListField(child=serializers.CharField(), required=False)
@@ -597,6 +611,8 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
             updates["deck_building_config"] = self.validated_data["deck_building_config"]
         if "lifecycle_status" in self.validated_data:
             updates["lifecycle_status"] = self.validated_data["lifecycle_status"]
+        if "card_back_override_id" in self.validated_data:
+            updates["card_back_override_id"] = self.validated_data["card_back_override_id"]
         for field_name in ("keyword_ids", "tag_ids", "type_ids", "symbol_ids"):
             if field_name in self.validated_data:
                 updates[field_name] = self.validated_data[field_name]

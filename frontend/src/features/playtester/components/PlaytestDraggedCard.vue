@@ -7,7 +7,8 @@
     >
       <PlaytestCard
         :instance="instance"
-        :card-back-url="cardBackUrl"
+        :card-back-urls-by-card-id="cardBackUrlsByCardId"
+        :default-card-back-url="defaultCardBackUrl"
         @activate="noop"
         @pointer-card="noopPointer"
         @context-menu="noopContext"
@@ -24,11 +25,13 @@ import type {
   PlaytestCardInstance,
   PlaytestDraggedCard,
 } from '@/features/playtester/types';
+import type { CardBackUrlsByCardId } from '@/features/playtester/utils/cardBacks';
 
 const props = defineProps<{
   drag: PlaytestDraggedCard;
   instance: PlaytestCardInstance;
-  cardBackUrl: string | null;
+  cardBackUrlsByCardId: CardBackUrlsByCardId;
+  defaultCardBackUrl: string | null;
 }>();
 
 const dragStyle = computed(() => ({

@@ -19,6 +19,7 @@ from card_reader_core.models import (
     Card,
     CardAlias,
     CardBack,
+    CardBackPoolDefault,
     CardClassificationRule,
     CardFactionAssignment,
     CardManaFamilyAssignment,
@@ -74,6 +75,12 @@ def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
 
     assert adopted == {
         "classification_rules": [],
+        "card_backs": [],
+        "card_back_pool_defaults": [
+            {"card_pool": "player", "card_back_checksum": None},
+            {"card_pool": "evil", "card_back_checksum": None},
+            {"card_pool": "neutral", "card_back_checksum": None},
+        ],
         "cards": [
             {
                 "key": "hero",
@@ -81,6 +88,7 @@ def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
                 "card_roles": ["hero"],
                 "card_factions": [],
                 "card_mana_families": [],
+                "card_back_override_checksum": None,
             },
             {
                 "key": "standard",
@@ -88,6 +96,7 @@ def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
                 "card_roles": [],
                 "card_factions": [],
                 "card_mana_families": [],
+                "card_back_override_checksum": None,
             },
         ],
     }
@@ -354,8 +363,14 @@ def test_version_four_adoption_preserves_authoritative_stored_roles() -> None:
 
     adopted = adopt_payload_for_format(payload, format_version=4)
 
-    assert adopted is payload
+    assert adopted is not payload
     assert [card["card_roles"] for card in adopted["cards"]] == [[], ["boss"]]
+    assert all(
+        card["card_back_override_checksum"] is None for card in adopted["cards"]
+    )
+    assert [
+        default["card_pool"] for default in adopted["card_back_pool_defaults"]
+    ] == ["player", "evil", "neutral"]
 
 
 def test_developer_data_coverage_rejects_missing_required_classification_rule(
@@ -503,6 +518,19 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         monkeypatch.setattr(settings, "app_data_dir", source_storage)
         selection = _build_synthetic_source(source_storage)
         selection["include_all_cards"] = True
+        source_card_back = CardBack.objects.get(label="Synthetic Card Back")
+        duplicate_card_back = CardBack.objects.create(
+            label="Duplicate Synthetic Card Back",
+            original_filename="duplicate-card-back.webp",
+            source_file="private/source/duplicate-card-back.png",
+            stored_path=source_card_back.stored_path,
+            width=source_card_back.width,
+            height=source_card_back.height,
+            checksum=source_card_back.checksum,
+        )
+        evil_default = CardBackPoolDefault.objects.get(card_pool="evil")
+        evil_default.card_back = duplicate_card_back
+        evil_default.save(update_fields=["card_back", "updated_at"])
         source_hero = Card.objects.get(key="synthetic-hero")
         assert source_hero.latest_version is not None
         source_hero.latest_version.rules_text_enriched = (
@@ -525,8 +553,18 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
 
         _, validated_payload = validate_archive(archive_path)
         mainboard_record = next(
-            card for card in validated_payload.cards if card.key == "synthetic-mainboard"
+            card
+            for card in validated_payload.cards
+            if card.key == "synthetic-mainboard"
+            and set(card.card_factions) == {"order", "blood"}
         )
+        assert mainboard_record.card_back_override_checksum == validated_payload.card_backs[0].checksum
+        assert len(validated_payload.card_backs) == 1
+        assert {row.card_pool for row in validated_payload.card_back_pool_defaults} == {
+            "player",
+            "evil",
+            "neutral",
+        }
         mainboard_record.card_roles = ["boon"]
         assert "no active mainboard cards are included" not in validate_import_readiness(
             validated_payload
@@ -625,12 +663,15 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         assert Template.objects.get(key="synthetic-template").definition_json["regions"][0][
             "parser_type"
         ] == "name"
+        imported_mainboard = Card.objects.get(
+            key="synthetic-mainboard",
+            faction_identity_key='["order","blood"]',
+        )
         assert set(
-            Card.objects.get(
-                key="synthetic-mainboard",
-                faction_identity_key='["order","blood"]',
-            ).faction_assignments.values_list("faction", flat=True)
+            imported_mainboard.faction_assignments.values_list("faction", flat=True)
         ) == {"order", "blood"}
+        assert imported_mainboard.card_back_override is not None
+        assert imported_mainboard.card_back_override.checksum == validated_payload.card_backs[0].checksum
         assert Card.objects.filter(key="synthetic-mainboard").count() == 2
         imported_group = CardGroup.objects.get(key="synthetic-group")
         assert (
@@ -1129,9 +1170,32 @@ def _build_archive_with_format_version(
     extraction_root.mkdir()
     with tarfile.open(source, "r:gz") as archive:
         archive.extractall(extraction_root, filter="data")
+    data_path = extraction_root / "data.json"
+    payload = json.loads(data_path.read_text(encoding="utf-8"))
+    player_default = next(
+        default
+        for default in payload.pop("card_back_pool_defaults")
+        if default["card_pool"] == "player"
+    )
+    player_default_checksum = player_default["card_back_checksum"]
+    payload["current_card_back"] = next(
+        (
+            card_back
+            for card_back in payload.pop("card_backs")
+            if card_back["checksum"] == player_default_checksum
+        ),
+        None,
+    )
+    for card in payload["cards"]:
+        card.pop("card_back_override_checksum", None)
+    serialized = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
+    data_path.write_bytes(serialized)
     manifest_path = extraction_root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["format_version"] = format_version
+    data_entry = next(entry for entry in manifest["files"] if entry["path"] == "data.json")
+    data_entry["sha256"] = hashlib.sha256(serialized).hexdigest()
+    data_entry["size_bytes"] = len(serialized)
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -1431,7 +1495,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
     CardGroupMember.objects.create(group=group, card=hero, position=1)
     CardGroupMember.objects.create(group=group, card=mainboard, position=2)
     card_back_content = assets["images/card-back.webp"]
-    CardBack.objects.create(
+    card_back = CardBack.objects.create(
         label="Synthetic Card Back",
         original_filename="card-back.webp",
         source_file="private/source/card-back.png",
@@ -1439,8 +1503,15 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         width=744,
         height=1039,
         checksum=hashlib.sha256(card_back_content).hexdigest(),
-        is_current=True,
     )
+    CardBackPoolDefault.objects.bulk_create(
+        [
+            CardBackPoolDefault(card_pool=card_pool, card_back=card_back)
+            for card_pool in ("player", "evil", "neutral")
+        ]
+    )
+    mainboard.card_back_override = card_back
+    mainboard.save(update_fields=["card_back_override", "updated_at"])
     return {
         "bundle_version": "synthetic-v1",
         "card_keys": [hero.key, deprecated.key],
@@ -1542,6 +1613,7 @@ def _clear_domain_data() -> None:
     ImportJob.objects.all().delete()
     CardGroup.objects.all().delete()
     Card.objects.all().delete()
+    CardBackPoolDefault.objects.all().delete()
     CardBack.objects.all().delete()
     MetadataSuggestion.objects.all().delete()
     CardClassificationRule.objects.all().delete()

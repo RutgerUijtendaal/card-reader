@@ -20,8 +20,8 @@ from card_reader_core.repositories.content_versions import get_content_version
 from card_reader_core.repositories.decks import get_deck_export_snapshot
 from card_reader_core.repositories.tts_card_sheets import resolve_tts_card_image_path
 from card_reader_core.services.card_backs import (
-    CardBackService,
     resolve_card_back_image_asset_path,
+    resolve_effective_card_backs,
 )
 from card_reader_core.services.tts_card_sheets import (
     TtsCardSheetPreparationError,
@@ -41,6 +41,14 @@ class TtsCardExportCard:
     slot_index: int
     lifecycle_status: str
     role: str | None
+    card_back_id: str
+
+
+@dataclass(frozen=True)
+class TtsCardExportCardBack:
+    card_back_id: str
+    image_checksum: str
+    asset_path: str
 
 
 @dataclass(frozen=True)
@@ -68,7 +76,7 @@ class TtsCardExportData:
     collection_name: str
     collection_description: str | None
     source_metadata: dict[str, object]
-    card_back_asset_path: str
+    card_backs: list[TtsCardExportCardBack]
     cards: list[TtsCardExportCard]
     sheets: list[TtsCardExportSheet]
     skipped: list[TtsCardExportSkippedCard]
@@ -259,16 +267,6 @@ class TtsCardExportService:
         ):
             raise _deck_source_unavailable()
 
-        card_back = CardBackService().get_current()
-        card_back_asset_path = (
-            resolve_card_back_image_asset_path(card_back) if card_back is not None else None
-        )
-        if card_back_asset_path is None:
-            raise TtsCardExportError(
-                TtsCardExportErrorCode.CARD_BACK_UNAVAILABLE,
-                "A usable current card back is required before exporting TTS cards.",
-            )
-
         usable_entries: list[tuple[_ResolvedTtsCardSelectionEntry, CardVersionImage]] = []
         skipped = list(selection.skipped)
         for entry in selection.entries:
@@ -296,6 +294,31 @@ class TtsCardExportService:
             )
 
         card_ids = [entry.row.version.card.id for entry, _image in usable_entries]
+        resolved_card_backs = resolve_effective_card_backs(card_ids)
+        card_back_resources: dict[str, TtsCardExportCardBack] = {}
+        card_back_ids_by_card_id: dict[str, str] = {}
+        for entry, _image in usable_entries:
+            card = entry.row.version.card
+            resolved = resolved_card_backs.get(card.id)
+            card_back = resolved.card_back if resolved is not None else None
+            asset_path = (
+                resolve_card_back_image_asset_path(card_back)
+                if card_back is not None
+                else None
+            )
+            if card_back is None or asset_path is None:
+                raise TtsCardExportError(
+                    TtsCardExportErrorCode.CARD_BACK_UNAVAILABLE,
+                    f"Card '{entry.row.version.name}' ({card.id}) in pool "
+                    f"'{card.card_pool}' has no usable effective card back.",
+                )
+            card_back_resources[card_back.id] = TtsCardExportCardBack(
+                card_back_id=card_back.id,
+                image_checksum=card_back.checksum,
+                asset_path=asset_path,
+            )
+            card_back_ids_by_card_id[card.id] = card_back.id
+
         try:
             assignments = TtsCardSheetService().prepare_cards(card_ids)
         except TtsCardSheetPreparationError as exc:
@@ -335,6 +358,7 @@ class TtsCardExportService:
                     slot_index=assignment.slot_index,
                     lifecycle_status=row.version.card.lifecycle_status,
                     role=entry.role,
+                    card_back_id=card_back_ids_by_card_id[row.version.card.id],
                 )
             )
 
@@ -368,7 +392,7 @@ class TtsCardExportService:
             collection_name=selection.collection_name,
             collection_description=selection.collection_description,
             source_metadata=selection.source_metadata,
-            card_back_asset_path=card_back_asset_path,
+            card_backs=list(card_back_resources.values()),
             cards=cards,
             sheets=sheets,
             skipped=skipped,

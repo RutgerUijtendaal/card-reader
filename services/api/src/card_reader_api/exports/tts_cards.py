@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from card_reader_core.services.exports import TtsCardExportData
 
-TTS_CARD_EXPORT_SCHEMA = "card-reader.tts-cards.v2"
+TTS_CARD_EXPORT_SCHEMA = "card-reader.tts-cards.v3"
 
 
 @dataclass(frozen=True)
@@ -48,7 +48,14 @@ def build_tts_card_export_payload(
     return {
         "schema": TTS_CARD_EXPORT_SCHEMA,
         "collection": collection,
-        "card_back_url": absolute_url(f"/card-images/{export.card_back_asset_path}"),
+        "card_backs": [
+            {
+                "card_back_id": card_back.card_back_id,
+                "image_checksum": card_back.image_checksum,
+                "url": absolute_url(f"/card-images/{card_back.asset_path}"),
+            }
+            for card_back in export.card_backs
+        ],
         "sheets": [
             {
                 "sheet_id": sheet.sheet_id,
@@ -74,6 +81,7 @@ def build_tts_card_export_payload(
                     "slot_index": card.slot_index,
                     "image_checksum": card.image_checksum,
                     "lifecycle_status": card.lifecycle_status,
+                    "card_back_id": card.card_back_id,
                 },
                 card.role,
             )

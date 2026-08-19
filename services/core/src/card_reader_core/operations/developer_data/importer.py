@@ -45,6 +45,7 @@ from card_reader_core.services.classification_rules import (
     ensure_default_mana_family_classification_rules,
 )
 from card_reader_core.services.templates import apply_bundled_template_compatibility
+from card_reader_core.services.card_backs import select_card_back_override, set_pool_default
 from card_reader_core.metadata import MANA_FAMILY_BY_KEY
 from card_reader_core.storage import calculate_checksum
 
@@ -236,8 +237,16 @@ def validate_import_readiness(payload: DeveloperDataPayload) -> list[str]:
         for card in payload.cards
     ):
         issues.append("no active mainboard cards are included")
-    if payload.current_card_back is None:
-        issues.append("current card back is missing")
+    player_default = next(
+        (
+            row.card_back_checksum
+            for row in payload.card_back_pool_defaults
+            if row.card_pool == "player"
+        ),
+        None,
+    )
+    if player_default is None:
+        issues.append("Player pool default card back is missing")
     return issues
 
 
@@ -389,6 +398,25 @@ def _import_payload(
     *,
     source_format_version: int,
 ) -> None:
+    card_backs_by_checksum: dict[str, CardBack] = {}
+    for card_back_record in payload.card_backs:
+        card_back = CardBack.objects.create(
+            label=card_back_record.label,
+            original_filename=Path(card_back_record.stored_path).name,
+            source_file=card_back_record.stored_path,
+            stored_path=card_back_record.stored_path,
+            width=card_back_record.width,
+            height=card_back_record.height,
+            checksum=card_back_record.checksum,
+        )
+        card_backs_by_checksum[card_back.checksum] = card_back
+    for default_record in payload.card_back_pool_defaults:
+        if default_record.card_back_checksum is not None:
+            set_pool_default(
+                default_record.card_pool,
+                card_backs_by_checksum[default_record.card_back_checksum].id,
+            )
+
     keywords = _create_catalog_rows(Keyword, payload.keywords)
     tags = _create_catalog_rows(Tag, payload.tags)
     types = _create_catalog_rows(Type, payload.types)
@@ -483,6 +511,11 @@ def _import_payload(
             faction_identity_key=card_faction_identity_key(row.card_factions),
             deck_building_config_json=row.deck_building_config,
             lifecycle_status=row.lifecycle_status,
+            card_back_override=select_card_back_override(
+                card_backs_by_checksum[row.card_back_override_checksum].id
+                if row.card_back_override_checksum is not None
+                else None
+            ),
         )
         for row in payload.cards
     }
@@ -602,20 +635,6 @@ def _import_payload(
                 for member in group_record.members
             ]
         )
-    if payload.current_card_back is not None:
-        card_back_record = payload.current_card_back
-        CardBack.objects.create(
-            label=card_back_record.label,
-            original_filename=Path(card_back_record.stored_path).name,
-            source_file=card_back_record.stored_path,
-            stored_path=card_back_record.stored_path,
-            width=card_back_record.width,
-            height=card_back_record.height,
-            checksum=card_back_record.checksum,
-            is_current=True,
-        )
-
-
 def _create_catalog_rows(model: Any, rows: list[Any]) -> dict[str, Any]:
     catalog: dict[str, Any] = {}
     for row in rows:
@@ -648,6 +667,22 @@ def _validate_payload_references(payload: DeveloperDataPayload) -> None:
     template_keys = {row.key for row in payload.templates}
     content_versions = {row.version_number for row in payload.content_versions}
     rule_identities: set[tuple[str, str, str, str, str]] = set()
+    card_back_checksums = {card_back.checksum for card_back in payload.card_backs}
+    if len(card_back_checksums) != len(payload.card_backs):
+        issues.append("card-back checksums are not unique")
+    default_pools = [row.card_pool for row in payload.card_back_pool_defaults]
+    if len(default_pools) != len(set(default_pools)):
+        issues.append("card-back pool defaults are not unique")
+    if set(default_pools) != {"player", "evil", "neutral"}:
+        issues.append("card-back pool defaults must include player, evil, and neutral")
+    for default in payload.card_back_pool_defaults:
+        if (
+            default.card_back_checksum is not None
+            and default.card_back_checksum not in card_back_checksums
+        ):
+            issues.append(
+                f"{default.card_pool} default references an unknown card back"
+            )
     for rule in payload.classification_rules:
         identity = (
             rule.card_pool,
@@ -688,6 +723,11 @@ def _validate_payload_references(payload: DeveloperDataPayload) -> None:
         for asset_path in symbol.reference_assets:
             _symbol_reference_asset_path(asset_path)
     for card in payload.cards:
+        if (
+            card.card_back_override_checksum is not None
+            and card.card_back_override_checksum not in card_back_checksums
+        ):
+            issues.append(f"card {card.key} references an unknown card back override")
         version_numbers = {version.version_number for version in card.versions}
         latest_markers = [
             version.version_number for version in card.versions if version.is_latest
@@ -783,8 +823,7 @@ def _validate_payload_assets(
         for version in card.versions
         for image in version.images
     }
-    if payload.current_card_back is not None:
-        image_assets.add(payload.current_card_back.stored_path)
+    image_assets.update(card_back.stored_path for card_back in payload.card_backs)
     symbol_assets = {asset for symbol in payload.symbols for asset in symbol.reference_assets}
     invalid_roots = sorted(
         path for path in image_assets if not _is_asset_under_root(path, expected_root="images")

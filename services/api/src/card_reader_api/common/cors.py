@@ -20,7 +20,7 @@ class SimpleCorsMiddleware:
             response["Access-Control-Allow-Origin"] = origin
 
         response["Vary"] = "Origin"
-        response["Access-Control-Allow-Methods"] = "GET,POST,PATCH,DELETE,OPTIONS"
+        response["Access-Control-Allow-Methods"] = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
         response["Access-Control-Allow-Headers"] = "Content-Type,Authorization,X-CSRFToken,Idempotency-Key"
         response["Access-Control-Allow-Credentials"] = "true"
         return response

@@ -145,7 +145,7 @@
   <text class="field" x="1070" y="871">card_pool (Player / Evil / Neutral)</text>
   <text class="field" x="1070" y="902">faction_identity_key</text>
   <text class="field" x="1070" y="929">mana_family_sort_key</text>
-  <text class="small" x="1070" y="954">lifecycle + deck config • latest_version</text>
+  <text class="small" x="1070" y="954">lifecycle + deck config • latest_version • back override</text>
   <rect class="box card" x="850" y="1050" width="125" height="110"/>
   <text class="model-name" x="913" y="1078"><tspan x="913">CardRole</tspan><tspan x="913" dy="13">Assignment</tspan></text>
   <text class="small" x="913" y="1122">role key</text>
@@ -194,9 +194,12 @@
   <text class="field" x="1710" y="1307">pool + role/faction/mana target</text>
   <text class="field" x="1710" y="1334">exactly one Tag, Type, or Symbol source</text>
   <text class="small" x="1710" y="1353">enabled • protected source</text>
+  <rect class="box version" x="1420" y="1430" width="270" height="90"/>
+  <text class="title-tight" x="1555" y="1462">CardBackPoolDefault</text>
+  <text class="small" x="1555" y="1492">card_pool PK • protected back</text>
   <rect class="box version" x="1730" y="1430" width="270" height="90"/>
   <text class="title" x="1865" y="1468">CardBack</text>
-  <text class="field" x="1865" y="1497">global back history</text>
+  <text class="field" x="1865" y="1497">immutable global asset</text>
 
   <!-- Metadata entities -->
   <rect class="box meta" x="2120" y="610" width="390" height="90"/>
@@ -352,6 +355,10 @@
   <text class="label" x="1215" y="755" text-anchor="end">versions</text>
   <path class="soft" d="M1420 750 L1360 750 L1360 945 L1290 945"/>
   <text class="label" x="1380" y="930" transform="rotate(-90 1380 930)">latest_version</text>
+  <path class="line" d="M1690 1475 L1730 1475"/>
+  <text class="label" x="1698" y="1458" text-anchor="end">pool default</text>
+  <path class="soft" d="M1290 960 L1325 960 L1325 1720 L1865 1720 L1865 1520"/>
+  <text class="label" x="1450" y="1710">card_back_override</text>
 
   <!-- Version/review relationships -->
   <path class="line" d="M1540 820 L1540 870 L1555 870 L1555 900"/>

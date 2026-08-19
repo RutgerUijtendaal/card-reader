@@ -72,6 +72,8 @@
         :mana-instances="manaInstances"
         :selected-mana-ids="selectedManaIds"
         :has-setup-cards="hasSetupCards"
+        :card-back-urls-by-card-id="cardBackUrlsByCardId"
+        :default-card-back-url="defaultCardBackUrl"
         @continue-mana="emit('continue-mana')"
         @draw-hand="emit('draw-hand')"
         @toggle-mana="forwardManaToggle"
@@ -82,6 +84,8 @@
         :library-instances="libraryInstances"
         :handled-setup-card-ids="handledSetupCardIds"
         :dragging-instance-ids="draggingInstanceIds"
+        :card-back-urls-by-card-id="cardBackUrlsByCardId"
+        :default-card-back-url="defaultCardBackUrl"
         @continue-setup="emit('continue-setup')"
         @toggle-setup-handled="forwardSetupHandled"
         @move-setup-card="forwardSetupMove"
@@ -94,6 +98,8 @@
         :hand-instances="handInstances"
         :hand-size="handSize"
         :mulligan-count="mulliganCount"
+        :card-back-urls-by-card-id="cardBackUrlsByCardId"
+        :default-card-back-url="defaultCardBackUrl"
         @keep="emit('keep')"
         @mulligan="emit('mulligan')"
         @update-hand-size="emit('update-hand-size', $event)"
@@ -123,6 +129,8 @@
               :instance="instance"
               :dragging="draggingInstanceIds.includes(instance.instanceId)"
               :interactive="isBottomInstanceDraggable(instance)"
+              :card-back-urls-by-card-id="cardBackUrlsByCardId"
+              :default-card-back-url="defaultCardBackUrl"
               @pointer-card="handleCardPointer"
               @context-menu="handleCardContextMenu"
               @hover="emit('hover', $event)"
@@ -161,6 +169,7 @@ import type {
   PlaytestOpeningStep,
   PlaytestZoneId,
 } from '@/features/playtester/types';
+import type { CardBackUrlsByCardId } from '@/features/playtester/utils/cardBacks';
 
 const props = defineProps<{
   openingStep: PlaytestOpeningStep;
@@ -174,6 +183,8 @@ const props = defineProps<{
   handledSetupCardIds: string[];
   handSize: number;
   mulliganCount: number;
+  cardBackUrlsByCardId: CardBackUrlsByCardId;
+  defaultCardBackUrl: string | null;
   draggingInstanceIds: string[];
 }>();
 

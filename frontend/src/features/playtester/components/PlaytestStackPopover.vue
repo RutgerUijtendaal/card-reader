@@ -9,7 +9,8 @@
       :title="title"
       subtitle="Inspect this stack by card identity."
       :instances="instances"
-      :card-back-url="cardBackUrl"
+      :card-back-urls-by-card-id="cardBackUrlsByCardId"
+      :default-card-back-url="defaultCardBackUrl"
       :card-interactive="cardInteractive"
       :dragging-instance-ids="draggingInstanceIds"
       :drop-zone-id="dropZoneId"
@@ -33,12 +34,14 @@ import type {
   PlaytestHoverTarget,
   PlaytestZoneId,
 } from '@/features/playtester/types';
+import type { CardBackUrlsByCardId } from '@/features/playtester/utils/cardBacks';
 
 const props = withDefaults(defineProps<{
   open: boolean;
   title: string;
   instances: PlaytestCardInstance[];
-  cardBackUrl: string | null;
+  cardBackUrlsByCardId?: CardBackUrlsByCardId;
+  defaultCardBackUrl?: string | null;
   cardInteractive?: boolean;
   draggingInstanceIds?: string[];
   dropZoneId?: PlaytestZoneId | null;
@@ -46,9 +49,11 @@ const props = withDefaults(defineProps<{
   testId?: string;
 }>(), {
   bottomOffsetPx: null,
+  cardBackUrlsByCardId: () => ({}),
   cardInteractive: true,
   draggingInstanceIds: () => [],
   dropZoneId: null,
+  defaultCardBackUrl: null,
   testId: 'playtest-stack-overlay',
 });
 

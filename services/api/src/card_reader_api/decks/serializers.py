@@ -8,6 +8,7 @@ from rest_framework import serializers
 
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload, symbol_option
+from card_reader_api.card_backs.serializers import resolved_card_back_payload
 from card_reader_api.common.serializer_values import ValidatedStringValuesMixin
 from card_reader_core.models import (
     PLAYER_CARD_POOL,
@@ -25,6 +26,7 @@ from card_reader_core.models import (
 )
 from card_reader_core.repositories.cards import get_card_image
 from card_reader_core.services.cards import CardMetadata
+from card_reader_core.services.card_backs import ResolvedCardBack, resolve_effective_card_backs
 from card_reader_core.services.decks import DeckConstraintEntry, DeckService, effective_deck_building_rules_json, normalize_deck_building_config
 from card_reader_core.services.deck_tags import DeckTagSuggestionResolution
 
@@ -110,6 +112,11 @@ def deck_payload(
         for sideboard in sideboards
         for entry in sideboard.entries.all()
     )
+    card_ids = [deck.hero_card.id, *(entry.card.id for entry in entries)]
+    card_ids.extend(
+        entry.card.id for sideboard in sideboards for entry in sideboard.entries.all()
+    )
+    resolved_card_backs = resolve_effective_card_backs(card_ids)
     return {
         "id": deck.id,
         "name": deck.name,
@@ -123,14 +130,20 @@ def deck_payload(
             "id": str(getattr(deck.owner, "pk", "")),
             "username": deck.owner.get_username(),
         },
-        "hero_card": deck_card_payload(deck.hero_card),
+        "hero_card": deck_card_payload(
+            deck.hero_card,
+            resolved_card_back=resolved_card_backs.get(deck.hero_card.id),
+        ),
         "mainboard": {
             "total_cards": totals.mainboard_total_cards,
             "unique_cards": totals.mainboard_unique_cards,
             "entries": [
                 {
                     "quantity": entry.quantity,
-                    "card": deck_card_payload(entry.card),
+                    "card": deck_card_payload(
+                        entry.card,
+                        resolved_card_back=resolved_card_backs.get(entry.card.id),
+                    ),
                 }
                 for entry in entries
             ],
@@ -144,7 +157,10 @@ def deck_payload(
                 "entries": [
                     {
                         "quantity": entry.quantity,
-                        "card": deck_card_payload(entry.card),
+                        "card": deck_card_payload(
+                            entry.card,
+                            resolved_card_back=resolved_card_backs.get(entry.card.id),
+                        ),
                     }
                     for entry in sideboard.entries.all()
                 ],
@@ -298,7 +314,11 @@ def _prefetched_card_image_asset_url(
     return card_image_asset_url(first_image, fallback_url=fallback_url)
 
 
-def deck_card_payload(card: Card) -> dict[str, object]:
+def deck_card_payload(
+    card: Card,
+    *,
+    resolved_card_back: ResolvedCardBack | None,
+) -> dict[str, object]:
     version = card.latest_version
     if version is None:
         return {
@@ -333,6 +353,8 @@ def deck_card_payload(card: Card) -> dict[str, object]:
             "tags": [],
             "symbols": [],
             "types": [],
+            "card_back_override_id": card.card_back_override_id,
+            "effective_card_back": resolved_card_back_payload(resolved_card_back),
         }
 
     image = get_card_image(version.id)
@@ -342,6 +364,7 @@ def deck_card_payload(card: Card) -> dict[str, object]:
         version,
         image_url=card_image_asset_url(image, fallback_url=f"/cards/{card.id}/image"),
         metadata=metadata,
+        resolved_card_back=resolved_card_back,
     )
 
 

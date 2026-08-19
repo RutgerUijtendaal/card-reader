@@ -34,6 +34,8 @@
             <PlaytestCard
               :instance="group.instances[0]"
               :interactive="false"
+              :card-back-urls-by-card-id="cardBackUrlsByCardId"
+              :default-card-back-url="defaultCardBackUrl"
             />
           </div>
           <div class="playtest-opening-setup-card-main">
@@ -79,6 +81,8 @@
         :instances="libraryInstances"
         :card-interactive="true"
         :dragging-instance-ids="draggingInstanceIds"
+        :card-back-urls-by-card-id="cardBackUrlsByCardId"
+        :default-card-back-url="defaultCardBackUrl"
         drop-zone-id="library"
         search-placeholder="Search library"
         test-id="playtest-opening-library-browser"
@@ -136,6 +140,7 @@ import type {
   PlaytestHoverTarget,
   PlaytestZoneId,
 } from '@/features/playtester/types';
+import type { CardBackUrlsByCardId } from '@/features/playtester/utils/cardBacks';
 
 type CardInstanceGroup = {
   cardId: string;
@@ -147,6 +152,8 @@ const props = defineProps<{
   libraryInstances: PlaytestCardInstance[];
   handledSetupCardIds: string[];
   draggingInstanceIds: string[];
+  cardBackUrlsByCardId: CardBackUrlsByCardId;
+  defaultCardBackUrl: string | null;
 }>();
 const emit = defineEmits<{
   (e: 'continue-setup'): void;
