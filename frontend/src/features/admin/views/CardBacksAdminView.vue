@@ -271,6 +271,7 @@ const settingPool = ref<CardPool | null>(null);
 const searchQuery = ref('');
 const errorMessage = ref('');
 const uploadErrorMessage = ref('');
+let loadRequestVersion = 0;
 
 const initialLoading = computed(() => loading.value && !hasLoaded.value);
 const filteredCardBacks = computed(() => {
@@ -288,15 +289,22 @@ const librarySummary = computed(() => {
 });
 
 const loadCardBackData = async (): Promise<void> => {
+  const requestVersion = ++loadRequestVersion;
   loading.value = true;
   errorMessage.value = '';
   try {
-    [cardBacks.value, defaults.value] = await Promise.all([fetchCardBacks(), fetchCardBackDefaults()]);
+    const [nextCardBacks, nextDefaults] = await Promise.all([fetchCardBacks(), fetchCardBackDefaults()]);
+    if (requestVersion !== loadRequestVersion) return;
+    cardBacks.value = nextCardBacks;
+    defaults.value = nextDefaults;
   } catch (error) {
+    if (requestVersion !== loadRequestVersion) return;
     errorMessage.value = extractErrorMessage(error, 'Card backs could not be loaded.');
   } finally {
-    loading.value = false;
-    hasLoaded.value = true;
+    if (requestVersion === loadRequestVersion) {
+      loading.value = false;
+      hasLoaded.value = true;
+    }
   }
 };
 

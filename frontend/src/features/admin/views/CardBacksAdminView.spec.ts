@@ -49,6 +49,14 @@ const flushPromises = async (): Promise<void> => {
   await Promise.resolve();
 };
 
+const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
+};
+
 const mountView = async () => {
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -218,6 +226,66 @@ describe('CardBacksAdminView', () => {
     closeButton?.click();
     await nextTick();
     expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    mounted.unmount();
+  });
+
+  test('ignores an older post-upload refresh that finishes after a newer one', async () => {
+    mockLoads([]);
+    apiPost.mockResolvedValue({ data: buildCardBack() });
+    const mounted = await mountView();
+    const firstAssets = deferred<{ data: CardBackRecord[] }>();
+    const firstDefaults = deferred<{ data: { player: CardBackRecord; evil: null; neutral: null } }>();
+    const secondAssets = deferred<{ data: CardBackRecord[] }>();
+    const secondDefaults = deferred<{ data: { player: CardBackRecord; evil: null; neutral: null } }>();
+    let assetRequestCount = 0;
+    let defaultsRequestCount = 0;
+    apiGet.mockImplementation((url: string) => {
+      if (url === '/card-backs/defaults') {
+        defaultsRequestCount += 1;
+        return defaultsRequestCount === 1 ? firstDefaults.promise : secondDefaults.promise;
+      }
+      assetRequestCount += 1;
+      return assetRequestCount === 1 ? firstAssets.promise : secondAssets.promise;
+    });
+
+    const submitUpload = async (filename: string): Promise<void> => {
+      const openButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
+        button.textContent?.includes('Add card back'),
+      );
+      if (!openButton) throw new Error('expected add card back action');
+      openButton.click();
+      await nextTick();
+      const fileInput = document.body.querySelector<HTMLInputElement>('input[type="file"]');
+      const submitButton = Array.from(document.body.querySelectorAll('button')).find((button) =>
+        button.textContent?.includes('Add to library'),
+      );
+      if (!fileInput || !submitButton) throw new Error('expected upload dialog controls');
+      Object.defineProperty(fileInput, 'files', {
+        value: [new File(['image'], filename, { type: 'image/png' })],
+        configurable: true,
+      });
+      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+      await nextTick();
+      submitButton.click();
+      await flushPromises();
+    };
+
+    await submitUpload('first.png');
+    await submitUpload('second.png');
+    const newer = buildCardBack({ id: 'newer', label: 'Newer Back' });
+    secondAssets.resolve({ data: [newer] });
+    secondDefaults.resolve({ data: { player: newer, evil: null, neutral: null } });
+    await flushPromises();
+    await nextTick();
+    expect(mounted.container.textContent).toContain('Newer Back');
+
+    const older = buildCardBack({ id: 'older', label: 'Older Back' });
+    firstAssets.resolve({ data: [older] });
+    firstDefaults.resolve({ data: { player: older, evil: null, neutral: null } });
+    await flushPromises();
+    await nextTick();
+    expect(mounted.container.textContent).toContain('Newer Back');
+    expect(mounted.container.textContent).not.toContain('Older Back');
     mounted.unmount();
   });
 
