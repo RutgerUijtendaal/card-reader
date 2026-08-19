@@ -26,7 +26,7 @@ def _restore_leaf() -> None:
 
 
 @pytest.mark.django_db(transaction=True)
-def test_current_card_back_is_adopted_for_every_pool() -> None:
+def test_current_card_back_is_adopted_for_every_pool_and_restored_on_rollback() -> None:
     apps = _migrate_to(BASE_MIGRATION)
     CardBack = apps.get_model("card_reader_core", "CardBack")
     legacy_current = CardBack.objects.create(
@@ -38,6 +38,16 @@ def test_current_card_back_is_adopted_for_every_pool() -> None:
         height=1039,
         checksum="legacy-card-back-checksum",
         is_current=True,
+    )
+    player_replacement = CardBack.objects.create(
+        label="Player replacement",
+        original_filename="replacement.png",
+        source_file="uploads/card-backs/replacement.png",
+        stored_path="images/replacement.webp",
+        width=744,
+        height=1039,
+        checksum="replacement-card-back-checksum",
+        is_current=False,
     )
 
     try:
@@ -60,5 +70,13 @@ def test_current_card_back_is_adopted_for_every_pool() -> None:
             field.name for field in migrated_apps.get_model("card_reader_core", "CardBack")._meta.fields
         }
         assert Card._meta.get_field("card_back_override").null is True
+
+        CardBackPoolDefault.objects.filter(card_pool="player").update(
+            card_back_id=player_replacement.id
+        )
+        rolled_back_apps = _migrate_to(BASE_MIGRATION)
+        LegacyCardBack = rolled_back_apps.get_model("card_reader_core", "CardBack")
+        assert LegacyCardBack.objects.get(id=player_replacement.id).is_current is True
+        assert LegacyCardBack.objects.get(id=legacy_current.id).is_current is False
     finally:
         _restore_leaf()

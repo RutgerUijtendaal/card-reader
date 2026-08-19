@@ -26,6 +26,24 @@ def adopt_current_card_back(apps: Any, schema_editor: Any) -> None:
     )
 
 
+def restore_current_card_back(apps: Any, schema_editor: Any) -> None:
+    del schema_editor
+    card_back_model = apps.get_model("card_reader_core", "CardBack")
+    pool_default_model = apps.get_model("card_reader_core", "CardBackPoolDefault")
+    selected_card_back_id = None
+    for card_pool in CARD_POOLS:
+        selected_card_back_id = (
+            pool_default_model.objects.filter(card_pool=card_pool)
+            .values_list("card_back_id", flat=True)
+            .first()
+        )
+        if selected_card_back_id is not None:
+            break
+    if selected_card_back_id is None:
+        return
+    card_back_model.objects.filter(id=selected_card_back_id).update(is_current=True)
+
+
 class Migration(migrations.Migration):
     dependencies = [("card_reader_core", "0059_backfill_card_version_rules_text")]
 
@@ -75,7 +93,7 @@ class Migration(migrations.Migration):
                 to="card_reader_core.cardback",
             ),
         ),
-        migrations.RunPython(adopt_current_card_back, migrations.RunPython.noop),
+        migrations.RunPython(adopt_current_card_back, restore_current_card_back),
         migrations.RemoveConstraint(model_name="cardback", name="ux_card_back_single_current"),
         migrations.RemoveField(model_name="cardback", name="is_current"),
     ]
