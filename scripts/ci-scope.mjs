@@ -5,6 +5,7 @@ const ALL_SCOPES = Object.freeze({
   ocr: true,
   macos_dependencies: true,
   portability: true,
+  deploy: true,
 });
 
 const PYTHON_DEPENDENCY_FILES = new Set(['.python-version', 'pyproject.toml', 'uv.lock']);
@@ -21,6 +22,16 @@ function isPythonManifest(filePath) {
 
 function isWorkflow(filePath) {
   return filePath.startsWith('.github/workflows/');
+}
+
+function isDocumentationOnly(filePath) {
+  const fileName = filePath.split('/').at(-1) ?? '';
+  return (
+    filePath === '.agents-location' ||
+    filePath.startsWith('docs/') ||
+    /\.md$/i.test(fileName) ||
+    /^licen[cs]e(?:\..+)?$/i.test(fileName)
+  );
 }
 
 function affectsOcr(filePath) {
@@ -77,6 +88,7 @@ export function detectCiScopes(
     ocr: paths.some(affectsOcr),
     macos_dependencies: paths.some(affectsMacosDependencies),
     portability: paths.some(affectsPortability),
+    deploy: paths.some((filePath) => !isDocumentationOnly(filePath)),
   };
 }
 
