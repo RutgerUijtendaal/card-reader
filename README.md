@@ -208,8 +208,11 @@ curl http://127.0.0.1:8000/health
 
 ### Production releases
 
-Successful `master` CI runs publish commit-addressed API and parser images to GHCR and package the
-frontend, Compose definition, backup scripts, and exact image digests as one release artifact.
+Successful `master` CI runs with application or deployment changes publish commit-addressed API and
+parser images to GHCR and package the frontend, Compose definition, backup scripts, and exact image
+digests as one release artifact. Documentation-only pushes still run CI but skip release publication
+and production deployment. If documentation lands while a preceding release is building, that
+release remains eligible to deploy.
 Production deployment uses:
 
 - repository variable `AUTO_DEPLOY_ENABLED=false`
@@ -217,7 +220,8 @@ Production deployment uses:
 - `production` environment secrets `DEPLOY_SSH_PRIVATE_KEY` and `DEPLOY_KNOWN_HOSTS`
 
 A manual workflow run from `master` deploys even while automatic deployment is disabled. After the
-first release is verified, setting `AUTO_DEPLOY_ENABLED=true` deploys each successful `master` push.
+first release is verified, setting `AUTO_DEPLOY_ENABLED=true` deploys each successful deployable
+`master` push.
 Runtime application secrets stay in the server-managed env file and are not stored in GitHub.
 
 Staff can monitor parser, developer-data, and TTS worker heartbeats plus recent queue activity from

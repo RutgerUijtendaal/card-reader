@@ -390,6 +390,9 @@ jobs:
       enabled: ${{ steps.gate.outputs.enabled }}
       current: ${{ steps.current_revision.outputs.current }}
     steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: Resolve production deployment gate
         id: gate
         env:
@@ -401,7 +404,7 @@ jobs:
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "Automatic production deployment is disabled."
           fi
-      - name: Confirm revision is still current master
+      - name: Confirm revision is still the latest deployable master revision
         if: steps.gate.outputs.enabled == 'true'
         id: current_revision
         env:
@@ -410,6 +413,18 @@ jobs:
           current_revision="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/master" --jq .object.sha)"
           if [[ "$current_revision" == "$GITHUB_SHA" ]]; then
             echo "current=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          intervening_scopes="$(
+            CI_EVENT_NAME=push \
+            CI_BASE_SHA="$GITHUB_SHA" \
+            CI_HEAD_SHA="$current_revision" \
+            node scripts/ci-scope.mjs
+          )"
+          if grep -qx 'deploy=false' <<< "$intervening_scopes"; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+            echo "Current master $current_revision only adds documentation; deploying $GITHUB_SHA."
           else
             echo "current=false" >> "$GITHUB_OUTPUT"
             echo "Skipping superseded revision $GITHUB_SHA; current master is $current_revision."
