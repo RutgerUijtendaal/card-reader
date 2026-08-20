@@ -416,6 +416,7 @@ jobs:
             exit 0
           fi
 
+          git fetch --no-tags --no-recurse-submodules origin "$current_revision"
           intervening_scopes="$(
             CI_EVENT_NAME=push \
             CI_BASE_SHA="$GITHUB_SHA" \
