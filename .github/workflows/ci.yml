@@ -377,6 +377,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       enabled: ${{ steps.gate.outputs.enabled }}
+      current: ${{ steps.current_revision.outputs.current }}
     steps:
       - name: Resolve production deployment gate
         id: gate
@@ -389,22 +390,8 @@ jobs:
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "Automatic production deployment is disabled."
           fi
-
-  deploy_production:
-    needs:
-      - release
-      - production_deploy_gate
-    if: needs.production_deploy_gate.outputs.enabled == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment:
-      name: production
-      url: https://maityscardgame.com
-    concurrency:
-      group: production-card-reader
-      cancel-in-progress: false
-    steps:
       - name: Confirm revision is still current master
+        if: steps.gate.outputs.enabled == 'true'
         id: current_revision
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -416,13 +403,28 @@ jobs:
             echo "current=false" >> "$GITHUB_OUTPUT"
             echo "Skipping superseded revision $GITHUB_SHA; current master is $current_revision."
           fi
+
+  deploy_production:
+    needs:
+      - release
+      - production_deploy_gate
+    if: >-
+      needs.production_deploy_gate.outputs.enabled == 'true' &&
+      needs.production_deploy_gate.outputs.current == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://maityscardgame.com
+    concurrency:
+      group: production-card-reader
+      cancel-in-progress: false
+    steps:
       - name: Download release artifact
-        if: steps.current_revision.outputs.current == 'true'
         uses: actions/download-artifact@v7
         with:
           name: card-reader-release-${{ github.sha }}
       - name: Configure deployment SSH identity
-        if: steps.current_revision.outputs.current == 'true'
         env:
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
           DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
@@ -439,7 +441,6 @@ jobs:
           ssh-keygen -y -f "$HOME/.ssh/card-reader-deploy" >/dev/null
           ssh-keygen -F "$DEPLOY_HOST" -f "$HOME/.ssh/known_hosts" >/dev/null
       - name: Upload and deploy release
-        if: steps.current_revision.outputs.current == 'true'
         env:
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
           DEPLOY_USER: ${{ vars.DEPLOY_USER }}
