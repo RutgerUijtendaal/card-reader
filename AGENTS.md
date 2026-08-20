@@ -103,6 +103,15 @@ Core stack:
   - Keep Playtester implementation details under `frontend/src/features/playtester/components`, `utils`, or `composables`; reusable deck/card business code belongs in its domain slice and domain-agnostic helpers belong in shared.
   - Keep Playtester state responsibilities separated: initialization/normalization in `playtestStateCore.ts`, board mutations in `playtestBoardState.ts`, opening setup in `playtestOpeningState.ts`, and storage migration/serialization in `playtestDraftPersistence.ts`. Import the owning file directly.
 - Django owns the domain schema through migrations in `services/core`.
+- Treat production database evolution as forward-only. Reverting application code does not reverse
+  migrations or restore database state.
+  - Do not add custom `reverse_code` or `reverse_sql` solely for symmetry. Add a reverse operation
+    only when it is lossless, straightforward, and has a concrete operator or development use case.
+  - Mark destructive or ambiguous migrations as irreversible rather than inventing a misleading
+    reverse path. Repair production mistakes with a corrective forward migration or, when data must
+    be rewound, an explicitly selected pre-deployment snapshot.
+  - Prefer backward-compatible expand/contract migrations so the previous and next application
+    releases can both operate safely during deployment and ordinary code reverts.
 - When adding, removing, or changing Django database models or relationships, update `docs/card-database-diagram.svg` when the card-related schema diagram is affected.
 - When changing documented feature behavior, workflows, permissions, API contracts, onboarding, or operations, review the relevant guides under `docs/` and update them when they are no longer accurate. Also review `docs/README.md` when documentation is added, removed, or renamed.
 - The target card classification model has four independent card-level dimensions:
