@@ -24,11 +24,12 @@ jobs:
       ocr: ${{ steps.scopes.outputs.ocr }}
       macos_dependencies: ${{ steps.scopes.outputs.macos_dependencies }}
       portability: ${{ steps.scopes.outputs.portability }}
+      deploy: ${{ steps.scopes.outputs.deploy }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: Detect heavyweight CI scopes
+      - name: Detect CI scopes
         id: scopes
         env:
           CI_EVENT_NAME: ${{ github.event_name }}
@@ -240,10 +241,15 @@ jobs:
           done
 
   publish_api:
-    needs: checks
+    needs:
+      - changes
+      - checks
     if: >-
+      needs.checks.result == 'success' &&
+      !cancelled() &&
       github.repository == 'RutgerUijtendaal/card-reader' &&
       github.ref == 'refs/heads/master' &&
+      needs.changes.outputs.deploy == 'true' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -274,10 +280,15 @@ jobs:
           cache-to: type=gha,mode=max,scope=production-api-amd64
 
   publish_parser:
-    needs: checks
+    needs:
+      - changes
+      - checks
     if: >-
+      needs.checks.result == 'success' &&
+      !cancelled() &&
       github.repository == 'RutgerUijtendaal/card-reader' &&
       github.ref == 'refs/heads/master' &&
+      needs.changes.outputs.deploy == 'true' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 45

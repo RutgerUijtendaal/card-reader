@@ -8,16 +8,19 @@ test('classifies OCR, macOS dependency, and portability paths independently', ()
     ocr: true,
     macos_dependencies: false,
     portability: false,
+    deploy: true,
   });
   assert.deepEqual(detectCiScopes(['scripts/check-native-platform.mjs']), {
     ocr: false,
     macos_dependencies: true,
     portability: true,
+    deploy: true,
   });
   assert.deepEqual(detectCiScopes(['frontend/src/App.vue']), {
     ocr: false,
     macos_dependencies: false,
     portability: false,
+    deploy: true,
   });
 });
 
@@ -26,11 +29,13 @@ test('covers shared runtime, API settings, Docker, and backup scope boundaries',
     ocr: true,
     macos_dependencies: false,
     portability: true,
+    deploy: true,
   });
   assert.deepEqual(detectCiScopes(['services/api/src/card_reader_api/project/test_settings.py']), {
     ocr: true,
     macos_dependencies: false,
     portability: false,
+    deploy: true,
   });
 
   for (const changedPath of [
@@ -43,6 +48,7 @@ test('covers shared runtime, API settings, Docker, and backup scope boundaries',
       ocr: false,
       macos_dependencies: false,
       portability: true,
+      deploy: true,
     });
   }
 });
@@ -75,8 +81,22 @@ test('shared Python and workflow changes enable every heavyweight scope', () => 
       ocr: true,
       macos_dependencies: true,
       portability: true,
+      deploy: true,
     });
   }
+});
+
+test('skips deployment only when every changed path is documentation', () => {
+  assert.deepEqual(detectCiScopes(['AGENTS.md', 'docs/operations/deployment.md']), {
+    ocr: false,
+    macos_dependencies: false,
+    portability: false,
+    deploy: false,
+  });
+  assert.equal(detectCiScopes(['frontend/README.md']).deploy, false);
+  assert.equal(detectCiScopes(['LICENSE']).deploy, false);
+  assert.equal(detectCiScopes(['docs/README.md', 'frontend/src/App.vue']).deploy, true);
+  assert.equal(detectCiScopes(['.github/workflows/ci.yml']).deploy, true);
 });
 
 test('scheduled and manual runs enable all scopes without comparing revisions', () => {
@@ -96,6 +116,7 @@ test('scheduled and manual runs enable all scopes without comparing revisions', 
       ocr: true,
       macos_dependencies: true,
       portability: true,
+      deploy: true,
     });
     assert.equal(compared, false);
   }
@@ -118,6 +139,16 @@ test('missing and unavailable comparison bases fail open', () => {
     reportError: () => {},
   });
 
-  assert.deepEqual(missingBase, { ocr: true, macos_dependencies: true, portability: true });
-  assert.deepEqual(unavailableBase, { ocr: true, macos_dependencies: true, portability: true });
+  assert.deepEqual(missingBase, {
+    ocr: true,
+    macos_dependencies: true,
+    portability: true,
+    deploy: true,
+  });
+  assert.deepEqual(unavailableBase, {
+    ocr: true,
+    macos_dependencies: true,
+    portability: true,
+    deploy: true,
+  });
 });
