@@ -13,6 +13,9 @@ env:
   UV_CACHE_DIR: ./.uv-cache
   UV_VERSION: 0.12.3
 
+permissions:
+  contents: read
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -187,6 +190,15 @@ jobs:
           docker compose config --quiet
           docker compose -f docker-compose.yml -f docker-compose.local.yml config --quiet
       - uses: docker/setup-buildx-action@v3
+      - name: Build linux/amd64 API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/api.Dockerfile
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=api-amd64
+          cache-to: type=gha,mode=max,scope=api-amd64
       - name: Build linux/amd64 parser image
         uses: docker/build-push-action@v6
         with:
@@ -226,3 +238,233 @@ jobs:
               exit 1
             fi
           done
+
+  publish_api:
+    needs: checks
+    if: >-
+      github.repository == 'RutgerUijtendaal/card-reader' &&
+      github.ref == 'refs/heads/master' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish API image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/api.Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/rutgeruijtendaal/card-reader-api:${{ github.sha }}
+          cache-from: type=gha,scope=production-api-amd64
+          cache-to: type=gha,mode=max,scope=production-api-amd64
+
+  publish_parser:
+    needs: checks
+    if: >-
+      github.repository == 'RutgerUijtendaal/card-reader' &&
+      github.ref == 'refs/heads/master' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish parser image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/parser.Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/rutgeruijtendaal/card-reader-parser:${{ github.sha }}
+          cache-from: type=gha,scope=production-parser-amd64
+          cache-to: type=gha,mode=max,scope=production-parser-amd64
+
+  release:
+    needs:
+      - publish_api
+      - publish_parser
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install Node deps
+        run: pnpm install --frozen-lockfile
+      - name: Build production frontend
+        env:
+          VITE_API_BASE_URL: /api
+        run: pnpm --filter @card-reader/web build
+      - name: Assemble immutable release archive
+        env:
+          API_IMAGE_DIGEST: ${{ needs.publish_api.outputs.digest }}
+          PARSER_IMAGE_DIGEST: ${{ needs.publish_parser.outputs.digest }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$API_IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$PARSER_IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+
+          release_dir="$(mktemp -d)"
+          archive="card-reader-${GITHUB_SHA}.tar.gz"
+          mkdir -p "$release_dir/frontend" "$release_dir/scripts"
+          cp -a frontend/dist/. "$release_dir/frontend/"
+          cp docker-compose.yml "$release_dir/docker-compose.yml"
+          install -m 0755 scripts/create-backup.sh "$release_dir/scripts/create-backup.sh"
+          install -m 0755 scripts/restore-backup.sh "$release_dir/scripts/restore-backup.sh"
+          printf '%s\n' \
+            "CARD_READER_RELEASE_REVISION=$GITHUB_SHA" \
+            "CARD_READER_API_IMAGE=ghcr.io/rutgeruijtendaal/card-reader-api@$API_IMAGE_DIGEST" \
+            "CARD_READER_PARSER_IMAGE=ghcr.io/rutgeruijtendaal/card-reader-parser@$PARSER_IMAGE_DIGEST" \
+            > "$release_dir/release.env"
+          tar -C "$release_dir" -czf "$archive" frontend docker-compose.yml scripts release.env
+
+          actual_top_level="$(tar -tzf "$archive" | sed -E 's#^\./##; /^$/d; s#/.*$##' | sort -u)"
+          expected_top_level="$(printf '%s\n' docker-compose.yml frontend release.env scripts | sort)"
+          if [[ "$actual_top_level" != "$expected_top_level" ]]; then
+            echo "Unexpected release archive contents:" >&2
+            printf '%s\n' "$actual_top_level" >&2
+            exit 1
+          fi
+          sha256sum "$archive"
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: card-reader-release-${{ github.sha }}
+          path: card-reader-${{ github.sha }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  production_deploy_gate:
+    needs: release
+    if: >-
+      github.repository == 'RutgerUijtendaal/card-reader' &&
+      github.ref == 'refs/heads/master' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      enabled: ${{ steps.gate.outputs.enabled }}
+    steps:
+      - name: Resolve production deployment gate
+        id: gate
+        env:
+          AUTO_DEPLOY_ENABLED: ${{ vars.AUTO_DEPLOY_ENABLED }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" || "$AUTO_DEPLOY_ENABLED" == "true" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Automatic production deployment is disabled."
+          fi
+
+  deploy_production:
+    needs:
+      - release
+      - production_deploy_gate
+    if: needs.production_deploy_gate.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://maityscardgame.com
+    concurrency:
+      group: production-card-reader
+      cancel-in-progress: false
+    steps:
+      - name: Confirm revision is still current master
+        id: current_revision
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          current_revision="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/master" --jq .object.sha)"
+          if [[ "$current_revision" == "$GITHUB_SHA" ]]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping superseded revision $GITHUB_SHA; current master is $current_revision."
+          fi
+      - name: Download release artifact
+        if: steps.current_revision.outputs.current == 'true'
+        uses: actions/download-artifact@v7
+        with:
+          name: card-reader-release-${{ github.sha }}
+      - name: Configure deployment SSH identity
+        if: steps.current_revision.outputs.current == 'true'
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]
+          test -n "$DEPLOY_SSH_PRIVATE_KEY"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+          install -m 0700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$HOME/.ssh/card-reader-deploy"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 0600 "$HOME/.ssh/card-reader-deploy" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/card-reader-deploy" >/dev/null
+          ssh-keygen -F "$DEPLOY_HOST" -f "$HOME/.ssh/known_hosts" >/dev/null
+      - name: Upload and deploy release
+        if: steps.current_revision.outputs.current == 'true'
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+
+          archive="card-reader-${GITHUB_SHA}.tar.gz"
+          remote_archive="/var/www/maityscardgame.com/incoming/$archive"
+          checksum="$(sha256sum "$archive" | awk '{print $1}')"
+          [[ "$checksum" =~ ^[0-9a-f]{64}$ ]]
+
+          scp \
+            -i "$HOME/.ssh/card-reader-deploy" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$archive" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${remote_archive}"
+          ssh \
+            -i "$HOME/.ssh/card-reader-deploy" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "sudo /usr/local/sbin/deploy-card-reader '$GITHUB_SHA' '$remote_archive' '$checksum'"

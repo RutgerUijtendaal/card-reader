@@ -70,7 +70,6 @@ from django.test import Client  # noqa: E402
 from django.utils import timezone  # noqa: E402
 
 from card_reader_api.imports.creation import StagedImportUpload  # noqa: E402
-from card_reader_api.seeds.users import seed_users  # noqa: E402
 
 
 def _valid_template_definition(
@@ -5196,83 +5195,6 @@ def test_targeted_reparse_rolls_back_name_conflict() -> None:
     assert version.mana_cost == "2"
     assert item.status == "queued"
     assert ParseResult.objects.filter(card_version=version).count() == original_parse_result_count
-
-
-def test_seed_users_creates_missing_configured_users(
-    tmp_path: Path,
-) -> None:
-    seed_path = tmp_path / "seed-users.json"
-    seed_path.write_text(
-        """
-        {
-          "users": [
-            {
-              "username": "seed-user",
-              "password": "seed-password",
-              "is_staff": true,
-              "is_superuser": true
-            },
-            {
-              "username": "viewer-user",
-              "password": "viewer-password",
-              "is_staff": false
-            }
-          ]
-        }
-        """,
-        encoding="utf-8",
-    )
-    get_user_model().objects.filter(username__in=["seed-user", "viewer-user"]).delete()
-
-    seed_users(seed_path)
-    seed_users(seed_path)
-
-    seed_user = get_user_model().objects.get(username="seed-user")
-    viewer_user = get_user_model().objects.get(username="viewer-user")
-    assert get_user_model().objects.filter(username__in=["seed-user", "viewer-user"]).count() == 2
-    assert seed_user.check_password("seed-password")
-    assert viewer_user.check_password("viewer-password")
-    assert seed_user.is_staff is True
-    assert seed_user.is_superuser is True
-    assert viewer_user.is_staff is False
-    assert viewer_user.is_superuser is False
-
-
-def test_seed_users_updates_existing_user_password(
-    tmp_path: Path,
-) -> None:
-    seed_path = tmp_path / "seed-users.json"
-    seed_path.write_text(
-        """
-        {
-          "users": [
-            {
-              "username": "existing-seed-user",
-              "password": "updated-seed-password",
-              "is_staff": true,
-              "is_superuser": true
-            }
-          ]
-        }
-        """,
-        encoding="utf-8",
-    )
-    get_user_model().objects.filter(username="existing-seed-user").delete()
-    existing_user = get_user_model().objects.create_user(
-        username="existing-seed-user",
-        password="old-seed-password",
-        is_staff=False,
-        is_superuser=False,
-    )
-
-    result = seed_users(seed_path)
-
-    existing_user.refresh_from_db()
-    assert result.created == 0
-    assert result.existing == 1
-    assert existing_user.check_password("updated-seed-password")
-    assert existing_user.is_staff is True
-    assert existing_user.is_superuser is True
 
 
 def test_latest_version_patch_updates_manual_fields_and_metadata() -> None:

@@ -1,12 +1,13 @@
 services:
   api:
+    image: ${CARD_READER_API_IMAGE:-card-reader-api:local}
     build:
       context: .
       dockerfile: docker/api.Dockerfile
     container_name: card-reader-api
     restart: unless-stopped
     env_file:
-      - .env
+      - ${CARD_READER_ENV_FILE:-.env}
     environment:
       CARD_READER_ENV: ${CARD_READER_ENV:-production}
       CARD_READER_API_HOST: 0.0.0.0
@@ -16,6 +17,7 @@ services:
       CARD_READER_DEVELOPER_DATA_DIR: ${CARD_READER_DEVELOPER_DATA_DIR:-/var/lib/card-reader/dev-data}
       CARD_READER_DEVELOPER_DATA_ACCEL_REDIRECT_PREFIX: "${CARD_READER_DEVELOPER_DATA_ACCEL_REDIRECT_PREFIX:-}"
       CARD_READER_DEVELOPER_DATA_PUBLIC_API_BASE_URL: ${CARD_READER_DEVELOPER_DATA_PUBLIC_API_BASE_URL:-https://maityscardgame.com/api}
+      CARD_READER_RELEASE_REVISION: ${CARD_READER_RELEASE_REVISION:-unknown}
       CARD_READER_SAVE_DEBUG_CROPS: ${CARD_READER_SAVE_DEBUG_CROPS:-false}
       CARD_READER_CORS_ORIGINS: '${CARD_READER_CORS_ORIGINS:-["http://localhost:5173"]}'
     ports:
@@ -36,6 +38,7 @@ services:
       start_period: 30s
 
   developer-data-builder:
+    image: ${CARD_READER_API_IMAGE:-card-reader-api:local}
     build:
       context: .
       dockerfile: docker/api.Dockerfile
@@ -53,7 +56,7 @@ services:
         "run_dev_data_builder",
       ]
     env_file:
-      - .env
+      - ${CARD_READER_ENV_FILE:-.env}
     environment:
       CARD_READER_ENV: ${CARD_READER_ENV:-production}
       CARD_READER_APP_DATA_DIR: /var/lib/card-reader
@@ -70,6 +73,7 @@ services:
         condition: service_healthy
 
   tts-sheet-renderer:
+    image: ${CARD_READER_API_IMAGE:-card-reader-api:local}
     build:
       context: .
       dockerfile: docker/api.Dockerfile
@@ -87,11 +91,12 @@ services:
         "run_tts_sheet_renderer",
       ]
     env_file:
-      - .env
+      - ${CARD_READER_ENV_FILE:-.env}
     environment:
       CARD_READER_ENV: ${CARD_READER_ENV:-production}
       CARD_READER_APP_DATA_DIR: /var/lib/card-reader
       CARD_READER_DATABASE_PATH: ${CARD_READER_DATABASE_PATH:-card_reader.db}
+      CARD_READER_RELEASE_REVISION: ${CARD_READER_RELEASE_REVISION:-unknown}
     volumes:
       - "${CARD_READER_APP_DATA_DIR:-/var/lib/card-reader}:/var/lib/card-reader"
       - "${CARD_READER_PUBLIC_APP_DATA_DIR:-/var/lib/card-reader/public}/images:/var/lib/card-reader/images"
@@ -101,6 +106,7 @@ services:
         condition: service_healthy
 
   parser:
+    image: ${CARD_READER_PARSER_IMAGE:-card-reader-parser:local}
     platform: ${CARD_READER_PARSER_PLATFORM:-linux/amd64}
     build:
       context: .
@@ -108,11 +114,12 @@ services:
     container_name: card-reader-parser
     restart: unless-stopped
     env_file:
-      - .env
+      - ${CARD_READER_ENV_FILE:-.env}
     environment:
       CARD_READER_ENV: ${CARD_READER_ENV:-production}
       CARD_READER_APP_DATA_DIR: /var/lib/card-reader
       CARD_READER_DATABASE_PATH: ${CARD_READER_DATABASE_PATH:-card_reader.db}
+      CARD_READER_RELEASE_REVISION: ${CARD_READER_RELEASE_REVISION:-unknown}
       CARD_READER_SAVE_DEBUG_CROPS: ${CARD_READER_SAVE_DEBUG_CROPS:-false}
       DJANGO_SETTINGS_MODULE: card_reader_core.django_settings
       PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: ${PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK:-True}

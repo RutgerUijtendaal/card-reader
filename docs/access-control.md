@@ -57,4 +57,4 @@ Requests and staff actions remain auditable. Approval does not bypass normal act
 - Prefer explicit capabilities for features that do not map cleanly to the full staff role.
 - Preserve ownership and audit history when access is revoked.
 - Re-check active status for long-lived or bearer-token workflows.
-- Keep credentials and local user seed files out of committed source.
+- Keep credentials out of committed source.
