@@ -322,6 +322,10 @@ jobs:
     needs:
       - publish_api
       - publish_parser
+    if: >-
+      !cancelled() &&
+      needs.publish_api.result == 'success' &&
+      needs.publish_parser.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -381,6 +385,8 @@ jobs:
   production_deploy_gate:
     needs: release
     if: >-
+      !cancelled() &&
+      needs.release.result == 'success' &&
       github.repository == 'RutgerUijtendaal/card-reader' &&
       github.ref == 'refs/heads/master' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
@@ -436,6 +442,9 @@ jobs:
       - release
       - production_deploy_gate
     if: >-
+      !cancelled() &&
+      needs.release.result == 'success' &&
+      needs.production_deploy_gate.result == 'success' &&
       needs.production_deploy_gate.outputs.enabled == 'true' &&
       needs.production_deploy_gate.outputs.current == 'true'
     runs-on: ubuntu-latest
