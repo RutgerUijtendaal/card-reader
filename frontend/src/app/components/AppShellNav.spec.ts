@@ -70,6 +70,11 @@ const mountNav = async (
     history: createMemoryHistory(),
     routes: [
       {
+        path: '/',
+        component: { template: '<div />' },
+        meta: { workspaceCapability: 'global' },
+      },
+      {
         path: '/cards',
         component: { template: '<div />' },
         meta: { workspaceCapability: 'gallery' },
@@ -101,6 +106,11 @@ const mountNav = async (
       },
       {
         path: '/notifications',
+        component: { template: '<div />' },
+        meta: { workspaceCapability: 'global' },
+      },
+      {
+        path: '/login',
         component: { template: '<div />' },
         meta: { workspaceCapability: 'global' },
       },
@@ -167,6 +177,7 @@ const mountNav = async (
 
 describe('AppShellNav', () => {
   afterEach(() => {
+    vi.clearAllMocks();
     authState.authenticated = true;
     unreadNotificationCount.value = 3;
     pendingAccessRequestCount.value = 0;
@@ -185,6 +196,16 @@ describe('AppShellNav', () => {
     expect(
       mounted.container.querySelector('a[href="/notifications"] .nav-badge')?.textContent,
     ).toContain('3');
+    mounted.unmount();
+  });
+
+  test('keeps Home separate from the workspace-aware Gallery link', async () => {
+    const mounted = await mountNav();
+
+    expect(mounted.container.querySelector('a[href="/"] .lucide-house')).not.toBeNull();
+    expect(mounted.container.querySelector('a[href="/cards"]')).not.toBeNull();
+    const brandLink = mounted.container.querySelector<HTMLAnchorElement>('a.flex.min-w-0');
+    expect(brandLink?.getAttribute('href')).toBe('/');
     mounted.unmount();
   });
 
@@ -313,6 +334,7 @@ describe('AppShellNav', () => {
   });
 
   test.each([
+    '/',
     '/settings?section=appearance',
     '/notifications',
     '/imports',
@@ -331,6 +353,21 @@ describe('AppShellNav', () => {
 
     expect(mounted.router.currentRoute.value.fullPath).toBe(initialPath);
     expect(mounted.workspace.activePool).toBe('evil');
+    mounted.unmount();
+  });
+
+  test('returns Home after signing out', async () => {
+    const mounted = await mountNav({}, false, '/settings');
+    const signOutButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      (button) => button.textContent?.includes('Sign out'),
+    );
+
+    signOutButton?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+
+    expect(authState.logout).toHaveBeenCalled();
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/');
     mounted.unmount();
   });
 

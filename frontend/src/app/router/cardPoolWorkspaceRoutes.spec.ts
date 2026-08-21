@@ -51,6 +51,27 @@ describe('card pool workspace routes', () => {
     },
   );
 
+  test('opens Home without redirecting and restores the saved workspace in place', async () => {
+    localStorage.setItem(CARD_POOL_WORKSPACE_PREFERENCE_KEY, 'evil');
+    setAnonymousSession();
+    const router = createAppRouter(createMemoryHistory());
+
+    await router.push('/');
+
+    expect(router.currentRoute.value.fullPath).toBe('/');
+    expect(router.currentRoute.value.meta.workspaceCapability).toBe('global');
+    expect(useCardPoolWorkspaceStore().activePool).toBe('evil');
+  });
+
+  test('returns an authenticated non-staff user Home from a staff-only route', async () => {
+    setSession();
+    const router = createAppRouter(createMemoryHistory());
+
+    await router.push('/imports');
+
+    expect(router.currentRoute.value.fullPath).toBe('/');
+  });
+
   test.each(['evil', 'neutral'] as const)(
     'allows an anonymous %s Gallery deep link',
     async (cardPool) => {
