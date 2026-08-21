@@ -28,7 +28,7 @@
 
         <RouterLink
           class="flex items-center gap-3"
-          :to="buildWorkspaceGalleryLocation(workspace.activePool)"
+          to="/"
         >
           <span class="flex h-11 w-11 items-center justify-center rounded-xl">
             <img
@@ -107,7 +107,6 @@ import {
   type HoverModeSurface,
 } from '@/domain/cards/composables/useHoverModePreferences';
 import {
-  buildWorkspaceGalleryLocation,
   useCardPoolWorkspaceStore,
 } from '@/domain/cards/cardPoolWorkspace';
 
@@ -210,7 +209,7 @@ watch(
   () => auth.canAccessStaffRoutes,
   (canAccessStaffRoutes) => {
     if (route.meta.requiresStaff && !canAccessStaffRoutes) {
-      void router.replace(buildWorkspaceGalleryLocation(workspace.activePool));
+      void router.replace('/');
     }
   },
   { flush: 'sync' },

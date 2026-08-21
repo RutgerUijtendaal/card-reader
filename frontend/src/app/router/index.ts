@@ -3,6 +3,7 @@ import type { RouteRecordRaw, RouterHistory } from 'vue-router';
 import { useAuthStore } from '@/domain/session/store';
 import LoginPage from '@/features/auth/LoginPage.vue';
 import PasswordSetupPage from '@/features/auth/PasswordSetupPage.vue';
+import HomePage from '@/features/home/HomePage.vue';
 import ImportJobsPage from '@/features/import-jobs/ImportJobsPage.vue';
 import OperationsPage from '@/features/operations/OperationsPage.vue';
 import CardGalleryPage from '@/features/card-gallery/CardGalleryPage.vue';
@@ -27,7 +28,7 @@ const APP_TITLE = "Maity's Card Game";
 const buildDocumentTitle = (pageTitle?: string): string => (pageTitle ? `${pageTitle} | ${APP_TITLE}` : APP_TITLE);
 
 export const APP_ROUTES: RouteRecordRaw[] = [
-  { path: '/', redirect: '/cards' },
+  { path: '/', component: HomePage, meta: { workspaceCapability: 'global', title: 'Home' } },
   { path: '/cards', component: CardGalleryPage, meta: { workspaceCapability: 'gallery', title: 'Gallery' } },
   { path: '/cards/:id', component: CardPublicDetailPage, props: true, meta: { workspaceCapability: 'resource', title: 'Card' } },
   { path: '/card-groups/:id', component: CardGroupDetailPage, props: true, meta: { workspaceCapability: 'resource', title: 'Card Group' } },
@@ -91,7 +92,7 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
 
     if (to.meta.requiresStaff && !auth.canAccessStaffRoutes) {
       if (auth.authenticated) {
-        return '/cards';
+        return '/';
       }
       return {
         path: '/login',

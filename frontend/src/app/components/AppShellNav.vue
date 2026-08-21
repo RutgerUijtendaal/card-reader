@@ -34,7 +34,7 @@
         v-else
         class="flex min-w-0 items-center gap-3 rounded-xl transition"
         :class="collapsed ? 'justify-center' : ''"
-        :to="galleryLocation"
+        to="/"
         @click="handleNavClick"
       >
         <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
@@ -261,6 +261,11 @@ const { pendingAccessRequestCount } = useAccessRequestSummary();
 const galleryLocation = computed(() => buildWorkspaceGalleryLocation(workspace.activePool));
 const items = computed<NavItem[]>(() => [
   {
+    label: 'Home',
+    to: '/',
+    icon: APP_SECTION_ICONS.home,
+  },
+  {
     label: 'Gallery',
     to: galleryLocation.value,
     icon: CARD_POOL_ICONS[workspace.activePool],
@@ -341,7 +346,7 @@ const signOut = async (): Promise<void> => {
   if (props.mobile) {
     emit('closeMobile');
   }
-  await router.push('/cards');
+  await router.push('/');
 };
 </script>
 
