@@ -28,6 +28,13 @@ export const buildWorkspaceGalleryLocation = (
     : '/cards';
 };
 
+export const buildWorkspaceGallerySelectionLocation = (
+  cardPool: CardPool,
+): RouteLocationRaw => ({
+  path: '/cards',
+  query: { card_pool: cardPool },
+});
+
 export const useCardPoolWorkspaceStore = defineStore('card-pool-workspace', () => {
   const preferredPool = useLocalStorage<CardPool | null>(
     CARD_POOL_WORKSPACE_PREFERENCE_KEY,

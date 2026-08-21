@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { nextTick } from 'vue';
 import {
   buildWorkspaceGalleryLocation,
+  buildWorkspaceGallerySelectionLocation,
   CARD_POOL_WORKSPACE_PREFERENCE_KEY,
   resolveCardPoolWorkspace,
   useCardPoolWorkspaceStore,
@@ -40,6 +41,17 @@ describe('card pool workspace', () => {
   test('builds a shareable gallery location without serializing the Player default', () => {
     expect(buildWorkspaceGalleryLocation('player')).toBe('/cards');
     expect(buildWorkspaceGalleryLocation('evil')).toEqual({
+      path: '/cards',
+      query: { card_pool: 'evil' },
+    });
+  });
+
+  test('keeps an explicit Player intent when selecting a Gallery workspace', () => {
+    expect(buildWorkspaceGallerySelectionLocation('player')).toEqual({
+      path: '/cards',
+      query: { card_pool: 'player' },
+    });
+    expect(buildWorkspaceGallerySelectionLocation('evil')).toEqual({
       path: '/cards',
       query: { card_pool: 'evil' },
     });

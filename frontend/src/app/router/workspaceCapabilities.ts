@@ -4,7 +4,7 @@ import type {
   RouteLocationRaw,
 } from 'vue-router';
 import type { CardPool } from '@/domain/cards/cardPools';
-import { buildWorkspaceGalleryLocation } from '@/domain/cards/cardPoolWorkspace';
+import { buildWorkspaceGallerySelectionLocation } from '@/domain/cards/cardPoolWorkspace';
 
 export type WorkspaceRouteCapability = 'global' | 'gallery' | 'resource' | 'player-only';
 
@@ -24,11 +24,6 @@ export type WorkspaceSelectionDecision =
     };
 
 type WorkspaceRoute = Pick<RouteLocationNormalizedLoaded, 'hash' | 'meta' | 'path' | 'query'>;
-
-const buildSelectionGalleryLocation = (cardPool: CardPool): RouteLocationRaw =>
-  cardPool === 'player'
-    ? { path: '/cards', query: { card_pool: 'player' } }
-    : buildWorkspaceGalleryLocation(cardPool);
 
 const buildResourceWorkspaceLocation = (
   route: WorkspaceRoute,
@@ -76,7 +71,7 @@ export const resolveWorkspaceSelectionDecision = (
     case 'gallery':
       return {
         kind: 'replace-gallery',
-        location: buildSelectionGalleryLocation(requestedPool),
+        location: buildWorkspaceGallerySelectionLocation(requestedPool),
         navigation: 'replace',
       };
     case 'resource':
@@ -91,7 +86,7 @@ export const resolveWorkspaceSelectionDecision = (
       }
       return {
         kind: 'fallback-gallery',
-        location: buildSelectionGalleryLocation(requestedPool),
+        location: buildWorkspaceGallerySelectionLocation(requestedPool),
         navigation: 'push',
       };
     default:

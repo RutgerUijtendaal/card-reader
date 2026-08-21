@@ -100,7 +100,7 @@
           <RouterLink
             v-for="collection in primaryCollections"
             :key="collection.pool"
-            :to="buildWorkspaceGalleryLocation(collection.pool)"
+            :to="buildWorkspaceGallerySelectionLocation(collection.pool)"
             class="home-collection theme-card-frame group rounded-2xl p-5 transition sm:p-6"
             :class="{ 'home-collection-active': workspace.activePool === collection.pool }"
             :data-card-pool-link="collection.pool"
@@ -145,7 +145,7 @@
         </div>
 
         <RouterLink
-          :to="buildWorkspaceGalleryLocation('neutral')"
+          :to="buildWorkspaceGallerySelectionLocation('neutral')"
           class="home-collection theme-card-frame-muted group mt-4 flex flex-col gap-4 rounded-2xl p-5 transition sm:flex-row sm:items-center"
           :class="{ 'home-collection-active': workspace.activePool === 'neutral' }"
           data-card-pool-link="neutral"
@@ -191,7 +191,7 @@ import { ArrowRight, LogIn } from 'lucide-vue-next';
 import type { RouteLocationRaw } from 'vue-router';
 import { RouterLink } from 'vue-router';
 import {
-  buildWorkspaceGalleryLocation,
+  buildWorkspaceGallerySelectionLocation,
   useCardPoolWorkspaceStore,
 } from '@/domain/cards/cardPoolWorkspace';
 import { CARD_POOL_ICONS } from '@/domain/cards/cardPoolIcons';

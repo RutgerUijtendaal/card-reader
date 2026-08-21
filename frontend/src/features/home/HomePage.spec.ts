@@ -60,7 +60,7 @@ describe('HomePage', () => {
       mounted.container
         .querySelector('[data-card-pool-link="player"]')
         ?.getAttribute('href'),
-    ).toBe('/cards');
+    ).toBe('/cards?card_pool=player');
     expect(
       mounted.container
         .querySelector('[data-card-pool-link="evil"]')
