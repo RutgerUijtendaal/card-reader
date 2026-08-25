@@ -267,25 +267,7 @@ class TtsCardExportService:
         ):
             raise _deck_source_unavailable()
 
-        usable_entries: list[tuple[_ResolvedTtsCardSelectionEntry, CardVersionImage]] = []
-        skipped = list(selection.skipped)
-        for entry in selection.entries:
-            row = entry.row
-            image = _first_usable_image(row)
-            if image is None:
-                if entry.required:
-                    raise _required_card_unavailable(row.version.name, "has no usable latest image")
-                skipped.append(
-                    TtsCardExportSkippedCard(
-                        card_id=row.version.card.id,
-                        name=row.version.name,
-                        quantity=entry.quantity,
-                        reason="Card has no usable latest image.",
-                        role=entry.role,
-                    )
-                )
-                continue
-            usable_entries.append((entry, image))
+        usable_entries, skipped = _resolve_usable_entries(selection)
 
         if not usable_entries:
             raise TtsCardExportError(
@@ -294,30 +276,10 @@ class TtsCardExportService:
             )
 
         card_ids = [entry.row.version.card.id for entry, _image in usable_entries]
-        resolved_card_backs = resolve_effective_card_backs(card_ids)
-        card_back_resources: dict[str, TtsCardExportCardBack] = {}
-        card_back_ids_by_card_id: dict[str, str] = {}
-        for entry, _image in usable_entries:
-            card = entry.row.version.card
-            resolved = resolved_card_backs.get(card.id)
-            card_back = resolved.card_back if resolved is not None else None
-            asset_path = (
-                resolve_card_back_image_asset_path(card_back)
-                if card_back is not None
-                else None
-            )
-            if card_back is None or asset_path is None:
-                raise TtsCardExportError(
-                    TtsCardExportErrorCode.CARD_BACK_UNAVAILABLE,
-                    f"Card '{entry.row.version.name}' ({card.id}) in pool "
-                    f"'{card.card_pool}' has no usable effective card back.",
-                )
-            card_back_resources[card_back.id] = TtsCardExportCardBack(
-                card_back_id=card_back.id,
-                image_checksum=card_back.checksum,
-                asset_path=asset_path,
-            )
-            card_back_ids_by_card_id[card.id] = card_back.id
+        card_back_resources, card_back_ids_by_card_id = _resolve_export_card_backs(
+            usable_entries,
+            card_ids=card_ids,
+        )
 
         try:
             assignments = TtsCardSheetService().prepare_cards(card_ids)
@@ -397,6 +359,66 @@ class TtsCardExportService:
             sheets=sheets,
             skipped=skipped,
         )
+
+
+def _resolve_usable_entries(
+    selection: _ResolvedTtsCardSelection,
+) -> tuple[
+    list[tuple[_ResolvedTtsCardSelectionEntry, CardVersionImage]],
+    list[TtsCardExportSkippedCard],
+]:
+    usable_entries: list[tuple[_ResolvedTtsCardSelectionEntry, CardVersionImage]] = []
+    skipped = list(selection.skipped)
+    for entry in selection.entries:
+        row = entry.row
+        image = _first_usable_image(row)
+        if image is not None:
+            usable_entries.append((entry, image))
+            continue
+        if entry.required:
+            raise _required_card_unavailable(row.version.name, "has no usable latest image")
+        skipped.append(
+            TtsCardExportSkippedCard(
+                card_id=row.version.card.id,
+                name=row.version.name,
+                quantity=entry.quantity,
+                reason="Card has no usable latest image.",
+                role=entry.role,
+            )
+        )
+    return usable_entries, skipped
+
+
+def _resolve_export_card_backs(
+    usable_entries: list[tuple[_ResolvedTtsCardSelectionEntry, CardVersionImage]],
+    *,
+    card_ids: list[str],
+) -> tuple[dict[str, TtsCardExportCardBack], dict[str, str]]:
+    resolved_card_backs = resolve_effective_card_backs(card_ids)
+    resources: dict[str, TtsCardExportCardBack] = {}
+    ids_by_card_id: dict[str, str] = {}
+    for entry, _image in usable_entries:
+        card = entry.row.version.card
+        resolved = resolved_card_backs.get(card.id)
+        card_back = resolved.card_back if resolved is not None else None
+        asset_path = (
+            resolve_card_back_image_asset_path(card_back)
+            if card_back is not None
+            else None
+        )
+        if card_back is None or asset_path is None:
+            raise TtsCardExportError(
+                TtsCardExportErrorCode.CARD_BACK_UNAVAILABLE,
+                f"Card '{entry.row.version.name}' ({card.id}) in pool "
+                f"'{card.card_pool}' has no usable effective card back.",
+            )
+        resources[card_back.id] = TtsCardExportCardBack(
+            card_back_id=card_back.id,
+            image_checksum=card_back.checksum,
+            asset_path=asset_path,
+        )
+        ids_by_card_id[card.id] = card_back.id
+    return resources, ids_by_card_id
 
 
 def _first_usable_image(row: CardListRow) -> CardVersionImage | None:

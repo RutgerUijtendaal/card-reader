@@ -126,23 +126,16 @@ class TemplateService:
         name_region: tuple[int, str, str] | None = None
         normalized_regions: list[dict[str, Any]] = []
         for index, region in enumerate(regions):
-            if not isinstance(region, dict):
-                raise ValueError(f"definition_json.regions[{index}] must be an object")
-
-            region_id = str(region.get("region_id", "")).strip()
-            if not region_id:
-                raise ValueError(f"definition_json.regions[{index}].region_id is required")
+            normalized_region, name_region_candidate = self._normalize_region_definition(
+                region,
+                index=index,
+            )
+            region_id = normalized_region["region_id"]
             if region_id in seen_region_ids:
                 raise ValueError(f"definition_json.regions[{index}].region_id must be unique")
             seen_region_ids.add(region_id)
 
-            parser_type = str(region.get("parser_type", "")).strip()
-            if parser_type not in SUPPORTED_TEMPLATE_PARSER_TYPES:
-                supported = ", ".join(TEMPLATE_PARSER_TYPES)
-                raise ValueError(
-                    f"definition_json.regions[{index}].parser_type must be one of: {supported}"
-                )
-            if parser_type in NAME_PRODUCING_TEMPLATE_PARSER_TYPES:
+            if name_region_candidate is not None:
                 if name_region is not None:
                     previous_index, previous_region_id, previous_parser_type = name_region
                     raise ValueError(
@@ -151,34 +144,56 @@ class TemplateService:
                         f"{previous_index} ({previous_parser_type}); only one of name or "
                         "name_mana_cost may be configured"
                     )
-                name_region = (index, region_id, parser_type)
-
-            cut_region = region.get("cut_region")
-            if not isinstance(cut_region, dict):
-                raise ValueError(f"definition_json.regions[{index}].cut_region must be an object")
-
-            ocr_config = region.get("ocr_config", {})
-            if not isinstance(ocr_config, dict):
-                raise ValueError(f"definition_json.regions[{index}].ocr_config must be an object")
-
-            mana_badge_ocr = region.get("mana_badge_ocr")
-            if mana_badge_ocr is not None:
-                self._validate_mana_badge_ocr(
-                    mana_badge_ocr,
-                    index=index,
-                    parser_type=parser_type,
-                )
-
-            normalized_region = dict(region)
-            normalized_region["region_id"] = region_id
-            normalized_region["parser_type"] = parser_type
-            normalized_region["cut_region"] = cut_region
-            normalized_region["ocr_config"] = ocr_config
+                name_region = name_region_candidate
             normalized_regions.append(normalized_region)
 
         normalized_definition = dict(definition)
         normalized_definition["regions"] = normalized_regions
         return normalized_definition
+
+    def _normalize_region_definition(
+        self,
+        region: object,
+        *,
+        index: int,
+    ) -> tuple[dict[str, Any], tuple[int, str, str] | None]:
+        field = f"definition_json.regions[{index}]"
+        if not isinstance(region, dict):
+            raise ValueError(f"{field} must be an object")
+
+        region_id = str(region.get("region_id", "")).strip()
+        if not region_id:
+            raise ValueError(f"{field}.region_id is required")
+
+        parser_type = str(region.get("parser_type", "")).strip()
+        if parser_type not in SUPPORTED_TEMPLATE_PARSER_TYPES:
+            supported = ", ".join(TEMPLATE_PARSER_TYPES)
+            raise ValueError(f"{field}.parser_type must be one of: {supported}")
+
+        cut_region = region.get("cut_region")
+        if not isinstance(cut_region, dict):
+            raise ValueError(f"{field}.cut_region must be an object")
+        ocr_config = region.get("ocr_config", {})
+        if not isinstance(ocr_config, dict):
+            raise ValueError(f"{field}.ocr_config must be an object")
+
+        mana_badge_ocr = region.get("mana_badge_ocr")
+        if mana_badge_ocr is not None:
+            self._validate_mana_badge_ocr(
+                mana_badge_ocr,
+                index=index,
+                parser_type=parser_type,
+            )
+
+        normalized_region = dict(region)
+        normalized_region["region_id"] = region_id
+        normalized_region["parser_type"] = parser_type
+        normalized_region["cut_region"] = cut_region
+        normalized_region["ocr_config"] = ocr_config
+        name_region = None
+        if parser_type in NAME_PRODUCING_TEMPLATE_PARSER_TYPES:
+            name_region = (index, region_id, parser_type)
+        return normalized_region, name_region
 
     def _validate_mana_badge_ocr(
         self,

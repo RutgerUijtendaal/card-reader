@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 
 from markdown_it import MarkdownIt
 from markdown_it.rules_inline import StateInline
+from markdown_it.token import Token
 
 
 SYMBOL_PLACEHOLDER_PATTERN = re.compile(r"\[\[symbol:([a-z0-9-]+)\]\]")
@@ -36,10 +37,10 @@ def replace_symbol_placeholder_key(
 ) -> str:
     old_placeholder = build_symbol_placeholder(old_symbol_key)
     new_placeholder = build_symbol_placeholder(new_symbol_key)
-    return _transform_markup_text(
+    return _replace_markup_text(
         markup,
         old_placeholder=old_placeholder,
-        transform=lambda _value: new_placeholder,
+        new_placeholder=new_placeholder,
     )
 
 
@@ -52,34 +53,59 @@ def render_markup_plain(
     symbols = symbol_tokens_by_key or {}
     parser = _markup_parser()
     parser.disable("image")
+    blocks = _render_plain_blocks(parser.parse(markup), symbols=symbols)
+    plain = _join_plain_blocks(blocks)
+    return _normalize_plain_text(plain, compact=compact)
+
+
+def _render_plain_blocks(
+    tokens: list[Token],
+    *,
+    symbols: Mapping[str, str],
+) -> list[tuple[str, tuple[int, int] | None]]:
     blocks: list[tuple[str, tuple[int, int] | None]] = []
-    for token in parser.parse(markup):
+    for token in tokens:
         if token.type == "inline":
-            output: list[str] = []
-            for child in token.children or []:
-                if child.type == "text":
-                    output.append(child.content)
-                elif child.type == "code_inline":
-                    output.append(child.content)
-                elif child.type == "card_reference":
-                    output.append(str(child.meta.get("label", "")))
-                elif child.type == "symbol_reference":
-                    key = str(child.meta.get("key", ""))
-                    symbol_token = symbols.get(key)
-                    output.append(
-                        symbol_token
-                        if symbol_token is not None and symbol_token.strip()
-                        else key
-                    )
-                elif child.type in {"softbreak", "hardbreak"}:
-                    output.append("\n")
-            source_map = (token.map[0], token.map[1]) if token.map is not None else None
-            blocks.append(("".join(output), source_map))
+            content = _render_inline_children(token.children or [], symbols=symbols)
+            blocks.append((content, _token_source_map(token)))
             continue
         if token.type in {"code_block", "fence"}:
-            source_map = (token.map[0], token.map[1]) if token.map is not None else None
-            blocks.append((token.content.rstrip("\n"), source_map))
+            blocks.append((token.content.rstrip("\n"), _token_source_map(token)))
+    return blocks
 
+
+def _render_inline_children(
+    children: list[Token],
+    *,
+    symbols: Mapping[str, str],
+) -> str:
+    output: list[str] = []
+    for child in children:
+        if child.type in {"text", "code_inline"}:
+            output.append(child.content)
+            continue
+        if child.type == "card_reference":
+            output.append(str(child.meta.get("label", "")))
+            continue
+        if child.type == "symbol_reference":
+            key = str(child.meta.get("key", ""))
+            symbol_token = symbols.get(key)
+            output.append(symbol_token if symbol_token and symbol_token.strip() else key)
+            continue
+        if child.type in {"softbreak", "hardbreak"}:
+            output.append("\n")
+    return "".join(output)
+
+
+def _token_source_map(token: Token) -> tuple[int, int] | None:
+    if token.map is None:
+        return None
+    return token.map[0], token.map[1]
+
+
+def _join_plain_blocks(
+    blocks: list[tuple[str, tuple[int, int] | None]],
+) -> str:
     output = []
     for index, (content, source_map) in enumerate(blocks):
         output.append(content)
@@ -92,10 +118,14 @@ def render_markup_plain(
             and next_map[0] > source_map[1]
         )
         output.append("\n\n" if has_blank_source_line else "\n")
-    plain = "".join(output)
+    return "".join(output)
+
+
+def _normalize_plain_text(plain: str, *, compact: bool) -> str:
     if compact:
         return " ".join(plain.split()).strip()
-    lines = [line.rstrip() for line in plain.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    normalized_newlines = plain.replace("\r\n", "\n").replace("\r", "\n")
+    lines = [line.rstrip() for line in normalized_newlines.split("\n")]
     normalized: list[str] = []
     previous_blank = False
     for line in lines:
@@ -141,11 +171,11 @@ def _reference_rule(state: StateInline, silent: bool) -> bool:
     return True
 
 
-def _transform_markup_text(
+def _replace_markup_text(
     markup: str,
     *,
     old_placeholder: str,
-    transform: Callable[[str], str],
+    new_placeholder: str,
 ) -> str:
     output: list[str] = []
     cursor = 0
@@ -156,7 +186,7 @@ def _transform_markup_text(
             return "".join(output)
         output.append(markup[cursor:position])
         if _position_is_symbol_reference(markup, position, old_placeholder):
-            output.append(transform(old_placeholder))
+            output.append(new_placeholder)
         else:
             output.append(old_placeholder)
         cursor = position + len(old_placeholder)

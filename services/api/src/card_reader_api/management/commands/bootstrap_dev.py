@@ -130,6 +130,23 @@ def _download_bundle(*, lock: DeveloperDataLock, code: str, stdout: Any) -> Path
     if target.is_file() and calculate_checksum(target) == lock.sha256:
         stdout.write(f"Using verified cached developer-data bundle {lock.bundle_version}.")
         return target
+    token, download_url, expected_size = _exchange_bundle_download(lock=lock, code=code)
+    stdout.write(f"Downloading developer-data bundle {lock.bundle_version}...")
+    return _download_bundle_with_retries(
+        token=token,
+        download_url=download_url,
+        expected_size=expected_size,
+        target=target,
+        temporary=temporary,
+        stdout=stdout,
+    )
+
+
+def _exchange_bundle_download(
+    *,
+    lock: DeveloperDataLock,
+    code: str,
+) -> tuple[str, str, int]:
     exchange_url = urljoin(lock.api_base_url.rstrip("/") + "/", "developer-data/grants/exchange")
     payload = json.dumps(
         {"code": code, "bundle_version": lock.bundle_version},
@@ -163,43 +180,81 @@ def _download_bundle(*, lock: DeveloperDataLock, code: str, stdout: Any) -> Path
     if expected_size <= 0:
         raise CommandError("Website returned an invalid developer-data bundle size.")
     download_url = urljoin(lock.api_base_url.rstrip("/") + "/", download_path.lstrip("/"))
-    stdout.write(f"Downloading developer-data bundle {lock.bundle_version}...")
+    return token, download_url, expected_size
+
+
+def _download_bundle_with_retries(
+    *,
+    token: str,
+    download_url: str,
+    expected_size: int,
+    target: Path,
+    temporary: Path,
+    stdout: Any,
+) -> Path:
     last_error = "download did not complete"
     for attempt in range(1, 4):
-        downloaded_size = temporary.stat().st_size if temporary.is_file() else 0
-        if downloaded_size > expected_size:
-            temporary.unlink()
-            downloaded_size = 0
-        if downloaded_size == expected_size:
-            temporary.replace(target)
+        attempt_error = _download_bundle_once(
+            token=token,
+            download_url=download_url,
+            expected_size=expected_size,
+            target=target,
+            temporary=temporary,
+        )
+        if attempt_error is None:
             return target
-        headers = {"Authorization": f"DevData {token}", "Accept": "application/gzip"}
-        if downloaded_size:
-            headers["Range"] = f"bytes={downloaded_size}-"
-        download_request = Request(download_url, headers=headers)
-        try:
-            with urlopen(download_request, timeout=120) as response:
-                is_partial = response.status == 206 and downloaded_size > 0
-                mode = "ab" if is_partial else "wb"
-                with temporary.open(mode) as handle:
-                    while chunk := response.read(1024 * 1024):
-                        handle.write(chunk)
-            if temporary.stat().st_size == expected_size:
-                temporary.replace(target)
-                return target
-            last_error = (
-                f"received {temporary.stat().st_size} of {expected_size} bytes"
-            )
-        except HTTPError as exc:
-            last_error = _http_error_detail(exc)
-        except (OSError, URLError) as exc:
-            last_error = str(exc)
+        last_error = attempt_error
         if attempt < 3:
             stdout.write(f"Download interrupted; retrying ({attempt}/3).")
     raise CommandError(
         f"Developer-data download failed after 3 attempts: {last_error}. "
         f"Partial data remains at {temporary}."
     )
+
+
+def _download_bundle_once(
+    *,
+    token: str,
+    download_url: str,
+    expected_size: int,
+    target: Path,
+    temporary: Path,
+) -> str | None:
+    downloaded_size = temporary.stat().st_size if temporary.is_file() else 0
+    if downloaded_size > expected_size:
+        temporary.unlink()
+        downloaded_size = 0
+    if downloaded_size == expected_size:
+        temporary.replace(target)
+        return None
+
+    headers = {"Authorization": f"DevData {token}", "Accept": "application/gzip"}
+    if downloaded_size:
+        headers["Range"] = f"bytes={downloaded_size}-"
+    download_request = Request(download_url, headers=headers)
+    try:
+        with urlopen(download_request, timeout=120) as response:
+            mode = "ab" if response.status == 206 and downloaded_size > 0 else "wb"
+            _write_download_response(response, temporary=temporary, mode=mode)
+    except HTTPError as exc:
+        return _http_error_detail(exc)
+    except (OSError, URLError) as exc:
+        return str(exc)
+
+    received_size = temporary.stat().st_size
+    if received_size == expected_size:
+        temporary.replace(target)
+        return None
+    return f"received {received_size} of {expected_size} bytes"
+
+
+def _write_download_response(response: Any, *, temporary: Path, mode: str) -> None:
+    with temporary.open(mode) as handle:
+        while True:
+            chunk = response.read(1024 * 1024)
+            if not chunk:
+                return
+            handle.write(chunk)
 
 
 def _verified_cached_bundle(lock: DeveloperDataLock) -> Path | None:

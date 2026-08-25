@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from PIL import Image, ImageOps
 
 from card_reader_core.config.settings import settings
-from card_reader_core.models import TtsCardSheet
+from card_reader_core.models import TtsCardSheet, TtsCardSheetSlot
 from card_reader_core.repositories.tts_card_sheets import (
     get_sheet_with_slots,
     mark_render_failed,
@@ -78,54 +78,13 @@ def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
         layout = get_tts_card_sheet_layout(sheet.layout_version)
         output_dir = settings.tts_card_sheets_dir
         output_dir.mkdir(parents=True, exist_ok=True)
-        canvas = Image.new("RGB", layout.image_size, _BACKGROUND)
-        for slot in sheet.slots.all():
-            if (
-                slot.resolved_card is None
-                or slot.card_pool != sheet.card_pool
-                or slot.resolved_card.card_pool != sheet.card_pool
-            ):
-                continue
-            image_path = resolve_storage_path(slot.image_stored_path)
-            if not image_path.is_file():
-                raise TtsCardSheetRenderError(
-                    f"Card image for sheet {sheet.id} slot {slot.slot_index} is unavailable."
-                )
-            with Image.open(image_path) as source_image:
-                normalized = ImageOps.exif_transpose(source_image).convert("RGB")
-                cell_size = (layout.cell_width, layout.cell_height)
-                if normalized.size == cell_size:
-                    cell = normalized
-                else:
-                    contained = ImageOps.contain(
-                        normalized,
-                        cell_size,
-                        Image.Resampling.LANCZOS,
-                    )
-                    cell = Image.new("RGB", cell_size, _BACKGROUND)
-                    cell.paste(
-                        contained,
-                        (
-                            (layout.cell_width - contained.width) // 2,
-                            (layout.cell_height - contained.height) // 2,
-                        ),
-                    )
-            x = (slot.slot_index % layout.columns) * layout.cell_width
-            y = (slot.slot_index // layout.columns) * layout.cell_height
-            canvas.paste(cell, (x, y))
-
-        with tempfile.NamedTemporaryFile(
-            prefix=f".{sheet.id}.",
-            suffix=".webp.tmp",
-            dir=output_dir,
-            delete=False,
-        ) as temporary:
-            temporary_path = Path(temporary.name)
+        canvas = _render_sheet_canvas(sheet, layout=layout)
+        temporary_path = _create_temporary_sheet_path(
+            sheet_id=str(sheet.id),
+            output_dir=output_dir,
+        )
         canvas.save(temporary_path, format="WEBP", quality=90, method=6)
-        with Image.open(temporary_path) as validation_image:
-            if validation_image.size != layout.image_size:
-                raise TtsCardSheetRenderError("Rendered TTS sheet has unexpected dimensions.")
-            validation_image.verify()
+        _validate_rendered_sheet(temporary_path, expected_size=layout.image_size)
         rendered_checksum = calculate_checksum(temporary_path)
         target = tts_card_sheet_path(str(sheet.id), rendered_checksum)
         os.replace(temporary_path, target)
@@ -163,6 +122,74 @@ def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
     finally:
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)
+
+
+def _render_sheet_canvas(
+    sheet: TtsCardSheet,
+    *,
+    layout: TtsCardSheetLayout,
+) -> Image.Image:
+    canvas = Image.new("RGB", layout.image_size, _BACKGROUND)
+    for slot in sheet.slots.all():
+        if not _slot_belongs_on_sheet(slot, sheet=sheet):
+            continue
+        image_path = resolve_storage_path(slot.image_stored_path)
+        if not image_path.is_file():
+            raise TtsCardSheetRenderError(
+                f"Card image for sheet {sheet.id} slot {slot.slot_index} is unavailable."
+            )
+        cell = _render_card_cell(image_path, layout=layout)
+        x = (slot.slot_index % layout.columns) * layout.cell_width
+        y = (slot.slot_index // layout.columns) * layout.cell_height
+        canvas.paste(cell, (x, y))
+    return canvas
+
+
+def _slot_belongs_on_sheet(slot: TtsCardSheetSlot, *, sheet: TtsCardSheet) -> bool:
+    resolved_card = slot.resolved_card
+    if resolved_card is None:
+        return False
+    if slot.card_pool != sheet.card_pool:
+        return False
+    return resolved_card.card_pool == sheet.card_pool
+
+
+def _render_card_cell(image_path: Path, *, layout: TtsCardSheetLayout) -> Image.Image:
+    with Image.open(image_path) as source_image:
+        normalized = ImageOps.exif_transpose(source_image).convert("RGB")
+    cell_size = (layout.cell_width, layout.cell_height)
+    if normalized.size == cell_size:
+        return normalized
+
+    contained = ImageOps.contain(
+        normalized,
+        cell_size,
+        Image.Resampling.LANCZOS,
+    )
+    cell = Image.new("RGB", cell_size, _BACKGROUND)
+    offset = (
+        (layout.cell_width - contained.width) // 2,
+        (layout.cell_height - contained.height) // 2,
+    )
+    cell.paste(contained, offset)
+    return cell
+
+
+def _create_temporary_sheet_path(*, sheet_id: str, output_dir: Path) -> Path:
+    with tempfile.NamedTemporaryFile(
+        prefix=f".{sheet_id}.",
+        suffix=".webp.tmp",
+        dir=output_dir,
+        delete=False,
+    ) as temporary:
+        return Path(temporary.name)
+
+
+def _validate_rendered_sheet(path: Path, *, expected_size: tuple[int, int]) -> None:
+    with Image.open(path) as validation_image:
+        if validation_image.size != expected_size:
+            raise TtsCardSheetRenderError("Rendered TTS sheet has unexpected dimensions.")
+        validation_image.verify()
 
 
 def _remove_superseded_sheet_revisions(*, sheet_id: str, current_path: Path) -> None:

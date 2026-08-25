@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from card_reader_core.models import (
@@ -58,6 +58,22 @@ class TrailingOcrIntegerCandidate:
     value: int
 
 
+@dataclass
+class NameManaParseState:
+    candidate_symbols: list[Symbol] = field(default_factory=list)
+    detected_symbols: list[DetectedSymbol] = field(default_factory=list)
+    mana_symbol_keys: list[str] = field(default_factory=list)
+    mana_cost: str = ""
+    mana_total: str = ""
+    has_mana: bool = False
+    has_variable_x: bool = False
+    mana_badge_result: ManaBadgeOcrResult | None = None
+    mana_badge_attempted_texts: list[str] = field(default_factory=list)
+    mana_badge_bounds: tuple[int, int, int, int] | None = None
+    trailing_integer_candidate: TrailingOcrIntegerCandidate | None = None
+    trailing_integer_confirmed: bool = False
+
+
 class NameManaCostParser:
     _EXPECTED_SYMBOL_TYPES = {"mana"}
     _DEFAULT_MANA_BADGE_OCR_SCALES = (3, 2)
@@ -101,84 +117,26 @@ class NameManaCostParser:
         filtered_lines = ocr_text.lines
         full_text = ocr_text.text
 
-        candidate_symbols: list[Symbol] = []
-        detected_symbols: list[DetectedSymbol] = []
-        mana_symbol_keys: list[str] = []
-        mana_cost = ""
-        mana_total = ""
-        has_mana = False
-        has_variable_x = False
-        mana_badge_result: ManaBadgeOcrResult | None = None
-        mana_badge_attempted_texts: list[str] = []
-        mana_badge_bounds: tuple[int, int, int, int] | None = None
-        trailing_integer_candidate: TrailingOcrIntegerCandidate | None = None
-        trailing_integer_confirmed = False
-
-        if mana_source == "symbols":
-            candidate_symbols = self._select_mana_candidate_symbols(symbols)
-            detected_symbols = self._symbol_detector.detect(
-                image=image,
-                symbols=candidate_symbols,
-                expected_symbol_types=self._EXPECTED_SYMBOL_TYPES,
-            )
-            mana_symbol_keys = self._mana_symbol_keys(detected_symbols)
-            variable_x_in_symbols = any(
-                self._is_variable_symbol_key(key) for key in mana_symbol_keys
-            )
-            variable_x_in_ocr = self._has_variable_x_in_text(full_text)
-            has_variable_x = variable_x_in_symbols or variable_x_in_ocr
-            parsed_total = sum(
-                self._mana_value_from_symbol_key(key) for key in mana_symbol_keys
-            )
-            if has_variable_x and not variable_x_in_symbols:
-                mana_symbol_keys.append("x")
-            mana_cost = self._format_mana_cost(
-                mana_total=parsed_total,
-                has_variable_x=has_variable_x,
-            )
-            mana_total = str(parsed_total)
-            has_mana = parsed_total > 0 or bool(mana_symbol_keys) or has_variable_x
-        elif mana_source == "trailing_ocr_integer":
-            trailing_integer_candidate = self._extract_trailing_ocr_integer(full_text)
-            mana_badge_attempt = self._read_evil_mana_badge(
-                image=image,
-                ocr_config=ocr_text.ocr_config,
-                region_spec=region_spec,
-            )
-            mana_badge_result = mana_badge_attempt.result
-            mana_badge_attempted_texts = mana_badge_attempt.attempted_texts
-            mana_badge_bounds = mana_badge_attempt.bounds
-            if mana_badge_result is not None:
-                mana_cost = mana_badge_result.mana_cost
-                mana_total = str(mana_badge_result.mana_total)
-                has_mana = True
-                has_variable_x = mana_cost == "X"
-                trailing_integer_confirmed = bool(
-                    trailing_integer_candidate is not None
-                    and not has_variable_x
-                    and mana_badge_result.mana_total
-                    == trailing_integer_candidate.value
-                    and self._primary_ocr_contains_badge_token(
-                        filtered_lines,
-                        token=trailing_integer_candidate.token,
-                        bounds=mana_badge_result.bounds,
-                    )
-                )
-                if has_variable_x:
-                    mana_symbol_keys.append("x")
-            elif (
-                trailing_integer_candidate is not None
-                and mana_badge_bounds is not None
-                and self._primary_ocr_contains_badge_token(
-                    filtered_lines,
-                    token=trailing_integer_candidate.token,
-                    bounds=mana_badge_bounds,
-                )
-            ):
-                mana_cost = str(trailing_integer_candidate.value)
-                mana_total = str(trailing_integer_candidate.value)
-                has_mana = True
-                trailing_integer_confirmed = True
+        state = self._parse_mana_state(
+            mana_source=mana_source,
+            image=image,
+            full_text=full_text,
+            filtered_lines=filtered_lines,
+            region_spec=region_spec,
+            ocr_config=ocr_text.ocr_config,
+            symbols=symbols,
+        )
+        candidate_symbols = state.candidate_symbols
+        detected_symbols = state.detected_symbols
+        mana_symbol_keys = state.mana_symbol_keys
+        mana_cost = state.mana_cost
+        mana_total = state.mana_total
+        has_mana = state.has_mana
+        mana_badge_result = state.mana_badge_result
+        mana_badge_attempted_texts = state.mana_badge_attempted_texts
+        mana_badge_bounds = state.mana_badge_bounds
+        trailing_integer_candidate = state.trailing_integer_candidate
+        trailing_integer_confirmed = state.trailing_integer_confirmed
 
         primary_ocr_contains_confirmed_badge_x = bool(
             mana_badge_result is not None
@@ -304,6 +262,148 @@ class NameManaCostParser:
                 "ocr_line_count_filtered": len(filtered_lines),
             },
         )
+
+    def _parse_mana_state(
+        self,
+        *,
+        mana_source: ManaCostSource,
+        image: Image.Image,
+        full_text: str,
+        filtered_lines: list[dict[str, Any]],
+        region_spec: dict[str, Any],
+        ocr_config: dict[str, Any],
+        symbols: list[Symbol],
+    ) -> NameManaParseState:
+        if mana_source == "symbols":
+            return self._parse_symbol_mana(
+                image=image,
+                full_text=full_text,
+                symbols=symbols,
+            )
+        if mana_source == "trailing_ocr_integer":
+            return self._parse_evil_mana(
+                image=image,
+                full_text=full_text,
+                filtered_lines=filtered_lines,
+                region_spec=region_spec,
+                ocr_config=ocr_config,
+            )
+        return NameManaParseState()
+
+    def _parse_symbol_mana(
+        self,
+        *,
+        image: Image.Image,
+        full_text: str,
+        symbols: list[Symbol],
+    ) -> NameManaParseState:
+        candidate_symbols = self._select_mana_candidate_symbols(symbols)
+        detected_symbols = self._symbol_detector.detect(
+            image=image,
+            symbols=candidate_symbols,
+            expected_symbol_types=self._EXPECTED_SYMBOL_TYPES,
+        )
+        mana_symbol_keys = self._mana_symbol_keys(detected_symbols)
+        variable_x_in_symbols = any(
+            self._is_variable_symbol_key(key) for key in mana_symbol_keys
+        )
+        has_variable_x = variable_x_in_symbols or self._has_variable_x_in_text(full_text)
+        parsed_total = sum(
+            self._mana_value_from_symbol_key(key) for key in mana_symbol_keys
+        )
+        if has_variable_x and not variable_x_in_symbols:
+            mana_symbol_keys.append("x")
+        return NameManaParseState(
+            candidate_symbols=candidate_symbols,
+            detected_symbols=detected_symbols,
+            mana_symbol_keys=mana_symbol_keys,
+            mana_cost=self._format_mana_cost(
+                mana_total=parsed_total,
+                has_variable_x=has_variable_x,
+            ),
+            mana_total=str(parsed_total),
+            has_mana=parsed_total > 0 or bool(mana_symbol_keys) or has_variable_x,
+            has_variable_x=has_variable_x,
+        )
+
+    def _parse_evil_mana(
+        self,
+        *,
+        image: Image.Image,
+        full_text: str,
+        filtered_lines: list[dict[str, Any]],
+        region_spec: dict[str, Any],
+        ocr_config: dict[str, Any],
+    ) -> NameManaParseState:
+        state = NameManaParseState(
+            trailing_integer_candidate=self._extract_trailing_ocr_integer(full_text)
+        )
+        badge_attempt = self._read_evil_mana_badge(
+            image=image,
+            ocr_config=ocr_config,
+            region_spec=region_spec,
+        )
+        state.mana_badge_result = badge_attempt.result
+        state.mana_badge_attempted_texts = badge_attempt.attempted_texts
+        state.mana_badge_bounds = badge_attempt.bounds
+        if badge_attempt.result is not None:
+            self._apply_confirmed_evil_mana_badge(
+                state,
+                filtered_lines=filtered_lines,
+            )
+        else:
+            self._apply_primary_ocr_mana_fallback(
+                state,
+                filtered_lines=filtered_lines,
+            )
+        return state
+
+    def _apply_confirmed_evil_mana_badge(
+        self,
+        state: NameManaParseState,
+        *,
+        filtered_lines: list[dict[str, Any]],
+    ) -> None:
+        result = state.mana_badge_result
+        if result is None:
+            return
+        state.mana_cost = result.mana_cost
+        state.mana_total = str(result.mana_total)
+        state.has_mana = True
+        state.has_variable_x = result.mana_cost == "X"
+        candidate = state.trailing_integer_candidate
+        state.trailing_integer_confirmed = bool(
+            candidate is not None
+            and not state.has_variable_x
+            and result.mana_total == candidate.value
+            and self._primary_ocr_contains_badge_token(
+                filtered_lines,
+                token=candidate.token,
+                bounds=result.bounds,
+            )
+        )
+        if state.has_variable_x:
+            state.mana_symbol_keys.append("x")
+
+    def _apply_primary_ocr_mana_fallback(
+        self,
+        state: NameManaParseState,
+        *,
+        filtered_lines: list[dict[str, Any]],
+    ) -> None:
+        candidate = state.trailing_integer_candidate
+        if candidate is None or state.mana_badge_bounds is None:
+            return
+        if not self._primary_ocr_contains_badge_token(
+            filtered_lines,
+            token=candidate.token,
+            bounds=state.mana_badge_bounds,
+        ):
+            return
+        state.mana_cost = str(candidate.value)
+        state.mana_total = str(candidate.value)
+        state.has_mana = True
+        state.trailing_integer_confirmed = True
 
     def _mana_source(self, card_pool: CardPool) -> ManaCostSource:
         try:

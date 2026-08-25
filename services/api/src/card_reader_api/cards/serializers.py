@@ -594,28 +594,25 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
 
     def validated_update_payload(self) -> dict[str, object]:
         updates: dict[str, object] = {}
-        for field_name in SCALAR_FIELDS:
+        direct_update_fields = (
+            *SCALAR_FIELDS,
+            "card_pool",
+            "card_roles",
+            "card_factions",
+            "card_mana_families",
+            "deck_building_config",
+            "lifecycle_status",
+            "card_back_override_id",
+            "keyword_ids",
+            "tag_ids",
+            "type_ids",
+            "symbol_ids",
+        )
+        for field_name in direct_update_fields:
             if field_name in self.validated_data:
                 updates[field_name] = self.validated_data[field_name]
         if "rules_text_enriched" in self.validated_data:
             updates["rules_text"] = self.validated_data["rules_text_enriched"]
-        if "card_pool" in self.validated_data:
-            updates["card_pool"] = self.validated_data["card_pool"]
-        if "card_roles" in self.validated_data:
-            updates["card_roles"] = self.validated_data["card_roles"]
-        if "card_factions" in self.validated_data:
-            updates["card_factions"] = self.validated_data["card_factions"]
-        if "card_mana_families" in self.validated_data:
-            updates["card_mana_families"] = self.validated_data["card_mana_families"]
-        if "deck_building_config" in self.validated_data:
-            updates["deck_building_config"] = self.validated_data["deck_building_config"]
-        if "lifecycle_status" in self.validated_data:
-            updates["lifecycle_status"] = self.validated_data["lifecycle_status"]
-        if "card_back_override_id" in self.validated_data:
-            updates["card_back_override_id"] = self.validated_data["card_back_override_id"]
-        for field_name in ("keyword_ids", "tag_ids", "type_ids", "symbol_ids"):
-            if field_name in self.validated_data:
-                updates[field_name] = self.validated_data[field_name]
         return updates
 
 

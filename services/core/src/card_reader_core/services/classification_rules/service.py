@@ -301,39 +301,7 @@ class ClassificationRuleService:
         if value.get("digest") != expected_digest:
             raise ClassificationRuleError("Classification rule snapshot digest is invalid.")
         for rule in rules:
-            rule_pool = str(rule.get("card_pool", ""))
-            _validate_identity(
-                card_pool=rule_pool,
-                target_kind=str(rule.get("target_kind", "")),
-                target_key=str(rule.get("target_key", "")),
-            )
-            if rule_pool != card_pool:
-                raise ClassificationRuleError(
-                    "Classification rule snapshot contains a rule from another pool."
-                )
-            if rule.get("source_kind") not in {
-                CARD_CLASSIFICATION_SOURCE_TAG,
-                CARD_CLASSIFICATION_SOURCE_TYPE,
-                CARD_CLASSIFICATION_SOURCE_SYMBOL,
-            }:
-                raise ClassificationRuleError("Snapshot contains an unsupported source kind.")
-            if not isinstance(rule.get("source_id"), str) or not rule["source_id"]:
-                raise ClassificationRuleError("Snapshot rule source_id is required.")
-            if not isinstance(rule.get("source_key"), str) or not rule["source_key"]:
-                raise ClassificationRuleError("Snapshot rule source_key is required.")
-            if not isinstance(rule.get("source_label"), str):
-                raise ClassificationRuleError("Snapshot rule source_label must be a string.")
-            source_identifiers = rule.get("source_identifiers")
-            if not isinstance(source_identifiers, list) or not all(
-                isinstance(identifier, str) for identifier in source_identifiers
-            ):
-                raise ClassificationRuleError(
-                    "Snapshot rule source_identifiers must be an array of strings."
-                )
-            if not isinstance(rule.get("rule_id"), str) or not rule["rule_id"]:
-                raise ClassificationRuleError("Snapshot rule rule_id is required.")
-            if rule.get("source_kind") == CARD_CLASSIFICATION_SOURCE_SYMBOL:
-                _validate_snapshot_symbol(rule.get("source_symbol"))
+            _validate_snapshot_rule(rule, card_pool=card_pool)
         return cast(dict[str, object], value)
 
     def detector_sources_from_snapshot(
@@ -592,6 +560,46 @@ class ClassificationRuleService:
                 "enabled": source.enabled,
             }
         return snapshot_rule
+
+
+def _validate_snapshot_rule(rule: dict[str, object], *, card_pool: CardPool) -> None:
+    rule_pool = str(rule.get("card_pool", ""))
+    _validate_identity(
+        card_pool=rule_pool,
+        target_kind=str(rule.get("target_kind", "")),
+        target_key=str(rule.get("target_key", "")),
+    )
+    if rule_pool != card_pool:
+        raise ClassificationRuleError(
+            "Classification rule snapshot contains a rule from another pool."
+        )
+    source_kind = rule.get("source_kind")
+    if source_kind not in {
+        CARD_CLASSIFICATION_SOURCE_TAG,
+        CARD_CLASSIFICATION_SOURCE_TYPE,
+        CARD_CLASSIFICATION_SOURCE_SYMBOL,
+    }:
+        raise ClassificationRuleError("Snapshot contains an unsupported source kind.")
+    _validate_required_snapshot_string(rule, "source_id")
+    _validate_required_snapshot_string(rule, "source_key")
+    if not isinstance(rule.get("source_label"), str):
+        raise ClassificationRuleError("Snapshot rule source_label must be a string.")
+    source_identifiers = rule.get("source_identifiers")
+    if not isinstance(source_identifiers, list) or not all(
+        isinstance(identifier, str) for identifier in source_identifiers
+    ):
+        raise ClassificationRuleError(
+            "Snapshot rule source_identifiers must be an array of strings."
+        )
+    _validate_required_snapshot_string(rule, "rule_id")
+    if source_kind == CARD_CLASSIFICATION_SOURCE_SYMBOL:
+        _validate_snapshot_symbol(rule.get("source_symbol"))
+
+
+def _validate_required_snapshot_string(rule: dict[str, object], field: str) -> None:
+    value = rule.get(field)
+    if not isinstance(value, str) or not value:
+        raise ClassificationRuleError(f"Snapshot rule {field} is required.")
 
 
 def _validate_snapshot_symbol(value: object) -> None:

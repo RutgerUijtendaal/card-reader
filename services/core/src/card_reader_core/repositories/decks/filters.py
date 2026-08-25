@@ -46,42 +46,80 @@ def apply_deck_filters(
             | _sideboard_text_query(normalized_card_query)
         )
 
-    normalized_affinity_symbol_ids = [symbol_id.strip() for symbol_id in affinity_symbol_ids or [] if symbol_id.strip()]
+    normalized_affinity_symbol_ids = _normalize_filter_ids(affinity_symbol_ids)
     if normalized_affinity_symbol_ids:
-        match_all = affinity_symbol_match == "all"
-        if match_all:
-            for symbol_id in normalized_affinity_symbol_ids:
-                filtered = filtered.filter(_affinity_symbol_query(symbol_id))
-        else:
-            affinity_query = Q()
-            for symbol_id in normalized_affinity_symbol_ids:
-                affinity_query |= _affinity_symbol_query(symbol_id)
-            filtered = filtered.filter(affinity_query)
+        filtered = _filter_affinity_symbols(
+            filtered,
+            symbol_ids=normalized_affinity_symbol_ids,
+            match_all=affinity_symbol_match == "all",
+        )
 
-    normalized_affinity_symbol_exclude_ids = [
-        symbol_id.strip() for symbol_id in affinity_symbol_exclude_ids or [] if symbol_id.strip()
-    ]
+    normalized_affinity_symbol_exclude_ids = _normalize_filter_ids(
+        affinity_symbol_exclude_ids
+    )
     if normalized_affinity_symbol_exclude_ids:
-        excluded_affinity_query = Q()
-        for symbol_id in normalized_affinity_symbol_exclude_ids:
-            excluded_affinity_query |= _affinity_symbol_query(symbol_id)
+        excluded_affinity_query = _combined_affinity_query(
+            normalized_affinity_symbol_exclude_ids
+        )
         filtered = filtered.exclude(excluded_affinity_query)
 
-    normalized_deck_tag_ids = [tag_id.strip() for tag_id in deck_tag_ids or [] if tag_id.strip()]
+    normalized_deck_tag_ids = _normalize_filter_ids(deck_tag_ids)
     if normalized_deck_tag_ids:
-        if deck_tag_match == "all":
-            for tag_id in normalized_deck_tag_ids:
-                filtered = filtered.filter(tag_assignments__tag_id=tag_id)
-        else:
-            filtered = filtered.filter(tag_assignments__tag_id__in=normalized_deck_tag_ids)
+        filtered = _filter_deck_tags(
+            filtered,
+            tag_ids=normalized_deck_tag_ids,
+            match_all=deck_tag_match == "all",
+        )
 
-    normalized_deck_tag_exclude_ids = [
-        tag_id.strip() for tag_id in deck_tag_exclude_ids or [] if tag_id.strip()
-    ]
+    normalized_deck_tag_exclude_ids = _normalize_filter_ids(deck_tag_exclude_ids)
     if normalized_deck_tag_exclude_ids:
         filtered = filtered.exclude(tag_assignments__tag_id__in=normalized_deck_tag_exclude_ids)
 
     return filtered.distinct()
+
+
+def _normalize_filter_ids(values: list[str] | None) -> list[str]:
+    normalized: list[str] = []
+    for value in values or []:
+        stripped_value = value.strip()
+        if stripped_value:
+            normalized.append(stripped_value)
+    return normalized
+
+
+def _filter_affinity_symbols(
+    queryset: QuerySet[Deck],
+    *,
+    symbol_ids: list[str],
+    match_all: bool,
+) -> QuerySet[Deck]:
+    if not match_all:
+        return queryset.filter(_combined_affinity_query(symbol_ids))
+    filtered = queryset
+    for symbol_id in symbol_ids:
+        filtered = filtered.filter(_affinity_symbol_query(symbol_id))
+    return filtered
+
+
+def _combined_affinity_query(symbol_ids: list[str]) -> Q:
+    combined_query = Q()
+    for symbol_id in symbol_ids:
+        combined_query |= _affinity_symbol_query(symbol_id)
+    return combined_query
+
+
+def _filter_deck_tags(
+    queryset: QuerySet[Deck],
+    *,
+    tag_ids: list[str],
+    match_all: bool,
+) -> QuerySet[Deck]:
+    if not match_all:
+        return queryset.filter(tag_assignments__tag_id__in=tag_ids)
+    filtered = queryset
+    for tag_id in tag_ids:
+        filtered = filtered.filter(tag_assignments__tag_id=tag_id)
+    return filtered
 
 
 def _hero_text_query(query: str) -> Q:
@@ -104,15 +142,15 @@ def _sideboard_text_query(query: str) -> Q:
 
 def _affinity_symbol_query(symbol_id: str) -> Q:
     hero_query = Q(
-            hero_card__latest_version__card_version_symbols__symbol_id=symbol_id,
-            hero_card__latest_version__card_version_symbols__symbol__symbol_type="affinity",
-        )
+        hero_card__latest_version__card_version_symbols__symbol_id=symbol_id,
+        hero_card__latest_version__card_version_symbols__symbol__symbol_type="affinity",
+    )
     entry_query = Q(
-            entries__card__latest_version__card_version_symbols__symbol_id=symbol_id,
-            entries__card__latest_version__card_version_symbols__symbol__symbol_type="affinity",
-        )
+        entries__card__latest_version__card_version_symbols__symbol_id=symbol_id,
+        entries__card__latest_version__card_version_symbols__symbol__symbol_type="affinity",
+    )
     sideboard_query = Q(
-            sideboards__entries__card__latest_version__card_version_symbols__symbol_id=symbol_id,
-            sideboards__entries__card__latest_version__card_version_symbols__symbol__symbol_type="affinity",
-        )
+        sideboards__entries__card__latest_version__card_version_symbols__symbol_id=symbol_id,
+        sideboards__entries__card__latest_version__card_version_symbols__symbol__symbol_type="affinity",
+    )
     return hero_query | entry_query | sideboard_query

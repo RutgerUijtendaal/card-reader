@@ -195,21 +195,27 @@ def _group_detections_by_symbol_id(
 def _parse_text_enrichment_config(raw: object) -> dict[str, list[Any]]:
     if not isinstance(raw, dict):
         return {"ocr_aliases": [], "pattern_anchors": []}
+    return {
+        "ocr_aliases": _parse_ocr_aliases(raw.get("ocr_aliases", [])),
+        "pattern_anchors": _parse_pattern_anchors(raw.get("pattern_anchors", [])),
+    }
 
+
+def _parse_ocr_aliases(raw_aliases: object) -> list[dict[str, object]]:
     aliases: list[dict[str, object]] = []
-    for item in raw.get("ocr_aliases", []):
+    if not isinstance(raw_aliases, list):
+        return aliases
+    for item in raw_aliases:
         if isinstance(item, str) and item.strip():
             aliases.append({"match": item.strip()})
             continue
         if not isinstance(item, dict):
             continue
 
-        match_text = item.get("match")
-        match_regex = item.get("match_regex")
-        normalized_match = match_text if isinstance(match_text, str) else ""
-        normalized_match_regex = match_regex if isinstance(match_regex, str) else ""
-        if bool(normalized_match) == bool(normalized_match_regex):
+        match_fields = _normalized_match_fields(item)
+        if match_fields is None:
             continue
+        normalized_match, normalized_match_regex = match_fields
 
         replace_group = item.get("replace_group", 0)
         if not isinstance(replace_group, int) or replace_group < 0:
@@ -225,18 +231,22 @@ def _parse_text_enrichment_config(raw: object) -> dict[str, list[Any]]:
                 "after_text": after_text if isinstance(after_text, str) else "",
             }
         )
+    return aliases
 
+
+def _parse_pattern_anchors(raw_anchors: object) -> list[dict[str, str]]:
     anchors: list[dict[str, str]] = []
-    for item in raw.get("pattern_anchors", []):
+    if not isinstance(raw_anchors, list):
+        return anchors
+    for item in raw_anchors:
         if not isinstance(item, dict):
             continue
-        match_text = item.get("match")
-        match_regex = item.get("match_regex")
-        position = item.get("position")
-        normalized_match = match_text if isinstance(match_text, str) else ""
-        normalized_match_regex = match_regex if isinstance(match_regex, str) else ""
-        if bool(normalized_match) == bool(normalized_match_regex):
+        match_fields = _normalized_match_fields(item)
+        if match_fields is None:
             continue
+        normalized_match, normalized_match_regex = match_fields
+
+        position = item.get("position")
         if position not in {"before", "after"}:
             position = "before"
         before_text = item.get("before_text")
@@ -250,7 +260,17 @@ def _parse_text_enrichment_config(raw: object) -> dict[str, list[Any]]:
                 "after_text": after_text if isinstance(after_text, str) else "",
             }
         )
-    return {"ocr_aliases": aliases, "pattern_anchors": anchors}
+    return anchors
+
+
+def _normalized_match_fields(item: dict[str, object]) -> tuple[str, str] | None:
+    match_text = item.get("match")
+    match_regex = item.get("match_regex")
+    normalized_match = match_text if isinstance(match_text, str) else ""
+    normalized_match_regex = match_regex if isinstance(match_regex, str) else ""
+    if bool(normalized_match) == bool(normalized_match_regex):
+        return None
+    return normalized_match, normalized_match_regex
 
 
 def _replace_alias_occurrences(

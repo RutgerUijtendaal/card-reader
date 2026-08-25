@@ -60,6 +60,11 @@ class CardClassificationResult:
     evidence: CardClassificationInferenceEvidence
 
 
+def _normalize_mana_family_values(values: Iterable[object]) -> tuple[ManaFamily, ...]:
+    string_values = tuple(str(value) for value in values)
+    return normalize_mana_family_keys(string_values)
+
+
 def _resolve_facet(
     *,
     mode: CardClassificationMode,
@@ -144,7 +149,7 @@ def classify_import_card(value: CardClassificationInput) -> CardClassificationRe
         mode=value.mana_family_mode,
         inferred_values=inferred_mana_families,
         override_values=override_mana_families,
-        normalize=lambda values: normalize_mana_family_keys(tuple(str(value) for value in values)),
+        normalize=_normalize_mana_family_values,
         facet_label="mana family",
     )
     role_evidence: CardRoleInferenceEvidence = {

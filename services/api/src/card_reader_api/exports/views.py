@@ -117,9 +117,12 @@ class CardTtsExportView(APIView):
         except TtsCardExportError as exc:
             return _tts_card_export_error_response(exc)
 
+        def absolute_url(path: str) -> str:
+            return build_public_api_url(request, path)
+
         export = encode_tts_card_export(
             export_data,
-            absolute_url=lambda path: build_public_api_url(request, path),
+            absolute_url=absolute_url,
         )
         return Response(
             {
@@ -153,9 +156,12 @@ class DeckTtsExportView(APIView):
         except TtsCardExportError as exc:
             return _tts_card_export_error_response(exc)
 
+        def absolute_url(path: str) -> str:
+            return build_public_api_url(request, path)
+
         export = encode_tts_card_export(
             export_data,
-            absolute_url=lambda path: build_public_api_url(request, path),
+            absolute_url=absolute_url,
         )
         return Response(
             {

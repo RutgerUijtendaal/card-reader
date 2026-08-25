@@ -182,14 +182,15 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
         and filters["card_pool"] is not None
         else None
     )
-    grouped_items.sort(
-        key=lambda row: _grouped_gallery_sort_key(
+    def grouped_item_sort_key(row: GroupedGalleryItem) -> tuple[object, ...]:
+        return _grouped_gallery_sort_key(
             row,
             filters["sort"],
             card_pool=filters["card_pool"],
             type_sort_lookup=type_sort_lookup,
         )
-    )
+
+    grouped_items.sort(key=grouped_item_sort_key)
     total_count = len(grouped_items)
     normalized_page = max(page, 1)
     normalized_page_size = max(1, min(page_size, 100))

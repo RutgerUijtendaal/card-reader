@@ -31,10 +31,13 @@ def _run_reconciliation_action(*, card_id: str, action_name: str, action: Callab
 
 
 def _reconcile_card_classification(*, card_id: str) -> None:
+    def sync_tts_card_sheets() -> None:
+        TtsCardSheetService().sync_cards([card_id])
+
     _run_reconciliation_action(
         card_id=card_id,
         action_name="sync_tts_card_sheets",
-        action=lambda: TtsCardSheetService().sync_cards([card_id]),
+        action=sync_tts_card_sheets,
     )
 
 
@@ -64,11 +67,11 @@ def update_latest_card_version_with_notifications(
     )
     if updated is not None and "card_pool" in resolved_updates:
         card, _version = updated
-        transaction.on_commit(
-            lambda: _reconcile_card_classification(
-                card_id=card.id,
-            )
-        )
+
+        def reconcile_card_classification() -> None:
+            _reconcile_card_classification(card_id=card.id)
+
+        transaction.on_commit(reconcile_card_classification)
     return updated
 
 
@@ -86,14 +89,18 @@ def promote_card_version_with_notifications(
     if promoted is not None and not target_was_current_latest:
         card, version = promoted
 
-        transaction.on_commit(
-            lambda: NotificationService().notify_deck_owners_card_version_changed(
+        def notify_deck_owners() -> None:
+            NotificationService().notify_deck_owners_card_version_changed(
                 card_id=card.id,
                 card_version_id=version.id,
                 previous_card_version_id=previous_card_version_id,
                 cause=DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
                 actor_id=actor_id,
             )
-        )
-        transaction.on_commit(lambda: TtsCardSheetService().sync_cards([card.id]))
+
+        def sync_tts_card_sheets() -> None:
+            TtsCardSheetService().sync_cards([card.id])
+
+        transaction.on_commit(notify_deck_owners)
+        transaction.on_commit(sync_tts_card_sheets)
     return promoted

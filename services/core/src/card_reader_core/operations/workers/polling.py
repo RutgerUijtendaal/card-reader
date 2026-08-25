@@ -39,8 +39,11 @@ class WorkerShutdownController:
         self._event = Event()
 
     def install_signal_handlers(self) -> None:
-        signal.signal(signal.SIGTERM, lambda signum, _frame: self.request_stop(signum))
-        signal.signal(signal.SIGINT, lambda signum, _frame: self.request_stop(signum))
+        signal.signal(signal.SIGTERM, self._handle_signal)
+        signal.signal(signal.SIGINT, self._handle_signal)
+
+    def _handle_signal(self, signum: int, _frame: object) -> None:
+        self.request_stop(signum)
 
     def request_stop(self, signum: int | None = None) -> None:
         if signum is not None:

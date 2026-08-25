@@ -171,65 +171,45 @@ def prepare_import_job_inputs(
 ) -> PreparedImportJobInputs:
     if not is_card_pool(card_pool):
         raise ImportJobInputValidationError(f"Unsupported card pool: {card_pool}")
-    if card_role_mode not in {
-        ImportClassificationMode.automatic,
-        ImportClassificationMode.override,
-    }:
-        raise ImportJobInputValidationError(
-            "card_role_mode must be either 'automatic' or 'override'."
-        )
-    normalized_mode = str(card_role_mode)
+    normalized_mode = _validated_classification_mode(card_role_mode, field="card_role_mode")
     normalized_override = normalize_card_roles(card_role_override)
-    if len(set(card_role_override)) != len(normalized_override):
-        raise ImportJobInputValidationError(
-            "card_role_override contains unsupported or duplicate roles."
-        )
-    if normalized_mode == ImportClassificationMode.automatic and normalized_override:
-        raise ImportJobInputValidationError(
-            "Automatic role inference cannot include role overrides."
-        )
-    if card_faction_mode not in {
-        ImportClassificationMode.automatic,
-        ImportClassificationMode.override,
-    }:
-        raise ImportJobInputValidationError(
-            "card_faction_mode must be either 'automatic' or 'override'."
-        )
-    normalized_faction_mode = str(card_faction_mode)
+    _validate_classification_override(
+        raw_values=card_role_override,
+        normalized_values=normalized_override,
+        mode=normalized_mode,
+        duplicate_error="card_role_override contains unsupported or duplicate roles.",
+        automatic_error="Automatic role inference cannot include role overrides.",
+    )
+    normalized_faction_mode = _validated_classification_mode(
+        card_faction_mode,
+        field="card_faction_mode",
+    )
     normalized_faction_override = normalize_card_factions(card_faction_override)
-    if len(set(card_faction_override)) != len(normalized_faction_override):
-        raise ImportJobInputValidationError(
-            "card_faction_override contains unsupported or duplicate factions."
-        )
-    if (
-        normalized_faction_mode == ImportClassificationMode.automatic
-        and normalized_faction_override
-    ):
-        raise ImportJobInputValidationError(
-            "Automatic faction inference cannot include faction overrides."
-        )
-    if card_mana_family_mode not in {
-        ImportClassificationMode.automatic,
-        ImportClassificationMode.override,
-    }:
-        raise ImportJobInputValidationError(
-            "card_mana_family_mode must be either 'automatic' or 'override'."
-        )
-    normalized_mana_family_mode = str(card_mana_family_mode)
+    _validate_classification_override(
+        raw_values=card_faction_override,
+        normalized_values=normalized_faction_override,
+        mode=normalized_faction_mode,
+        duplicate_error="card_faction_override contains unsupported or duplicate factions.",
+        automatic_error="Automatic faction inference cannot include faction overrides.",
+    )
+    normalized_mana_family_mode = _validated_classification_mode(
+        card_mana_family_mode,
+        field="card_mana_family_mode",
+    )
     normalized_mana_family_override = normalize_mana_family_keys(
         tuple(card_mana_family_override)
     )
-    if len(set(card_mana_family_override)) != len(normalized_mana_family_override):
-        raise ImportJobInputValidationError(
+    _validate_classification_override(
+        raw_values=card_mana_family_override,
+        normalized_values=normalized_mana_family_override,
+        mode=normalized_mana_family_mode,
+        duplicate_error=(
             "card_mana_family_override contains unsupported or duplicate families."
-        )
-    if (
-        normalized_mana_family_mode == ImportClassificationMode.automatic
-        and normalized_mana_family_override
-    ):
-        raise ImportJobInputValidationError(
+        ),
+        automatic_error=(
             "Automatic mana family inference cannot include mana family overrides."
-        )
+        ),
+    )
     template = get_template_by_key(key=template_id)
     if template is None:
         raise ImportJobInputValidationError(f"Unknown template_id '{template_id}'")
@@ -243,3 +223,29 @@ def prepare_import_job_inputs(
         card_mana_family_mode=normalized_mana_family_mode,
         card_mana_family_override=normalized_mana_family_override,
     )
+
+
+def _validated_classification_mode(mode: str, *, field: str) -> str:
+    allowed_modes = {
+        ImportClassificationMode.automatic,
+        ImportClassificationMode.override,
+    }
+    if mode not in allowed_modes:
+        raise ImportJobInputValidationError(
+            f"{field} must be either 'automatic' or 'override'."
+        )
+    return str(mode)
+
+
+def _validate_classification_override(
+    *,
+    raw_values: Sequence[object],
+    normalized_values: Sequence[object],
+    mode: str,
+    duplicate_error: str,
+    automatic_error: str,
+) -> None:
+    if len(set(raw_values)) != len(normalized_values):
+        raise ImportJobInputValidationError(duplicate_error)
+    if mode == ImportClassificationMode.automatic and normalized_values:
+        raise ImportJobInputValidationError(automatic_error)

@@ -90,35 +90,29 @@ class WorkerHeartbeatSession:
         desired_activity = self._desired_activity_snapshot()
         if self._reported_activity != desired_activity:
             activity, current_work_id = desired_activity
-            reported = self._report(
-                "activity",
-                lambda: update_worker_activity(
+
+            def report_activity() -> None:
+                update_worker_activity(
                     instance_id=self._instance_id,
                     activity=activity,
                     current_work_id=current_work_id,
-                ),
+                )
+
+            reported = self._report(
+                "activity",
+                report_activity,
             )
             if reported:
                 self._reported_activity = desired_activity
             return
         if not was_registered:
             return
-        self._report(
-            "heartbeat",
-            lambda: heartbeat_worker(instance_id=self._instance_id),
-        )
+        self._report("heartbeat", self._send_heartbeat)
 
     def _ensure_registered(self) -> bool:
         if self._registered:
             return True
-        registered = self._report(
-            "register",
-            lambda: register_worker(
-                instance_id=self._instance_id,
-                worker_key=self._worker_key,
-                display_name=self._display_name,
-            ),
-        )
+        registered = self._report("register", self._register_worker)
         if registered:
             self._registered = True
             self._reported_activity = (WorkerActivity.idle, None)
@@ -143,7 +137,20 @@ class WorkerHeartbeatSession:
 
     def _report_stop(self) -> None:
         if self._ensure_registered():
-            self._report("stop", lambda: stop_worker(instance_id=self._instance_id))
+            self._report("stop", self._stop_worker)
+
+    def _send_heartbeat(self) -> None:
+        heartbeat_worker(instance_id=self._instance_id)
+
+    def _register_worker(self) -> None:
+        register_worker(
+            instance_id=self._instance_id,
+            worker_key=self._worker_key,
+            display_name=self._display_name,
+        )
+
+    def _stop_worker(self) -> None:
+        stop_worker(instance_id=self._instance_id)
 
     def _report(self, operation: str, callback: Callable[[], object]) -> bool:
         try:

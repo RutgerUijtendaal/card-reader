@@ -425,39 +425,60 @@ def normalize_deck_building_config(value: object) -> dict[str, object]:
     overrides = _extract_rule_overrides(value)
     normalized_overrides: dict[str, object] = {}
     for rule_id, override in overrides.items():
-        if rule_id not in SUPPORTED_RULE_IDS:
-            raise ValueError(f"Unsupported deck-building rule id: {rule_id}.")
-        if not isinstance(override, dict):
-            raise ValueError("Deck-building rule overrides must be JSON objects.")
-        _validate_numeric_aliases(override)
-        normalized_override: dict[str, object] = {}
-        for key, raw_value in override.items():
-            if key in {"severity"}:
-                if raw_value not in ("hard", "soft"):
-                    raise ValueError("Deck-building rule severity must be 'hard' or 'soft'.")
-                normalized_override[key] = raw_value
-            elif key == "scope":
-                if raw_value not in ("mainboard", "whole_deck"):
-                    raise ValueError("Deck-building rule scope must be 'mainboard' or 'whole_deck'.")
-                normalized_override[key] = raw_value
-            elif key == "blocks_action":
-                if not isinstance(raw_value, bool):
-                    raise ValueError("Deck-building blocks_action must be a boolean.")
-                normalized_override[key] = raw_value
-            elif key == "applies_to":
-                if raw_value not in DECK_CONSTRAINT_APPLICATIONS:
-                    raise ValueError("Deck-building applies_to must be 'deck' or 'self'.")
-                if raw_value == "self" and rule_id not in SELF_APPLICABLE_RULE_IDS:
-                    raise ValueError("Deck-building applies_to 'self' is only supported for card-specific rules.")
-                normalized_override[key] = raw_value
-            elif key in {"min", "max", "count", "minimum", "maximum"}:
-                if isinstance(raw_value, bool) or not isinstance(raw_value, int) or raw_value < 0:
-                    raise ValueError("Deck-building numeric rule values must be non-negative integers.")
-                normalized_override[key] = raw_value
-            else:
-                raise ValueError(f"Unsupported deck-building override field: {key}.")
-        normalized_overrides[rule_id] = normalized_override
+        normalized_overrides[rule_id] = _normalize_rule_override(rule_id, override)
     return {"overrides": normalized_overrides}
+
+
+def _normalize_rule_override(rule_id: str, override: object) -> dict[str, object]:
+    if rule_id not in SUPPORTED_RULE_IDS:
+        raise ValueError(f"Unsupported deck-building rule id: {rule_id}.")
+    if not isinstance(override, dict):
+        raise ValueError("Deck-building rule overrides must be JSON objects.")
+    _validate_numeric_aliases(override)
+
+    normalized: dict[str, object] = {}
+    for key, raw_value in override.items():
+        normalized_key = str(key)
+        normalized[normalized_key] = _normalize_override_field(
+            rule_id=rule_id,
+            key=normalized_key,
+            value=raw_value,
+        )
+    return normalized
+
+
+def _normalize_override_field(*, rule_id: str, key: str, value: object) -> object:
+    if key == "severity":
+        if value not in DECK_CONSTRAINT_SEVERITIES:
+            raise ValueError("Deck-building rule severity must be 'hard' or 'soft'.")
+        return value
+    if key == "scope":
+        if value not in DECK_CONSTRAINT_SCOPES:
+            raise ValueError("Deck-building rule scope must be 'mainboard' or 'whole_deck'.")
+        return value
+    if key == "blocks_action":
+        if not isinstance(value, bool):
+            raise ValueError("Deck-building blocks_action must be a boolean.")
+        return value
+    if key == "applies_to":
+        return _normalize_override_application(rule_id=rule_id, value=value)
+    if key in {"min", "max", "count", "minimum", "maximum"}:
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(
+                "Deck-building numeric rule values must be non-negative integers."
+            )
+        return value
+    raise ValueError(f"Unsupported deck-building override field: {key}.")
+
+
+def _normalize_override_application(*, rule_id: str, value: object) -> object:
+    if value not in DECK_CONSTRAINT_APPLICATIONS:
+        raise ValueError("Deck-building applies_to must be 'deck' or 'self'.")
+    if value == "self" and rule_id not in SELF_APPLICABLE_RULE_IDS:
+        raise ValueError(
+            "Deck-building applies_to 'self' is only supported for card-specific rules."
+        )
+    return value
 
 
 def effective_deck_building_rules_json(
