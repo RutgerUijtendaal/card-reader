@@ -438,7 +438,7 @@ def test_import_accepts_only_unmodified_migration_defaults(
 
         assert result.counts["cards"] == 4
         assert Template.objects.filter(key="full-height", label="Full height").exists()
-        assert CardClassificationRule.objects.count() == 18
+        assert CardClassificationRule.objects.count() == 19
         transaction.set_rollback(True)
 
 
@@ -630,7 +630,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         ).exists()
         assert CardAlias.objects.filter(key="synthetic-hero-alias").exists()
         assert CardGroup.objects.filter(key="synthetic-group").exists()
-        assert CardClassificationRule.objects.count() == 9
+        assert CardClassificationRule.objects.count() == 10
         imported_hero = Card.objects.get(key="synthetic-hero")
         assert list(
             CardManaFamilyAssignment.objects.filter(card=imported_hero).values_list(
@@ -656,10 +656,10 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
             CardClassificationRule.objects.filter(
                 card_pool="evil",
                 target_kind="faction",
-                target_key__in=("dark", "metal"),
+                target_key__in=("dark", "metal", "fire"),
                 enabled=True,
             ).values_list("target_key", "tag__key")
-        ) == {("dark", "dark"), ("metal", "metal")}
+        ) == {("dark", "dark"), ("metal", "metal"), ("fire", "fire")}
         assert Template.objects.get(key="synthetic-template").definition_json["regions"][0][
             "parser_type"
         ] == "name"
@@ -1318,6 +1318,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         "blood",
         "dark",
         "metal",
+        "fire",
     )
     Tag.objects.bulk_create(
         [
@@ -1368,6 +1369,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         ("evil", "faction", "blood", "blood"),
         ("evil", "faction", "dark", "dark"),
         ("evil", "faction", "metal", "metal"),
+        ("evil", "faction", "fire", "fire"),
         ("neutral", "role", "shop_item", "shop-item"),
     ]
     classification_rule_service = ClassificationRuleService()
@@ -1531,7 +1533,13 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
                 "reminder": 0,
                 "mana": 0,
             },
-            "min_cards_by_faction": {"order": 1, "blood": 1, "dark": 0, "metal": 0},
+            "min_cards_by_faction": {
+                "order": 1,
+                "blood": 1,
+                "dark": 0,
+                "metal": 0,
+                "fire": 0,
+            },
             "min_cards_by_mana_family": {"arcane": 1},
             "min_deprecated_cards": 1,
             "min_card_groups": 1,

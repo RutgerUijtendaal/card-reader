@@ -313,6 +313,7 @@ describe('CardVersionEditorPane tabs', () => {
     const order = mounted.container.querySelector('[data-testid="card-faction-option-order"]');
     const dark = mounted.container.querySelector('[data-testid="card-faction-option-dark"]');
     const metal = mounted.container.querySelector('[data-testid="card-faction-option-metal"]');
+    const fire = mounted.container.querySelector('[data-testid="card-faction-option-fire"]');
     const arcane = mounted.container.querySelector('[data-testid="card-mana-family-option-arcane"]');
     const primal = mounted.container.querySelector('[data-testid="card-mana-family-option-primal"]');
 
@@ -321,18 +322,21 @@ describe('CardVersionEditorPane tabs', () => {
     expect(order?.getAttribute('aria-pressed')).toBe('true');
     expect(dark?.getAttribute('aria-pressed')).toBe('false');
     expect(metal?.getAttribute('aria-pressed')).toBe('false');
+    expect(fire?.getAttribute('aria-pressed')).toBe('false');
     expect(arcane?.getAttribute('aria-pressed')).toBe('true');
     expect(primal?.getAttribute('aria-pressed')).toBe('false');
 
     (hero as HTMLButtonElement).click();
     (order as HTMLButtonElement).click();
     (metal as HTMLButtonElement).click();
+    (fire as HTMLButtonElement).click();
     (primal as HTMLButtonElement).click();
     await nextTick();
 
     expect(mounted.toggleCardRole).toHaveBeenCalledWith('hero', true);
     expect(mounted.toggleCardFaction).toHaveBeenCalledWith('order', false);
     expect(mounted.toggleCardFaction).toHaveBeenCalledWith('metal', true);
+    expect(mounted.toggleCardFaction).toHaveBeenCalledWith('fire', true);
     expect(mounted.toggleCardManaFamily).toHaveBeenCalledWith('primal', true);
     mounted.unmount();
   });

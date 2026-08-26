@@ -12,12 +12,19 @@ describe('card faction registry', () => {
       { value: 'blood', label: 'Blood' },
       { value: 'dark', label: 'Dark' },
       { value: 'metal', label: 'Metal' },
+      { value: 'fire', label: 'Fire' },
     ]);
     expect(isCardFaction('blood')).toBe(true);
     expect(isCardFaction('dark')).toBe(true);
     expect(isCardFaction('metal')).toBe(true);
+    expect(isCardFaction('fire')).toBe(true);
     expect(isCardFaction('unknown')).toBe(false);
-    expect(displayCardFactionLabels(['order', 'dark', 'metal'])).toEqual(['Order', 'Dark', 'Metal']);
+    expect(displayCardFactionLabels(['order', 'dark', 'metal', 'fire'])).toEqual([
+      'Order',
+      'Dark',
+      'Metal',
+      'Fire',
+    ]);
     expect(displayCardFactionLabels([])).toEqual(['No faction']);
   });
 });

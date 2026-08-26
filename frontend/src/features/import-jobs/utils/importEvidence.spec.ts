@@ -53,9 +53,9 @@ describe('import evidence presentation', () => {
     expect(formatImportRoles(['unknown', 'boon'])).toBe('Boon');
   });
 
-  test('uses the shared faction registry for Dark and Metal labels', () => {
+  test('uses the shared faction registry for Dark, Metal, and Fire labels', () => {
     expect(formatImportFactions([])).toBe('No faction');
-    expect(formatImportFactions(['dark', 'metal'])).toBe('Dark, Metal');
+    expect(formatImportFactions(['dark', 'metal', 'fire'])).toBe('Dark, Metal, Fire');
   });
 
   test('distinguishes explicit Colorless from unavailable legacy mana evidence', () => {
