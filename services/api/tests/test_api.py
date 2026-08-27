@@ -2109,6 +2109,7 @@ def test_filters_payload_uses_the_canonical_card_role_registry() -> None:
         {"key": "blood", "label": "Blood", "rank": 2},
         {"key": "dark", "label": "Dark", "rank": 3},
         {"key": "metal", "label": "Metal", "rank": 4},
+        {"key": "fire", "label": "Fire", "rank": 5},
     ]
 
 
@@ -3147,6 +3148,9 @@ def test_cards_list_uses_evil_faction_default_order() -> None:
     metal_boss, metal_boss_version = _create_editable_card_version(
         name="Default Evil Metal Boss", card_pool="evil"
     )
+    fire_boss, fire_boss_version = _create_editable_card_version(
+        name="Default Evil Fire Boss", card_pool="evil"
+    )
     no_faction_boss, no_faction_boss_version = _create_editable_card_version(
         name="Default Evil No Faction Boss", card_pool="evil"
     )
@@ -3162,6 +3166,7 @@ def test_cards_list_uses_evil_faction_default_order() -> None:
         (blood_boss_version, 0),
         (dark_boss_version, 0),
         (metal_boss_version, 0),
+        (fire_boss_version, 0),
         (no_faction_boss_version, 0),
     ):
         _create_card_image(version)
@@ -3180,6 +3185,7 @@ def test_cards_list_uses_evil_faction_default_order() -> None:
             CardFactionAssignment(card=blood_boss, faction="blood"),
             CardFactionAssignment(card=dark_boss, faction="dark"),
             CardFactionAssignment(card=metal_boss, faction="metal"),
+            CardFactionAssignment(card=fire_boss, faction="fire"),
         ]
     )
     CardRoleAssignment.objects.bulk_create(
@@ -3193,6 +3199,7 @@ def test_cards_list_uses_evil_faction_default_order() -> None:
             CardRoleAssignment(card=blood_boss, role="boss"),
             CardRoleAssignment(card=dark_boss, role="boss"),
             CardRoleAssignment(card=metal_boss, role="boss"),
+            CardRoleAssignment(card=fire_boss, role="boss"),
             CardRoleAssignment(card=no_faction_boss, role="boss"),
         ]
     )
@@ -3214,6 +3221,7 @@ def test_cards_list_uses_evil_faction_default_order() -> None:
         blood_boss.id,
         dark_boss.id,
         metal_boss.id,
+        fire_boss.id,
         no_faction_boss.id,
     ]
 

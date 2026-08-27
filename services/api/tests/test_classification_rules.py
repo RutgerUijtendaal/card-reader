@@ -175,6 +175,7 @@ def test_catalog_definitions_are_global_and_sources_have_reverse_references() ->
         "Blood",
         "Dark",
         "Metal",
+        "Fire",
     ]
     blood = next(
         row for row in catalog.json()["classification"]["factions"] if row["key"] == "blood"
@@ -261,9 +262,10 @@ def test_snapshots_are_pool_scoped_and_exclude_disabled_rules() -> None:
     assert disabled.id not in {rule["rule_id"] for rule in snapshot["rules"]}
 
 
-def test_dark_and_metal_are_supported_faction_rule_targets() -> None:
+def test_dark_metal_and_fire_are_supported_faction_rule_targets() -> None:
     dark_tag = Tag.objects.get(key="dark")
     metal_tag = Tag.objects.get(key="metal")
+    fire_tag = Tag.objects.get(key="fire")
     service = ClassificationRuleService()
 
     dark_rule = service.create_rule(
@@ -280,8 +282,19 @@ def test_dark_and_metal_are_supported_faction_rule_targets() -> None:
         source_kind="tag",
         source_id=metal_tag.id,
     )
+    fire_rule = service.create_rule(
+        card_pool="evil",
+        target_kind="faction",
+        target_key="fire",
+        source_kind="tag",
+        source_id=fire_tag.id,
+    )
 
-    assert [dark_rule.target_key, metal_rule.target_key] == ["dark", "metal"]
+    assert [dark_rule.target_key, metal_rule.target_key, fire_rule.target_key] == [
+        "dark",
+        "metal",
+        "fire",
+    ]
 
 
 def test_symbol_rules_support_all_classification_targets_and_protect_the_source() -> None:

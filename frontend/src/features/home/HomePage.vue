@@ -223,7 +223,7 @@ const primaryCollections: HomeCollection[] = [
     label: 'Evil',
     title: 'Discover what waits across from you',
     description:
-      'Explore bosses, locations, and the Order, Blood, Dark, and Metal factions.',
+      'Explore bosses, locations, and the Order, Blood, Dark, Metal, and Fire factions.',
     linkLabel: 'Browse Evil cards',
   },
 ];

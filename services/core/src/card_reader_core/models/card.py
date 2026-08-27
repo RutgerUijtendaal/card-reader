@@ -149,7 +149,8 @@ ORDER_CARD_FACTION: Literal["order"] = "order"
 BLOOD_CARD_FACTION: Literal["blood"] = "blood"
 DARK_CARD_FACTION: Literal["dark"] = "dark"
 METAL_CARD_FACTION: Literal["metal"] = "metal"
-CardFaction = Literal["order", "blood", "dark", "metal"]
+FIRE_CARD_FACTION: Literal["fire"] = "fire"
+CardFaction = Literal["order", "blood", "dark", "metal", "fire"]
 
 
 @dataclass(frozen=True)
@@ -165,6 +166,7 @@ CARD_FACTION_DEFINITIONS: tuple[CardFactionDefinition, ...] = (
     CardFactionDefinition(key=BLOOD_CARD_FACTION, label="Blood", rank=2),
     CardFactionDefinition(key=DARK_CARD_FACTION, label="Dark", rank=3),
     CardFactionDefinition(key=METAL_CARD_FACTION, label="Metal", rank=4),
+    CardFactionDefinition(key=FIRE_CARD_FACTION, label="Fire", rank=5),
 )
 CARD_FACTIONS: tuple[CardFaction, ...] = tuple(
     definition.key for definition in CARD_FACTION_DEFINITIONS

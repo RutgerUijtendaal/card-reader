@@ -117,7 +117,8 @@
       "order": 0,
       "blood": 0,
       "dark": 0,
-      "metal": 0
+      "metal": 0,
+      "fire": 0
     },
     "min_cards_by_mana_family": {
       "arcane": 1,
@@ -139,7 +140,8 @@
       "order",
       "blood",
       "dark",
-      "metal"
+      "metal",
+      "fire"
     ],
     "required_classification_rules": [
       {
@@ -228,6 +230,14 @@
         "target_key": "metal",
         "source_kind": "tag",
         "source_key": "metal",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "faction",
+        "target_key": "fire",
+        "source_kind": "tag",
+        "source_key": "fire",
         "enabled": true
       },
       {
