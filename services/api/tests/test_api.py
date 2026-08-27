@@ -1700,7 +1700,11 @@ def test_non_player_card_images_are_public_across_all_routes(
     inactive_user.save(update_fields=["is_active"])
     staff = _staff_client(f"public-{card_pool}-image-staff")
 
-    responses = [client.get(path) for client in (anonymous, ordinary, inactive, staff) for path in paths]
+    responses = []
+    clients = (anonymous, ordinary, inactive, staff)
+    for client in clients:
+        for path in paths:
+            responses.append(client.get(path))
     try:
         assert [response.status_code for response in responses] == [200] * 12
     finally:

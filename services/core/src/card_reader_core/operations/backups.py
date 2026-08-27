@@ -169,53 +169,81 @@ def restore_backup_archive(
         if compose_config is not None:
             _run_compose(compose_config, "down")
 
-        safety_archive_path: Path | None = None
-        safety_backup_error: Exception | None = None
+        safety_archive_path, safety_backup_error = _try_create_safety_backup(
+            runtime_paths=runtime_paths,
+            backup_root=backup_root,
+            include_logs=include_logs,
+        )
         try:
-            if backup_root is not None:
-                try:
-                    safety_backup = create_backup_archive(
-                        runtime_paths=runtime_paths,
-                        backup_root=backup_root,
-                        include_logs=include_logs,
-                        prefix="pre-restore-card-reader",
-                    )
-                except Exception as exc:
-                    safety_backup_error = exc
-                else:
-                    safety_archive_path = safety_backup.archive_path
-
-            _replace_live_runtime(runtime_paths, validated)
-
-            if compose_config is not None:
-                _run_compose(compose_config, "up", "-d", "--remove-orphans")
-
-            if healthcheck_url is not None:
-                _wait_for_healthcheck(
-                    healthcheck_url,
-                    attempts=healthcheck_attempts,
-                    delay_seconds=healthcheck_delay_seconds,
-                )
-        except Exception:
-            if compose_config is not None:
-                try:
-                    _run_compose(compose_config, "up", "-d", "--remove-orphans")
-                except Exception:
-                    pass
+            _replace_runtime_and_restart(
+                runtime_paths=runtime_paths,
+                validated=validated,
+                compose_config=compose_config,
+                healthcheck_url=healthcheck_url,
+                healthcheck_attempts=healthcheck_attempts,
+                healthcheck_delay_seconds=healthcheck_delay_seconds,
+            )
+        except Exception as restore_error:
+            _best_effort_restart(compose_config)
             if safety_backup_error is not None:
-                try:
-                    raise
-                except Exception as restore_error:
-                    restore_error.add_note(
-                        "Pre-restore safety backup creation failed before restore: "
-                        f"{safety_backup_error!r}"
-                    )
-                    raise
+                restore_error.add_note(
+                    "Pre-restore safety backup creation failed before restore: "
+                    f"{safety_backup_error!r}"
+                )
             raise
 
         return safety_archive_path
     finally:
         _cleanup_work_dir(extraction_root)
+
+
+def _try_create_safety_backup(
+    *,
+    runtime_paths: RuntimePaths,
+    backup_root: Path | None,
+    include_logs: bool,
+) -> tuple[Path | None, Exception | None]:
+    if backup_root is None:
+        return None, None
+    try:
+        backup = create_backup_archive(
+            runtime_paths=runtime_paths,
+            backup_root=backup_root,
+            include_logs=include_logs,
+            prefix="pre-restore-card-reader",
+        )
+    except Exception as exc:
+        return None, exc
+    return backup.archive_path, None
+
+
+def _replace_runtime_and_restart(
+    *,
+    runtime_paths: RuntimePaths,
+    validated: ValidatedBackup,
+    compose_config: ComposeConfig | None,
+    healthcheck_url: str | None,
+    healthcheck_attempts: int,
+    healthcheck_delay_seconds: float,
+) -> None:
+    _replace_live_runtime(runtime_paths, validated)
+    if compose_config is not None:
+        _run_compose(compose_config, "up", "-d", "--remove-orphans")
+    if healthcheck_url is not None:
+        _wait_for_healthcheck(
+            healthcheck_url,
+            attempts=healthcheck_attempts,
+            delay_seconds=healthcheck_delay_seconds,
+        )
+
+
+def _best_effort_restart(compose_config: ComposeConfig | None) -> None:
+    if compose_config is None:
+        return
+    try:
+        _run_compose(compose_config, "up", "-d", "--remove-orphans")
+    except Exception:
+        pass
 
 
 def default_compose_config() -> ComposeConfig:
@@ -324,6 +352,20 @@ def _extract_archive(archive_path: Path, extraction_root: Path) -> None:
 
 
 def _validate_extracted_backup(extraction_root: Path) -> ValidatedBackup:
+    manifest, content_root = _load_extracted_manifest(extraction_root)
+    manifest_paths = _validate_manifest_files(content_root, manifest=manifest)
+    _validate_no_unexpected_files(content_root, manifest_paths=manifest_paths)
+    database_snapshot_path = _validated_database_snapshot(content_root)
+    return ValidatedBackup(
+        manifest=manifest,
+        extracted_root=extraction_root,
+        database_snapshot_path=database_snapshot_path,
+        app_data_root=content_root / "app_data",
+        public_root=content_root / "public",
+    )
+
+
+def _load_extracted_manifest(extraction_root: Path) -> tuple[dict[str, Any], Path]:
     manifest_path = extraction_root / "manifest.json"
     if not manifest_path.exists():
         raise BackupError("Backup manifest is missing.")
@@ -331,7 +373,14 @@ def _validate_extracted_backup(extraction_root: Path) -> ValidatedBackup:
     content_root = extraction_root / "content"
     if not content_root.exists():
         raise BackupError("Backup content directory is missing.")
+    return manifest, content_root
 
+
+def _validate_manifest_files(
+    content_root: Path,
+    *,
+    manifest: dict[str, Any],
+) -> set[str]:
     files = manifest.get("files")
     if not isinstance(files, list):
         raise BackupError("Backup manifest is missing the files list.")
@@ -350,12 +399,21 @@ def _validate_extracted_backup(extraction_root: Path) -> ValidatedBackup:
             raise BackupError(f"Backup file is missing: {path_value}")
         if calculate_checksum(file_path) != checksum:
             raise BackupError(f"Checksum mismatch for backup file: {path_value}")
+    return manifest_paths
 
+
+def _validate_no_unexpected_files(
+    content_root: Path,
+    *,
+    manifest_paths: set[str],
+) -> None:
     extracted_paths = {path.relative_to(content_root).as_posix() for path in content_root.rglob("*") if path.is_file()}
     unexpected_paths = sorted(extracted_paths - manifest_paths)
     if unexpected_paths:
         raise BackupError(f"Backup contains unexpected files: {', '.join(unexpected_paths)}")
 
+
+def _validated_database_snapshot(content_root: Path) -> Path:
     db_dir = content_root / "db"
     database_files = sorted(path for path in db_dir.glob("*") if path.is_file())
     if len(database_files) != 1:
@@ -364,14 +422,7 @@ def _validate_extracted_backup(extraction_root: Path) -> ValidatedBackup:
         result = snapshot_db.execute("PRAGMA integrity_check").fetchone()
     if result is None or result[0] != "ok":
         raise BackupError("Backup database snapshot failed integrity validation.")
-
-    return ValidatedBackup(
-        manifest=manifest,
-        extracted_root=extraction_root,
-        database_snapshot_path=database_files[0],
-        app_data_root=content_root / "app_data",
-        public_root=content_root / "public",
-    )
+    return database_files[0]
 
 
 def _replace_live_runtime(runtime_paths: RuntimePaths, validated: ValidatedBackup) -> None:

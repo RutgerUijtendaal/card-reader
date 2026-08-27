@@ -65,8 +65,9 @@ def save_parsed_card_with_notifications(
     version = result.version
     if result.created_new_version:
         card_id = version.card.id
-        transaction.on_commit(
-            lambda: NotificationService().notify_deck_owners_card_version_changed(
+
+        def notify_deck_owners() -> None:
+            NotificationService().notify_deck_owners_card_version_changed(
                 card_id=version.card.id,
                 card_version_id=version.id,
                 previous_card_version_id=(
@@ -75,8 +76,11 @@ def save_parsed_card_with_notifications(
                 cause=DECK_CARD_VERSION_CHANGE_IMPORT_CREATED,
                 import_job_id=item.job.id,
                 import_item_id=item.id,
-            ),
-            robust=True,
-        )
-        transaction.on_commit(lambda: TtsCardSheetService().sync_cards([card_id]), robust=True)
+            )
+
+        def sync_tts_card_sheets() -> None:
+            TtsCardSheetService().sync_cards([card_id])
+
+        transaction.on_commit(notify_deck_owners, robust=True)
+        transaction.on_commit(sync_tts_card_sheets, robust=True)
     return version

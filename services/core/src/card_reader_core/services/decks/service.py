@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
@@ -39,6 +40,53 @@ from .validation import DeckValidationService
 
 class DeckCreationDeletedError(Exception):
     """Raised when an idempotency key belongs to a deck that was deleted."""
+
+
+@dataclass(frozen=True)
+class _EffectiveDeckUpdate:
+    name: str
+    description_markup: str | None
+    long_description_markup: str | None
+    difficulty: str | None
+    visibility: str
+    hero_card_id: str
+    entries: list[DeckEntryInput]
+    sideboards: list[DeckSideboardInput]
+
+
+def _effective_markup_value(
+    *,
+    stored_markup: str | None,
+    stored_plain: str | None,
+    update_markup: bool,
+    markup_value: str | None,
+    update_plain: bool,
+    plain_value: str | None,
+) -> str | None:
+    current_value = stored_markup if stored_markup is not None else stored_plain
+    if update_markup:
+        return markup_value
+    if update_plain:
+        return plain_value
+    return current_value
+
+
+def _current_mainboard_inputs(deck: Deck) -> list[DeckEntryInput]:
+    return [
+        DeckEntryInput(card_id=entry.card.id, quantity=int(entry.quantity))
+        for entry in deck.entries.all()
+    ]
+
+
+def _current_sideboard_inputs(deck: Deck) -> list[DeckSideboardInput]:
+    sideboards: list[DeckSideboardInput] = []
+    for sideboard in deck.sideboards.all():
+        entries = [
+            DeckEntryInput(card_id=entry.card.id, quantity=int(entry.quantity))
+            for entry in sideboard.entries.all()
+        ]
+        sideboards.append(DeckSideboardInput(name=sideboard.name, entries=entries))
+    return sideboards
 
 
 class DeckService:
@@ -480,70 +528,13 @@ class DeckService:
 
     def _update_deck(self, *, existing_deck: Deck, updates: DeckUpdateInput) -> Deck | None:
         deck_id = existing_deck.id
-        effective_name = existing_deck.name if not updates.update_name else updates.name
-        effective_description_markup = (
-            existing_deck.description_markup
-            if existing_deck.description_markup is not None
-            else existing_deck.description
-        )
-        if updates.update_description_markup:
-            effective_description_markup = updates.description_markup
-        elif updates.update_description:
-            effective_description_markup = updates.description
-        effective_long_description_markup = (
-            existing_deck.long_description_markup
-            if existing_deck.long_description_markup is not None
-            else existing_deck.long_description
-        )
-        if updates.update_long_description_markup:
-            effective_long_description_markup = updates.long_description_markup
-        elif updates.update_long_description:
-            effective_long_description_markup = updates.long_description
-        effective_difficulty = (
-            existing_deck.difficulty if not updates.update_difficulty else updates.difficulty
-        )
-        effective_visibility = existing_deck.visibility if not updates.update_visibility else updates.visibility
-        effective_hero_card_id = existing_deck.hero_card.id if not updates.update_hero_card_id else updates.hero_card_id
-        effective_entries = (
-            [
-                DeckEntryInput(card_id=entry.card.id, quantity=int(entry.quantity))
-                for entry in existing_deck.entries.all()
-            ]
-            if not updates.update_entries
-            else updates.entries
-        )
-        effective_sideboards = (
-            [
-                DeckSideboardInput(
-                    name=sideboard.name,
-                    entries=[
-                        DeckEntryInput(card_id=entry.card.id, quantity=int(entry.quantity))
-                        for entry in sideboard.entries.all()
-                    ],
-                )
-                for sideboard in existing_deck.sideboards.all()
-            ]
-            if not updates.update_sideboards
-            else updates.sideboards
-        )
-
-        if effective_name is None:
-            raise ValueError("Deck name is required.")
-        if effective_visibility is None:
-            raise ValueError("Deck visibility is required.")
-        if effective_hero_card_id is None:
-            raise ValueError("Hero card is required.")
-        if effective_entries is None:
-            raise ValueError("Deck entries are required.")
-        if effective_sideboards is None:
-            raise ValueError("Sideboards are required.")
-
-        normalized_name = self._normalizer.normalize_name(effective_name)
+        effective = self._resolve_effective_deck_update(existing_deck, updates=updates)
+        normalized_name = self._normalizer.normalize_name(effective.name)
         normalized_description_markup = self._normalizer.normalize_markup(
-            effective_description_markup
+            effective.description_markup
         )
         normalized_long_description_markup = self._normalizer.normalize_markup(
-            effective_long_description_markup
+            effective.long_description_markup
         )
         normalized_description = (
             render_markup_plain(normalized_description_markup, compact=True)
@@ -561,9 +552,9 @@ class DeckService:
         if updates_card_references:
             hero_card, normalized_entries, normalized_sideboards = self._normalizer.normalize_deck_update(
                 existing_deck=existing_deck,
-                hero_card_id=effective_hero_card_id,
-                entries=effective_entries,
-                sideboards=effective_sideboards,
+                hero_card_id=effective.hero_card_id,
+                entries=effective.entries,
+                sideboards=effective.sideboards,
                 update_hero_card_id=updates.update_hero_card_id,
                 update_entries=updates.update_entries,
                 update_sideboards=updates.update_sideboards,
@@ -580,8 +571,8 @@ class DeckService:
                 "description": normalized_description,
                 "long_description_markup": normalized_long_description_markup,
                 "long_description": normalized_long_description,
-                "difficulty": effective_difficulty,
-                "visibility": effective_visibility,
+                "difficulty": effective.difficulty,
+                "visibility": effective.visibility,
                 "hero_card": hero_card,
             },
         )
@@ -599,6 +590,63 @@ class DeckService:
                 suggested_type_labels=updates.suggested_type_labels,
             )
         return self.get_deck(deck_id) or updated
+
+    def _resolve_effective_deck_update(
+        self,
+        existing_deck: Deck,
+        *,
+        updates: DeckUpdateInput,
+    ) -> _EffectiveDeckUpdate:
+        name = updates.name if updates.update_name else existing_deck.name
+        description_markup = _effective_markup_value(
+            stored_markup=existing_deck.description_markup,
+            stored_plain=existing_deck.description,
+            update_markup=updates.update_description_markup,
+            markup_value=updates.description_markup,
+            update_plain=updates.update_description,
+            plain_value=updates.description,
+        )
+        long_description_markup = _effective_markup_value(
+            stored_markup=existing_deck.long_description_markup,
+            stored_plain=existing_deck.long_description,
+            update_markup=updates.update_long_description_markup,
+            markup_value=updates.long_description_markup,
+            update_plain=updates.update_long_description,
+            plain_value=updates.long_description,
+        )
+        difficulty = updates.difficulty if updates.update_difficulty else existing_deck.difficulty
+        visibility = updates.visibility if updates.update_visibility else existing_deck.visibility
+        hero_card_id = (
+            updates.hero_card_id
+            if updates.update_hero_card_id
+            else existing_deck.hero_card.id
+        )
+        entries = updates.entries if updates.update_entries else _current_mainboard_inputs(existing_deck)
+        sideboards = (
+            updates.sideboards
+            if updates.update_sideboards
+            else _current_sideboard_inputs(existing_deck)
+        )
+        if name is None:
+            raise ValueError("Deck name is required.")
+        if visibility is None:
+            raise ValueError("Deck visibility is required.")
+        if hero_card_id is None:
+            raise ValueError("Hero card is required.")
+        if entries is None:
+            raise ValueError("Deck entries are required.")
+        if sideboards is None:
+            raise ValueError("Sideboards are required.")
+        return _EffectiveDeckUpdate(
+            name=name,
+            description_markup=description_markup,
+            long_description_markup=long_description_markup,
+            difficulty=difficulty,
+            visibility=visibility,
+            hero_card_id=hero_card_id,
+            entries=entries,
+            sideboards=sideboards,
+        )
 
     def delete_owner_deck(self, *, deck_id: str, owner_id: str) -> bool:
         return delete_deck(deck_id=deck_id, owner_id=owner_id)

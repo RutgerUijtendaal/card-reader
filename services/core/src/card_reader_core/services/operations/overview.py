@@ -68,51 +68,99 @@ class OperationsQueueNotFoundError(ValueError):
     pass
 
 
+def _build_import_counts(_now: datetime) -> dict[str, int]:
+    return _normalized_counts(import_job_status_counts(), _normalize_import_status)
+
+
+def _load_recent_imports(limit: int) -> list[ImportJob]:
+    return list_import_jobs_for_operations(limit=limit)
+
+
+def _load_import_page(page: int, page_size: int) -> PaginatedOperationsRows[ImportJob]:
+    return paginate_import_jobs_for_operations(page=page, page_size=page_size)
+
+
+def _build_import_item(row: ImportJob, _now: datetime) -> dict[str, Any]:
+    return _import_item_payload(row)
+
+
+def _build_tts_counts(now: datetime) -> dict[str, int]:
+    return _tts_counts(now=now)
+
+
+def _load_recent_tts_sheets(limit: int) -> list[TtsCardSheet]:
+    return list_tts_card_sheets_for_operations(limit=limit)
+
+
+def _load_tts_sheet_page(
+    page: int,
+    page_size: int,
+) -> PaginatedOperationsRows[TtsCardSheet]:
+    return paginate_tts_card_sheets_for_operations(page=page, page_size=page_size)
+
+
+def _build_tts_item(row: TtsCardSheet, now: datetime) -> dict[str, Any]:
+    return _tts_item_payload(row, now=now)
+
+
+def _build_developer_data_counts(_now: datetime) -> dict[str, int]:
+    return _normalized_counts(
+        developer_data_build_status_counts(),
+        _normalize_developer_data_status,
+    )
+
+
+def _load_recent_developer_data_builds(limit: int) -> list[DeveloperDataBuild]:
+    return list_recent_developer_data_builds(limit=limit)
+
+
+def _load_developer_data_build_page(
+    page: int,
+    page_size: int,
+) -> PaginatedOperationsRows[DeveloperDataBuild]:
+    return paginate_developer_data_builds_for_operations(
+        page=page,
+        page_size=page_size,
+    )
+
+
+def _build_developer_data_item(
+    row: DeveloperDataBuild,
+    _now: datetime,
+) -> dict[str, Any]:
+    return _developer_data_item_payload(row)
+
+
 _QUEUE_DEFINITIONS = (
     OperationsQueueDefinition(
         key="imports",
         display_name="Card imports",
         worker_key="parser",
         worker_display_name="Parser worker",
-        build_counts=lambda _now: _normalized_counts(
-            import_job_status_counts(),
-            _normalize_import_status,
-        ),
-        load_recent=lambda limit: list_import_jobs_for_operations(limit=limit),
-        load_page=lambda page, page_size: paginate_import_jobs_for_operations(
-            page=page,
-            page_size=page_size,
-        ),
-        build_item=lambda row, _now: _import_item_payload(row),
+        build_counts=_build_import_counts,
+        load_recent=_load_recent_imports,
+        load_page=_load_import_page,
+        build_item=_build_import_item,
     ),
     OperationsQueueDefinition(
         key="tts-card-sheets",
         display_name="TTS card sheets",
         worker_key="tts-sheet-renderer",
         worker_display_name="TTS card-sheet renderer",
-        build_counts=lambda now: _tts_counts(now=now),
-        load_recent=lambda limit: list_tts_card_sheets_for_operations(limit=limit),
-        load_page=lambda page, page_size: paginate_tts_card_sheets_for_operations(
-            page=page,
-            page_size=page_size,
-        ),
-        build_item=lambda row, now: _tts_item_payload(row, now=now),
+        build_counts=_build_tts_counts,
+        load_recent=_load_recent_tts_sheets,
+        load_page=_load_tts_sheet_page,
+        build_item=_build_tts_item,
     ),
     OperationsQueueDefinition(
         key="developer-data-builds",
         display_name="Developer-data builds",
         worker_key="developer-data-builder",
         worker_display_name="Developer-data builder",
-        build_counts=lambda _now: _normalized_counts(
-            developer_data_build_status_counts(),
-            _normalize_developer_data_status,
-        ),
-        load_recent=lambda limit: list_recent_developer_data_builds(limit=limit),
-        load_page=lambda page, page_size: paginate_developer_data_builds_for_operations(
-            page=page,
-            page_size=page_size,
-        ),
-        build_item=lambda row, _now: _developer_data_item_payload(row),
+        build_counts=_build_developer_data_counts,
+        load_recent=_load_recent_developer_data_builds,
+        load_page=_load_developer_data_build_page,
+        build_item=_build_developer_data_item,
     ),
 )
 

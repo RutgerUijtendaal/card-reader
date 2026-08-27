@@ -378,6 +378,107 @@ def _adopt_type_inferred_roles(card: dict[str, Any]) -> dict[str, Any]:
     return adopted_card
 
 
+def _add_card_back_override_field(card: object) -> object:
+    if not isinstance(card, dict):
+        return card
+    return {**card, "card_back_override_checksum": None}
+
+
+def _adopt_inferred_roles_and_card_back(card: object) -> object:
+    if not isinstance(card, dict):
+        return card
+    adopted_card = _adopt_type_inferred_roles(card)
+    adopted_card["card_back_override_checksum"] = None
+    return adopted_card
+
+
+def _card_reference_identity(
+    reference: dict[str, Any],
+) -> tuple[object, object, tuple[str, ...]]:
+    normalized_factions = normalize_card_factions(reference.get("card_factions", []))
+    return (
+        reference.get("key"),
+        reference.get("card_pool"),
+        tuple(normalized_factions),
+    )
+
+
+def _adopt_reference_mana_families(
+    reference: object,
+    *,
+    families_by_reference: dict[tuple[object, object, tuple[str, ...]], list[object]],
+) -> object:
+    if not isinstance(reference, dict):
+        return reference
+    identity = _card_reference_identity(reference)
+    return {
+        **reference,
+        "card_mana_families": families_by_reference.get(identity, []),
+    }
+
+
+def _adopt_group_mana_family_references(
+    group: object,
+    *,
+    families_by_reference: dict[tuple[object, object, tuple[str, ...]], list[object]],
+) -> object:
+    if not isinstance(group, dict):
+        return group
+
+    adopted_members: list[object] = []
+    for member in group.get("members", []):
+        if not isinstance(member, dict):
+            adopted_members.append(member)
+            continue
+        adopted_members.append(
+            {
+                **member,
+                "card_ref": _adopt_reference_mana_families(
+                    member.get("card_ref"),
+                    families_by_reference=families_by_reference,
+                ),
+            }
+        )
+    return {
+        **group,
+        "anchor_card_ref": _adopt_reference_mana_families(
+            group.get("anchor_card_ref"),
+            families_by_reference=families_by_reference,
+        ),
+        "members": adopted_members,
+    }
+
+
+def _adopt_legacy_card_group(
+    group: object,
+    *,
+    cards_by_key: dict[object, dict[str, object]],
+) -> object:
+    if not isinstance(group, dict):
+        return group
+
+    adopted_group: dict[str, object] = {}
+    for key, item in group.items():
+        if key not in {"anchor_card_key", "members"}:
+            adopted_group[key] = item
+    adopted_group["anchor_card_ref"] = cards_by_key.get(group.get("anchor_card_key"))
+
+    adopted_members: list[object] = []
+    for member in group.get("members", []):
+        if not isinstance(member, dict):
+            adopted_members.append(member)
+            continue
+        adopted_member = {
+            key: item
+            for key, item in member.items()
+            if key != "card_key"
+        }
+        adopted_member["card_ref"] = cards_by_key.get(member.get("card_key"))
+        adopted_members.append(adopted_member)
+    adopted_group["members"] = adopted_members
+    return adopted_group
+
+
 def adopt_payload_for_format(value: object, *, format_version: int) -> object:
     """Adopt supported bundle payloads into the current strict schema."""
     if (
@@ -388,6 +489,31 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
     if format_version == DEVELOPER_DATA_FORMAT_VERSION:
         return value
     adopted = dict(value)
+    _adopt_legacy_card_back_fields(adopted)
+    cards = adopted.get("cards")
+    if not isinstance(cards, list):
+        return adopted
+    if format_version == 3:
+        adopted["cards"] = [_adopt_inferred_roles_and_card_back(card) for card in cards]
+        return adopted
+    if format_version == 4:
+        adopted["cards"] = [_add_card_back_override_field(card) for card in cards]
+        return adopted
+
+    adopted_cards = _adopt_format_one_or_two_cards(
+        cards,
+        format_version=format_version,
+    )
+    adopted["cards"] = adopted_cards
+    if format_version == 1:
+        adopted["classification_rules"] = []
+        _adopt_format_one_group_references(adopted, cards=adopted_cards)
+    else:
+        _adopt_format_two_group_references(adopted, cards=adopted_cards)
+    return adopted
+
+
+def _adopt_legacy_card_back_fields(adopted: dict[str, Any]) -> None:
     legacy_current_card_back = adopted.pop("current_card_back", None)
     adopted["card_backs"] = (
         [legacy_current_card_back] if isinstance(legacy_current_card_back, dict) else []
@@ -401,108 +527,89 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
         {"card_pool": card_pool, "card_back_checksum": legacy_checksum}
         for card_pool in ("player", "evil", "neutral")
     ]
-    cards = adopted.get("cards")
-    if not isinstance(cards, list):
-        return adopted
-    if format_version == 3:
-        adopted["cards"] = [
-            {
-                **_adopt_type_inferred_roles(card),
-                "card_back_override_checksum": None,
-            }
-            if isinstance(card, dict)
-            else card
-            for card in cards
-        ]
-        return adopted
-    if format_version == 4:
-        adopted["cards"] = [
-            {**card, "card_back_override_checksum": None}
-            if isinstance(card, dict)
-            else card
-            for card in cards
-        ]
-        return adopted
-    if format_version == 1:
-        adopted["classification_rules"] = []
+
+
+def _adopt_format_one_or_two_cards(
+    cards: list[object],
+    *,
+    format_version: int,
+) -> list[object]:
     adopted_cards: list[object] = []
     for card in cards:
         if not isinstance(card, dict):
             adopted_cards.append(card)
             continue
-        adopted_card = dict(card)
-        adopted_card["card_back_override_checksum"] = None
-        if format_version == 1:
-            if "is_hero" not in adopted_card or type(adopted_card["is_hero"]) is not bool:
-                raise ValueError("Legacy developer-data card is_hero must be a Boolean.")
-            was_hero = adopted_card.pop("is_hero")
-            adopted_card["card_pool"] = "player"
-            adopted_card["card_roles"] = ["hero"] if was_hero is True else []
-            adopted_card["card_factions"] = []
-        adopted_card = _adopt_type_inferred_roles(adopted_card)
-        latest_version = _latest_version_record(adopted_card)
-        symbol_keys = (
-            latest_version.get("symbol_keys", [])
-            if isinstance(latest_version, dict)
-            else []
+        adopted_cards.append(
+            _adopt_format_one_or_two_card(card, format_version=format_version)
         )
-        adopted_card["card_mana_families"] = (
-            list(
-                mana_family_keys_for_symbol_keys(
-                    tuple(str(key) for key in symbol_keys if isinstance(key, str))
-                )
-            )
-            if adopted_card.get("card_pool") == "player"
-            else []
+    return adopted_cards
+
+
+def _adopt_format_one_or_two_card(
+    card: dict[str, Any],
+    *,
+    format_version: int,
+) -> dict[str, Any]:
+    adopted_card = dict(card)
+    adopted_card["card_back_override_checksum"] = None
+    if format_version == 1:
+        if "is_hero" not in adopted_card or type(adopted_card["is_hero"]) is not bool:
+            raise ValueError("Legacy developer-data card is_hero must be a Boolean.")
+        was_hero = adopted_card.pop("is_hero")
+        adopted_card["card_pool"] = "player"
+        adopted_card["card_roles"] = ["hero"] if was_hero is True else []
+        adopted_card["card_factions"] = []
+    adopted_card = _adopt_type_inferred_roles(adopted_card)
+    latest_version = _latest_version_record(adopted_card)
+    symbol_keys = latest_version.get("symbol_keys", []) if latest_version else []
+    if adopted_card.get("card_pool") == "player":
+        string_symbol_keys = tuple(
+            str(key) for key in symbol_keys if isinstance(key, str)
         )
-        adopted_cards.append(adopted_card)
-    adopted["cards"] = adopted_cards
-    if format_version != 1:
-        families_by_reference = {
-            (
-                card.get("key"),
-                card.get("card_pool"),
-                tuple(normalize_card_factions(card.get("card_factions", []))),
-            ): list(card.get("card_mana_families", []))
-            for card in adopted_cards
-            if isinstance(card, dict)
-            and isinstance(card.get("card_factions", []), list)
-        }
+        adopted_card["card_mana_families"] = list(
+            mana_family_keys_for_symbol_keys(string_symbol_keys)
+        )
+    else:
+        adopted_card["card_mana_families"] = []
+    return adopted_card
 
-        def adopt_reference(reference: object) -> object:
-            if not isinstance(reference, dict):
-                return reference
-            identity = (
-                reference.get("key"),
-                reference.get("card_pool"),
-                tuple(normalize_card_factions(reference.get("card_factions", []))),
+
+def _adopt_format_two_group_references(
+    adopted: dict[str, Any],
+    *,
+    cards: list[object],
+) -> None:
+    families_by_reference: dict[
+        tuple[object, object, tuple[str, ...]],
+        list[object],
+    ] = {}
+    for card in cards:
+        if not isinstance(card, dict):
+            continue
+        if not isinstance(card.get("card_factions", []), list):
+            continue
+        family_values = card.get("card_mana_families", [])
+        if not isinstance(family_values, list):
+            continue
+        identity = _card_reference_identity(card)
+        families_by_reference[identity] = list(family_values)
+
+    groups = adopted.get("card_groups")
+    if isinstance(groups, list):
+        adopted["card_groups"] = [
+            _adopt_group_mana_family_references(
+                group,
+                families_by_reference=families_by_reference,
             )
-            return {
-                **reference,
-                "card_mana_families": families_by_reference.get(identity, []),
-            }
+            for group in groups
+        ]
 
-        groups = adopted.get("card_groups")
-        if isinstance(groups, list):
-            adopted["card_groups"] = [
-                {
-                    **group,
-                    "anchor_card_ref": adopt_reference(group.get("anchor_card_ref")),
-                    "members": [
-                        {
-                            **member,
-                            "card_ref": adopt_reference(member.get("card_ref")),
-                        }
-                        if isinstance(member, dict)
-                        else member
-                        for member in group.get("members", [])
-                    ],
-                }
-                if isinstance(group, dict)
-                else group
-                for group in groups
-            ]
-        return adopted
+
+def _adopt_format_one_group_references(
+    adopted: dict[str, Any],
+    *,
+    cards: list[object],
+) -> None:
     cards_by_key = {
         card["key"]: {
             "key": card["key"],
@@ -510,33 +617,14 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
             "card_factions": card["card_factions"],
             "card_mana_families": card["card_mana_families"],
         }
-        for card in adopted_cards
+        for card in cards
         if isinstance(card, dict)
     }
-    if len(cards_by_key) != len(adopted_cards):
+    if len(cards_by_key) != len(cards):
         raise ValueError("Legacy developer-data card keys must be unique.")
     groups = adopted.get("card_groups")
     if isinstance(groups, list):
         adopted["card_groups"] = [
-            {
-                **{
-                    key: item
-                    for key, item in group.items()
-                    if key not in {"anchor_card_key", "members"}
-                },
-                "anchor_card_ref": cards_by_key.get(group.get("anchor_card_key")),
-                "members": [
-                    {
-                        **{key: item for key, item in member.items() if key != "card_key"},
-                        "card_ref": cards_by_key.get(member.get("card_key")),
-                    }
-                    if isinstance(member, dict)
-                    else member
-                    for member in group.get("members", [])
-                ],
-            }
-            if isinstance(group, dict)
-            else group
+            _adopt_legacy_card_group(group, cards_by_key=cards_by_key)
             for group in groups
         ]
-    return adopted

@@ -139,3 +139,44 @@ def test_download_retries_with_the_same_token_and_resumes_partial_content(
     )
     assert download_requests[0].get_header("Range") is None
     assert download_requests[1].get_header("Range") == "bytes=3-"
+
+
+def test_download_retries_when_final_replacement_is_temporarily_blocked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    content = b"abcdef"
+    temporary = tmp_path / "bundle.tar.gz.part"
+    target = tmp_path / "bundle.tar.gz"
+    responses = iter([_Response(content)])
+    replacement_attempts = 0
+    original_replace = Path.replace
+
+    def fake_urlopen(_request: Request, timeout: int) -> _Response:
+        assert timeout == 120
+        return next(responses)
+
+    def replace_with_transient_failure(source: Path, destination: Path) -> Path:
+        nonlocal replacement_attempts
+        replacement_attempts += 1
+        if replacement_attempts == 1:
+            raise OSError("bundle is temporarily locked")
+        return original_replace(source, destination)
+
+    monkeypatch.setattr(bootstrap_dev, "urlopen", fake_urlopen)
+    monkeypatch.setattr(Path, "replace", replace_with_transient_failure)
+    messages: list[str] = []
+    stdout = SimpleNamespace(write=messages.append)
+
+    archive = bootstrap_dev._download_bundle_with_retries(
+        token="same-retry-token",
+        download_url="https://cards.example.test/bundle.tar.gz",
+        expected_size=len(content),
+        target=target,
+        temporary=temporary,
+        stdout=stdout,
+    )
+
+    assert archive.read_bytes() == content
+    assert replacement_attempts == 2
+    assert messages == ["Download interrupted; retrying (1/3)."]

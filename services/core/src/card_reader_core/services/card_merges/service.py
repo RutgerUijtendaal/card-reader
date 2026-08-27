@@ -33,10 +33,11 @@ from .versions import merge_card_versions
 def preview_card_merge(*, target_card_id: str, source_card_ids: list[str]) -> CardMergePreview:
     target, sources = _load_merge_cards(target_card_id=target_card_id, source_card_ids=source_card_ids)
     aliases = build_alias_previews(target=target, sources=sources)
+    source_ids = {source.id for source in sources}
     blocking_conflicts = [
         f"Alias key '{alias.key}' already points to card '{alias.conflict_card_id}'."
         for alias in aliases
-        if alias.conflict_card_id is not None and alias.conflict_card_id not in {source.id for source in sources}
+        if alias.conflict_card_id is not None and alias.conflict_card_id not in source_ids
     ]
     if any(source.card_pool != target.card_pool for source in sources):
         blocking_conflicts.append("Cards from different pools cannot be merged.")
@@ -57,13 +58,15 @@ def preview_card_merge(*, target_card_id: str, source_card_ids: list[str]) -> Ca
         warnings.append(
             "Card-back overrides differ; the target Card's override will be preserved."
         )
-    source_ids = [source.id for source in sources]
+    ordered_source_ids = [source.id for source in sources]
     return CardMergePreview(
         target=_card_summary(target),
         sources=[_card_summary(source) for source in sources],
         aliases=aliases,
-        relations=preview_relation_changes(target_id=target.id, source_ids=source_ids),
-        resulting_version_count=CardVersion.objects.filter(card_id__in=[target.id, *source_ids]).count(),
+        relations=preview_relation_changes(target_id=target.id, source_ids=ordered_source_ids),
+        resulting_version_count=CardVersion.objects.filter(
+            card_id__in=[target.id, *ordered_source_ids]
+        ).count(),
         blocking_conflicts=blocking_conflicts,
         warnings=warnings,
     )

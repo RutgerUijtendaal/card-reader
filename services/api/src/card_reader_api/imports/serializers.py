@@ -72,47 +72,50 @@ def import_job_payload(job: ImportJob) -> dict[str, object]:
 def import_detail_payload(job: ImportJob, items: list[ImportJobItem]) -> dict[str, object]:
     return {
         **import_job_payload(job),
-        "items": [
-            {
-                "id": item.id,
-                "source_file": item.source_file,
-                "status": item.status,
-                "error_message": item.error_message,
-                "warning_code": item.warning_code,
-                "warning_message": item.warning_message,
-                "warnings": item.warnings_json,
-                "resolved_card_roles": item.resolved_card_roles_json,
-                "resolved_card_factions": item.resolved_card_factions_json,
-                "resolved_card_mana_families": item.resolved_card_mana_families_json,
-                "classification_inference": item.classification_inference_json,
-                "target_card_id": item.target_card.id if item.target_card is not None else None,
-                "target_card_version_id": (
-                    item.target_card_version.id if item.target_card_version is not None else None
-                ),
-                "target_card_pool_snapshot": item.target_card_pool_snapshot,
-                "target_card_roles_snapshot": item.target_card_roles_snapshot_json,
-                "target_card_factions_snapshot": item.target_card_factions_snapshot_json,
-                "target_card_mana_families_snapshot": (
-                    item.target_card_mana_families_snapshot_json
-                ),
-                "card_tab_url": (
-                    f"/cards/{item.target_card.id}/edit?tab=card"
-                    if item.target_card is not None
-                    else None
-                ),
-                "classification_review": (
-                    {
-                        "id": review_item.id,
-                        "status": review_item.status,
-                        "url": f"/review?view=classification&status={review_item.status}",
-                    }
-                    if (review_item := getattr(item, "classification_review_item", None))
-                    is not None
-                    else None
-                ),
-            }
-            for item in items
-        ],
+        "items": [_import_item_payload(item) for item in items],
+    }
+
+
+def _import_item_payload(item: ImportJobItem) -> dict[str, object]:
+    target_card = item.target_card
+    target_card_version = item.target_card_version
+    return {
+        "id": item.id,
+        "source_file": item.source_file,
+        "status": item.status,
+        "error_message": item.error_message,
+        "warning_code": item.warning_code,
+        "warning_message": item.warning_message,
+        "warnings": item.warnings_json,
+        "resolved_card_roles": item.resolved_card_roles_json,
+        "resolved_card_factions": item.resolved_card_factions_json,
+        "resolved_card_mana_families": item.resolved_card_mana_families_json,
+        "classification_inference": item.classification_inference_json,
+        "target_card_id": target_card.id if target_card is not None else None,
+        "target_card_version_id": (
+            target_card_version.id if target_card_version is not None else None
+        ),
+        "target_card_pool_snapshot": item.target_card_pool_snapshot,
+        "target_card_roles_snapshot": item.target_card_roles_snapshot_json,
+        "target_card_factions_snapshot": item.target_card_factions_snapshot_json,
+        "target_card_mana_families_snapshot": item.target_card_mana_families_snapshot_json,
+        "card_tab_url": (
+            f"/cards/{target_card.id}/edit?tab=card"
+            if target_card is not None
+            else None
+        ),
+        "classification_review": _classification_review_payload(item),
+    }
+
+
+def _classification_review_payload(item: ImportJobItem) -> dict[str, object] | None:
+    review_item = getattr(item, "classification_review_item", None)
+    if review_item is None:
+        return None
+    return {
+        "id": review_item.id,
+        "status": review_item.status,
+        "url": f"/review?view=classification&status={review_item.status}",
     }
 
 

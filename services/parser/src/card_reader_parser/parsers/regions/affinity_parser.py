@@ -45,11 +45,14 @@ class AffinityParser:
             detected_symbols=detected_symbols,
             symbols=symbols,
         )
-        affinity_keys = [
-            row.key
-            for row in sorted(detected_symbols, key=lambda row: row.bbox.x)
-            if row.symbol_type.strip().lower() == "affinity"
-        ]
+        affinity_keys: list[str] = []
+        detections_by_horizontal_position = sorted(
+            detected_symbols,
+            key=lambda row: row.bbox.x,
+        )
+        for detection in detections_by_horizontal_position:
+            if detection.symbol_type.strip().lower() == "affinity":
+                affinity_keys.append(detection.key)
         logger.info(
             "Affinity parser finished. region=%s symbols=%s affinity_keys=%s",
             region_name,

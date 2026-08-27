@@ -59,6 +59,7 @@ from .schema import (
     CatalogRecord,
     ClassificationRuleRecord,
     ContentVersionRecord,
+    CoverageRequirements,
     DeckTagRecord,
     DeveloperDataManifest,
     DeveloperDataPayload,
@@ -468,93 +469,132 @@ def _validate_coverage(
 ) -> None:
     coverage = selection.coverage
     errors: list[str] = []
+    _append_card_coverage_errors(coverage, payload, errors)
+    _append_catalog_coverage_errors(coverage, payload, errors)
+    _append_classification_coverage_errors(coverage, payload, errors)
+    _append_rule_coverage_errors(coverage, payload, errors)
+    _append_card_back_coverage_errors(payload, errors)
+    if errors:
+        raise DeveloperDataError("Developer-data coverage failed: " + "; ".join(errors))
+
+
+def _append_card_coverage_errors(
+    coverage: CoverageRequirements,
+    payload: DeveloperDataPayload,
+    errors: list[str],
+) -> None:
     if len(payload.cards) < coverage.min_cards:
         errors.append(f"requires at least {coverage.min_cards} cards")
+
     for card_pool, minimum in coverage.min_cards_by_pool.items():
         count = sum(card.card_pool == card_pool for card in payload.cards)
         if count < minimum:
             errors.append(f"requires at least {minimum} {card_pool} cards")
+
     for card_role, minimum in coverage.min_cards_by_role.items():
-        count = sum(
-            (not card.card_roles if card_role == "standard" else card_role in card.card_roles)
-            for card in payload.cards
-        )
+        if card_role == "standard":
+            count = sum(not card.card_roles for card in payload.cards)
+        else:
+            count = sum(card_role in card.card_roles for card in payload.cards)
         if count < minimum:
             errors.append(f"requires at least {minimum} cards with role {card_role}")
-    if (
-        sum(card.lifecycle_status == "deprecated" for card in payload.cards)
-        < coverage.min_deprecated_cards
-    ):
+
+    deprecated_count = sum(
+        card.lifecycle_status == "deprecated" for card in payload.cards
+    )
+    if deprecated_count < coverage.min_deprecated_cards:
         errors.append(f"requires at least {coverage.min_deprecated_cards} deprecated cards")
+
     if len(payload.card_groups) < coverage.min_card_groups:
         errors.append(f"requires at least {coverage.min_card_groups} card groups")
-    if (
-        sum(len(card.versions) > 1 for card in payload.cards)
-        < coverage.min_cards_with_multiple_versions
-    ):
+
+    cards_with_history = sum(len(card.versions) > 1 for card in payload.cards)
+    if cards_with_history < coverage.min_cards_with_multiple_versions:
         errors.append(
             f"requires at least {coverage.min_cards_with_multiple_versions} cards with version history"
         )
+
+
+def _append_catalog_coverage_errors(
+    coverage: CoverageRequirements,
+    payload: DeveloperDataPayload,
+    errors: list[str],
+) -> None:
     template_keys = {template.key for template in payload.templates}
     missing_templates = sorted(set(coverage.required_template_keys) - template_keys)
     if missing_templates:
         errors.append(f"missing required templates: {', '.join(missing_templates)}")
+
     tag_keys = {tag.key for tag in payload.tags}
     missing_tags = sorted(set(coverage.required_tag_keys) - tag_keys)
     if missing_tags:
         errors.append(f"missing required tags: {', '.join(missing_tags)}")
-    faction_counts = {
-        faction: sum(faction in card.card_factions for card in payload.cards)
-        for faction in coverage.min_cards_by_faction
-    }
+
+
+def _append_classification_coverage_errors(
+    coverage: CoverageRequirements,
+    payload: DeveloperDataPayload,
+    errors: list[str],
+) -> None:
     for faction, minimum in coverage.min_cards_by_faction.items():
-        if faction_counts[faction] < minimum:
+        count = sum(faction in card.card_factions for card in payload.cards)
+        if count < minimum:
             errors.append(
-                f"faction {faction} has {faction_counts[faction]} cards; requires {minimum}"
+                f"faction {faction} has {count} cards; requires {minimum}"
             )
-    mana_family_counts = {
-        family: sum(family in card.card_mana_families for card in payload.cards)
-        for family in coverage.min_cards_by_mana_family
-    }
+
     for family, minimum in coverage.min_cards_by_mana_family.items():
-        if mana_family_counts[family] < minimum:
+        count = sum(family in card.card_mana_families for card in payload.cards)
+        if count < minimum:
             errors.append(
-                f"mana family {family} has {mana_family_counts[family]} cards; "
-                f"requires {minimum}"
+                f"mana family {family} has {count} cards; requires {minimum}"
             )
+
+
+def _classification_rule_identity(
+    rule: ClassificationRuleRecord,
+) -> tuple[str, str, str, str, str, bool]:
+    return (
+        rule.card_pool,
+        rule.target_kind,
+        rule.target_key,
+        rule.source_kind,
+        rule.source_key,
+        rule.enabled,
+    )
+
+
+def _append_rule_coverage_errors(
+    coverage: CoverageRequirements,
+    payload: DeveloperDataPayload,
+    errors: list[str],
+) -> None:
     available_rules = {
-        (
-            rule.card_pool,
-            rule.target_kind,
-            rule.target_key,
-            rule.source_kind,
-            rule.source_key,
-            rule.enabled,
-        )
-        for rule in payload.classification_rules
+        _classification_rule_identity(rule) for rule in payload.classification_rules
     }
-    missing_rules = [
-        rule
-        for rule in coverage.required_classification_rules
-        if (
-            rule.card_pool,
-            rule.target_kind,
-            rule.target_key,
-            rule.source_kind,
-            rule.source_key,
-            rule.enabled,
-        )
-        not in available_rules
-    ]
+    missing_rules: list[ClassificationRuleRecord] = []
+    for rule in coverage.required_classification_rules:
+        if _classification_rule_identity(rule) not in available_rules:
+            missing_rules.append(rule)
+
     if missing_rules:
-        errors.append(
-            "missing required classification rules: "
-            + ", ".join(
+        missing_descriptions = []
+        for rule in missing_rules:
+            description = (
                 f"{rule.card_pool}/{rule.target_kind}:{rule.target_key}"
                 f"<-{rule.source_kind}:{rule.source_key}"
-                for rule in missing_rules
             )
+            missing_descriptions.append(description)
+        errors.append(
+            "missing required classification rules: "
+            + ", ".join(missing_descriptions)
         )
+
+
+def _append_card_back_coverage_errors(
+    payload: DeveloperDataPayload,
+    errors: list[str],
+) -> None:
     player_default = next(
         (
             row.card_back_checksum
@@ -565,8 +605,6 @@ def _validate_coverage(
     )
     if player_default is None:
         errors.append("requires a Player pool default card back")
-    if errors:
-        raise DeveloperDataError("Developer-data coverage failed: " + "; ".join(errors))
 
 
 _FORBIDDEN_DATA_KEYS = {

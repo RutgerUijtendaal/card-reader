@@ -65,7 +65,7 @@ from .snapshots import (
     build_parsed_snapshot,
     decode_field_sources,
 )
-from .types import ParsedCardSaveResult
+from .types import FieldSourcesPayload, ParsedCardSaveResult
 
 
 UnknownEvilFactionMatchReason = Literal[
@@ -1123,6 +1123,35 @@ def apply_parsed_output_to_version(
     symbol_ids: list[str],
 ) -> None:
     field_sources = decode_field_sources(version.field_sources_json)
+    _apply_auto_owned_scalar_output(
+        version,
+        normalized_fields=normalized_fields,
+        field_sources=field_sources,
+    )
+    symbols_are_auto_owned = _apply_auto_owned_metadata_output(
+        version,
+        field_sources=field_sources,
+        keyword_ids=keyword_ids,
+        tag_ids=tag_ids,
+        type_ids=type_ids,
+        symbol_ids=symbol_ids,
+    )
+    if field_sources["fields"]["rules_text"] == FIELD_SOURCE_AUTO:
+        version.rules_text_enriched = normalized_fields.get("rules_text_enriched", "")
+    if field_sources["fields"]["rules_text"] == FIELD_SOURCE_AUTO or symbols_are_auto_owned:
+        version.rules_text = render_rule_text_for_card_version(
+            card_version_id=version.id,
+            enriched_text=version.rules_text_enriched,
+        )
+    version.confidence = float(confidence.get("overall", 0.0))
+
+
+def _apply_auto_owned_scalar_output(
+    version: CardVersion,
+    *,
+    normalized_fields: dict[str, str],
+    field_sources: FieldSourcesPayload,
+) -> None:
     if field_sources["fields"]["name"] == FIELD_SOURCE_AUTO:
         version.name = normalized_fields.get("name", "")
     if field_sources["fields"]["type_line"] == FIELD_SOURCE_AUTO:
@@ -1141,6 +1170,16 @@ def apply_parsed_output_to_version(
         version.health = to_int_or_none(normalized_fields.get("health"))
     version.rules_text_raw = normalized_fields.get("rules_text_raw", "")
 
+
+def _apply_auto_owned_metadata_output(
+    version: CardVersion,
+    *,
+    field_sources: FieldSourcesPayload,
+    keyword_ids: list[str],
+    tag_ids: list[str],
+    type_ids: list[str],
+    symbol_ids: list[str],
+) -> bool:
     if field_sources["metadata"]["keywords"] == FIELD_SOURCE_AUTO:
         replace_card_version_keywords(card_version_id=version.id, keyword_ids=keyword_ids)
     if field_sources["metadata"]["tags"] == FIELD_SOURCE_AUTO:
@@ -1153,13 +1192,4 @@ def apply_parsed_output_to_version(
             card_version_id=version.id,
             symbol_ids=symbol_ids,
         )
-
-    if field_sources["fields"]["rules_text"] == FIELD_SOURCE_AUTO:
-        version.rules_text_enriched = normalized_fields.get("rules_text_enriched", "")
-    if field_sources["fields"]["rules_text"] == FIELD_SOURCE_AUTO or symbols_are_auto_owned:
-        version.rules_text = render_rule_text_for_card_version(
-            card_version_id=version.id,
-            enriched_text=version.rules_text_enriched,
-        )
-
-    version.confidence = float(confidence.get("overall", 0.0))
+    return symbols_are_auto_owned

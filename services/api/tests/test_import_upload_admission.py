@@ -131,11 +131,14 @@ def test_retry_cleanup_failure_does_not_replace_prevalidation_rejection(
     def reject(**_kwargs: object) -> None:
         raise ImportCreationRejected("Unknown template_id 'missing'")
 
+    def fail_to_reconcile(*_args: object, **_kwargs: object) -> None:
+        raise PermissionError("unreadable stage")
+
     service.prevalidate_job_creation = reject  # type: ignore[method-assign]
     monkeypatch.setattr(
         StagedImportUpload,
         "reconcile_existing",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(PermissionError("unreadable stage")),
+        fail_to_reconcile,
     )
 
     with pytest.raises(ImportAdmissionRejected, match="Unknown template_id"):
@@ -244,13 +247,18 @@ def test_matching_replay_returns_before_staging(
     )
     service = _FakeImportService()
     service.existing = SimpleNamespace(id="existing", creation_fingerprint=fingerprint)
-    service.prevalidate_job_creation = lambda **_kwargs: pytest.fail(  # type: ignore[method-assign]
-        "matching replay must return before current domain prevalidation"
-    )
+
+    def fail_prevalidation(**_kwargs: object) -> None:
+        pytest.fail("matching replay must return before current domain prevalidation")
+
+    def fail_publish(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("matching replay must not stage files")
+
+    service.prevalidate_job_creation = fail_prevalidation  # type: ignore[method-assign]
     monkeypatch.setattr(
         StagedImportUpload,
         "publish",
-        lambda *_args, **_kwargs: pytest.fail("matching replay must not stage files"),
+        fail_publish,
     )
 
     result = ImportUploadAdmission(service=service).admit(data)  # type: ignore[arg-type]
@@ -423,15 +431,22 @@ def test_core_creation_accepts_the_matching_fingerprint_after_an_integrity_race(
     )
     lookups = iter((None, existing))
     service = ImportService()
+
+    def get_next_job(**_kwargs: object) -> object:
+        return next(lookups)
+
+    def fail_creation_race(**_kwargs: object) -> None:
+        raise IntegrityError("creation race")
+
     monkeypatch.setattr(
         service,
         "get_job_by_creation_key",
-        lambda **_kwargs: next(lookups),
+        get_next_job,
     )
     monkeypatch.setattr(
         import_service_module,
         "create_import_job",
-        lambda **_kwargs: (_ for _ in ()).throw(IntegrityError("creation race")),
+        fail_creation_race,
     )
 
     result = service.create_job(

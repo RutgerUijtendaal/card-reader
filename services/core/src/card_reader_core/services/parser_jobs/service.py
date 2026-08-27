@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Callable, TypeVar, cast
 
 from card_reader_core.models import (
@@ -47,6 +48,18 @@ logger = logging.getLogger(__name__)
 _MetadataSource = TypeVar("_MetadataSource", Tag, Type, Symbol)
 
 
+def _never_stop() -> bool:
+    return False
+
+
+@dataclass(frozen=True)
+class _JobRunOutcome:
+    failed_items: int = 0
+    shutdown_requested: bool = False
+    cancel_requested: bool = False
+    job_missing: bool = False
+
+
 class ImportProcessorService:
     def __init__(
         self,
@@ -68,25 +81,45 @@ class ImportProcessorService:
             logger.warning("process_job called for missing job. job_id=%s", job_id)
             return
 
-        stop_requested = should_stop or (lambda: False)
+        stop_requested = should_stop or _never_stop
         options = self._context_loader.load_job_options(job)
         resources = self._context_loader.load_parser_resources(options)
-        failed_items = 0
-        shutdown_requested = False
-        cancel_requested = False
 
         mark_job_running(job)
+        outcome = self._process_job_items(
+            job,
+            options=options,
+            resources=resources,
+            stop_requested=stop_requested,
+        )
+        if outcome.job_missing:
+            return
+        self._finalize_job(job, outcome=outcome)
+
+    def _process_job_items(
+        self,
+        job: ImportJob,
+        *,
+        options: JobOptions,
+        resources: ParserResources,
+        stop_requested: Callable[[], bool],
+    ) -> _JobRunOutcome:
+        failed_items = 0
         for item in fetch_items_for_job(job.id):
             current_job = fetch_job(job.id)
             if current_job is None:
                 logger.warning("Stopping processing for missing job during run. job_id=%s", job.id)
-                return
+                return _JobRunOutcome(failed_items=failed_items, job_missing=True)
             if current_job.status in {ImportJobStatus.canceling, ImportJobStatus.cancelled}:
-                cancel_requested = True
-                break
+                return _JobRunOutcome(
+                    failed_items=failed_items,
+                    cancel_requested=True,
+                )
             if stop_requested():
-                shutdown_requested = True
-                break
+                return _JobRunOutcome(
+                    failed_items=failed_items,
+                    shutdown_requested=True,
+                )
             item.refresh_from_db(fields=["status", "error_message", "updated_at"])
             if item.status != ImportJobStatus.queued:
                 continue
@@ -95,14 +128,18 @@ class ImportProcessorService:
             bump_job_processed(job)
             current_job = fetch_job(job.id)
             if current_job is not None and current_job.status == ImportJobStatus.canceling:
-                cancel_requested = True
-                break
+                return _JobRunOutcome(
+                    failed_items=failed_items,
+                    cancel_requested=True,
+                )
+        return _JobRunOutcome(failed_items=failed_items)
 
-        if cancel_requested:
+    def _finalize_job(self, job: ImportJob, *, outcome: _JobRunOutcome) -> None:
+        if outcome.cancel_requested:
             mark_job_cancelled(job)
-        elif failed_items > 0:
+        elif outcome.failed_items > 0:
             mark_job_failed(job)
-        elif shutdown_requested:
+        elif outcome.shutdown_requested:
             mark_job_queued(job)
         else:
             mark_job_complete(job)

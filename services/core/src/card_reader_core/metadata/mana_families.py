@@ -53,23 +53,22 @@ MANA_FAMILY_BY_KEY = {family.key: family for family in MANA_FAMILIES}
 MANA_FAMILY_CHOICES: tuple[tuple[ManaFamily, str], ...] = tuple(
     (family.key, family.label) for family in MANA_FAMILIES
 )
-MANA_FAMILY_BY_SYMBOL_KEY = {
-    symbol_key: family
-    for family in MANA_FAMILIES
-    for symbol_key in family.symbol_keys
-}
+MANA_FAMILY_BY_SYMBOL_KEY: dict[str, ManaFamilyDefinition] = {}
+for family in MANA_FAMILIES:
+    for symbol_key in family.symbol_keys:
+        MANA_FAMILY_BY_SYMBOL_KEY[symbol_key] = family
 
-_FAMILY_COMBINATIONS = sorted(
-    (
-        combination
-        for size in range(1, len(MANA_FAMILIES) + 1)
-        for combination in combinations(range(len(MANA_FAMILIES)), size)
-    ),
-    key=lambda combination: (
+def _family_combination_sort_key(combination: tuple[int, ...]) -> tuple[int, int]:
+    return (
         combination[0],
         sum(1 << rank for rank in combination),
-    ),
-)
+    )
+
+
+_FAMILY_COMBINATIONS: list[tuple[int, ...]] = []
+for size in range(1, len(MANA_FAMILIES) + 1):
+    _FAMILY_COMBINATIONS.extend(combinations(range(len(MANA_FAMILIES)), size))
+_FAMILY_COMBINATIONS.sort(key=_family_combination_sort_key)
 _FAMILY_COMBINATION_RANKS = {
     combination: index for index, combination in enumerate(_FAMILY_COMBINATIONS)
 }
@@ -84,20 +83,21 @@ def normalize_mana_family_keys(values: list[str] | tuple[str, ...]) -> tuple[Man
 def mana_family_keys_for_symbol_keys(
     symbol_keys: list[str] | tuple[str, ...],
 ) -> tuple[ManaFamily, ...]:
-    selected = {
-        family.key
-        for raw_key in symbol_keys
-        if (family := MANA_FAMILY_BY_SYMBOL_KEY.get(raw_key.strip().casefold())) is not None
-    }
+    selected: set[ManaFamily] = set()
+    for raw_key in symbol_keys:
+        normalized_key = raw_key.strip().casefold()
+        family = MANA_FAMILY_BY_SYMBOL_KEY.get(normalized_key)
+        if family is not None:
+            selected.add(family.key)
     return tuple(family.key for family in MANA_FAMILIES if family.key in selected)
 
 
 def mana_family_symbol_keys(family_keys: list[str] | tuple[str, ...]) -> tuple[str, ...]:
-    return tuple(
-        symbol_key
-        for family_key in normalize_mana_family_keys(family_keys)
-        for symbol_key in MANA_FAMILY_BY_KEY[family_key].symbol_keys
-    )
+    symbol_keys: list[str] = []
+    for family_key in normalize_mana_family_keys(family_keys):
+        family = MANA_FAMILY_BY_KEY[family_key]
+        symbol_keys.extend(family.symbol_keys)
+    return tuple(symbol_keys)
 
 
 def mana_family_sort_key_for_family_keys(family_keys: list[str] | tuple[str, ...]) -> int:

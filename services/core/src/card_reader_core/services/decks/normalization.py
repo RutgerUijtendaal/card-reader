@@ -36,26 +36,15 @@ def _validate_preserved_non_player_sideboard_entries(
     sideboards: list[DeckSideboardInput],
     existing_sideboards: list[DeckSideboard],
 ) -> list[str | None]:
-    non_player_card_ids: set[str] = set()
     existing_by_id = {sideboard.id: sideboard for sideboard in existing_sideboards}
-    existing_by_name: dict[str, list[DeckSideboard]] = {}
-    for existing_sideboard in existing_sideboards:
-        existing_by_name.setdefault(existing_sideboard.name, []).append(existing_sideboard)
-    expected_quantities: dict[tuple[str, str], int] = {}
-    for existing_sideboard in existing_sideboards:
-        for existing_entry in existing_sideboard.entries.all():
-            if existing_entry.card.card_pool == PLAYER_CARD_POOL:
-                continue
-            non_player_card_ids.add(existing_entry.card.id)
-            expected_quantities[(existing_sideboard.id, existing_entry.card.id)] = int(
-                existing_entry.quantity
-            )
-    explicitly_referenced_source_ids = [
-        source.id
-        for submitted_sideboard in sideboards
-        if submitted_sideboard.source_id is not None
-        if (source := existing_by_id.get(submitted_sideboard.source_id)) is not None
-    ]
+    existing_by_name = _index_sideboards_by_name(existing_sideboards)
+    non_player_card_ids, expected_quantities = _index_non_player_sideboard_entries(
+        existing_sideboards
+    )
+    explicitly_referenced_source_ids = _existing_source_ids(
+        sideboards,
+        existing_by_id=existing_by_id,
+    )
     if len(explicitly_referenced_source_ids) != len(set(explicitly_referenced_source_ids)):
         raise ValueError("Each existing sideboard can only be submitted once.")
     reserved_source_sideboard_ids = set(explicitly_referenced_source_ids)
@@ -78,19 +67,69 @@ def _validate_preserved_non_player_sideboard_entries(
         )
         if source_sideboard is not None:
             used_source_sideboard_ids.add(source_sideboard.id)
-        for submitted_entry in submitted_sideboard.entries:
-            if submitted_entry.card_id not in non_player_card_ids:
-                continue
-            if expected_quantities.get(
-                (
-                    source_sideboard.id if source_sideboard is not None else "",
-                    submitted_entry.card_id,
-                )
-            ) != int(
-                submitted_entry.quantity
-            ):
-                raise ValueError("Non-Player sideboard references can only be preserved unchanged.")
+        _validate_non_player_sideboard_quantities(
+            submitted_sideboard,
+            source_sideboard=source_sideboard,
+            non_player_card_ids=non_player_card_ids,
+            expected_quantities=expected_quantities,
+        )
     return resolved_source_sideboard_ids
+
+
+def _index_sideboards_by_name(
+    sideboards: list[DeckSideboard],
+) -> dict[str, list[DeckSideboard]]:
+    sideboards_by_name: dict[str, list[DeckSideboard]] = {}
+    for sideboard in sideboards:
+        sideboards_by_name.setdefault(sideboard.name, []).append(sideboard)
+    return sideboards_by_name
+
+
+def _index_non_player_sideboard_entries(
+    sideboards: list[DeckSideboard],
+) -> tuple[set[str], dict[tuple[str, str], int]]:
+    card_ids: set[str] = set()
+    quantities: dict[tuple[str, str], int] = {}
+    for sideboard in sideboards:
+        for entry in sideboard.entries.all():
+            if entry.card.card_pool == PLAYER_CARD_POOL:
+                continue
+            card_ids.add(entry.card.id)
+            quantities[(sideboard.id, entry.card.id)] = int(entry.quantity)
+    return card_ids, quantities
+
+
+def _existing_source_ids(
+    sideboards: list[DeckSideboardInput],
+    *,
+    existing_by_id: dict[str, DeckSideboard],
+) -> list[str]:
+    source_ids: list[str] = []
+    for submitted_sideboard in sideboards:
+        if submitted_sideboard.source_id is None:
+            continue
+        source = existing_by_id.get(submitted_sideboard.source_id)
+        if source is not None:
+            source_ids.append(source.id)
+    return source_ids
+
+
+def _validate_non_player_sideboard_quantities(
+    submitted_sideboard: DeckSideboardInput,
+    *,
+    source_sideboard: DeckSideboard | None,
+    non_player_card_ids: set[str],
+    expected_quantities: dict[tuple[str, str], int],
+) -> None:
+    source_id = source_sideboard.id if source_sideboard is not None else ""
+    for entry in submitted_sideboard.entries:
+        if entry.card_id not in non_player_card_ids:
+            continue
+        expected_quantity = expected_quantities.get((source_id, entry.card_id))
+        if expected_quantity != int(entry.quantity):
+            raise ValueError(
+                "Non-Player sideboard references can only be preserved unchanged."
+            )
 
 
 def _resolve_source_sideboard(
@@ -124,16 +163,31 @@ def _resolve_source_sideboard(
             raise ValueError("Each existing sideboard can only be submitted once.")
         return None
 
-    submitted_entries = [
-        (entry.card_id, int(entry.quantity)) for entry in submitted_sideboard.entries
-    ]
+    submitted_entries = _submitted_sideboard_entry_signature(submitted_sideboard)
     exact_candidates = [
         sideboard
         for sideboard in available_candidates
-        if [(entry.card.id, int(entry.quantity)) for entry in sideboard.entries.all()]
-        == submitted_entries
+        if _stored_sideboard_entry_signature(sideboard) == submitted_entries
     ]
     return exact_candidates[0] if len(exact_candidates) == 1 else available_candidates[0]
+
+
+def _submitted_sideboard_entry_signature(
+    sideboard: DeckSideboardInput,
+) -> list[tuple[str, int]]:
+    return [
+        (entry.card_id, int(entry.quantity))
+        for entry in sideboard.entries
+    ]
+
+
+def _stored_sideboard_entry_signature(
+    sideboard: DeckSideboard,
+) -> list[tuple[str, int]]:
+    return [
+        (entry.card.id, int(entry.quantity))
+        for entry in sideboard.entries.all()
+    ]
 
 
 class DeckPayloadNormalizer:
@@ -182,13 +236,15 @@ class DeckPayloadNormalizer:
             if not update_entries
             or entry.card.card_pool != PLAYER_CARD_POOL
         }
-        retained_sideboard_cards_by_id = {
-            entry.card.id: entry.card
-            for sideboard in existing_sideboards
-            for entry in sideboard.entries.all()
-            if not update_sideboards
-            or entry.card.card_pool != PLAYER_CARD_POOL
-        }
+        retained_sideboard_cards_by_id: dict[str, Card] = {}
+        for sideboard in existing_sideboards:
+            for entry in sideboard.entries.all():
+                should_retain = (
+                    not update_sideboards
+                    or entry.card.card_pool != PLAYER_CARD_POOL
+                )
+                if should_retain:
+                    retained_sideboard_cards_by_id[entry.card.id] = entry.card
         if update_entries:
             _validate_preserved_non_player_mainboard_entries(
                 entries=entries,
@@ -230,19 +286,13 @@ class DeckPayloadNormalizer:
         if len(set(ordered_entry_ids)) != len(ordered_entry_ids):
             raise ValueError("Each card can only appear once in the mainboard entries.")
 
-        sideboard_entry_ids = [
-            entry.card_id.strip()
-            for sideboard in sideboards
-            for entry in sideboard.entries
-            if entry.card_id.strip()
-        ]
-        sideboard_missing_card_id = any(
-            not entry.card_id.strip()
-            for sideboard in sideboards
-            for entry in sideboard.entries
-        )
-        if sideboard_missing_card_id:
-            raise ValueError("Each sideboard entry must reference a card.")
+        sideboard_entry_ids: list[str] = []
+        for sideboard in sideboards:
+            for entry in sideboard.entries:
+                card_id = entry.card_id.strip()
+                if not card_id:
+                    raise ValueError("Each sideboard entry must reference a card.")
+                sideboard_entry_ids.append(card_id)
 
         all_card_ids = list(dict.fromkeys([*ordered_entry_ids, *sideboard_entry_ids]))
         cards_by_id = get_cards_by_ids(all_card_ids)

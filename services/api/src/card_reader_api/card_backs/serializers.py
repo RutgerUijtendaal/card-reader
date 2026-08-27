@@ -9,6 +9,7 @@ from card_reader_core.services.card_backs import ResolvedCardBack, resolve_card_
 
 def card_back_payload(card_back: CardBack) -> dict[str, object]:
     pool_defaults = list(card_back.pool_defaults.all())
+    default_pool_keys = {row.card_pool for row in pool_defaults}
     return {
         "id": card_back.id,
         "label": card_back.label,
@@ -18,7 +19,7 @@ def card_back_payload(card_back: CardBack) -> dict[str, object]:
         "width": card_back.width,
         "height": card_back.height,
         "checksum": card_back.checksum,
-        "default_for_pools": [pool for pool in CARD_POOLS if any(row.card_pool == pool for row in pool_defaults)],
+        "default_for_pools": [pool for pool in CARD_POOLS if pool in default_pool_keys],
         "override_card_count": int(getattr(card_back, "override_card_count", 0)),
         "is_usable": resolve_card_back_image_asset_path(card_back) is not None,
         "image_url": card_back_image_url(card_back),

@@ -293,21 +293,48 @@ Local app URL:
 - Use `http://localhost:8888` to reach the running web app in the local desktop environment.
 
 ## Coding Standards
-- Python:
-  - dependency/runtime via `uv`
-  - lint: `ruff`
-  - typing: `mypy`
-  - tests: `pytest`
-- TypeScript/Vue:
-  - lint: `eslint`
-  - format: `prettier`
-  - typecheck: `vue-tsc`
-  - tests: `vitest`
-  - prefer shared UI utilities over duplicating component-local styling; for custom scroll areas, use the shared `.app-scrollbar` utility from `frontend/src/app/styles/utilities.css`
-  - prefer VueUse composables when they fit cleanly and reduce custom reactive glue
-  - preserve and extend the shared light/dark theme system in `frontend/src/app/styles/base.css`, `frontend/src/app/styles/components.css`, `frontend/src/app/styles/utilities.css`, and `frontend/src/shared/composables/useTheme.ts`; `frontend/src/app/styles.css` is the ordered Tailwind/import entrypoint
-  - prefer semantic theme primitives and token-backed shared classes over scattering raw light-only or dark-only color utilities across components
-  - when adding or changing visible UI, verify both light and dark appearances instead of treating dark mode as optional follow-up polish
+
+### Python
+
+- Dependency/runtime: `uv`
+- Lint: `ruff`
+- Typing: `mypy`
+- Tests: `pytest`
+
+#### Python style
+
+Optimize Python code for readability, maintainability, and ease of debugging.
+
+Prefer explicit, unsurprising Python over clever or overly dense code. When these
+guidelines conflict with a general style preference for concision or Python
+idiom, prefer these guidelines.
+
+- Use simple comprehensions when they are immediately readable; prefer straightforward `for` loops for more complex transformations.
+- Avoid nested comprehensions.
+- Avoid the walrus operator unless it substantially improves readability.
+- Prefer named functions over lambdas when the behavior benefits from a descriptive name.
+- Prefer intermediate variables over dense or heavily chained expressions.
+- Prefer early returns and `continue` statements over deeply nested control flow.
+- Keep control flow easy to mentally execute line by line.
+- Avoid unnecessary decorators, metaprogramming, and implicit behavior.
+- Use typing to clarify interfaces and boundaries, not to create type gymnastics.
+- Do not optimize for minimum line count.
+- When modifying existing dense code, simplify it when practical without changing behavior.
+
+A few extra lines are preferable to code that requires mentally unpacking
+Python-specific tricks.
+
+### TypeScript/Vue
+
+- Lint: `eslint`
+- Format: `prettier`
+- Typecheck: `vue-tsc`
+- Tests: `vitest`
+- Prefer shared UI utilities over duplicating component-local styling; for custom scroll areas, use the shared `.app-scrollbar` utility from `frontend/src/app/styles/utilities.css`.
+- Prefer VueUse composables when they fit cleanly and reduce custom reactive glue.
+- Preserve and extend the shared light/dark theme system in `frontend/src/app/styles/base.css`, `frontend/src/app/styles/components.css`, `frontend/src/app/styles/utilities.css`, and `frontend/src/shared/composables/useTheme.ts`; `frontend/src/app/styles.css` is the ordered Tailwind/import entrypoint.
+- Prefer semantic theme primitives and token-backed shared classes over scattering raw light-only or dark-only color utilities across components.
+- When adding or changing visible UI, verify both light and dark appearances instead of treating dark mode as optional follow-up polish.
 
 ## API Surface
 - `POST /imports/upload`

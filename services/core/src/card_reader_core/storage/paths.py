@@ -15,7 +15,10 @@ WEBP_IMAGE_QUALITY = 90
 def calculate_checksum(file_path: Path) -> str:
     hasher = hashlib.sha256()
     with file_path.open("rb") as file:
-        while chunk := file.read(1024 * 1024):
+        while True:
+            chunk = file.read(1024 * 1024)
+            if not chunk:
+                break
             hasher.update(chunk)
     return hasher.hexdigest()
 
@@ -55,9 +58,13 @@ def relativize_storage_path(
 
     normalized = raw_path.replace("\\", "/")
     parts = [part for part in normalized.split("/") if part and part != "."]
-    indexes = [index for index, part in enumerate(parts) if part.lower() in {root.lower() for root in allowed_roots}]
-    if indexes:
-        return PurePosixPath(*parts[indexes[-1] :]).as_posix()
+    normalized_allowed_roots = {root.lower() for root in allowed_roots}
+    matching_root_indexes: list[int] = []
+    for index, part in enumerate(parts):
+        if part.lower() in normalized_allowed_roots:
+            matching_root_indexes.append(index)
+    if matching_root_indexes:
+        return PurePosixPath(*parts[matching_root_indexes[-1] :]).as_posix()
     if preserve_unmatched_absolute:
         return raw_path
     if default_root is not None and parts:

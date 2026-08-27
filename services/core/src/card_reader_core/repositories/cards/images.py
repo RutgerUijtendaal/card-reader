@@ -66,25 +66,16 @@ def list_latest_active_card_image_sources(
             break
 
         for image in page:
-            card_id = str(image.card_version.card.id)
-            if card_id in seen_card_ids:
-                continue
-            image_path = resolve_image_file_path(image)
-            if image_path is None:
-                continue
-            checksum = image.checksum.strip()
-            if not checksum or checksum in seen_checksums:
-                continue
-            seen_card_ids.add(card_id)
-            seen_checksums.add(checksum)
-            sources.append(
-                CardImageSource(
-                    card_id=card_id,
-                    card_version_id=str(image.card_version.id),
-                    checksum=checksum,
-                    path=image_path,
-                )
+            source = _usable_public_image_source(
+                image,
+                seen_card_ids=seen_card_ids,
+                seen_checksums=seen_checksums,
             )
+            if source is None:
+                continue
+            seen_card_ids.add(source.card_id)
+            seen_checksums.add(source.checksum)
+            sources.append(source)
             if len(sources) == normalized_limit:
                 break
 
@@ -92,6 +83,29 @@ def list_latest_active_card_image_sources(
             break
         page_start += _PUBLIC_IMAGE_SCAN_PAGE_SIZE
     return sources
+
+
+def _usable_public_image_source(
+    image: CardVersionImage,
+    *,
+    seen_card_ids: set[str],
+    seen_checksums: set[str],
+) -> CardImageSource | None:
+    card_id = str(image.card_version.card.id)
+    if card_id in seen_card_ids:
+        return None
+    image_path = resolve_image_file_path(image)
+    if image_path is None:
+        return None
+    checksum = image.checksum.strip()
+    if not checksum or checksum in seen_checksums:
+        return None
+    return CardImageSource(
+        card_id=card_id,
+        card_version_id=str(image.card_version.id),
+        checksum=checksum,
+        path=image_path,
+    )
 
 
 def save_image_record(version: CardVersion, source_file: str, checksum: str) -> None:

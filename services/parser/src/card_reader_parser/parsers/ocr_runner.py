@@ -150,22 +150,12 @@ class OcrRunner:
         return lines
 
     def _extract_text_conf_pairs(self, result_json: Any) -> list[tuple[Polygon, str, float]]:
-        if not isinstance(result_json, dict):
+        payload_lists = self._extract_ocr_payload_lists(result_json)
+        if payload_lists is None:
             return []
-
-        payload = result_json.get("res")
-        if not isinstance(payload, dict):
-            return []
-
-        rec_texts = payload.get("rec_texts")
-        rec_scores = payload.get("rec_scores")
-        rec_polys = payload.get("rec_polys")
-
-        if not (isinstance(rec_texts, list) and isinstance(rec_scores, list) and isinstance(rec_polys, list)):
-            return []
+        rec_texts, rec_scores, rec_polys = payload_lists
 
         pairs: list[tuple[Polygon, str, float]] = []
-
         for text_item, score_item, poly in zip(rec_texts, rec_scores, rec_polys):
             text_value = str(text_item).strip()
             if not text_value:
@@ -176,29 +166,47 @@ class OcrRunner:
             except (TypeError, ValueError):
                 continue
 
-            if not isinstance(poly, list):
+            normalized_poly = self._normalize_polygon(poly)
+            if normalized_poly is None:
                 continue
-
-            normalized_poly: Polygon = []
-            valid_poly = True
-            for point in poly:
-                if not isinstance(point, (list, tuple)) or len(point) < 2:
-                    valid_poly = False
-                    break
-                try:
-                    px = float(point[0])
-                    py = float(point[1])
-                except (TypeError, ValueError):
-                    valid_poly = False
-                    break
-                normalized_poly.append((px, py))
-
-            if not valid_poly or not normalized_poly:
-                continue
-
             pairs.append((normalized_poly, text_value, conf_value))
-
         return pairs
+
+    def _extract_ocr_payload_lists(
+        self,
+        result_json: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]] | None:
+        if not isinstance(result_json, dict):
+            return None
+        payload = result_json.get("res")
+        if not isinstance(payload, dict):
+            return None
+
+        rec_texts = payload.get("rec_texts")
+        rec_scores = payload.get("rec_scores")
+        rec_polys = payload.get("rec_polys")
+        if not isinstance(rec_texts, list):
+            return None
+        if not isinstance(rec_scores, list):
+            return None
+        if not isinstance(rec_polys, list):
+            return None
+        return rec_texts, rec_scores, rec_polys
+
+    def _normalize_polygon(self, raw_polygon: object) -> Polygon | None:
+        if not isinstance(raw_polygon, list):
+            return None
+        normalized_polygon: Polygon = []
+        for point in raw_polygon:
+            if not isinstance(point, (list, tuple)) or len(point) < 2:
+                return None
+            try:
+                x = float(point[0])
+                y = float(point[1])
+            except (TypeError, ValueError):
+                return None
+            normalized_polygon.append((x, y))
+        return normalized_polygon or None
 
     def _get_ocr_engine(self, config: dict[str, Any]) -> Any:
         if self._ocr_init_failed:

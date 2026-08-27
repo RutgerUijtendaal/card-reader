@@ -211,34 +211,57 @@ def import_developer_data(
 
 def validate_import_readiness(payload: DeveloperDataPayload) -> list[str]:
     issues: list[str] = []
-    if not payload.keywords:
-        issues.append("keyword catalog is empty")
-    if not payload.tags:
-        issues.append("tag catalog is empty")
-    if not payload.types:
-        issues.append("type catalog is empty")
-    if not payload.symbols:
-        issues.append("symbol catalog is empty")
-    if not payload.templates:
-        issues.append("template catalog is empty")
-    if not payload.deck_tags:
-        issues.append("deck-tag catalog is empty")
-    if not payload.cards:
-        issues.append("card selection is empty")
-    if not any(
+    _append_empty_selection_issues(payload, issues)
+    _append_player_card_readiness_issues(payload, issues)
+    _append_player_card_back_readiness_issue(payload, issues)
+    return issues
+
+
+def _append_empty_selection_issues(
+    payload: DeveloperDataPayload,
+    issues: list[str],
+) -> None:
+    required_collections = (
+        (payload.keywords, "keyword catalog"),
+        (payload.tags, "tag catalog"),
+        (payload.types, "type catalog"),
+        (payload.symbols, "symbol catalog"),
+        (payload.templates, "template catalog"),
+        (payload.deck_tags, "deck-tag catalog"),
+        (payload.cards, "card selection"),
+    )
+    for collection, label in required_collections:
+        if not collection:
+            issues.append(f"{label} is empty")
+
+
+def _append_player_card_readiness_issues(
+    payload: DeveloperDataPayload,
+    issues: list[str],
+) -> None:
+    has_active_hero = any(
         card.card_pool == "player"
         and "hero" in card.card_roles
         and card.lifecycle_status == "active"
         for card in payload.cards
-    ):
+    )
+    if not has_active_hero:
         issues.append("no active hero is included")
-    if not any(
+
+    has_active_mainboard_card = any(
         "hero" not in card.card_roles
         and card.card_pool == "player"
         and card.lifecycle_status == "active"
         for card in payload.cards
-    ):
+    )
+    if not has_active_mainboard_card:
         issues.append("no active mainboard cards are included")
+
+
+def _append_player_card_back_readiness_issue(
+    payload: DeveloperDataPayload,
+    issues: list[str],
+) -> None:
     player_default = next(
         (
             row.card_back_checksum
@@ -249,7 +272,6 @@ def validate_import_readiness(payload: DeveloperDataPayload) -> list[str]:
     )
     if player_default is None:
         issues.append("Player pool default card back is missing")
-    return issues
 
 
 def _ensure_domain_is_empty(payload: DeveloperDataPayload) -> None:
@@ -400,6 +422,28 @@ def _import_payload(
     *,
     source_format_version: int,
 ) -> None:
+    card_backs = _import_card_backs(payload)
+    catalogs = _import_catalogs(payload)
+    _import_classification_rules(
+        payload,
+        catalogs=catalogs,
+        source_format_version=source_format_version,
+    )
+    _import_deck_tags(payload)
+    content_versions = _import_content_versions(payload)
+    cards = _create_cards(payload, card_backs)
+    for card_record in payload.cards:
+        card = cards[_payload_card_identity(card_record)]
+        _import_card_details(
+            card_record,
+            card=card,
+            catalogs=catalogs,
+            content_versions=content_versions,
+        )
+    _import_card_groups(payload, cards)
+
+
+def _import_card_backs(payload: DeveloperDataPayload) -> dict[str, CardBack]:
     card_backs_by_checksum: dict[str, CardBack] = {}
     for card_back_record in payload.card_backs:
         card_back = CardBack.objects.create(
@@ -418,26 +462,51 @@ def _import_payload(
                 default_record.card_pool,
                 card_backs_by_checksum[default_record.card_back_checksum].id,
             )
+    return card_backs_by_checksum
 
+
+@dataclass(frozen=True)
+class _ImportedCatalogs:
+    keywords: dict[str, Any]
+    tags: dict[str, Any]
+    types: dict[str, Any]
+    symbols: dict[str, Symbol]
+    templates: dict[str, Template]
+
+
+def _import_catalogs(payload: DeveloperDataPayload) -> _ImportedCatalogs:
     keywords = _create_catalog_rows(Keyword, payload.keywords)
     tags = _create_catalog_rows(Tag, payload.tags)
     types = _create_catalog_rows(Type, payload.types)
-    symbols = {
-        row.key: Symbol.objects.create(
+
+    symbols: dict[str, Symbol] = {}
+    for row in payload.symbols:
+        reference_assets = []
+        for asset_path in row.reference_assets:
+            reference_assets.append(_symbol_reference_asset_path(asset_path))
+        symbols[row.key] = Symbol.objects.create(
             key=row.key,
             label=row.label,
             symbol_type=row.symbol_type,
             detector_type=row.detector_type,
             detection_config_json=row.detection_config,
             text_enrichment_json=row.text_enrichment,
-            reference_assets_json=[
-                _symbol_reference_asset_path(asset_path) for asset_path in row.reference_assets
-            ],
+            reference_assets_json=reference_assets,
             text_token=row.text_token,
             enabled=row.enabled,
         )
-        for row in payload.symbols
-    }
+
+    templates = _import_templates(payload)
+    return _ImportedCatalogs(
+        keywords=keywords,
+        tags=tags,
+        types=types,
+        symbols=symbols,
+        templates=templates,
+    )
+
+
+def _import_templates(payload: DeveloperDataPayload) -> dict[str, Template]:
     templates: dict[str, Template] = {}
     for template_record in payload.templates:
         template_definition = apply_bundled_template_compatibility(
@@ -452,14 +521,23 @@ def _import_payload(
             },
         )
         templates[template_record.key] = template
-    classification_rule_service = ClassificationRuleService()
+    return templates
+
+
+def _import_classification_rules(
+    payload: DeveloperDataPayload,
+    *,
+    catalogs: _ImportedCatalogs,
+    source_format_version: int,
+) -> None:
+    sources_by_kind = {
+        "tag": catalogs.tags,
+        "type": catalogs.types,
+        "symbol": catalogs.symbols,
+    }
+    service = ClassificationRuleService()
     for rule_record in payload.classification_rules:
-        source_rows = {
-            "tag": tags,
-            "type": types,
-            "symbol": symbols,
-        }[rule_record.source_kind]
-        source = source_rows[rule_record.source_key]
+        source = sources_by_kind[rule_record.source_kind][rule_record.source_key]
         source_fields = {
             "tag_id": source.id if rule_record.source_kind == "tag" else None,
             "type_id": source.id if rule_record.source_kind == "type" else None,
@@ -473,7 +551,7 @@ def _import_payload(
             **source_fields,
         ).first()
         if existing_rule is None:
-            classification_rule_service.create_rule(
+            service.create_rule(
                 card_pool=rule_record.card_pool,
                 target_kind=rule_record.target_kind,
                 target_key=rule_record.target_key,
@@ -481,21 +559,30 @@ def _import_payload(
                 source_id=source.id,
                 enabled=rule_record.enabled,
             )
-        elif existing_rule.enabled != rule_record.enabled:
-            classification_rule_service.update_rule(
+            continue
+        if existing_rule.enabled != rule_record.enabled:
+            service.update_rule(
                 rule_id=existing_rule.id,
                 enabled=rule_record.enabled,
             )
+
     if source_format_version in {1, 2}:
         ensure_default_mana_family_classification_rules()
+
+
+def _import_deck_tags(payload: DeveloperDataPayload) -> None:
     for deck_tag_record in payload.deck_tags:
         DeckTag.objects.update_or_create(
             kind=deck_tag_record.kind,
             key=deck_tag_record.key,
             defaults={"label": deck_tag_record.label},
         )
-    content_versions = {
-        row.version_number: ContentVersion.objects.create(
+
+
+def _import_content_versions(payload: DeveloperDataPayload) -> dict[str, ContentVersion]:
+    content_versions: dict[str, ContentVersion] = {}
+    for row in payload.content_versions:
+        content_versions[row.version_number] = ContentVersion.objects.create(
             version_number=row.version_number,
             base_version=row.base_version,
             major=row.major,
@@ -503,140 +590,205 @@ def _import_payload(
             patch=row.patch,
             description=row.description,
         )
-        for row in payload.content_versions
-    }
-    cards = {
-        _payload_card_identity(row): Card.objects.create(
+    return content_versions
+
+
+def _create_cards(
+    payload: DeveloperDataPayload,
+    card_backs: dict[str, CardBack],
+) -> dict[CardReferenceIdentity, Card]:
+    cards: dict[CardReferenceIdentity, Card] = {}
+    for row in payload.cards:
+        card_back_id = None
+        if row.card_back_override_checksum is not None:
+            card_back_id = card_backs[row.card_back_override_checksum].id
+        cards[_payload_card_identity(row)] = Card.objects.create(
             key=row.key,
             label=row.label,
             card_pool=row.card_pool,
             faction_identity_key=card_faction_identity_key(row.card_factions),
             deck_building_config_json=row.deck_building_config,
             lifecycle_status=row.lifecycle_status,
-            card_back_override=select_card_back_override(
-                card_backs_by_checksum[row.card_back_override_checksum].id
-                if row.card_back_override_checksum is not None
-                else None
-            ),
+            card_back_override=select_card_back_override(card_back_id),
         )
-        for row in payload.cards
-    }
-    for card_record in payload.cards:
-        card = cards[_payload_card_identity(card_record)]
-        CardRoleAssignment.objects.bulk_create(
-            [CardRoleAssignment(card=card, role=role) for role in card_record.card_roles]
-        )
-        CardFactionAssignment.objects.bulk_create(
-            [
-                CardFactionAssignment(card=card, faction=faction)
-                for faction in card_record.card_factions
-            ]
-        )
-        set_card_mana_families(
-            card=card,
-            mana_families=card_record.card_mana_families,
-        )
-        CardAlias.objects.bulk_create(
-            [
-                CardAlias(
-                    card=card,
-                    card_pool=card.card_pool,
-                    faction_identity_key=card.faction_identity_key,
-                    key=alias.key,
-                    label=alias.label,
-                )
-                for alias in card_record.aliases
-            ]
-        )
-        version_models: dict[int, CardVersion] = {}
-        for version in card_record.versions:
-            symbol_tokens_by_key = {
-                key: symbols[key].text_token for key in version.symbol_keys
-            }
-            version_models[version.version_number] = CardVersion.objects.create(
-                card=card,
-                version_number=version.version_number,
-                template=templates[version.template_key],
-                image_hash=version.image_hash,
-                name=version.name,
-                type_line=version.type_line,
-                mana_cost=version.mana_cost,
-                mana_symbols_json=version.mana_symbols,
-                mana_value=version.mana_value,
-                attack=version.attack,
-                health=version.health,
-                rules_text_raw=version.rules_text_raw,
-                rules_text_enriched=version.rules_text_enriched,
-                rules_text=render_enriched_rule_text(
-                    version.rules_text_enriched,
-                    symbol_tokens_by_key=symbol_tokens_by_key,
-                ),
-                confidence=version.confidence,
-                field_sources_json=version.field_sources,
-                parsed_snapshot_json=version.parsed_snapshot,
-                is_latest=version.is_latest,
-                content_version=(
-                    content_versions[version.content_version_number]
-                    if version.content_version_number is not None
-                    else None
-                ),
-            )
-        for version in card_record.versions:
-            model = version_models[version.version_number]
-            if version.previous_version_number is not None:
-                model.previous_version = version_models[version.previous_version_number]
-                model.save(update_fields=["previous_version"])
-            CardVersionImage.objects.bulk_create(
-                [
-                    CardVersionImage(
-                        card_version=model,
-                        source_file=image.stored_path,
-                        stored_path=image.stored_path,
-                        width=image.width,
-                        height=image.height,
-                        checksum=image.checksum,
-                    )
-                    for image in version.images
-                ]
-            )
-            CardVersionKeyword.objects.bulk_create(
-                [
-                    CardVersionKeyword(card_version=model, keyword=keywords[key])
-                    for key in version.keyword_keys
-                ]
-            )
-            CardVersionTag.objects.bulk_create(
-                [CardVersionTag(card_version=model, tag=tags[key]) for key in version.tag_keys]
-            )
-            CardVersionSymbol.objects.bulk_create(
-                [
-                    CardVersionSymbol(card_version=model, symbol=symbols[key])
-                    for key in version.symbol_keys
-                ]
-            )
-            CardVersionType.objects.bulk_create(
-                [CardVersionType(card_version=model, type=types[key]) for key in version.type_keys]
-            )
-        if card_record.latest_version_number is not None:
-            card.latest_version = version_models[card_record.latest_version_number]
-            card.save(update_fields=["latest_version"])
+    return cards
 
+
+def _import_card_details(
+    card_record: DeveloperDataCardRecord,
+    *,
+    card: Card,
+    catalogs: _ImportedCatalogs,
+    content_versions: dict[str, ContentVersion],
+) -> None:
+    _import_card_classification(card_record, card)
+    _import_card_aliases(card_record, card)
+    version_models = _create_card_versions(
+        card_record,
+        card=card,
+        catalogs=catalogs,
+        content_versions=content_versions,
+    )
+    _import_card_version_relations(
+        card_record,
+        version_models=version_models,
+        catalogs=catalogs,
+    )
+    if card_record.latest_version_number is not None:
+        card.latest_version = version_models[card_record.latest_version_number]
+        card.save(update_fields=["latest_version"])
+
+
+def _import_card_classification(
+    card_record: DeveloperDataCardRecord,
+    card: Card,
+) -> None:
+    role_assignments = []
+    for role in card_record.card_roles:
+        role_assignments.append(CardRoleAssignment(card=card, role=role))
+    CardRoleAssignment.objects.bulk_create(role_assignments)
+
+    faction_assignments = []
+    for faction in card_record.card_factions:
+        faction_assignments.append(CardFactionAssignment(card=card, faction=faction))
+    CardFactionAssignment.objects.bulk_create(faction_assignments)
+    set_card_mana_families(card=card, mana_families=card_record.card_mana_families)
+
+
+def _import_card_aliases(card_record: DeveloperDataCardRecord, card: Card) -> None:
+    aliases = []
+    for alias in card_record.aliases:
+        aliases.append(
+            CardAlias(
+                card=card,
+                card_pool=card.card_pool,
+                faction_identity_key=card.faction_identity_key,
+                key=alias.key,
+                label=alias.label,
+            )
+        )
+    CardAlias.objects.bulk_create(aliases)
+
+
+def _create_card_versions(
+    card_record: DeveloperDataCardRecord,
+    *,
+    card: Card,
+    catalogs: _ImportedCatalogs,
+    content_versions: dict[str, ContentVersion],
+) -> dict[int, CardVersion]:
+    version_models: dict[int, CardVersion] = {}
+    for version in card_record.versions:
+        symbol_tokens_by_key = {}
+        for key in version.symbol_keys:
+            symbol_tokens_by_key[key] = catalogs.symbols[key].text_token
+        content_version = None
+        if version.content_version_number is not None:
+            content_version = content_versions[version.content_version_number]
+        version_models[version.version_number] = CardVersion.objects.create(
+            card=card,
+            version_number=version.version_number,
+            template=catalogs.templates[version.template_key],
+            image_hash=version.image_hash,
+            name=version.name,
+            type_line=version.type_line,
+            mana_cost=version.mana_cost,
+            mana_symbols_json=version.mana_symbols,
+            mana_value=version.mana_value,
+            attack=version.attack,
+            health=version.health,
+            rules_text_raw=version.rules_text_raw,
+            rules_text_enriched=version.rules_text_enriched,
+            rules_text=render_enriched_rule_text(
+                version.rules_text_enriched,
+                symbol_tokens_by_key=symbol_tokens_by_key,
+            ),
+            confidence=version.confidence,
+            field_sources_json=version.field_sources,
+            parsed_snapshot_json=version.parsed_snapshot,
+            is_latest=version.is_latest,
+            content_version=content_version,
+        )
+    return version_models
+
+
+def _import_card_version_relations(
+    card_record: DeveloperDataCardRecord,
+    *,
+    version_models: dict[int, CardVersion],
+    catalogs: _ImportedCatalogs,
+) -> None:
+    for version in card_record.versions:
+        model = version_models[version.version_number]
+        if version.previous_version_number is not None:
+            model.previous_version = version_models[version.previous_version_number]
+            model.save(update_fields=["previous_version"])
+        _import_card_version_images(version, model)
+        _import_card_version_catalog_links(version, model, catalogs)
+
+
+def _import_card_version_images(version: Any, model: CardVersion) -> None:
+    images = []
+    for image in version.images:
+        images.append(
+            CardVersionImage(
+                card_version=model,
+                source_file=image.stored_path,
+                stored_path=image.stored_path,
+                width=image.width,
+                height=image.height,
+                checksum=image.checksum,
+            )
+        )
+    CardVersionImage.objects.bulk_create(images)
+
+
+def _import_card_version_catalog_links(
+    version: Any,
+    model: CardVersion,
+    catalogs: _ImportedCatalogs,
+) -> None:
+    keyword_links = []
+    for key in version.keyword_keys:
+        keyword_links.append(CardVersionKeyword(card_version=model, keyword=catalogs.keywords[key]))
+    CardVersionKeyword.objects.bulk_create(keyword_links)
+
+    tag_links = []
+    for key in version.tag_keys:
+        tag_links.append(CardVersionTag(card_version=model, tag=catalogs.tags[key]))
+    CardVersionTag.objects.bulk_create(tag_links)
+
+    symbol_links = []
+    for key in version.symbol_keys:
+        symbol_links.append(CardVersionSymbol(card_version=model, symbol=catalogs.symbols[key]))
+    CardVersionSymbol.objects.bulk_create(symbol_links)
+
+    type_links = []
+    for key in version.type_keys:
+        type_links.append(CardVersionType(card_version=model, type=catalogs.types[key]))
+    CardVersionType.objects.bulk_create(type_links)
+
+
+def _import_card_groups(
+    payload: DeveloperDataPayload,
+    cards: dict[CardReferenceIdentity, Card],
+) -> None:
     for group_record in payload.card_groups:
         group = CardGroup.objects.create(
             key=group_record.key,
             name=group_record.name,
             anchor_card=cards[card_reference_identity(group_record.anchor_card_ref)],
         )
-        CardGroupMember.objects.bulk_create(
-            [
+        members = []
+        for member in group_record.members:
+            members.append(
                 CardGroupMember(
                     group=group,
                     card=cards[card_reference_identity(member.card_ref)],
                     position=member.position,
                 )
-                for member in group_record.members
-            ]
-        )
+            )
+        CardGroupMember.objects.bulk_create(members)
 def _create_catalog_rows(model: Any, rows: list[Any]) -> dict[str, Any]:
     catalog: dict[str, Any] = {}
     for row in rows:
@@ -662,21 +814,53 @@ def _symbol_reference_asset_path(stored_path: str) -> str:
 
 def _validate_payload_references(payload: DeveloperDataPayload) -> None:
     issues = validate_import_readiness(payload)
-    keyword_keys = {row.key for row in payload.keywords}
-    tag_keys = {row.key for row in payload.tags}
-    type_keys = {row.key for row in payload.types}
-    symbol_keys = {row.key for row in payload.symbols}
-    template_keys = {row.key for row in payload.templates}
-    content_versions = {row.version_number for row in payload.content_versions}
-    rule_identities: set[tuple[str, str, str, str, str]] = set()
-    card_back_checksums = {card_back.checksum for card_back in payload.card_backs}
+    references = _payload_reference_sets(payload)
+    _validate_card_back_references(payload, references.card_back_checksums, issues)
+    _validate_classification_rule_references(payload, references, issues)
+    _validate_symbol_asset_references(payload)
+    card_identities = _validate_card_references(payload, references, issues)
+    _validate_card_group_references(payload, card_identities, issues)
+    if issues:
+        raise DeveloperDataError("Developer-data payload failed validation: " + "; ".join(issues))
+
+
+@dataclass(frozen=True)
+class _PayloadReferenceSets:
+    keyword_keys: set[str]
+    tag_keys: set[str]
+    type_keys: set[str]
+    symbol_keys: set[str]
+    template_keys: set[str]
+    content_versions: set[str]
+    card_back_checksums: set[str]
+
+
+def _payload_reference_sets(payload: DeveloperDataPayload) -> _PayloadReferenceSets:
+    return _PayloadReferenceSets(
+        keyword_keys={row.key for row in payload.keywords},
+        tag_keys={row.key for row in payload.tags},
+        type_keys={row.key for row in payload.types},
+        symbol_keys={row.key for row in payload.symbols},
+        template_keys={row.key for row in payload.templates},
+        content_versions={row.version_number for row in payload.content_versions},
+        card_back_checksums={row.checksum for row in payload.card_backs},
+    )
+
+
+def _validate_card_back_references(
+    payload: DeveloperDataPayload,
+    card_back_checksums: set[str],
+    issues: list[str],
+) -> None:
     if len(card_back_checksums) != len(payload.card_backs):
         issues.append("card-back checksums are not unique")
+
     default_pools = [row.card_pool for row in payload.card_back_pool_defaults]
     if len(default_pools) != len(set(default_pools)):
         issues.append("card-back pool defaults are not unique")
     if set(default_pools) != {"player", "evil", "neutral"}:
         issues.append("card-back pool defaults must include player, evil, and neutral")
+
     for default in payload.card_back_pool_defaults:
         if (
             default.card_back_checksum is not None
@@ -685,6 +869,24 @@ def _validate_payload_references(payload: DeveloperDataPayload) -> None:
             issues.append(
                 f"{default.card_pool} default references an unknown card back"
             )
+
+
+def _validate_classification_rule_references(
+    payload: DeveloperDataPayload,
+    references: _PayloadReferenceSets,
+    issues: list[str],
+) -> None:
+    targets_by_kind = {
+        "role": CARD_ROLES,
+        "faction": CARD_FACTIONS,
+        "mana_family": tuple(MANA_FAMILY_BY_KEY),
+    }
+    sources_by_kind = {
+        "tag": references.tag_keys,
+        "type": references.type_keys,
+        "symbol": references.symbol_keys,
+    }
+    rule_identities: set[tuple[str, str, str, str, str]] = set()
     for rule in payload.classification_rules:
         identity = (
             rule.card_pool,
@@ -696,86 +898,125 @@ def _validate_payload_references(payload: DeveloperDataPayload) -> None:
         if identity in rule_identities:
             issues.append("classification rule identities are not unique")
         rule_identities.add(identity)
-        available_targets = (
-            CARD_ROLES
-            if rule.target_kind == "role"
-            else CARD_FACTIONS
-            if rule.target_kind == "faction"
-            else tuple(MANA_FAMILY_BY_KEY)
-        )
+        available_targets = targets_by_kind[rule.target_kind]
         if rule.target_key not in available_targets:
             issues.append(
                 f"classification rule references unknown {rule.target_kind} {rule.target_key}"
             )
-        available_sources = (
-            tag_keys
-            if rule.source_kind == "tag"
-            else type_keys
-            if rule.source_kind == "type"
-            else symbol_keys
-        )
+        available_sources = sources_by_kind[rule.source_kind]
         if rule.source_key not in available_sources:
             issues.append(
                 f"classification rule references unknown {rule.source_kind} {rule.source_key}"
             )
-    card_identities = {_payload_card_identity(row) for row in payload.cards}
-    if len(card_identities) != len(payload.cards):
-        issues.append("card identities are not unique")
+
+
+def _validate_symbol_asset_references(payload: DeveloperDataPayload) -> None:
     for symbol in payload.symbols:
         for asset_path in symbol.reference_assets:
             _symbol_reference_asset_path(asset_path)
+
+
+def _validate_card_references(
+    payload: DeveloperDataPayload,
+    references: _PayloadReferenceSets,
+    issues: list[str],
+) -> set[CardReferenceIdentity]:
+    card_identities = {_payload_card_identity(row) for row in payload.cards}
+    if len(card_identities) != len(payload.cards):
+        issues.append("card identities are not unique")
+
     for card in payload.cards:
         if (
             card.card_back_override_checksum is not None
-            and card.card_back_override_checksum not in card_back_checksums
+            and card.card_back_override_checksum not in references.card_back_checksums
         ):
             issues.append(f"card {card.key} references an unknown card back override")
-        version_numbers = {version.version_number for version in card.versions}
-        latest_markers = [
-            version.version_number for version in card.versions if version.is_latest
-        ]
-        valid_latest_version = (
-            card.latest_version_number is None
-            and not version_numbers
-            and not latest_markers
-        ) or (
-            card.latest_version_number in version_numbers
-            and latest_markers == [card.latest_version_number]
+        _validate_card_version_references(card, references, issues)
+    return card_identities
+
+
+def _validate_card_version_references(
+    card: DeveloperDataCardRecord,
+    references: _PayloadReferenceSets,
+    issues: list[str],
+) -> None:
+    version_numbers = {version.version_number for version in card.versions}
+    latest_markers = []
+    for version in card.versions:
+        if version.is_latest:
+            latest_markers.append(version.version_number)
+
+    no_versions_expected = (
+        card.latest_version_number is None
+        and not version_numbers
+        and not latest_markers
+    )
+    selected_latest_is_valid = (
+        card.latest_version_number in version_numbers
+        and latest_markers == [card.latest_version_number]
+    )
+    if not no_versions_expected and not selected_latest_is_valid:
+        issues.append(f"card {card.key} has an invalid latest version")
+
+    for version in card.versions:
+        if version.template_key not in references.template_keys:
+            issues.append(f"card {card.key} references unknown template {version.template_key}")
+        if (
+            version.previous_version_number is not None
+            and version.previous_version_number not in version_numbers
+        ):
+            issues.append(f"card {card.key} has an invalid previous version")
+        if (
+            version.content_version_number is not None
+            and version.content_version_number not in references.content_versions
+        ):
+            issues.append(f"card {card.key} references an unknown content version")
+        _append_missing_reference_issue(
+            issues,
+            card.key,
+            "keywords",
+            version.keyword_keys,
+            references.keyword_keys,
         )
-        if not valid_latest_version:
-            issues.append(f"card {card.key} has an invalid latest version")
-        for version in card.versions:
-            if version.template_key not in template_keys:
-                issues.append(f"card {card.key} references unknown template {version.template_key}")
-            if (
-                version.previous_version_number is not None
-                and version.previous_version_number not in version_numbers
-            ):
-                issues.append(f"card {card.key} has an invalid previous version")
-            if (
-                version.content_version_number is not None
-                and version.content_version_number not in content_versions
-            ):
-                issues.append(f"card {card.key} references an unknown content version")
-            _append_missing_reference_issue(
-                issues, card.key, "keywords", version.keyword_keys, keyword_keys
-            )
-            _append_missing_reference_issue(issues, card.key, "tags", version.tag_keys, tag_keys)
-            _append_missing_reference_issue(
-                issues, card.key, "symbols", version.symbol_keys, symbol_keys
-            )
-            _append_missing_reference_issue(issues, card.key, "types", version.type_keys, type_keys)
+        _append_missing_reference_issue(
+            issues,
+            card.key,
+            "tags",
+            version.tag_keys,
+            references.tag_keys,
+        )
+        _append_missing_reference_issue(
+            issues,
+            card.key,
+            "symbols",
+            version.symbol_keys,
+            references.symbol_keys,
+        )
+        _append_missing_reference_issue(
+            issues,
+            card.key,
+            "types",
+            version.type_keys,
+            references.type_keys,
+        )
+
+
+def _validate_card_group_references(
+    payload: DeveloperDataPayload,
+    card_identities: set[CardReferenceIdentity],
+    issues: list[str],
+) -> None:
     for group in payload.card_groups:
-        referenced = {
-            card_reference_identity(group.anchor_card_ref),
-            *(card_reference_identity(member.card_ref) for member in group.members),
-        }
+        referenced = {card_reference_identity(group.anchor_card_ref)}
+        for member in group.members:
+            referenced.add(card_reference_identity(member.card_ref))
         missing = sorted(referenced - card_identities)
         if missing:
-            missing_labels = ", ".join(_card_reference_label(reference) for reference in missing)
-            issues.append(f"group {group.key} references unknown cards: {missing_labels}")
-    if issues:
-        raise DeveloperDataError("Developer-data payload failed validation: " + "; ".join(issues))
+            missing_labels = []
+            for reference in missing:
+                missing_labels.append(_card_reference_label(reference))
+            joined_labels = ", ".join(missing_labels)
+            issues.append(f"group {group.key} references unknown cards: {joined_labels}")
 
 
 def _card_reference_label(

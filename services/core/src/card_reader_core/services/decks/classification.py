@@ -27,12 +27,11 @@ def deck_export_uses_non_player_card(
     if sideboard_id is None:
         cards = [deck.hero_card, *(entry.card for entry in deck.entries.all())]
     else:
-        cards = [
-            entry.card
-            for sideboard in deck.sideboards.all()
-            if sideboard.id == sideboard_id
-            for entry in sideboard.entries.all()
-        ]
+        cards = []
+        for sideboard in deck.sideboards.all():
+            if sideboard.id != sideboard_id:
+                continue
+            cards.extend(entry.card for entry in sideboard.entries.all())
     return any(card.card_pool != PLAYER_CARD_POOL for card in cards)
 
 

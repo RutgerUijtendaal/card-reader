@@ -104,18 +104,25 @@ def deck_payload(
     )
     validation = DeckService().get_deck_validation(deck)
     constraint_entries = [
-        DeckConstraintEntry(card=entry.card, quantity=int(entry.quantity), board="mainboard")
+        DeckConstraintEntry(
+            card=entry.card,
+            quantity=int(entry.quantity),
+            board="mainboard",
+        )
         for entry in entries
     ]
-    constraint_entries.extend(
-        DeckConstraintEntry(card=entry.card, quantity=int(entry.quantity), board="sideboard")
-        for sideboard in sideboards
-        for entry in sideboard.entries.all()
-    )
+    for sideboard in sideboards:
+        for entry in sideboard.entries.all():
+            constraint_entries.append(
+                DeckConstraintEntry(
+                    card=entry.card,
+                    quantity=int(entry.quantity),
+                    board="sideboard",
+                )
+            )
     card_ids = [deck.hero_card.id, *(entry.card.id for entry in entries)]
-    card_ids.extend(
-        entry.card.id for sideboard in sideboards for entry in sideboard.entries.all()
-    )
+    for sideboard in sideboards:
+        card_ids.extend(entry.card.id for entry in sideboard.entries.all())
     resolved_card_backs = resolve_effective_card_backs(card_ids)
     return {
         "id": deck.id,
@@ -149,22 +156,10 @@ def deck_payload(
             ],
         },
         "sideboards": [
-            {
-                "id": sideboard.id,
-                "name": sideboard.name,
-                "total_cards": sum(int(entry.quantity) for entry in sideboard.entries.all()),
-                "unique_cards": sideboard.entries.count(),
-                "entries": [
-                    {
-                        "quantity": entry.quantity,
-                        "card": deck_card_payload(
-                            entry.card,
-                            resolved_card_back=resolved_card_backs.get(entry.card.id),
-                        ),
-                    }
-                    for entry in sideboard.entries.all()
-                ],
-            }
+            _deck_sideboard_payload(
+                sideboard,
+                resolved_card_backs=resolved_card_backs,
+            )
             for sideboard in sideboards
         ],
         "totals": {
@@ -192,6 +187,34 @@ def deck_payload(
         else [],
         "created_at": deck.created_at.isoformat(),
         "updated_at": deck.updated_at.isoformat(),
+    }
+
+
+def _deck_sideboard_payload(
+    sideboard: DeckSideboard,
+    *,
+    resolved_card_backs: dict[str, ResolvedCardBack],
+) -> dict[str, object]:
+    entries = list(sideboard.entries.all())
+    entry_payloads: list[dict[str, object]] = []
+    total_cards = 0
+    for entry in entries:
+        total_cards += int(entry.quantity)
+        entry_payloads.append(
+            {
+                "quantity": entry.quantity,
+                "card": deck_card_payload(
+                    entry.card,
+                    resolved_card_back=resolved_card_backs.get(entry.card.id),
+                ),
+            }
+        )
+    return {
+        "id": sideboard.id,
+        "name": sideboard.name,
+        "total_cards": total_cards,
+        "unique_cards": len(entries),
+        "entries": entry_payloads,
     }
 
 

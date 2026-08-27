@@ -115,7 +115,11 @@ class TtsCardSheetService:
             target_card_id=target_card_id,
             target_source=target_sources[0] if target_sources else None,
         )
-        transaction.on_commit(lambda: self.sync_cards([target_card_id]))
+
+        def sync_target_card() -> None:
+            self.sync_cards([target_card_id])
+
+        transaction.on_commit(sync_target_card)
         return affected_sheet_ids
 
     def prepare_cards(

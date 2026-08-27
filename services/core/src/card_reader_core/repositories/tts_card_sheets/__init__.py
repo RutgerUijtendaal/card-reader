@@ -124,7 +124,10 @@ def resolve_tts_card_image_path(image: CardVersionImage) -> Path | None:
 
 
 def sync_card_sources(sources: list[TtsCardImageSource]) -> set[str]:
-    return run_with_sqlite_write_retry(lambda: _sync_card_sources_once(sources))
+    def sync_once() -> set[str]:
+        return _sync_card_sources_once(sources)
+
+    return run_with_sqlite_write_retry(sync_once)
 
 
 @transaction.atomic
@@ -348,12 +351,13 @@ def claim_sheet_for_render(
     *,
     respect_not_before: bool = False,
 ) -> TtsCardSheet | None:
-    return run_with_sqlite_write_retry(
-        lambda: _claim_sheet_for_render_once(
+    def claim_once() -> TtsCardSheet | None:
+        return _claim_sheet_for_render_once(
             sheet_id,
             respect_not_before=respect_not_before,
         )
-    )
+
+    return run_with_sqlite_write_retry(claim_once)
 
 
 def _claim_sheet_for_render_once(
@@ -405,7 +409,10 @@ def get_sheet_with_slots(sheet_id: str) -> TtsCardSheet | None:
 
 
 def refresh_card_source_visibility(card_ids: list[str] | None = None) -> set[str]:
-    return run_with_sqlite_write_retry(lambda: _refresh_card_source_visibility_once(card_ids))
+    def refresh_once() -> set[str]:
+        return _refresh_card_source_visibility_once(card_ids)
+
+    return run_with_sqlite_write_retry(refresh_once)
 
 
 @transaction.atomic
@@ -444,7 +451,10 @@ def sheet_has_unretired_incompatible_slots(sheet_id: str) -> bool:
 
 
 def retire_incompatible_sheet_slots(sheet_id: str) -> None:
-    run_with_sqlite_write_retry(lambda: _retire_incompatible_sheet_slots_once(sheet_id))
+    def retire_once() -> None:
+        _retire_incompatible_sheet_slots_once(sheet_id)
+
+    run_with_sqlite_write_retry(retire_once)
 
 
 @transaction.atomic

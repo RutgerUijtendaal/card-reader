@@ -40,7 +40,10 @@ def retry_sqlite_write(operation: Callable[P, R]) -> Callable[P, R]:
 
     @wraps(operation)
     def wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
-        return run_with_sqlite_write_retry(lambda: operation(*args, **kwargs))
+        def run_operation() -> R:
+            return operation(*args, **kwargs)
+
+        return run_with_sqlite_write_retry(run_operation)
 
     return wrapped
 
