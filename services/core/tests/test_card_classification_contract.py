@@ -44,6 +44,7 @@ def test_classification_registries_expose_the_final_canonical_contract() -> None
         ("blood", "Blood", 2),
         ("dark", "Dark", 3),
         ("metal", "Metal", 4),
+        ("fire", "Fire", 5),
     ]
 
 
@@ -76,11 +77,14 @@ def test_role_and_faction_normalization_are_independent_and_canonical() -> None:
         "reminder",
         "mana",
     )
-    assert normalize_card_factions(("metal", "dark", "order", "dark", "unsupported")) == (
+    assert normalize_card_factions(
+        ("fire", "metal", "dark", "order", "dark", "unsupported")
+    ) == (
         "order",
         "dark",
         "metal",
+        "fire",
     )
-    assert card_faction_identity_key(("metal", "dark", "order", "dark")) == (
-        '["order","dark","metal"]'
+    assert card_faction_identity_key(("fire", "metal", "dark", "order", "dark")) == (
+        '["order","dark","metal","fire"]'
     )

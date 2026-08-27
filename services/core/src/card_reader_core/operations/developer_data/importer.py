@@ -67,6 +67,7 @@ MIGRATION_DEFAULT_SOURCE_DEFINITIONS = {
         "blood": ("Blood", ["blood"]),
         "dark": ("Dark", ["dark"]),
         "metal": ("Metal", ["metal"]),
+        "fire": ("Fire", ["fire"]),
     },
     "type": {
         "hero": ("Hero", ["hero"]),
@@ -91,6 +92,7 @@ MIGRATION_DEFAULT_CLASSIFICATION_RULES = (
     ("evil", "faction", "blood", "tag", "blood"),
     ("evil", "faction", "dark", "tag", "dark"),
     ("evil", "faction", "metal", "tag", "metal"),
+    ("evil", "faction", "fire", "tag", "fire"),
     ("neutral", "role", "boon", "type", "boon"),
     ("neutral", "role", "event", "type", "event"),
 )

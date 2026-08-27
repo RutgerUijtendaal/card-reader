@@ -117,7 +117,7 @@ Core stack:
 - The target card classification model has four independent card-level dimensions:
   - `card_pool` is exactly one of `player`, `evil`, or `neutral`; unknown values are invalid.
   - `card_roles` is a set of zero or more code-owned roles: `hero`, `boss`, `location`, `boon`, `event`, `shop_item`, `directive`, `reminder`, and `mana`; roles may coexist.
-  - `card_factions` is a set of zero or more code-owned factions: `order`, `blood`, `dark`, and `metal`; factions may coexist.
+  - `card_factions` is a set of zero or more code-owned factions: `order`, `blood`, `dark`, `metal`, and `fire`; factions may coexist.
   - `card_mana_families` is a set of zero or more code-owned families: `arcane`, `dark`, `divine`, `martial`, `occult`, and `primal`; families may coexist across every pool. Colorless is the derived empty state and is never persisted.
   - Normal is the product label for the derived empty-role state and must not be persisted as a role. Keep `standard` only as the existing internal/query sentinel for that derived state.
   - Pool/role/faction/mana-family conventions belong in core code, not mutually-exclusive or same-pool database constraints. Cross-pool relationships are allowed.
@@ -153,7 +153,7 @@ Core stack:
   - paginated or query-backed card collections should sort in the backend
   - already-loaded embedded card collections may sort client-side for presentation
   - shared sort keys and semantics must stay aligned across both layers
-  - `default` is the canonical single-pool sort: Player orders by mana family, then Hero before the default role order, then ascending mana value; Evil orders by Order, Blood, Dark, Metal, then no faction, followed by Boss, Location, the default role order, and ascending mana value; Neutral uses the default role order
+  - `default` is the canonical single-pool sort: Player orders by mana family, then Hero before the default role order, then ascending mana value; Evil orders by Order, Blood, Dark, Metal, Fire, then no faction, followed by Boss, Location, the default role order, and ascending mana value; Neutral uses the default role order
   - the default role order is Normal, Hero, Boss, Location, Boon, Event, Shop Item, Directive, Reminder, then Mana; pool-specific priority roles are moved ahead of that order without duplicating them
   - multi-valued factions, roles, and mana families sort by their earliest effective value, then their complete effective membership vector; grouped Gallery results use their anchor Card's values
   - keep the pool sort as declarative mirrored component lists in backend and frontend code so future priority changes remain localized; query-backed defaults must translate those components to SQL annotations and paginate in the database

@@ -52,7 +52,7 @@ rendering semantics as ordinary card saves.
 Selection coverage is evaluated by pool, role, faction, and mana family through `min_cards_by_pool`,
 `min_cards_by_role`, `min_cards_by_faction`, and `min_cards_by_mana_family`. The existing Hero minimum is retained under the Hero
 role. Evil and Neutral pool coverage remains zero under the Player-only publication contract; Directive, Reminder,
-and Order, Blood, Dark, and Metal may remain at zero until reviewed source data is available. The
+and Order, Blood, Dark, Metal, and Fire may remain at zero until reviewed source data is available. The
 selection still requires both Evil Type-to-role rules so migration-owned defaults cannot disappear
 silently even while Evil card coverage is optional. Mana coverage is required because existing Player
 and Evil cards with the Mana Type are assigned the Mana role. The lock file is still generated only by publishing a validated immutable bundle and must
