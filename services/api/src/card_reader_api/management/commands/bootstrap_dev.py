@@ -220,32 +220,32 @@ def _download_bundle_once(
     target: Path,
     temporary: Path,
 ) -> str | None:
-    downloaded_size = temporary.stat().st_size if temporary.is_file() else 0
-    if downloaded_size > expected_size:
-        temporary.unlink()
-        downloaded_size = 0
-    if downloaded_size == expected_size:
-        temporary.replace(target)
-        return None
-
-    headers = {"Authorization": f"DevData {token}", "Accept": "application/gzip"}
-    if downloaded_size:
-        headers["Range"] = f"bytes={downloaded_size}-"
-    download_request = Request(download_url, headers=headers)
     try:
+        downloaded_size = temporary.stat().st_size if temporary.is_file() else 0
+        if downloaded_size > expected_size:
+            temporary.unlink()
+            downloaded_size = 0
+        if downloaded_size == expected_size:
+            temporary.replace(target)
+            return None
+
+        headers = {"Authorization": f"DevData {token}", "Accept": "application/gzip"}
+        if downloaded_size:
+            headers["Range"] = f"bytes={downloaded_size}-"
+        download_request = Request(download_url, headers=headers)
         with urlopen(download_request, timeout=120) as response:
             mode = "ab" if response.status == 206 and downloaded_size > 0 else "wb"
             _write_download_response(response, temporary=temporary, mode=mode)
+
+        received_size = temporary.stat().st_size
+        if received_size == expected_size:
+            temporary.replace(target)
+            return None
+        return f"received {received_size} of {expected_size} bytes"
     except HTTPError as exc:
         return _http_error_detail(exc)
     except (OSError, URLError) as exc:
         return str(exc)
-
-    received_size = temporary.stat().st_size
-    if received_size == expected_size:
-        temporary.replace(target)
-        return None
-    return f"received {received_size} of {expected_size} bytes"
 
 
 def _write_download_response(response: Any, *, temporary: Path, mode: str) -> None:
