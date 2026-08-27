@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.apps.registry import Apps
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+from django.db.migrations.exceptions import IrreversibleError
 import pytest
 
 
@@ -78,7 +79,7 @@ def test_fire_faction_migration_reuses_the_tag_and_seeds_the_rule() -> None:
 
 
 @pytest.mark.django_db(transaction=True)
-def test_fire_faction_reverse_preserves_a_staff_modified_seeded_rule() -> None:
+def test_fire_faction_reverse_rejects_a_staff_modified_seeded_rule() -> None:
     _migrate_to(BASE_MIGRATION)
     apps = _migrate_to(FIRE_MIGRATION)
     CardClassificationRule = apps.get_model(
@@ -95,11 +96,103 @@ def test_fire_faction_reverse_preserves_a_staff_modified_seeded_rule() -> None:
     rule.enabled = False
     rule.save(update_fields=["enabled", "updated_at"])
 
-    reversed_apps = _migrate_to(BASE_MIGRATION)
-    ReversedRule = reversed_apps.get_model(
+    with pytest.raises(
+        IrreversibleError,
+        match="staff-modified or additional Fire classification rules",
+    ):
+        _migrate_to(BASE_MIGRATION)
+
+    CardClassificationRule.objects.filter(id=rule.id).delete()
+    _migrate_to(BASE_MIGRATION)
+    _restore_leaf()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_fire_faction_reverse_rejects_assignments_identities_and_snapshots() -> None:
+    _migrate_to(BASE_MIGRATION)
+    apps = _migrate_to(FIRE_MIGRATION)
+    Card = apps.get_model("card_reader_core", "Card")
+    CardAlias = apps.get_model("card_reader_core", "CardAlias")
+    CardClassificationReviewItem = apps.get_model(
         "card_reader_core",
-        "CardClassificationRule",
+        "CardClassificationReviewItem",
     )
-    assert ReversedRule.objects.filter(id=rule.id, enabled=False).exists()
-    ReversedRule.objects.filter(id=rule.id).delete()
+    CardFactionAssignment = apps.get_model(
+        "card_reader_core",
+        "CardFactionAssignment",
+    )
+    ImportJob = apps.get_model("card_reader_core", "ImportJob")
+    ImportJobItem = apps.get_model("card_reader_core", "ImportJobItem")
+    Template = apps.get_model("card_reader_core", "Template")
+
+    card = Card.objects.create(
+        key="fire-rollback-card",
+        label="Fire Rollback Card",
+        card_pool="evil",
+        faction_identity_key='["fire"]',
+    )
+    CardFactionAssignment.objects.create(card_id=card.id, faction="fire")
+    CardAlias.objects.create(
+        card_id=card.id,
+        key="fire-rollback-alias",
+        label="Fire Rollback Alias",
+        card_pool="evil",
+        faction_identity_key='["fire"]',
+    )
+    template = Template.objects.create(
+        key="fire-rollback-template",
+        label="Fire Rollback Template",
+    )
+    job = ImportJob.objects.create(
+        source_path="imports/fire-rollback",
+        template_id=template.id,
+        card_pool="evil",
+        card_faction_override_json=["fire"],
+        classification_rule_snapshot_json={
+            "rules": [{"target_kind": "faction", "target_key": "fire"}],
+        },
+    )
+    item = ImportJobItem.objects.create(
+        job_id=job.id,
+        source_file="fire-rollback.webp",
+        resolved_card_factions_json=["fire"],
+        classification_inference_json={"factions": {"resolved_factions": ["fire"]}},
+        target_card_factions_snapshot_json=["fire"],
+    )
+    CardClassificationReviewItem.objects.create(
+        import_item_id=item.id,
+        card_id=card.id,
+        card_pool="evil",
+        existing_classification_json={"card_factions": ["fire"]},
+        inferred_classification_json={"card_factions": ["fire"]},
+        inference_evidence_json={"factions": {"resolved_factions": ["fire"]}},
+    )
+
+    with pytest.raises(IrreversibleError) as exception_info:
+        _migrate_to(BASE_MIGRATION)
+
+    message = str(exception_info.value)
+    for blocker in (
+        "card faction assignments",
+        "card identity keys",
+        "card alias identity keys",
+        "ImportJob.card_faction_override_json",
+        "ImportJob.classification_rule_snapshot_json",
+        "ImportJobItem.resolved_card_factions_json",
+        "ImportJobItem.classification_inference_json",
+        "ImportJobItem.target_card_factions_snapshot_json",
+        "CardClassificationReviewItem.existing_classification_json",
+        "CardClassificationReviewItem.inferred_classification_json",
+        "CardClassificationReviewItem.inference_evidence_json",
+    ):
+        assert blocker in message
+
+    CardClassificationReviewItem.objects.filter(import_item_id=item.id).delete()
+    ImportJobItem.objects.filter(id=item.id).delete()
+    ImportJob.objects.filter(id=job.id).delete()
+    Template.objects.filter(id=template.id).delete()
+    CardAlias.objects.filter(card_id=card.id).delete()
+    CardFactionAssignment.objects.filter(card_id=card.id).delete()
+    Card.objects.filter(id=card.id).delete()
+    _migrate_to(BASE_MIGRATION)
     _restore_leaf()
