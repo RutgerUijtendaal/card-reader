@@ -18,11 +18,14 @@ from card_reader_core.models import PLAYER_CARD_POOL
 from card_reader_core.services.card_backs import (
     clear_faction_default,
     clear_pool_default,
+    clear_role_default,
     get_faction_card_back_defaults,
     get_pool_card_back_defaults,
+    get_role_card_back_defaults,
     list_card_back_assets,
     set_faction_default,
     set_pool_default,
+    set_role_default,
     upload_card_back_asset,
 )
 
@@ -56,6 +59,19 @@ class CardBackFactionDefaultsView(APIView):
             {
                 faction: None if card_back is None else public_card_back_payload(card_back)
                 for faction, card_back in defaults.items()
+            }
+        )
+
+
+class CardBackRoleDefaultsView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, _request: Request) -> Response:
+        defaults = get_role_card_back_defaults()
+        return Response(
+            {
+                role: None if card_back is None else public_card_back_payload(card_back)
+                for role, card_back in defaults.items()
             }
         )
 
@@ -116,6 +132,22 @@ class AdminCardBackFactionDefaultView(APIView):
                 clear_faction_default(faction)
                 return Response(status=status.HTTP_204_NO_CONTENT)
             row = set_faction_default(faction, str(card_back_id))
+        except ValueError as exc:
+            return bad_request(str(exc))
+        return Response(public_card_back_payload(row.card_back))
+
+
+class AdminCardBackRoleDefaultView(APIView):
+    def put(self, request: Request, role: str) -> Response:
+        serializer = CardBackDefaultUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return serializer_error(serializer)
+        card_back_id = serializer.validated_data["card_back_id"]
+        try:
+            if card_back_id is None:
+                clear_role_default(role)
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            row = set_role_default(role, str(card_back_id))
         except ValueError as exc:
             return bad_request(str(exc))
         return Response(public_card_back_payload(row.card_back))

@@ -15,7 +15,9 @@ from card_reader_core.models import (
     CardBack,
     CardBackFactionDefault,
     CardBackPoolDefault,
+    CardBackRoleDefault,
     CardFactionAssignment,
+    CardRoleAssignment,
     CardVersion,
     Template,
 )
@@ -65,6 +67,34 @@ def test_public_faction_defaults_always_return_every_evil_faction() -> None:
         "dark": None,
         "metal": None,
         "fire": None,
+    }
+
+
+def test_public_role_defaults_always_return_every_persisted_role() -> None:
+    card_back = _create_card_back(label="Hero Back", write_image=True)
+    CardBackRoleDefault.objects.create(role="hero", card_back=card_back)
+
+    response = Client(HTTP_HOST="localhost").get("/card-backs/role-defaults")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "hero": {
+            "id": card_back.id,
+            "label": card_back.label,
+            "width": card_back.width,
+            "height": card_back.height,
+            "image_url": f"/card-images/{card_back.stored_path}",
+            "created_at": card_back.created_at.isoformat(),
+            "updated_at": card_back.updated_at.isoformat(),
+        },
+        "boss": None,
+        "location": None,
+        "boon": None,
+        "event": None,
+        "shop_item": None,
+        "directive": None,
+        "reminder": None,
+        "mana": None,
     }
 
 
@@ -215,6 +245,56 @@ def test_staff_sets_and_clears_one_faction_default() -> None:
     assert not CardBackFactionDefault.objects.filter(faction="blood").exists()
 
 
+def test_staff_sets_and_clears_one_role_default() -> None:
+    client, csrf_token = _staff_client("staff-card-back-role-default-user")
+    card_back = _create_card_back(label="Boss Back", write_image=True)
+
+    response = client.put(
+        "/admin/card-backs/role-defaults/boss",
+        data={"card_back_id": card_back.id},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    assert CardBackRoleDefault.objects.get(role="boss").card_back_id == card_back.id
+
+    clear_response = client.put(
+        "/admin/card-backs/role-defaults/boss",
+        data={"card_back_id": None},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert clear_response.status_code == 204
+    assert not CardBackRoleDefault.objects.filter(role="boss").exists()
+
+
+def test_staff_role_default_rejects_invalid_role_and_unusable_asset() -> None:
+    client, csrf_token = _staff_client("staff-card-back-invalid-role-default-user")
+    usable = _create_card_back(label="Usable Back", write_image=True)
+    missing = _create_card_back(label="Missing Back", write_image=False)
+
+    invalid_role_response = client.put(
+        "/admin/card-backs/role-defaults/standard",
+        data={"card_back_id": usable.id},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    missing_asset_response = client.put(
+        "/admin/card-backs/role-defaults/hero",
+        data={"card_back_id": missing.id},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert invalid_role_response.status_code == 400
+    assert invalid_role_response.json()["detail"] == "Invalid card role."
+    assert missing_asset_response.status_code == 400
+    assert missing_asset_response.json()["detail"] == "Card back image file is missing."
+    assert CardBackRoleDefault.objects.count() == 0
+
+
 def test_staff_cannot_assign_card_back_with_missing_image() -> None:
     client, csrf_token = _staff_client("staff-card-back-missing-image-user")
     missing = _create_card_back(label="Missing Back", write_image=False)
@@ -236,6 +316,7 @@ def test_admin_list_reports_default_and_override_usage() -> None:
     card_back = _create_card_back(label="Used Back", write_image=True)
     CardBackPoolDefault.objects.create(card_pool="player", card_back=card_back)
     CardBackFactionDefault.objects.create(faction="fire", card_back=card_back)
+    CardBackRoleDefault.objects.create(role="event", card_back=card_back)
     Card.objects.create(key="card", label="Card", card_back_override=card_back)
 
     response = client.get("/admin/card-backs")
@@ -243,6 +324,7 @@ def test_admin_list_reports_default_and_override_usage() -> None:
     assert response.status_code == 200
     assert response.json()[0]["default_for_pools"] == ["player"]
     assert response.json()[0]["default_for_factions"] == ["fire"]
+    assert response.json()[0]["default_for_roles"] == ["event"]
     assert response.json()[0]["override_card_count"] == 1
 
 
@@ -253,6 +335,8 @@ def test_card_patch_sets_and_clears_override_inside_the_card_edit() -> None:
     faction_default = _create_card_back(label="Order Default", write_image=True)
     CardBackPoolDefault.objects.create(card_pool="evil", card_back=inherited)
     CardBackFactionDefault.objects.create(faction="order", card_back=faction_default)
+    role_default = _create_card_back(label="Event Default", write_image=True)
+    CardBackRoleDefault.objects.create(role="event", card_back=role_default)
     template = Template.objects.create(key="card-back-edit", label="Card Back Edit")
     card = Card.objects.create(key="card-back-edit", label="Card Back Edit")
     version = CardVersion.objects.create(
@@ -264,6 +348,7 @@ def test_card_patch_sets_and_clears_override_inside_the_card_edit() -> None:
     card.latest_version = version
     card.save(update_fields=["latest_version"])
     CardFactionAssignment.objects.create(card=card, faction="order")
+    CardRoleAssignment.objects.create(card=card, role="event")
     original_updated_at = card.updated_at
 
     response = client.patch(
@@ -290,9 +375,9 @@ def test_card_patch_sets_and_clears_override_inside_the_card_edit() -> None:
     assert clear_response.status_code == 200
     card.refresh_from_db()
     assert card.card_back_override_id is None
-    assert clear_response.json()["effective_card_back"]["source"] == "faction_default"
-    assert clear_response.json()["effective_card_back"]["faction"] == "order"
-    assert clear_response.json()["effective_card_back"]["asset"]["id"] == faction_default.id
+    assert clear_response.json()["effective_card_back"]["source"] == "role_default"
+    assert clear_response.json()["effective_card_back"]["role"] == "event"
+    assert clear_response.json()["effective_card_back"]["asset"]["id"] == role_default.id
 
 
 def test_invalid_card_override_keeps_the_rest_of_the_card_edit_unchanged() -> None:
@@ -331,6 +416,7 @@ def test_card_back_admin_endpoints_require_staff() -> None:
         ("post", "/admin/card-backs/upload"),
         ("put", "/admin/card-backs/defaults/player"),
         ("put", "/admin/card-backs/faction-defaults/order"),
+        ("put", "/admin/card-backs/role-defaults/hero"),
     ]:
         assert getattr(anonymous, method)(path).status_code in {401, 403}
         assert getattr(regular, method)(path).status_code == 403

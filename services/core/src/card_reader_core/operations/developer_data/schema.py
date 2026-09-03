@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from card_reader_core.models import (
     CARD_ROLE_FILTER_VALUES,
+    CARD_ROLES,
     CARD_FACTIONS,
     HERO_CARD_ROLE,
     STANDARD_CARD_ROLE,
@@ -23,8 +24,8 @@ from card_reader_core.metadata import (
     normalize_mana_family_keys,
 )
 
-DEVELOPER_DATA_FORMAT_VERSION = 6
-SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, 3, 4, 5, DEVELOPER_DATA_FORMAT_VERSION)
+DEVELOPER_DATA_FORMAT_VERSION = 7
+SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, 3, 4, 5, 6, DEVELOPER_DATA_FORMAT_VERSION)
 TYPE_INFERRED_ROLE_POOLS: tuple[tuple[CardRole, frozenset[CardPool]], ...] = (
     ("directive", frozenset({"evil"})),
     ("reminder", frozenset({"evil"})),
@@ -292,6 +293,11 @@ class CardBackFactionDefaultRecord(StrictModel):
     card_back_checksum: str | None
 
 
+class CardBackRoleDefaultRecord(StrictModel):
+    role: CardRole
+    card_back_checksum: str | None
+
+
 class DeveloperDataPayload(StrictModel):
     keywords: list[CatalogRecord]
     tags: list[CatalogRecord]
@@ -306,6 +312,7 @@ class DeveloperDataPayload(StrictModel):
     card_backs: list[CardBackRecord]
     card_back_pool_defaults: list[CardBackPoolDefaultRecord]
     card_back_faction_defaults: list[CardBackFactionDefaultRecord]
+    card_back_role_defaults: list[CardBackRoleDefaultRecord]
 
 
 class BundleFileRecord(StrictModel):
@@ -495,6 +502,12 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
     if format_version == DEVELOPER_DATA_FORMAT_VERSION:
         return value
     adopted = dict(value)
+    adopted["card_back_role_defaults"] = [
+        {"role": role, "card_back_checksum": None}
+        for role in CARD_ROLES
+    ]
+    if format_version == 6:
+        return adopted
     adopted["card_back_faction_defaults"] = [
         {"faction": faction, "card_back_checksum": None}
         for faction in CARD_FACTIONS

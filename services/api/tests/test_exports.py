@@ -16,7 +16,9 @@ from card_reader_core.models import (
     CardBack,
     CardBackFactionDefault,
     CardBackPoolDefault,
+    CardBackRoleDefault,
     CardFactionAssignment,
+    CardRoleAssignment,
     CardVersion,
     CardVersionImage,
     ContentVersion,
@@ -646,18 +648,40 @@ def test_non_player_gallery_tts_export_uses_stable_pool_sheet_urls() -> None:
         checksum="card-back-evil-gallery-order",
     )
     CardBackFactionDefault.objects.create(faction="order", card_back=faction_default)
+    role_back_path = build_storage_relative_path(
+        "images", "tts-card-back-evil-gallery-event.webp"
+    )
+    (settings.storage_root_dir / role_back_path).write_bytes(b"event-card-back")
+    role_default = CardBack.objects.create(
+        label="Evil Gallery Event",
+        original_filename="evil-gallery-event.png",
+        source_file="uploads/card-backs/evil-gallery-event.png",
+        stored_path=role_back_path,
+        width=63,
+        height=88,
+        checksum="card-back-evil-gallery-event",
+    )
+    CardBackRoleDefault.objects.create(role="event", card_back=role_default)
     evil = _create_card(name="Evil Gallery TTS Card", hero=False)
     evil.card_pool = "evil"
     evil.save(update_fields=["card_pool", "updated_at"])
     CardFactionAssignment.objects.create(card=evil, faction="order")
+    CardRoleAssignment.objects.create(card=evil, role="event")
     _create_card_image(evil.latest_version, content=b"evil-gallery")
+    overridden = _create_card(name="Evil Gallery TTS Override", hero=False)
+    overridden.card_pool = "evil"
+    overridden.card_back_override = pool_default
+    overridden.save(update_fields=["card_pool", "card_back_override", "updated_at"])
+    CardFactionAssignment.objects.create(card=overridden, faction="order")
+    CardRoleAssignment.objects.create(card=overridden, role="event")
+    _create_card_image(overridden.latest_version, content=b"evil-gallery-override")
 
     response = client.post(
         "/exports/tts/cards",
         data={
             "source": {
                 "type": "gallery",
-                "filters": {"q": "Evil Gallery TTS Card", "card_pool": "evil"},
+                "filters": {"q": "Evil Gallery TTS", "card_pool": "evil"},
             }
         },
         content_type="application/json",
@@ -665,12 +689,13 @@ def test_non_player_gallery_tts_export_uses_stable_pool_sheet_urls() -> None:
 
     assert response.status_code == 200
     response_payload = response.json()
-    assert response_payload["exported_count"] == 1
+    assert response_payload["exported_count"] == 2
     assert response_payload["skipped_count"] == 0
     payload = _decode_tts_card_export(response_payload["encoded_payload"])
-    assert [card["card_id"] for card in payload["cards"]] == [evil.id]
-    assert payload["cards"][0]["card_back_id"] == faction_default.id
-    assert payload["cards"][0]["card_back_id"] != pool_default.id
+    card_back_ids = {card["card_id"]: card["card_back_id"] for card in payload["cards"]}
+    assert card_back_ids[evil.id] == role_default.id
+    assert card_back_ids[evil.id] != faction_default.id
+    assert card_back_ids[overridden.id] == pool_default.id
     sheet = payload["sheets"][0]
     assert sheet["card_pool"] == "evil"
     face_url = urlsplit(sheet["face_url"])

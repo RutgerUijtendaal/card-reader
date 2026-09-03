@@ -49,6 +49,7 @@ from card_reader_core.services.card_backs import (
     select_card_back_override,
     set_faction_default,
     set_pool_default,
+    set_role_default,
 )
 from card_reader_core.metadata import MANA_FAMILY_BY_KEY
 from card_reader_core.storage import calculate_checksum
@@ -472,6 +473,12 @@ def _import_card_backs(payload: DeveloperDataPayload) -> dict[str, CardBack]:
                 faction_default_record.faction,
                 card_backs_by_checksum[faction_default_record.card_back_checksum].id,
             )
+    for role_default_record in payload.card_back_role_defaults:
+        if role_default_record.card_back_checksum is not None:
+            set_role_default(
+                role_default_record.role,
+                card_backs_by_checksum[role_default_record.card_back_checksum].id,
+            )
     return card_backs_by_checksum
 
 
@@ -893,6 +900,21 @@ def _validate_card_back_references(
         ):
             issues.append(
                 f"{faction_default.faction} faction default references an unknown card back"
+            )
+
+    default_roles = [row.role for row in payload.card_back_role_defaults]
+    if len(default_roles) != len(set(default_roles)):
+        issues.append("card-back role defaults are not unique")
+    if set(default_roles) != set(CARD_ROLES):
+        issues.append("card-back role defaults must include every persisted role")
+
+    for role_default in payload.card_back_role_defaults:
+        if (
+            role_default.card_back_checksum is not None
+            and role_default.card_back_checksum not in card_back_checksums
+        ):
+            issues.append(
+                f"{role_default.role} role default references an unknown card back"
             )
 
 

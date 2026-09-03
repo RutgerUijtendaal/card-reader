@@ -1,5 +1,6 @@
 import type { CardPool } from '@/domain/cards/cardPools';
 import type { CardFaction } from '@/domain/cards/cardFactions';
+import type { CardRole } from '@/domain/cards/cardRoles';
 
 export type CardBackRecord = {
   id: string;
@@ -12,6 +13,7 @@ export type CardBackRecord = {
   checksum: string;
   default_for_pools: CardPool[];
   default_for_factions: CardFaction[];
+  default_for_roles: CardRole[];
   override_card_count: number;
   is_usable: boolean;
   image_url: string | null;
@@ -32,6 +34,8 @@ export type CardBackDefaults = Record<CardPool, PublicCardBackRecord | null>;
 
 export type CardBackFactionDefaults = Record<CardFaction, PublicCardBackRecord | null>;
 
+export type CardBackRoleDefaults = Record<CardRole, PublicCardBackRecord | null>;
+
 export type ResolvedCardBackPayload = (
   | {
     source: 'override' | 'pool_default';
@@ -40,6 +44,11 @@ export type ResolvedCardBackPayload = (
   | {
     source: 'faction_default';
     faction: CardFaction;
+    asset: PublicCardBackRecord;
+  }
+  | {
+    source: 'role_default';
+    role: CardRole;
     asset: PublicCardBackRecord;
   }
 ) | null;

@@ -1,7 +1,11 @@
 import { createApp, nextTick } from 'vue';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import CardBacksAdminView from '@/features/admin/views/CardBacksAdminView.vue';
-import type { CardBackFactionDefaults, CardBackRecord } from '@/domain/card-backs/types';
+import type {
+  CardBackFactionDefaults,
+  CardBackRecord,
+  CardBackRoleDefaults,
+} from '@/domain/card-backs/types';
 
 Object.defineProperty(URL, 'createObjectURL', {
   configurable: true,
@@ -36,6 +40,7 @@ const buildCardBack = (overrides: Partial<CardBackRecord> = {}): CardBackRecord 
   checksum: 'checksum',
   default_for_pools: ['player'],
   default_for_factions: [],
+  default_for_roles: [],
   override_card_count: 2,
   is_usable: true,
   image_url: '/card-images/images/back.webp',
@@ -66,6 +71,18 @@ const emptyFactionDefaults = (): CardBackFactionDefaults => ({
   fire: null,
 });
 
+const emptyRoleDefaults = (): CardBackRoleDefaults => ({
+  hero: null,
+  boss: null,
+  location: null,
+  boon: null,
+  event: null,
+  shop_item: null,
+  directive: null,
+  reminder: null,
+  mana: null,
+});
+
 const mountView = async () => {
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -80,6 +97,8 @@ const mockLoads = (assets = [buildCardBack()]): void => {
   apiGet.mockImplementation((url: string) => Promise.resolve({
     data: url === '/card-backs/defaults'
       ? { player: assets[0] ?? null, evil: null, neutral: null }
+      : url === '/card-backs/role-defaults'
+        ? emptyRoleDefaults()
       : url === '/card-backs/faction-defaults'
         ? emptyFactionDefaults()
       : assets,
@@ -98,7 +117,10 @@ describe('CardBacksAdminView', () => {
     expect(apiGet).toHaveBeenCalledWith('/admin/card-backs');
     expect(apiGet).toHaveBeenCalledWith('/card-backs/defaults');
     expect(apiGet).toHaveBeenCalledWith('/card-backs/faction-defaults');
+    expect(apiGet).toHaveBeenCalledWith('/card-backs/role-defaults');
+    expect(mounted.container.textContent).toContain('Role defaults');
     expect(mounted.container.textContent).toContain('Evil faction defaults');
+    expect(mounted.container.querySelector('select[aria-label="Normal role default card back"]')).toBeNull();
     expect(mounted.container.textContent).toContain('Default Back');
     expect(mounted.container.textContent).toContain('2 card overrides');
     expect(mounted.container.textContent).not.toContain('back.png');
@@ -260,6 +282,9 @@ describe('CardBacksAdminView', () => {
       if (url === '/card-backs/faction-defaults') {
         return Promise.resolve({ data: emptyFactionDefaults() });
       }
+      if (url === '/card-backs/role-defaults') {
+        return Promise.resolve({ data: emptyRoleDefaults() });
+      }
       assetRequestCount += 1;
       return assetRequestCount === 1 ? firstAssets.promise : secondAssets.promise;
     });
@@ -351,11 +376,93 @@ describe('CardBacksAdminView', () => {
     mounted.unmount();
   });
 
+  test('sets a role default with the dedicated mutation', async () => {
+    const second = buildCardBack({ id: 'card-back-2', label: 'Second Back', default_for_pools: [] });
+    mockLoads([buildCardBack(), second]);
+    apiPut.mockResolvedValue({ data: second });
+    const mounted = await mountView();
+    const heroSelect = mounted.container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Hero role default card back"]',
+    );
+    if (!heroSelect) throw new Error('expected Hero role default selector');
+
+    heroSelect.value = second.id;
+    heroSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushPromises();
+    expect(apiPut).toHaveBeenCalledWith('/admin/card-backs/role-defaults/hero', {
+      card_back_id: second.id,
+    });
+    mounted.unmount();
+  });
+
+  test('locks every default section while a role mutation is pending', async () => {
+    const second = buildCardBack({ id: 'card-back-2', label: 'Second Back', default_for_pools: [] });
+    mockLoads([buildCardBack(), second]);
+    const pendingMutation = deferred<{ data: CardBackRecord }>();
+    apiPut.mockReturnValue(pendingMutation.promise);
+    const mounted = await mountView();
+    const heroSelect = mounted.container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Hero role default card back"]',
+    );
+    if (!heroSelect) throw new Error('expected Hero role default selector');
+
+    heroSelect.value = second.id;
+    heroSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+
+    expect(mounted.container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Player default card back"]',
+    )?.disabled).toBe(true);
+    expect(mounted.container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Boss role default card back"]',
+    )?.disabled).toBe(true);
+    expect(mounted.container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Order faction default card back"]',
+    )?.disabled).toBe(true);
+
+    pendingMutation.resolve({ data: second });
+    await flushPromises();
+    mounted.unmount();
+  });
+
+  test('clears a role default and explains its card-specific fallback', async () => {
+    const selected = buildCardBack({ default_for_pools: [], default_for_roles: ['hero'] });
+    apiGet.mockImplementation((url: string) => Promise.resolve({
+      data: url === '/card-backs/defaults'
+        ? { player: null, evil: null, neutral: null }
+        : url === '/card-backs/role-defaults'
+          ? { ...emptyRoleDefaults(), hero: selected }
+          : url === '/card-backs/faction-defaults'
+            ? emptyFactionDefaults()
+            : [selected],
+    }));
+    apiPut.mockResolvedValue({ data: null });
+    const mounted = await mountView();
+    const heroSelect = mounted.container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Hero role default card back"]',
+    );
+    if (!heroSelect) throw new Error('expected Hero role default selector');
+
+    heroSelect.value = '__placeholder__';
+    heroSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushPromises();
+    expect(apiPut).toHaveBeenCalledWith('/admin/card-backs/role-defaults/hero', {
+      card_back_id: null,
+    });
+    expect(mounted.container.textContent).toContain(
+      'Falls back per card to its Evil faction default when applicable, then its pool default.',
+    );
+    expect(mounted.container.textContent).toContain('Per-card fallback');
+    mounted.unmount();
+  });
+
   test('clears an Evil faction default with the same authoritative mutation', async () => {
     const selected = buildCardBack({ default_for_pools: [], default_for_factions: ['order'] });
     apiGet.mockImplementation((url: string) => Promise.resolve({
       data: url === '/card-backs/defaults'
         ? { player: null, evil: null, neutral: null }
+        : url === '/card-backs/role-defaults'
+          ? emptyRoleDefaults()
         : url === '/card-backs/faction-defaults'
           ? { ...emptyFactionDefaults(), order: selected }
           : [selected],

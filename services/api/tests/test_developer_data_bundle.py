@@ -21,6 +21,7 @@ from card_reader_core.models import (
     CardBack,
     CardBackFactionDefault,
     CardBackPoolDefault,
+    CardBackRoleDefault,
     CardClassificationRule,
     CardFactionAssignment,
     CardManaFamilyAssignment,
@@ -89,6 +90,17 @@ def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
             {"faction": "metal", "card_back_checksum": None},
             {"faction": "fire", "card_back_checksum": None},
         ],
+        "card_back_role_defaults": [
+            {"role": "hero", "card_back_checksum": None},
+            {"role": "boss", "card_back_checksum": None},
+            {"role": "location", "card_back_checksum": None},
+            {"role": "boon", "card_back_checksum": None},
+            {"role": "event", "card_back_checksum": None},
+            {"role": "shop_item", "card_back_checksum": None},
+            {"role": "directive", "card_back_checksum": None},
+            {"role": "reminder", "card_back_checksum": None},
+            {"role": "mana", "card_back_checksum": None},
+        ],
         "cards": [
             {
                 "key": "hero",
@@ -148,7 +160,41 @@ def test_version_five_payload_adoption_adds_empty_faction_defaults() -> None:
             {"faction": "metal", "card_back_checksum": None},
             {"faction": "fire", "card_back_checksum": None},
         ],
+        "card_back_role_defaults": [
+            {"role": "hero", "card_back_checksum": None},
+            {"role": "boss", "card_back_checksum": None},
+            {"role": "location", "card_back_checksum": None},
+            {"role": "boon", "card_back_checksum": None},
+            {"role": "event", "card_back_checksum": None},
+            {"role": "shop_item", "card_back_checksum": None},
+            {"role": "directive", "card_back_checksum": None},
+            {"role": "reminder", "card_back_checksum": None},
+            {"role": "mana", "card_back_checksum": None},
+        ],
     }
+
+
+def test_version_six_payload_adoption_adds_empty_role_defaults() -> None:
+    payload = {
+        "cards": [],
+        "card_back_pool_defaults": [],
+        "card_back_faction_defaults": [],
+    }
+
+    adopted = adopt_payload_for_format(payload, format_version=6)
+
+    assert adopted["card_back_role_defaults"] == [
+        {"role": "hero", "card_back_checksum": None},
+        {"role": "boss", "card_back_checksum": None},
+        {"role": "location", "card_back_checksum": None},
+        {"role": "boon", "card_back_checksum": None},
+        {"role": "event", "card_back_checksum": None},
+        {"role": "shop_item", "card_back_checksum": None},
+        {"role": "directive", "card_back_checksum": None},
+        {"role": "reminder", "card_back_checksum": None},
+        {"role": "mana", "card_back_checksum": None},
+    ]
+    assert adopt_payload_for_format(adopted, format_version=7) == adopted
 
 
 @pytest.mark.parametrize(
@@ -599,6 +645,22 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
             for row in validated_payload.card_back_faction_defaults
             if row.card_back_checksum is not None
         } == {"order", "fire"}
+        assert {row.role for row in validated_payload.card_back_role_defaults} == {
+            "hero",
+            "boss",
+            "location",
+            "boon",
+            "event",
+            "shop_item",
+            "directive",
+            "reminder",
+            "mana",
+        }
+        assert {
+            row.role
+            for row in validated_payload.card_back_role_defaults
+            if row.card_back_checksum is not None
+        } == {"hero", "event"}
         mainboard_record.card_roles = ["boon"]
         assert "no active mainboard cards are included" not in validate_import_readiness(
             validated_payload
@@ -709,6 +771,10 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         assert set(
             CardBackFactionDefault.objects.values_list("faction", flat=True)
         ) == {"order", "fire"}
+        assert set(CardBackRoleDefault.objects.values_list("role", flat=True)) == {
+            "hero",
+            "event",
+        }
         assert Card.objects.filter(key="synthetic-mainboard").count() == 2
         imported_group = CardGroup.objects.get(key="synthetic-group")
         assert (
@@ -732,6 +798,39 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         with pytest.raises(DeveloperDataError, match="requires an empty domain database"):
             import_developer_data(archive_path=archive_path)
         transaction.set_rollback(True)
+
+
+@pytest.mark.django_db
+def test_bundle_validation_rejects_missing_role_default() -> None:
+    payload = _build_payload(cards=[], groups=[])
+    payload.card_back_role_defaults.pop()
+
+    with pytest.raises(
+        DeveloperDataError,
+        match="card-back role defaults must include every persisted role",
+    ):
+        _validate_payload_references(payload)
+
+
+@pytest.mark.django_db
+def test_bundle_validation_rejects_duplicate_role_default() -> None:
+    payload = _build_payload(cards=[], groups=[])
+    payload.card_back_role_defaults.append(payload.card_back_role_defaults[0])
+
+    with pytest.raises(DeveloperDataError, match="card-back role defaults are not unique"):
+        _validate_payload_references(payload)
+
+
+@pytest.mark.django_db
+def test_bundle_validation_rejects_unknown_role_default_asset() -> None:
+    payload = _build_payload(cards=[], groups=[])
+    payload.card_back_role_defaults[0].card_back_checksum = "missing-checksum"
+
+    with pytest.raises(
+        DeveloperDataError,
+        match="hero role default references an unknown card back",
+    ):
+        _validate_payload_references(payload)
 
 
 @pytest.mark.parametrize("marked_version_number", [1, 2])
@@ -1209,6 +1308,7 @@ def _build_archive_with_format_version(
         archive.extractall(extraction_root, filter="data")
     data_path = extraction_root / "data.json"
     payload = json.loads(data_path.read_text(encoding="utf-8"))
+    payload.pop("card_back_role_defaults")
     payload.pop("card_back_faction_defaults")
     player_default = next(
         default
@@ -1556,6 +1656,12 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
             CardBackFactionDefault(faction="fire", card_back=card_back),
         ]
     )
+    CardBackRoleDefault.objects.bulk_create(
+        [
+            CardBackRoleDefault(role="hero", card_back=card_back),
+            CardBackRoleDefault(role="event", card_back=card_back),
+        ]
+    )
     mainboard.card_back_override = card_back
     mainboard.save(update_fields=["card_back_override", "updated_at"])
     return {
@@ -1665,6 +1771,7 @@ def _clear_domain_data() -> None:
     ImportJob.objects.all().delete()
     CardGroup.objects.all().delete()
     Card.objects.all().delete()
+    CardBackRoleDefault.objects.all().delete()
     CardBackFactionDefault.objects.all().delete()
     CardBackPoolDefault.objects.all().delete()
     CardBack.objects.all().delete()

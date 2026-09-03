@@ -66,10 +66,87 @@
             :card-pool="option.value"
             :assets="cardBacks"
             :defaults="defaults"
-            :disabled="loading || settingPool !== null || settingFaction !== null"
+            :disabled="loading || settingPool !== null || settingRole !== null || settingFaction !== null"
             :aria-label="`${option.label} default card back`"
             selection-kind="default"
             @update:model-value="setDefault(option.value, $event)"
+          />
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="card-back-role-defaults-heading">
+      <div class="theme-divider flex flex-wrap items-end justify-between gap-3 border-b pb-4">
+        <div>
+          <h3
+            id="card-back-role-defaults-heading"
+            class="theme-section-title text-base font-semibold"
+          >
+            Role defaults
+          </h3>
+          <p class="theme-section-muted mt-1 text-sm">
+            Cards inherit the first configured role default in canonical role order before faction and pool defaults.
+          </p>
+        </div>
+        <p class="theme-section-muted text-xs">
+          Applies across every pool. Normal is the no-role state.
+        </p>
+      </div>
+
+      <div
+        v-if="initialLoading"
+        class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+        aria-label="Loading role defaults"
+      >
+        <div
+          v-for="option in CARD_ROLE_OPTIONS"
+          :key="option.value"
+          class="theme-card-frame-muted animate-pulse rounded-xl p-4"
+        >
+          <div class="h-4 w-20 rounded bg-[var(--color-surface-soft)]" />
+          <div class="mt-4 grid grid-cols-[minmax(0,1fr)_5rem] gap-3">
+            <div class="h-10 rounded-lg bg-[var(--color-surface-soft)]" />
+            <div class="aspect-[63/88] rounded-lg bg-[var(--color-surface-soft)]" />
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-else
+        class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        <article
+          v-for="option in CARD_ROLE_OPTIONS"
+          :key="option.value"
+          class="theme-card-frame-muted rounded-xl p-4"
+        >
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h4 class="theme-section-title text-sm font-semibold">
+                {{ option.label }}
+              </h4>
+              <p class="theme-section-muted mt-0.5 text-xs">
+                Role card back
+              </p>
+            </div>
+            <span
+              class="theme-pill px-2 py-0.5 text-xs"
+              :class="roleDefaults[option.value] ? 'theme-pill-success' : 'theme-pill-neutral'"
+            >
+              {{ roleDefaults[option.value] ? 'Set' : 'Inherits' }}
+            </span>
+          </div>
+          <CardBackSelect
+            :model-value="roleDefaults[option.value]?.id ?? null"
+            card-pool="player"
+            :assets="cardBacks"
+            :defaults="defaults"
+            :disabled="loading || settingPool !== null || settingRole !== null || settingFaction !== null"
+            :aria-label="`${option.label} role default card back`"
+            :scope-label="`${option.label} role`"
+            inheritance-mode="per-card"
+            selection-kind="default"
+            @update:model-value="setRoleDefault(option.value, $event)"
           />
         </article>
       </div>
@@ -141,7 +218,7 @@
             card-pool="evil"
             :assets="cardBacks"
             :defaults="defaults"
-            :disabled="loading || settingPool !== null || settingFaction !== null"
+            :disabled="loading || settingPool !== null || settingRole !== null || settingFaction !== null"
             :aria-label="`${option.label} faction default card back`"
             :scope-label="`${option.label} faction`"
             selection-kind="default"
@@ -301,7 +378,16 @@
                 {{ cardFactionLabel(faction) }} faction default
               </span>
               <span
-                v-if="cardBack.default_for_pools.length === 0 && cardBack.default_for_factions.length === 0"
+                v-for="role in cardBack.default_for_roles"
+                :key="role"
+                class="theme-pill theme-pill-success px-2 py-0.5 text-[11px]"
+              >
+                {{ cardRoleLabel(role) }} role default
+              </span>
+              <span
+                v-if="cardBack.default_for_pools.length === 0
+                  && cardBack.default_for_roles.length === 0
+                  && cardBack.default_for_factions.length === 0"
                 class="theme-section-muted text-[11px]"
               >
                 Not a default
@@ -336,15 +422,18 @@ import CardBackSelect from '@/domain/card-backs/components/CardBackSelect.vue';
 import {
   fetchCardBackDefaults,
   fetchCardBackFactionDefaults,
+  fetchCardBackRoleDefaults,
   fetchCardBacks,
   setFactionCardBackDefault,
   setPoolCardBackDefault,
+  setRoleCardBackDefault,
   uploadCardBack,
 } from '@/domain/card-backs/api';
 import type {
   CardBackDefaults,
   CardBackFactionDefaults,
   CardBackRecord,
+  CardBackRoleDefaults,
 } from '@/domain/card-backs/types';
 import {
   CARD_FACTION_OPTIONS,
@@ -352,6 +441,7 @@ import {
   type CardFaction,
 } from '@/domain/cards/cardFactions';
 import { CARD_POOL_OPTIONS, type CardPool } from '@/domain/cards/cardPools';
+import { CARD_ROLE_OPTIONS, cardRoleLabel, type CardRole } from '@/domain/cards/cardRoles';
 import CardBackUploadModal from '@/features/admin/components/CardBackUploadModal.vue';
 
 const emptyDefaults = (): CardBackDefaults => ({ player: null, evil: null, neutral: null });
@@ -362,14 +452,27 @@ const emptyFactionDefaults = (): CardBackFactionDefaults => ({
   metal: null,
   fire: null,
 });
+const emptyRoleDefaults = (): CardBackRoleDefaults => ({
+  hero: null,
+  boss: null,
+  location: null,
+  boon: null,
+  event: null,
+  shop_item: null,
+  directive: null,
+  reminder: null,
+  mana: null,
+});
 const cardBacks = ref<CardBackRecord[]>([]);
 const defaults = ref<CardBackDefaults>(emptyDefaults());
 const factionDefaults = ref<CardBackFactionDefaults>(emptyFactionDefaults());
+const roleDefaults = ref<CardBackRoleDefaults>(emptyRoleDefaults());
 const loading = ref(false);
 const hasLoaded = ref(false);
 const uploading = ref(false);
 const uploadModalOpen = ref(false);
 const settingPool = ref<CardPool | null>(null);
+const settingRole = ref<CardRole | null>(null);
 const settingFaction = ref<CardFaction | null>(null);
 const searchQuery = ref('');
 const errorMessage = ref('');
@@ -396,14 +499,16 @@ const loadCardBackData = async (): Promise<void> => {
   loading.value = true;
   errorMessage.value = '';
   try {
-    const [nextCardBacks, nextDefaults, nextFactionDefaults] = await Promise.all([
+    const [nextCardBacks, nextDefaults, nextRoleDefaults, nextFactionDefaults] = await Promise.all([
       fetchCardBacks(),
       fetchCardBackDefaults(),
+      fetchCardBackRoleDefaults(),
       fetchCardBackFactionDefaults(),
     ]);
     if (requestVersion !== loadRequestVersion) return;
     cardBacks.value = nextCardBacks;
     defaults.value = nextDefaults;
+    roleDefaults.value = nextRoleDefaults;
     factionDefaults.value = nextFactionDefaults;
   } catch (error) {
     if (requestVersion !== loadRequestVersion) return;
@@ -448,6 +553,7 @@ const uploadSelectedCardBack = async (payload: { file: File; label: string }): P
 const setDefault = async (cardPool: CardPool, cardBackId: string | null): Promise<void> => {
   if (
     settingPool.value !== null
+    || settingRole.value !== null
     || settingFaction.value !== null
     || (defaults.value[cardPool]?.id ?? null) === cardBackId
   ) return;
@@ -465,12 +571,37 @@ const setDefault = async (cardPool: CardPool, cardBackId: string | null): Promis
   }
 };
 
+const setRoleDefault = async (
+  role: CardRole,
+  cardBackId: string | null,
+): Promise<void> => {
+  if (
+    settingPool.value !== null
+    || settingRole.value !== null
+    || settingFaction.value !== null
+    || (roleDefaults.value[role]?.id ?? null) === cardBackId
+  ) return;
+  settingRole.value = role;
+  errorMessage.value = '';
+  try {
+    await setRoleCardBackDefault(role, cardBackId);
+    await loadCardBackData();
+    toast.success(`${cardRoleLabel(role)} role default updated.`);
+  } catch (error) {
+    errorMessage.value = extractErrorMessage(error, 'Role default could not be updated.');
+    toast.error(errorMessage.value);
+  } finally {
+    settingRole.value = null;
+  }
+};
+
 const setFactionDefault = async (
   faction: CardFaction,
   cardBackId: string | null,
 ): Promise<void> => {
   if (
     settingPool.value !== null
+    || settingRole.value !== null
     || settingFaction.value !== null
     || (factionDefaults.value[faction]?.id ?? null) === cardBackId
   ) return;

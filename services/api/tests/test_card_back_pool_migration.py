@@ -18,6 +18,10 @@ FACTION_DEFAULT_MIGRATION = (
     "card_reader_core",
     "0062_card_back_faction_defaults",
 )
+ROLE_DEFAULT_MIGRATION = (
+    "card_reader_core",
+    "0063_card_back_role_defaults",
+)
 
 
 def _migrate_to(target: tuple[str, str]):
@@ -110,5 +114,44 @@ def test_faction_default_migration_rejects_rollback_with_assignments() -> None:
     try:
         with pytest.raises(IrreversibleError, match="faction-default assignments exist"):
             _migrate_to(FIRE_FACTION_MIGRATION)
+    finally:
+        _restore_leaf()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_role_default_migration_allows_empty_rollback() -> None:
+    try:
+        _migrate_to(ROLE_DEFAULT_MIGRATION)
+        rolled_back_apps = _migrate_to(FACTION_DEFAULT_MIGRATION)
+
+        assert "CardBackRoleDefault" not in {
+            model.__name__ for model in rolled_back_apps.get_models()
+        }
+    finally:
+        _restore_leaf()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_role_default_migration_rejects_rollback_with_assignments() -> None:
+    apps = _migrate_to(ROLE_DEFAULT_MIGRATION)
+    CardBack = apps.get_model("card_reader_core", "CardBack")
+    CardBackRoleDefault = apps.get_model(
+        "card_reader_core",
+        "CardBackRoleDefault",
+    )
+    card_back = CardBack.objects.create(
+        label="Hero default",
+        original_filename="hero.png",
+        source_file="uploads/card-backs/hero.png",
+        stored_path="images/hero.webp",
+        width=744,
+        height=1039,
+        checksum="hero-card-back-checksum",
+    )
+    CardBackRoleDefault.objects.create(role="hero", card_back=card_back)
+
+    try:
+        with pytest.raises(IrreversibleError, match="role-default assignments exist"):
+            _migrate_to(FACTION_DEFAULT_MIGRATION)
     finally:
         _restore_leaf()
