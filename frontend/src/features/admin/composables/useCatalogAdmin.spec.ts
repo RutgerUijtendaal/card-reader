@@ -87,7 +87,45 @@ beforeEach(() => {
   rejectSuggestionMock.mockResolvedValue(undefined);
 });
 
-describe('useCatalogAdmin deck suggestion details', () => {
+describe('useCatalogAdmin', () => {
+  test('sorts suggested tags by workflow status and then label', async () => {
+    routeMock.query = { admin_kind: 'suggested-tags' };
+    fetchCatalogMock.mockResolvedValue({
+      ...emptyCardCatalog,
+      suggested: {
+        ...emptyCardCatalog.suggested,
+        tags: [
+          {
+            ...suggestion('rejected'),
+            kind: 'tag',
+            status: 'rejected',
+            label: 'Alpha',
+            display_value: 'Alpha',
+          },
+          {
+            ...suggestion('accepted'),
+            kind: 'tag',
+            status: 'accepted',
+            label: 'Beta',
+            display_value: 'Beta',
+          },
+          { ...suggestion('pending-zulu'), kind: 'tag', label: 'Zulu', display_value: 'Zulu' },
+          { ...suggestion('pending-echo'), kind: 'tag', label: 'Echo', display_value: 'Echo' },
+        ],
+      },
+    });
+    const controller = useCatalogAdmin();
+
+    await controller.loadCatalog();
+
+    expect(controller.currentRows.value.map((row) => row.id)).toEqual([
+      'pending-echo',
+      'pending-zulu',
+      'accepted',
+      'rejected',
+    ]);
+  });
+
   test('ignores a stale catalog refresh that completes after a newer load', async () => {
     const staleCatalog = deferred<typeof emptyCardCatalog>();
     const staleDeckTags = deferred<{
