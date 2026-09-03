@@ -1,6 +1,25 @@
 import card_reader_core.models.base
 import django.db.models.deletion
+from django.apps.registry import Apps
 from django.db import migrations, models
+from django.db.backends.base.schema import BaseDatabaseSchemaEditor
+from django.db.migrations.exceptions import IrreversibleError
+
+
+def require_empty_faction_defaults_for_rollback(
+    apps: Apps,
+    _schema_editor: BaseDatabaseSchemaEditor,
+) -> None:
+    CardBackFactionDefault = apps.get_model(
+        "card_reader_core",
+        "CardBackFactionDefault",
+    )
+    if CardBackFactionDefault.objects.exists():
+        raise IrreversibleError(
+            "Cannot reverse 0062_card_back_faction_defaults while faction-default "
+            "assignments exist. Restore a pre-migration snapshot or remove the "
+            "assignments before retrying."
+        )
 
 
 class Migration(migrations.Migration):
@@ -45,8 +64,8 @@ class Migration(migrations.Migration):
             ],
             options={"db_table": "card_back_faction_default"},
         ),
-        # Reversing the CreateModel would discard configured faction defaults.
-        # Keep production schema evolution forward-only and require a snapshot
-        # when operators intentionally need to restore pre-migration state.
-        migrations.RunPython(migrations.RunPython.noop),
+        migrations.RunPython(
+            migrations.RunPython.noop,
+            require_empty_faction_defaults_for_rollback,
+        ),
     ]
