@@ -45,4 +45,8 @@ class Migration(migrations.Migration):
             ],
             options={"db_table": "card_back_faction_default"},
         ),
+        # Reversing the CreateModel would discard configured faction defaults.
+        # Keep production schema evolution forward-only and require a snapshot
+        # when operators intentionally need to restore pre-migration state.
+        migrations.RunPython(migrations.RunPython.noop),
     ]

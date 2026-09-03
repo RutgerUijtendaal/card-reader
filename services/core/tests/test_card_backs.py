@@ -1,3 +1,4 @@
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,14 @@ from card_reader_core.services.card_backs import (
     set_pool_default,
 )
 from card_reader_core.services.card_merges import merge_cards, preview_card_merge
+
+
+def test_faction_default_schema_migration_is_irreversible() -> None:
+    migration_module = import_module(
+        "card_reader_core.migrations.0062_card_back_faction_defaults"
+    )
+
+    assert migration_module.Migration.operations[-1].reversible is False
 
 
 @pytest.mark.django_db
