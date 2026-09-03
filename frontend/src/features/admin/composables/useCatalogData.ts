@@ -5,6 +5,7 @@ import type {
   CatalogRow,
   CatalogSearchState,
   KeywordRecord,
+  SuggestionStatus,
   SuggestionRecord,
   SymbolRecord,
   TagRecord,
@@ -62,11 +63,13 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
   const allCurrentRows = computed<CatalogRow[]>(() => catalog[selectedKind.value]);
   const currentRows = computed<CatalogRow[]>(() => {
     const query = currentSearchTerm.value.trim().toLowerCase();
-    if (query.length === 0) {
-      return allCurrentRows.value;
-    }
+    const matchingRows = query.length === 0
+      ? allCurrentRows.value
+      : allCurrentRows.value.filter((row) => matchesCatalogSearch(row, query));
 
-    return allCurrentRows.value.filter((row) => matchesCatalogSearch(row, query));
+    return selectedKind.value === 'suggested-tags'
+      ? sortSuggestedTagsByStatus(matchingRows)
+      : matchingRows;
   });
 
   const selectKind = (kind: CatalogKind): void => {
@@ -109,6 +112,27 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     loadCatalog,
   };
 };
+
+const SUGGESTION_STATUS_ORDER: Record<SuggestionStatus, number> = {
+  pending: 0,
+  accepted: 1,
+  rejected: 2,
+};
+
+const sortSuggestedTagsByStatus = (rows: CatalogRow[]): CatalogRow[] =>
+  [...rows].sort((left, right) => {
+    if (!('status' in left) || !('status' in right)) {
+      return 0;
+    }
+
+    const statusComparison = SUGGESTION_STATUS_ORDER[left.status]
+      - SUGGESTION_STATUS_ORDER[right.status];
+    if (statusComparison !== 0) {
+      return statusComparison;
+    }
+
+    return left.label.localeCompare(right.label);
+  });
 
 const matchesCatalogSearch = (row: CatalogRow, query: string): boolean => {
   const haystacks = [row.label, row.key];
