@@ -67,9 +67,9 @@ checks fail when a source Tag, Type, or Symbol or exact pool/target/source rule 
 checked only against fields it can represent. Templates and catalogs are supplied by developer-data
 on a clean checkout; there is no parallel built-in catalog seed to keep in sync. The committed lock
 continues to pin Version 1 so clean checkouts remain bootstrappable; Version 1 adoption derives its
-missing Card mana families after import. After the compatible application is deployed, publish a Version
-5 bundle through the normal staff workflow and commit its generated lock; never hand-edit the lock as
-a substitute for that publish.
+missing Card mana families after import. After the compatible application is deployed, publish a
+Version 6 bundle through the normal staff workflow and commit its generated lock; never hand-edit the
+lock as a substitute for that publish.
 
 They exclude accounts, decks, notifications, access and activity records, import jobs, uploads, raw
 OCR, parse flags, suggestions, logs, debug crops, credentials, and source or server paths.
