@@ -1,14 +1,24 @@
 import { ref } from 'vue';
-import { fetchCards } from '@/domain/cards/api';
+import { fetchCardLinkSuggestions, fetchCards } from '@/domain/cards/api';
 import type { CardPool } from '@/domain/cards/cardPools';
 import type { CardListItem } from '@/domain/cards/types';
 import type { CardLifecycleFilterValue } from '@/domain/cards/utils/filters/cardLifecycle';
 
-type CardSearchOptions = {
+type CardListSearchOptions = {
+  mode?: 'cards';
   cardPool?: CardPool;
   lifecycleStatus?: CardLifecycleFilterValue;
   pageSize: number;
 };
+
+type CardLinkSearchOptions = {
+  mode: 'link-suggestions';
+  preferredCardPool: CardPool;
+  lifecycleStatus?: CardLifecycleFilterValue;
+  pageSize: number;
+};
+
+type CardSearchOptions = CardListSearchOptions | CardLinkSearchOptions;
 
 export const useCardSearchResults = (getOptions: () => CardSearchOptions) => {
   const results = ref<CardListItem[]>([]);
@@ -34,15 +44,22 @@ export const useCardSearchResults = (getOptions: () => CardSearchOptions) => {
     searching.value = true;
     searchError.value = false;
     try {
-      const response = await fetchCards<CardListItem>({
-        q: term || undefined,
-        card_pool: options.cardPool,
-        lifecycle_status: options.lifecycleStatus,
-        page: 1,
-        page_size: options.pageSize,
-      });
+      const nextResults = options.mode === 'link-suggestions'
+        ? await fetchCardLinkSuggestions({
+            q: term || undefined,
+            preferred_card_pool: options.preferredCardPool,
+            lifecycle_status: options.lifecycleStatus ?? 'active',
+            limit: options.pageSize,
+          })
+        : (await fetchCards<CardListItem>({
+            q: term || undefined,
+            card_pool: options.cardPool,
+            lifecycle_status: options.lifecycleStatus,
+            page: 1,
+            page_size: options.pageSize,
+          })).results;
       if (currentRequest === requestId) {
-        results.value = response.results.filter(
+        results.value = nextResults.filter(
           (item): item is CardListItem => item.result_type === 'card',
         );
       }

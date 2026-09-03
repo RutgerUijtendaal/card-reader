@@ -30,6 +30,7 @@
         <CardMarkupEditor
           v-model="deckDescription"
           label="Deck summary"
+          preferred-card-pool="player"
           textarea-id="deck-summary-field"
           min-height-class="min-h-20"
           placeholder="A short summary shown in deck lists"
@@ -41,6 +42,7 @@
         <CardMarkupEditor
           v-model="deckLongDescription"
           label="Deck long description"
+          preferred-card-pool="player"
           textarea-id="deck-long-description-field"
           min-height-class="min-h-64"
           placeholder="Optional notes, strategy, matchups, or other deck information"
