@@ -45,7 +45,11 @@ from card_reader_core.services.classification_rules import (
     ensure_default_mana_family_classification_rules,
 )
 from card_reader_core.services.templates import apply_bundled_template_compatibility
-from card_reader_core.services.card_backs import select_card_back_override, set_pool_default
+from card_reader_core.services.card_backs import (
+    select_card_back_override,
+    set_faction_default,
+    set_pool_default,
+)
 from card_reader_core.metadata import MANA_FAMILY_BY_KEY
 from card_reader_core.storage import calculate_checksum
 
@@ -456,11 +460,17 @@ def _import_card_backs(payload: DeveloperDataPayload) -> dict[str, CardBack]:
             checksum=card_back_record.checksum,
         )
         card_backs_by_checksum[card_back.checksum] = card_back
-    for default_record in payload.card_back_pool_defaults:
-        if default_record.card_back_checksum is not None:
+    for pool_default_record in payload.card_back_pool_defaults:
+        if pool_default_record.card_back_checksum is not None:
             set_pool_default(
-                default_record.card_pool,
-                card_backs_by_checksum[default_record.card_back_checksum].id,
+                pool_default_record.card_pool,
+                card_backs_by_checksum[pool_default_record.card_back_checksum].id,
+            )
+    for faction_default_record in payload.card_back_faction_defaults:
+        if faction_default_record.card_back_checksum is not None:
+            set_faction_default(
+                faction_default_record.faction,
+                card_backs_by_checksum[faction_default_record.card_back_checksum].id,
             )
     return card_backs_by_checksum
 
@@ -861,13 +871,28 @@ def _validate_card_back_references(
     if set(default_pools) != {"player", "evil", "neutral"}:
         issues.append("card-back pool defaults must include player, evil, and neutral")
 
-    for default in payload.card_back_pool_defaults:
+    for pool_default in payload.card_back_pool_defaults:
         if (
-            default.card_back_checksum is not None
-            and default.card_back_checksum not in card_back_checksums
+            pool_default.card_back_checksum is not None
+            and pool_default.card_back_checksum not in card_back_checksums
         ):
             issues.append(
-                f"{default.card_pool} default references an unknown card back"
+                f"{pool_default.card_pool} default references an unknown card back"
+            )
+
+    default_factions = [row.faction for row in payload.card_back_faction_defaults]
+    if len(default_factions) != len(set(default_factions)):
+        issues.append("card-back faction defaults are not unique")
+    if set(default_factions) != set(CARD_FACTIONS):
+        issues.append("card-back faction defaults must include every Evil faction")
+
+    for faction_default in payload.card_back_faction_defaults:
+        if (
+            faction_default.card_back_checksum is not None
+            and faction_default.card_back_checksum not in card_back_checksums
+        ):
+            issues.append(
+                f"{faction_default.faction} faction default references an unknown card back"
             )
 
 

@@ -96,13 +96,14 @@ if TYPE_CHECKING:
         card_lifecycle_filter_q,
         card_role_keys,
         filter_queryset_by_card_lifecycle,
+        is_card_faction,
         is_card_pool,
         is_card_lifecycle_status,
         normalize_card_lifecycle_filter,
         normalize_card_factions,
         normalize_card_roles,
     )
-    from .card_back import CardBack, CardBackPoolDefault
+    from .card_back import CardBack, CardBackFactionDefault, CardBackPoolDefault
     from .card_group import CardGroup, CardGroupMember
     from .content_version import ContentVersion
     from .card_version import CardVersion, CardVersionImage, ParseResult
@@ -225,6 +226,7 @@ _EXPORTS = {
     "ImportJobItem": ".import_job",
     "Card": ".card",
     "CardBack": ".card_back",
+    "CardBackFactionDefault": ".card_back",
     "CardBackPoolDefault": ".card_back",
     "CardAlias": ".card",
     "BLOOD_CARD_FACTION": ".card",
@@ -291,6 +293,7 @@ _EXPORTS = {
     "card_lifecycle_filter_q": ".card",
     "card_role_keys": ".card",
     "filter_queryset_by_card_lifecycle": ".card",
+    "is_card_faction": ".card",
     "is_card_pool": ".card",
     "is_card_lifecycle_status": ".card",
     "normalize_card_lifecycle_filter": ".card",
@@ -393,6 +396,7 @@ __all__ = [
     "ImportJobItem",
     "Card",
     "CardBack",
+    "CardBackFactionDefault",
     "CardBackPoolDefault",
     "CardAlias",
     "CardIdentityPoolLock",
@@ -459,6 +463,7 @@ __all__ = [
     "card_lifecycle_filter_q",
     "card_role_keys",
     "filter_queryset_by_card_lifecycle",
+    "is_card_faction",
     "is_card_pool",
     "is_card_lifecycle_status",
     "normalize_card_lifecycle_filter",

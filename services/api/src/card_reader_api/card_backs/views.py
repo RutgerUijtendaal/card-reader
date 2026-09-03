@@ -16,9 +16,12 @@ from card_reader_api.card_backs.serializers import (
 from card_reader_api.common.responses import bad_request, serializer_error
 from card_reader_core.models import PLAYER_CARD_POOL
 from card_reader_core.services.card_backs import (
+    clear_faction_default,
     clear_pool_default,
+    get_faction_card_back_defaults,
     get_pool_card_back_defaults,
     list_card_back_assets,
+    set_faction_default,
     set_pool_default,
     upload_card_back_asset,
 )
@@ -40,6 +43,19 @@ class CardBackDefaultsView(APIView):
             {
                 card_pool: None if card_back is None else public_card_back_payload(card_back)
                 for card_pool, card_back in defaults.items()
+            }
+        )
+
+
+class CardBackFactionDefaultsView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, _request: Request) -> Response:
+        defaults = get_faction_card_back_defaults()
+        return Response(
+            {
+                faction: None if card_back is None else public_card_back_payload(card_back)
+                for faction, card_back in defaults.items()
             }
         )
 
@@ -84,6 +100,22 @@ class AdminCardBackDefaultView(APIView):
                 clear_pool_default(card_pool)
                 return Response(status=status.HTTP_204_NO_CONTENT)
             row = set_pool_default(card_pool, str(card_back_id))
+        except ValueError as exc:
+            return bad_request(str(exc))
+        return Response(public_card_back_payload(row.card_back))
+
+
+class AdminCardBackFactionDefaultView(APIView):
+    def put(self, request: Request, faction: str) -> Response:
+        serializer = CardBackDefaultUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return serializer_error(serializer)
+        card_back_id = serializer.validated_data["card_back_id"]
+        try:
+            if card_back_id is None:
+                clear_faction_default(faction)
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            row = set_faction_default(faction, str(card_back_id))
         except ValueError as exc:
             return bad_request(str(exc))
         return Response(public_card_back_payload(row.card_back))

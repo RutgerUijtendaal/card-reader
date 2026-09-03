@@ -10,7 +10,15 @@ from django.test import Client, override_settings
 from PIL import Image
 
 from card_reader_core.config.settings import settings
-from card_reader_core.models import Card, CardBack, CardBackPoolDefault, CardVersion, Template
+from card_reader_core.models import (
+    Card,
+    CardBack,
+    CardBackFactionDefault,
+    CardBackPoolDefault,
+    CardFactionAssignment,
+    CardVersion,
+    Template,
+)
 from card_reader_core.storage import resolve_storage_path
 
 
@@ -34,6 +42,30 @@ def test_public_defaults_always_return_all_pools_and_current_aliases_player() ->
         "neutral": None,
     }
     assert current_response.json()["current"]["id"] == card_back.id
+
+
+def test_public_faction_defaults_always_return_every_evil_faction() -> None:
+    card_back = _create_card_back(label="Order Back", write_image=True)
+    CardBackFactionDefault.objects.create(faction="order", card_back=card_back)
+
+    response = Client(HTTP_HOST="localhost").get("/card-backs/faction-defaults")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "order": {
+            "id": card_back.id,
+            "label": card_back.label,
+            "width": card_back.width,
+            "height": card_back.height,
+            "image_url": f"/card-images/{card_back.stored_path}",
+            "created_at": card_back.created_at.isoformat(),
+            "updated_at": card_back.updated_at.isoformat(),
+        },
+        "blood": None,
+        "dark": None,
+        "metal": None,
+        "fire": None,
+    }
 
 
 @override_settings(DEBUG=True)
@@ -158,6 +190,31 @@ def test_staff_clears_one_pool_default_without_changing_other_pools() -> None:
     assert not CardBackPoolDefault.objects.filter(card_pool="evil").exists()
 
 
+def test_staff_sets_and_clears_one_faction_default() -> None:
+    client, csrf_token = _staff_client("staff-card-back-faction-default-user")
+    card_back = _create_card_back(label="Blood Back", write_image=True)
+
+    response = client.put(
+        "/admin/card-backs/faction-defaults/blood",
+        data={"card_back_id": card_back.id},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    assert CardBackFactionDefault.objects.get(faction="blood").card_back_id == card_back.id
+
+    clear_response = client.put(
+        "/admin/card-backs/faction-defaults/blood",
+        data={"card_back_id": None},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert clear_response.status_code == 204
+    assert not CardBackFactionDefault.objects.filter(faction="blood").exists()
+
+
 def test_staff_cannot_assign_card_back_with_missing_image() -> None:
     client, csrf_token = _staff_client("staff-card-back-missing-image-user")
     missing = _create_card_back(label="Missing Back", write_image=False)
@@ -178,12 +235,14 @@ def test_admin_list_reports_default_and_override_usage() -> None:
     client, _csrf_token = _staff_client("staff-card-back-list-user")
     card_back = _create_card_back(label="Used Back", write_image=True)
     CardBackPoolDefault.objects.create(card_pool="player", card_back=card_back)
+    CardBackFactionDefault.objects.create(faction="fire", card_back=card_back)
     Card.objects.create(key="card", label="Card", card_back_override=card_back)
 
     response = client.get("/admin/card-backs")
 
     assert response.status_code == 200
     assert response.json()[0]["default_for_pools"] == ["player"]
+    assert response.json()[0]["default_for_factions"] == ["fire"]
     assert response.json()[0]["override_card_count"] == 1
 
 
@@ -191,7 +250,9 @@ def test_card_patch_sets_and_clears_override_inside_the_card_edit() -> None:
     client, csrf_token = _staff_client("staff-card-back-card-edit-user")
     inherited = _create_card_back(label="Evil Default", write_image=True)
     override = _create_card_back(label="Card Override", write_image=True)
+    faction_default = _create_card_back(label="Order Default", write_image=True)
     CardBackPoolDefault.objects.create(card_pool="evil", card_back=inherited)
+    CardBackFactionDefault.objects.create(faction="order", card_back=faction_default)
     template = Template.objects.create(key="card-back-edit", label="Card Back Edit")
     card = Card.objects.create(key="card-back-edit", label="Card Back Edit")
     version = CardVersion.objects.create(
@@ -202,6 +263,7 @@ def test_card_patch_sets_and_clears_override_inside_the_card_edit() -> None:
     )
     card.latest_version = version
     card.save(update_fields=["latest_version"])
+    CardFactionAssignment.objects.create(card=card, faction="order")
     original_updated_at = card.updated_at
 
     response = client.patch(
@@ -228,8 +290,9 @@ def test_card_patch_sets_and_clears_override_inside_the_card_edit() -> None:
     assert clear_response.status_code == 200
     card.refresh_from_db()
     assert card.card_back_override_id is None
-    assert clear_response.json()["effective_card_back"]["source"] == "pool_default"
-    assert clear_response.json()["effective_card_back"]["asset"]["id"] == inherited.id
+    assert clear_response.json()["effective_card_back"]["source"] == "faction_default"
+    assert clear_response.json()["effective_card_back"]["faction"] == "order"
+    assert clear_response.json()["effective_card_back"]["asset"]["id"] == faction_default.id
 
 
 def test_invalid_card_override_keeps_the_rest_of_the_card_edit_unchanged() -> None:
@@ -267,6 +330,7 @@ def test_card_back_admin_endpoints_require_staff() -> None:
         ("get", "/admin/card-backs"),
         ("post", "/admin/card-backs/upload"),
         ("put", "/admin/card-backs/defaults/player"),
+        ("put", "/admin/card-backs/faction-defaults/order"),
     ]:
         assert getattr(anonymous, method)(path).status_code in {401, 403}
         assert getattr(regular, method)(path).status_code == 403

@@ -14,7 +14,9 @@ from card_reader_core.models import (
     CARD_POOLS,
     Card,
     CardBack,
+    CardBackFactionDefault,
     CardBackPoolDefault,
+    CardFactionAssignment,
     CardVersion,
     CardVersionImage,
     ContentVersion,
@@ -629,10 +631,25 @@ def test_non_player_gallery_tts_export_uses_stable_pool_sheet_urls() -> None:
     staff = _create_user("tts-evil-gallery-staff", "password", is_staff=True)
     client = Client(HTTP_HOST="cards.example")
     client.force_login(staff)
-    _create_current_card_back("evil-gallery")
+    pool_default = _create_current_card_back("evil-gallery")
+    faction_back_path = build_storage_relative_path(
+        "images", "tts-card-back-evil-gallery-order.webp"
+    )
+    (settings.storage_root_dir / faction_back_path).write_bytes(b"order-card-back")
+    faction_default = CardBack.objects.create(
+        label="Evil Gallery Order",
+        original_filename="evil-gallery-order.png",
+        source_file="uploads/card-backs/evil-gallery-order.png",
+        stored_path=faction_back_path,
+        width=63,
+        height=88,
+        checksum="card-back-evil-gallery-order",
+    )
+    CardBackFactionDefault.objects.create(faction="order", card_back=faction_default)
     evil = _create_card(name="Evil Gallery TTS Card", hero=False)
     evil.card_pool = "evil"
     evil.save(update_fields=["card_pool", "updated_at"])
+    CardFactionAssignment.objects.create(card=evil, faction="order")
     _create_card_image(evil.latest_version, content=b"evil-gallery")
 
     response = client.post(
@@ -652,6 +669,8 @@ def test_non_player_gallery_tts_export_uses_stable_pool_sheet_urls() -> None:
     assert response_payload["skipped_count"] == 0
     payload = _decode_tts_card_export(response_payload["encoded_payload"])
     assert [card["card_id"] for card in payload["cards"]] == [evil.id]
+    assert payload["cards"][0]["card_back_id"] == faction_default.id
+    assert payload["cards"][0]["card_back_id"] != pool_default.id
     sheet = payload["sheets"][0]
     assert sheet["card_pool"] == "evil"
     face_url = urlsplit(sheet["face_url"])

@@ -349,6 +349,10 @@ def is_card_pool(value: object) -> TypeGuard[CardPool]:
     return value in CARD_POOLS
 
 
+def is_card_faction(value: object) -> TypeGuard[CardFaction]:
+    return value in CARD_FACTIONS
+
+
 def normalize_card_roles(values: Iterable[object]) -> tuple[CardRole, ...]:
     requested = set(values)
     return tuple(role for role in CARD_ROLES if role in requested)

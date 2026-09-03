@@ -83,6 +83,9 @@ exports store an export-time source snapshot with the deck ID, scope, hero ID, d
 sideboard identity. The imported deck receives the collection name and description plus structured collection GM
 Notes. Each card receives Card Reader identity GM Notes and its optional `hero`, `mainboard`, or `sideboard` role.
 
+Card Reader resolves each exported card back as an explicit Card override, then the first configured Evil faction
+default in canonical faction order, then its pool default. Faction defaults do not apply outside the Evil pool.
+
 Deck exports keep the hero and mainboard in one native deck. Targeted sideboard exports contain only that sideboard.
 The hero is required for a main-deck export; unavailable non-hero cards are included in `skipped` with their saved
 quantity and role.
