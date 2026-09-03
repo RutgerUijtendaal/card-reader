@@ -22,6 +22,7 @@ from card_reader_api.cards.query_params import card_filter_query_data
 from card_reader_api.cards.serializers import (
     CardFilterMetadataScopeSerializer,
     CardFiltersQuerySerializer,
+    CardLinkSuggestionQuerySerializer,
     CardVersionParseFlagCreateSerializer,
     LatestCardReparseSerializer,
     LatestVersionUpdateSerializer,
@@ -38,6 +39,7 @@ from card_reader_api.cards.services import CardActionService, CardReparseError
 from card_reader_core.repositories.cards import (
     get_card,
     get_card_image,
+    list_card_link_suggestions,
     list_card_generations,
     list_cards,
 )
@@ -124,6 +126,23 @@ class CardListView(APIView):
                 [card_list_row_payload(row) for row in cards.results],
             )
         )
+
+
+class CardLinkSuggestionView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request: Request) -> Response:
+        serializer = CardLinkSuggestionQuerySerializer(data=request.query_params)
+        if not serializer.is_valid():
+            return serializer_error(serializer)
+        params = serializer.validated_params()
+        suggestions = list_card_link_suggestions(
+            query=params["query"],
+            preferred_card_pool=params["preferred_card_pool"],
+            lifecycle_status=params["lifecycle_status"],
+            limit=params["limit"],
+        )
+        return Response([card_list_row_payload(row) for row in suggestions])
 
 
 class CardFiltersView(APIView):

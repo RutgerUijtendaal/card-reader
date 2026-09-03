@@ -128,6 +128,7 @@ import { useDebounceFn } from '@vueuse/core';
 import { computed, nextTick, ref } from 'vue';
 import CardMarkupText from '@/domain/cards/components/CardMarkupText.vue';
 import SmallCardSearchResultRow from '@/domain/cards/components/SmallCardSearchResultRow.vue';
+import type { CardPool } from '@/domain/cards/cardPools';
 import { useCardSearchResults } from '@/domain/cards/composables/useCardSearchResults';
 import type { CardListItem, SymbolFilterOption } from '@/domain/cards/types';
 import {
@@ -144,6 +145,7 @@ const props = withDefaults(
     placeholder?: string;
     symbols?: SymbolFilterOption[];
     allowSymbols?: boolean;
+    preferredCardPool: CardPool;
     includeDeprecatedCards?: boolean;
     disabled?: boolean;
   minHeightClass?: string;
@@ -169,6 +171,8 @@ const trigger = ref<CardMarkupTrigger | null>(null);
 const popupPosition = ref({ left: 0, top: 0, width: 320 });
 const selectedIndex = ref(0);
 const cardSearch = useCardSearchResults(() => ({
+  mode: 'link-suggestions',
+  preferredCardPool: props.preferredCardPool,
   lifecycleStatus: props.includeDeprecatedCards ? 'all' : 'active',
   pageSize: 8,
 }));

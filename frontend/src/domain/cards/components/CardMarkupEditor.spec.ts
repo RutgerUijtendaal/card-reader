@@ -1,14 +1,14 @@
 import { createApp, defineComponent, h, nextTick, ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import CardMarkupEditor from '@/domain/cards/components/CardMarkupEditor.vue';
-import { fetchCards } from '@/domain/cards/api';
+import { fetchCardLinkSuggestions } from '@/domain/cards/api';
 import type { CardListItem } from '@/domain/cards/types';
 
 vi.mock('@/domain/cards/api', () => ({
-  fetchCards: vi.fn(),
+  fetchCardLinkSuggestions: vi.fn(),
 }));
 
-const fetchCardsMock = vi.mocked(fetchCards);
+const fetchCardLinkSuggestionsMock = vi.mocked(fetchCardLinkSuggestions);
 
 const card: CardListItem = {
   id: 'card-1',
@@ -59,7 +59,11 @@ const symbols = [
   },
 ];
 
-const mountEditor = async (initialValue: string, allowSymbols = false) => {
+const mountEditor = async (
+  initialValue: string,
+  allowSymbols = false,
+  props: Record<string, unknown> = {},
+) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const value = ref(initialValue);
@@ -69,8 +73,10 @@ const mountEditor = async (initialValue: string, allowSymbols = false) => {
         h(CardMarkupEditor, {
           modelValue: value.value,
           label: 'Rules text',
+          preferredCardPool: 'player',
           symbols,
           allowSymbols,
+          ...props,
           'onUpdate:modelValue': (next: string) => {
             value.value = next;
           },
@@ -84,14 +90,7 @@ const mountEditor = async (initialValue: string, allowSymbols = false) => {
 
 describe('CardMarkupEditor', () => {
   beforeEach(() => {
-    fetchCardsMock.mockResolvedValue({
-      count: 0,
-      next_page: null,
-      previous_page: null,
-      page: 1,
-      page_size: 8,
-      results: [],
-    });
+    fetchCardLinkSuggestionsMock.mockResolvedValue([]);
   });
   afterEach(() => {
     document.body.innerHTML = '';
@@ -158,14 +157,7 @@ describe('CardMarkupEditor', () => {
 
   test('does not select a stale hidden card after narrowing to symbols', async () => {
     vi.useFakeTimers();
-    fetchCardsMock.mockResolvedValue({
-      count: 1,
-      next_page: null,
-      previous_page: null,
-      page: 1,
-      page_size: 8,
-      results: [card],
-    });
+    fetchCardLinkSuggestionsMock.mockResolvedValue([card]);
     const mounted = await mountEditor('[[card:one', true);
     const textarea = mounted.container.querySelector('textarea');
     if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Expected textarea.');
@@ -187,14 +179,7 @@ describe('CardMarkupEditor', () => {
 
   test('invalidates visible card results as soon as the query changes', async () => {
     vi.useFakeTimers();
-    fetchCardsMock.mockResolvedValue({
-      count: 1,
-      next_page: null,
-      previous_page: null,
-      page: 1,
-      page_size: 8,
-      results: [card],
-    });
+    fetchCardLinkSuggestionsMock.mockResolvedValue([card]);
     const mounted = await mountEditor('[[card:one');
     const textarea = mounted.container.querySelector('textarea');
     if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Expected textarea.');
@@ -218,7 +203,7 @@ describe('CardMarkupEditor', () => {
 
   test('reports a failed card search without an unhandled rejection', async () => {
     vi.useFakeTimers();
-    fetchCardsMock.mockRejectedValue(new Error('Search unavailable'));
+    fetchCardLinkSuggestionsMock.mockRejectedValue(new Error('Search unavailable'));
     const mounted = await mountEditor('[[card:one');
     const textarea = mounted.container.querySelector('textarea');
     if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Expected textarea.');
@@ -231,6 +216,65 @@ describe('CardMarkupEditor', () => {
 
     expect(mounted.container.textContent).toContain('Card search is unavailable. Try again.');
     expect(mounted.container.textContent).not.toContain('No matching references.');
+    mounted.app.unmount();
+  });
+
+  test('searches card-link suggestions in the preferred pool with the configured lifecycle', async () => {
+    vi.useFakeTimers();
+    const mounted = await mountEditor('[[Bless', false, {
+      preferredCardPool: 'evil',
+      includeDeprecatedCards: true,
+    });
+    const textarea = mounted.container.querySelector('textarea');
+    if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Expected textarea.');
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    textarea.dispatchEvent(new KeyboardEvent('keyup', { key: 's', bubbles: true }));
+
+    await vi.advanceTimersByTimeAsync(200);
+    await nextTick();
+
+    expect(fetchCardLinkSuggestionsMock).toHaveBeenCalledWith({
+      q: 'Bless',
+      preferred_card_pool: 'evil',
+      lifecycle_status: 'all',
+      limit: 8,
+    });
+    mounted.app.unmount();
+  });
+
+  test('preserves suggestion order and inserts the first ranked card', async () => {
+    vi.useFakeTimers();
+    fetchCardLinkSuggestionsMock.mockResolvedValue([
+      { ...card, id: 'card-bless', key: 'bless', label: 'Bless', name: 'Bless' },
+      {
+        ...card,
+        id: 'card-blessing',
+        key: 'blessing-of-giants',
+        label: 'Blessing of Giants',
+        name: 'Blessing of Giants',
+      },
+    ]);
+    const mounted = await mountEditor('[[Bless');
+    const textarea = mounted.container.querySelector('textarea');
+    if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Expected textarea.');
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    textarea.dispatchEvent(new KeyboardEvent('keyup', { key: 's', bubbles: true }));
+
+    await vi.advanceTimersByTimeAsync(200);
+    await nextTick();
+
+    const resultRows = [...mounted.container.querySelectorAll('button.theme-card-frame')];
+    expect(resultRows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining('Bless'),
+      expect.stringContaining('Blessing of Giants'),
+    ]);
+
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await nextTick();
+
+    expect(mounted.value.value).toBe('[[card:card-bless|Bless]]');
     mounted.app.unmount();
   });
 });

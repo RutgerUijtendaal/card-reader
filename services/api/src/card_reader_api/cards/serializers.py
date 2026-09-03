@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypedDict, cast
 
 from rest_framework import serializers
 
@@ -30,7 +30,11 @@ from card_reader_core.models import (
     card_mana_family_keys,
     normalize_card_lifecycle_filter,
 )
-from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE, CardListRow
+from card_reader_core.repositories.cards import (
+    DEFAULT_CARD_PAGE_SIZE,
+    MAX_CARD_LINK_SUGGESTIONS,
+    CardListRow,
+)
 from card_reader_core.repositories.cards import (
     CARD_SORT_DEFAULT,
     CARD_SORT_TYPES_ASC,
@@ -58,6 +62,43 @@ class CardListFilterParams(CardFilterParams):
     page: int
     page_size: int
     show_groups: bool
+
+
+class CardLinkSuggestionParams(TypedDict):
+    query: str
+    preferred_card_pool: CardPool
+    lifecycle_status: CardLifecycleFilter
+    limit: int
+
+
+class CardLinkSuggestionQuerySerializer(serializers.Serializer[dict[str, object]]):
+    q = serializers.CharField(required=False, allow_blank=True, default="")
+    preferred_card_pool = serializers.ChoiceField(choices=CARD_POOLS)
+    lifecycle_status = serializers.ChoiceField(
+        choices=CARD_LIFECYCLE_FILTER_VALUES,
+        required=False,
+        default=DEFAULT_CARD_LIFECYCLE_FILTER,
+    )
+    limit = serializers.IntegerField(
+        required=False,
+        min_value=1,
+        max_value=MAX_CARD_LINK_SUGGESTIONS,
+        default=MAX_CARD_LINK_SUGGESTIONS,
+    )
+
+    def validated_params(self) -> CardLinkSuggestionParams:
+        return {
+            "query": cast(str, self.validated_data["q"]),
+            "preferred_card_pool": cast(
+                CardPool,
+                self.validated_data["preferred_card_pool"],
+            ),
+            "lifecycle_status": cast(
+                CardLifecycleFilter,
+                self.validated_data["lifecycle_status"],
+            ),
+            "limit": cast(int, self.validated_data["limit"]),
+        }
 
 
 class CardFilterMetadataScopeSerializer(serializers.Serializer[dict[str, object]]):

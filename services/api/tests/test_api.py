@@ -2212,6 +2212,81 @@ def test_card_list_and_csv_without_card_pool_cover_every_pool() -> None:
     assert "Global Pool Query Neutral" in csv_text
 
 
+def test_card_link_suggestions_are_public_name_matches_ranked_by_preferred_pool() -> None:
+    _create_editable_card_version(name="Blessing of Giants", card_pool="player")
+    _create_editable_card_version(name="Unblessed", card_pool="player")
+    _create_editable_card_version(name="BLESS", card_pool="player")
+    _create_editable_card_version(name="Blessed", card_pool="player")
+    _create_editable_card_version(name="Bless", card_pool="evil")
+    _create_editable_card_version(name="Blessing", card_pool="evil")
+    _irrelevant_card, irrelevant_version = _create_editable_card_version(
+        name="Unrelated Link Suggestion",
+        card_pool="player",
+    )
+    irrelevant_version.rules_text = "Bless appears only in rules text."
+    irrelevant_version.type_line = "Bless"
+    irrelevant_version.save(update_fields=["rules_text", "type_line"])
+
+    response = Client(HTTP_HOST="localhost").get(
+        "/cards/link-suggestions",
+        {"q": "bless", "preferred_card_pool": "player"},
+    )
+
+    assert response.status_code == 200
+    assert [(row["card_pool"], row["name"]) for row in response.json()] == [
+        ("player", "BLESS"),
+        ("player", "Blessed"),
+        ("player", "Blessing of Giants"),
+        ("player", "Unblessed"),
+        ("evil", "Bless"),
+        ("evil", "Blessing"),
+    ]
+
+
+def test_card_link_suggestions_validate_limit_and_include_requested_lifecycle() -> None:
+    deprecated_card, _deprecated_version = _create_editable_card_version(
+        name="Bounded",
+        card_pool="player",
+    )
+    deprecated_card.lifecycle_status = "deprecated"
+    deprecated_card.save(update_fields=["lifecycle_status"])
+    for index in range(9):
+        _create_editable_card_version(
+            name=f"Bounded Suggestion {index}",
+            card_pool="player",
+        )
+
+    active_response = Client(HTTP_HOST="localhost").get(
+        "/cards/link-suggestions",
+        {"q": "Bounded", "preferred_card_pool": "player", "limit": 2},
+    )
+    all_response = Client(HTTP_HOST="localhost").get(
+        "/cards/link-suggestions",
+        {
+            "q": "Bounded",
+            "preferred_card_pool": "player",
+            "lifecycle_status": "all",
+            "limit": 8,
+        },
+    )
+    excessive_limit_response = Client(HTTP_HOST="localhost").get(
+        "/cards/link-suggestions",
+        {"q": "Bounded", "preferred_card_pool": "player", "limit": 9},
+    )
+    missing_pool_response = Client(HTTP_HOST="localhost").get(
+        "/cards/link-suggestions",
+        {"q": "Bounded"},
+    )
+
+    assert active_response.status_code == 200
+    assert len(active_response.json()) == 2
+    assert all(row["name"] != "Bounded" for row in active_response.json())
+    assert all_response.status_code == 200
+    assert "Bounded" in [row["name"] for row in all_response.json()]
+    assert excessive_limit_response.status_code == 400
+    assert missing_pool_response.status_code == 400
+
+
 def test_global_csv_rows_include_the_exact_card_identity_namespace() -> None:
     shared_name = "Global CSV Shared Identity"
     player_card, _player_version = _create_editable_card_version(

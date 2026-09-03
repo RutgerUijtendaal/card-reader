@@ -1,12 +1,14 @@
 import { api } from '@/shared/api/client';
 import type {
   CardFiltersResponse,
+  CardListItem,
   CardVersionDetail,
   PaginatedCardsResponse,
 } from '@/domain/cards/types';
 import type { CardFilterApiPayload } from '@/domain/cards/utils/filters/cardFilterRequest';
 import type { CardSort } from '@/domain/cards/utils/gallery/cardSort';
 import type { CardPool } from '@/domain/cards/cardPools';
+import type { CardLifecycleFilterValue } from '@/domain/cards/utils/filters/cardLifecycle';
 import {
   mapTtsExportResponse,
   type TtsExportApiResponse,
@@ -39,6 +41,16 @@ export const fetchCardPage = async <TCard>(
 export const fetchCards = async <TCard>(
   params: URLSearchParams | CardQueryParams,
 ): Promise<PaginatedCardsResponse<TCard>> => fetchCardPage('/cards', params);
+
+export const fetchCardLinkSuggestions = async (params: {
+  q?: string;
+  preferred_card_pool: CardPool;
+  lifecycle_status: CardLifecycleFilterValue;
+  limit: number;
+}): Promise<CardListItem[]> => {
+  const response = await api.get<CardListItem[]>('/cards/link-suggestions', { params });
+  return response.data;
+};
 
 export const fetchCard = async <TCard>(cardId: string): Promise<TCard> => {
   const response = await api.get<TCard>(`/cards/${cardId}`);

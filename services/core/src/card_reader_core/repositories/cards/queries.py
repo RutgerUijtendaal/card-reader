@@ -3,7 +3,19 @@ from __future__ import annotations
 from collections.abc import Collection
 from typing import Any, cast
 
-from django.db.models import Count, F, Prefetch, Q, QuerySet, Subquery
+from django.db.models import (
+    Case,
+    Count,
+    F,
+    IntegerField,
+    Prefetch,
+    Q,
+    QuerySet,
+    Subquery,
+    Value,
+    When,
+)
+from django.db.models.functions import Length, Lower
 
 from card_reader_core.metadata import normalize_mana_family_keys
 from card_reader_core.models import (
@@ -53,6 +65,7 @@ from .types import (
     CARD_SORT_UPDATED_DESC,
     DEFAULT_CARD_PAGE_SIZE,
     DEFAULT_CARD_LIFECYCLE_FILTER,
+    MAX_CARD_LINK_SUGGESTIONS,
     CardListCandidate,
     CardFilterParams,
     CardLifecycleFilter,
@@ -190,6 +203,56 @@ def list_cards_across_pools(
         page=page,
         page_size=page_size,
     )
+
+
+def list_card_link_suggestions(
+    *,
+    query: str | None,
+    preferred_card_pool: CardPool,
+    lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
+    limit: int = MAX_CARD_LINK_SUGGESTIONS,
+) -> list[CardListRow]:
+    normalized_query = (query or "").strip()
+    versions = CardVersion.objects.filter(
+        is_latest=True,
+        card__card_pool__in=CARD_POOLS,
+    )
+    versions = filter_queryset_by_card_lifecycle(versions, lifecycle_status)
+    match_rank: Case | Value
+    if normalized_query:
+        versions = versions.filter(name__icontains=normalized_query)
+        match_rank = Case(
+            When(name__iexact=normalized_query, then=Value(0)),
+            When(name__istartswith=normalized_query, then=Value(1)),
+            default=Value(2),
+            output_field=IntegerField(),
+        )
+    else:
+        match_rank = Value(0, output_field=IntegerField())
+
+    ordered_version_ids = list(
+        versions.annotate(
+            link_pool_rank=Case(
+                When(card__card_pool=preferred_card_pool, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            ),
+            link_match_rank=match_rank,
+            link_name_length=Length("name"),
+            link_name_lower=Lower("name"),
+            link_label_lower=Lower("card__label"),
+        )
+        .order_by(
+            "link_pool_rank",
+            "link_match_rank",
+            "link_name_length",
+            "link_name_lower",
+            "link_label_lower",
+            "card__id",
+        )
+        .values_list("id", flat=True)[: max(1, min(limit, MAX_CARD_LINK_SUGGESTIONS))]
+    )
+    return get_card_list_rows_by_version_ids(ordered_version_ids)
 
 
 def list_matching_cards(

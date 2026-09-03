@@ -274,6 +274,7 @@
               label="Rules text"
               :symbols="symbolInsertOptions"
               allow-symbols
+              :preferred-card-pool="form.card_pool"
               include-deprecated-cards
               :disabled="!version.editable || isBusy"
               min-height-class="min-h-32"
