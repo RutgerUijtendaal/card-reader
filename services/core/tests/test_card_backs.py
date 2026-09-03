@@ -6,16 +6,24 @@ from django.db.models.deletion import ProtectedError
 from PIL import Image
 
 from card_reader_core.config.settings import settings
-from card_reader_core.models import Card, CardBack, CardFactionAssignment
+from card_reader_core.models import (
+    Card,
+    CardBack,
+    CardFactionAssignment,
+    CardRoleAssignment,
+)
 from card_reader_core.services.card_backs import (
     clear_faction_default,
     clear_pool_default,
+    clear_role_default,
     get_faction_card_back_defaults,
     get_pool_card_back_defaults,
+    get_role_card_back_defaults,
     resolve_effective_card_backs,
     select_card_back_override,
     set_faction_default,
     set_pool_default,
+    set_role_default,
 )
 from card_reader_core.services.card_merges import merge_cards, preview_card_merge
 
@@ -38,13 +46,53 @@ def test_resolution_prefers_override_and_uses_bounded_queries(
         card_back_override=override,
     )
 
-    with django_assert_num_queries(4):
+    with django_assert_num_queries(6):
         resolved = resolve_effective_card_backs([inherited.id, overridden.id])
 
     assert resolved[inherited.id].source == "pool_default"
     assert resolved[inherited.id].card_back == player_default
     assert resolved[overridden.id].source == "override"
     assert resolved[overridden.id].card_back == override
+
+
+@pytest.mark.django_db
+def test_role_defaults_apply_across_pools_and_precede_evil_factions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+    player_default = _create_usable_card_back("player-default")
+    evil_default = _create_usable_card_back("evil-default")
+    faction_default = _create_usable_card_back("order-default")
+    hero_default = _create_usable_card_back("hero-default")
+    event_default = _create_usable_card_back("event-default")
+    set_pool_default("player", player_default.id)
+    set_pool_default("evil", evil_default.id)
+    set_faction_default("order", faction_default.id)
+    set_role_default("hero", hero_default.id)
+    set_role_default("event", event_default.id)
+    player_card = Card.objects.create(key="player-event", label="Player Event")
+    evil_card = Card.objects.create(key="evil-multi-role", label="Evil Multi Role", card_pool="evil")
+    CardRoleAssignment.objects.create(card=player_card, role="event")
+    CardRoleAssignment.objects.bulk_create(
+        [
+            CardRoleAssignment(card=evil_card, role="event"),
+            CardRoleAssignment(card=evil_card, role="hero"),
+            CardRoleAssignment(card=evil_card, role="boss"),
+        ]
+    )
+    CardFactionAssignment.objects.create(card=evil_card, faction="order")
+
+    resolved = resolve_effective_card_backs([player_card.id, evil_card.id])
+
+    assert resolved[player_card.id].source == "role_default"
+    assert resolved[player_card.id].role == "event"
+    assert resolved[player_card.id].faction is None
+    assert resolved[player_card.id].card_back == event_default
+    assert resolved[evil_card.id].source == "role_default"
+    assert resolved[evil_card.id].role == "hero"
+    assert resolved[evil_card.id].faction is None
+    assert resolved[evil_card.id].card_back == hero_default
 
 
 @pytest.mark.django_db
@@ -162,6 +210,8 @@ def test_assignments_validate_files_and_protect_referenced_assets(
         set_pool_default("evil", missing.id)
     with pytest.raises(ValueError, match="missing"):
         set_faction_default("order", missing.id)
+    with pytest.raises(ValueError, match="missing"):
+        set_role_default("hero", missing.id)
     set_pool_default("evil", usable.id)
     with pytest.raises(ProtectedError):
         usable.delete()
@@ -192,6 +242,21 @@ def test_defaults_explicitly_include_missing_factions() -> None:
 
 
 @pytest.mark.django_db
+def test_defaults_explicitly_include_missing_roles() -> None:
+    assert get_role_card_back_defaults() == {
+        "hero": None,
+        "boss": None,
+        "location": None,
+        "boon": None,
+        "event": None,
+        "shop_item": None,
+        "directive": None,
+        "reminder": None,
+        "mana": None,
+    }
+
+
+@pytest.mark.django_db
 def test_pool_default_can_be_cleared(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -217,6 +282,20 @@ def test_faction_default_can_be_cleared(
     clear_faction_default("dark")
 
     assert get_faction_card_back_defaults()["dark"] is None
+
+
+@pytest.mark.django_db
+def test_role_default_can_be_cleared(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+    card_back = _create_usable_card_back("role-default")
+    set_role_default("location", card_back.id)
+
+    clear_role_default("location")
+
+    assert get_role_card_back_defaults()["location"] is None
 
 
 @pytest.mark.django_db

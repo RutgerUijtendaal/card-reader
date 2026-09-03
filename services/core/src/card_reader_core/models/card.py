@@ -353,6 +353,10 @@ def is_card_faction(value: object) -> TypeGuard[CardFaction]:
     return value in CARD_FACTIONS
 
 
+def is_card_role(value: object) -> TypeGuard[CardRole]:
+    return value in CARD_ROLES
+
+
 def normalize_card_roles(values: Iterable[object]) -> tuple[CardRole, ...]:
     requested = set(values)
     return tuple(role for role in CARD_ROLES if role in requested)

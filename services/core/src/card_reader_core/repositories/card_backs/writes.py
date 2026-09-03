@@ -6,8 +6,10 @@ from card_reader_core.models import (
     CardBack,
     CardBackFactionDefault,
     CardBackPoolDefault,
+    CardBackRoleDefault,
     CardFaction,
     CardPool,
+    CardRole,
     now_utc,
 )
 
@@ -62,3 +64,20 @@ def upsert_faction_default(
 
 def delete_faction_default(*, faction: CardFaction) -> None:
     CardBackFactionDefault.objects.filter(faction=faction).delete()
+
+
+def upsert_role_default(
+    *,
+    role: CardRole,
+    card_back: CardBack,
+) -> CardBackRoleDefault:
+    with transaction.atomic():
+        row, _created = CardBackRoleDefault.objects.update_or_create(
+            role=role,
+            defaults={"card_back": card_back, "updated_at": now_utc()},
+        )
+        return row
+
+
+def delete_role_default(*, role: CardRole) -> None:
+    CardBackRoleDefault.objects.filter(role=role).delete()

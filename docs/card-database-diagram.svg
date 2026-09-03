@@ -194,15 +194,18 @@
   <text class="field" x="1710" y="1307">pool + role/faction/mana target</text>
   <text class="field" x="1710" y="1334">exactly one Tag, Type, or Symbol source</text>
   <text class="small" x="1710" y="1353">enabled • protected source</text>
-  <rect class="box version" x="1420" y="1400" width="270" height="90"/>
-  <text class="title-tight" x="1555" y="1432">CardBackPoolDefault</text>
-  <text class="small" x="1555" y="1462">card_pool PK • protected back</text>
-  <rect class="box version" x="1420" y="1540" width="270" height="90"/>
-  <text class="title-tight" x="1555" y="1572">CardBackFactionDefault</text>
-  <text class="small" x="1555" y="1602">faction PK • Evil-only default</text>
-  <rect class="box version" x="1730" y="1470" width="270" height="90"/>
-  <text class="title" x="1865" y="1508">CardBack</text>
-  <text class="field" x="1865" y="1537">immutable global asset</text>
+  <rect class="box version" x="1420" y="1385" width="270" height="80"/>
+  <text class="title-tight" x="1555" y="1415">CardBackPoolDefault</text>
+  <text class="small" x="1555" y="1443">card_pool PK • protected back</text>
+  <rect class="box version" x="1420" y="1495" width="270" height="80"/>
+  <text class="title-tight" x="1555" y="1525">CardBackFactionDefault</text>
+  <text class="small" x="1555" y="1553">faction PK • Evil-only default</text>
+  <rect class="box version" x="1420" y="1605" width="270" height="80"/>
+  <text class="title-tight" x="1555" y="1635">CardBackRoleDefault</text>
+  <text class="small" x="1555" y="1663">role PK • all-pool default</text>
+  <rect class="box version" x="1730" y="1495" width="270" height="90"/>
+  <text class="title" x="1865" y="1533">CardBack</text>
+  <text class="field" x="1865" y="1562">immutable global asset</text>
 
   <!-- Metadata entities -->
   <rect class="box meta" x="2120" y="610" width="390" height="90"/>
@@ -358,10 +361,11 @@
   <text class="label" x="1215" y="755" text-anchor="end">versions</text>
   <path class="soft" d="M1420 750 L1360 750 L1360 945 L1290 945"/>
   <text class="label" x="1380" y="930" transform="rotate(-90 1380 930)">latest_version</text>
-  <path class="line" d="M1690 1445 L1710 1445 L1710 1500 L1730 1500"/>
-  <path class="line" d="M1690 1585 L1715 1585 L1715 1540 L1730 1540"/>
-  <path class="soft" d="M1290 960 L1325 960 L1325 1720 L1865 1720 L1865 1560"/>
-  <text class="label" x="1450" y="1710">card_back_override</text>
+  <path class="line" d="M1690 1425 L1710 1425 L1710 1515 L1730 1515"/>
+  <path class="line" d="M1690 1535 L1730 1535"/>
+  <path class="line" d="M1690 1645 L1715 1645 L1715 1560 L1730 1560"/>
+  <path class="soft" d="M1290 960 L1325 960 L1325 1760 L1865 1760 L1865 1585"/>
+  <text class="label" x="1450" y="1750">card_back_override</text>
 
   <!-- Version/review relationships -->
   <path class="line" d="M1540 820 L1540 870 L1555 870 L1555 900"/>

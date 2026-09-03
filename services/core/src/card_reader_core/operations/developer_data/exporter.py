@@ -52,6 +52,7 @@ from .schema import (
     CardBackRecord,
     CardBackFactionDefaultRecord,
     CardBackPoolDefaultRecord,
+    CardBackRoleDefaultRecord,
     CardGroupMemberRecord,
     CardGroupRecord,
     CardImageRecord,
@@ -72,6 +73,7 @@ from .schema import (
 from card_reader_core.services.card_backs import (
     get_faction_card_back_defaults,
     get_pool_card_back_defaults,
+    get_role_card_back_defaults,
 )
 
 DEVELOPER_DATA_CARD_POOL = PLAYER_CARD_POOL
@@ -204,11 +206,15 @@ def _build_payload(*, cards: list[Card], groups: list[CardGroup]) -> DeveloperDa
     }
     pool_defaults = get_pool_card_back_defaults()
     faction_defaults = get_faction_card_back_defaults()
+    role_defaults = get_role_card_back_defaults()
     referenced_card_back_ids = {
         card_back.id for card_back in pool_defaults.values() if card_back is not None
     }
     referenced_card_back_ids.update(
         card_back.id for card_back in faction_defaults.values() if card_back is not None
+    )
+    referenced_card_back_ids.update(
+        card_back.id for card_back in role_defaults.values() if card_back is not None
     )
     referenced_card_back_ids.update(
         card.card_back_override.id
@@ -276,6 +282,15 @@ def _build_payload(*, cards: list[Card], groups: list[CardGroup]) -> DeveloperDa
                 card_back_checksum=_optional_card_back_checksum(faction_defaults[faction]),
             )
             for faction in CARD_FACTIONS
+        ],
+        card_back_role_defaults=[
+            CardBackRoleDefaultRecord(
+                role=definition.key,
+                card_back_checksum=_optional_card_back_checksum(
+                    role_defaults[definition.key]
+                ),
+            )
+            for definition in CARD_ROLE_DEFINITIONS
         ],
     )
 

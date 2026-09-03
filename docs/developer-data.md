@@ -19,10 +19,11 @@ same-key Player card in another faction namespace is not pulled into the bundle 
 shares the group's member key.
 
 Bundles contain complete catalogs, parsing-only templates, pool-specific classification rules, deck
-tags, symbol assets, all three pool-default and all five Evil faction-default card-back assignments,
-referenced immutable card-back assets, and Card override references with the public relationships
+tags, symbol assets, all three pool-default, all nine role-default, and all five Evil faction-default
+card-back assignments, referenced immutable card-back assets, and Card override references with the
+public relationships
 needed for gallery, history, metadata, deck building, and Playtester workflows. Version 3 through
-Version 6 classification-rule
+Version 7 classification-rule
 records identify their Tag, Type, or Symbol source by stable natural key; template records contain no
 classification hints. Card records include the required `card_pool`, canonical `card_roles`,
 canonical `card_factions`, and canonical `card_mana_families` fields; they never emit
@@ -30,10 +31,11 @@ the removed Hero boolean or internal faction identity key. Card-group anchors an
 structured card reference containing the pool, canonical faction set, mana-family context, and normalized card key, so
 same-key cards in different faction namespaces remain distinct throughout validation and import.
 
-The importer writes current Version 6 archives and explicitly adopts retained Versions 1 through 5.
-Version 6 identifies card-back assets by checksum, imports assets first, applies pool and Evil faction
-defaults second, and then imports Player Cards with optional override references. Retained Version 5
-archives adopt empty Evil faction defaults. Retained Versions 1 through 4 adopt
+The importer writes current Version 7 archives and explicitly adopts retained Versions 1 through 6.
+Version 7 identifies card-back assets by checksum, imports assets first, applies pool, role, and Evil faction
+defaults second, and then imports Player Cards with optional override references. Retained Version 6
+archives adopt empty role defaults, and retained Version 5 archives adopt empty role and Evil faction
+defaults. Retained Versions 1 through 4 adopt
 their `current_card_back` as the default for Player, Evil, and Neutral; their Cards inherit because
 those formats had no per-Card override.
 Version 1 adoption assigns every card to the Player pool and converts `is_hero=true` to the Hero role
@@ -61,14 +63,14 @@ and Evil cards with the Mana Type are assigned the Mana role. The lock file is s
 not be edited by hand.
 
 `required_tag_keys` and `required_classification_rules` in the reviewed selection make expected
-inference inputs explicit. Version 6 bundle validation and normal `doctor_dev_data` source-readiness
+inference inputs explicit. Version 7 bundle validation and normal `doctor_dev_data` source-readiness
 checks fail when a source Tag, Type, or Symbol or exact pool/target/source rule is missing.
 `bootstrap_dev` passes the pinned source format to the doctor so the immutable Version 1 bundle is
 checked only against fields it can represent. Templates and catalogs are supplied by developer-data
 on a clean checkout; there is no parallel built-in catalog seed to keep in sync. The committed lock
 continues to pin Version 1 so clean checkouts remain bootstrappable; Version 1 adoption derives its
 missing Card mana families after import. After the compatible application is deployed, publish a
-Version 6 bundle through the normal staff workflow and commit its generated lock; never hand-edit the
+Version 7 bundle through the normal staff workflow and commit its generated lock; never hand-edit the
 lock as a substitute for that publish.
 
 They exclude accounts, decks, notifications, access and activity records, import jobs, uploads, raw

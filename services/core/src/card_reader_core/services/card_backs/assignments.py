@@ -4,15 +4,19 @@ from card_reader_core.models import (
     CardBack,
     CardBackFactionDefault,
     CardBackPoolDefault,
+    CardBackRoleDefault,
     is_card_faction,
     is_card_pool,
+    is_card_role,
 )
 from card_reader_core.repositories.card_backs import (
     delete_faction_default,
     delete_pool_default,
+    delete_role_default,
     get_card_back,
     upsert_faction_default,
     upsert_pool_default,
+    upsert_role_default,
 )
 
 from .assets import resolve_card_back_image_asset_path
@@ -46,6 +50,21 @@ def clear_faction_default(faction: object) -> None:
     if not is_card_faction(faction):
         raise ValueError("Invalid card faction.")
     delete_faction_default(faction=faction)
+
+
+def set_role_default(role: object, card_back_id: str) -> CardBackRoleDefault:
+    if not is_card_role(role):
+        raise ValueError("Invalid card role.")
+    card_back = select_card_back_override(card_back_id)
+    if card_back is None:
+        raise ValueError("Card back is required.")
+    return upsert_role_default(role=role, card_back=card_back)
+
+
+def clear_role_default(role: object) -> None:
+    if not is_card_role(role):
+        raise ValueError("Invalid card role.")
+    delete_role_default(role=role)
 
 
 def select_card_back_override(card_back_id: str | None) -> CardBack | None:
