@@ -1,234 +1,240 @@
 <template>
   <div class="page-card space-y-6">
-    <section aria-labelledby="card-back-defaults-heading">
-      <div class="theme-divider flex flex-wrap items-end justify-between gap-3 border-b pb-4">
-        <div>
-          <h3
-            id="card-back-defaults-heading"
-            class="theme-section-title text-base font-semibold"
-          >
-            Pool defaults
-          </h3>
-          <p class="theme-section-muted mt-1 text-sm">
-            Cards without an override inherit the default for their pool.
-          </p>
+    <div class="theme-divider flex flex-wrap items-center justify-between gap-4 border-b pb-4">
+      <div>
+        <h3 class="theme-section-title text-base font-semibold">
+          Card backs
+        </h3>
+        <p class="theme-section-muted mt-1 text-sm">
+          Assign reusable artwork or manage the asset library.
+        </p>
+      </div>
+      <div
+        class="theme-tablist w-full sm:w-auto"
+        aria-label="Card-back administration"
+      >
+        <button
+          id="card-back-defaults-tab"
+          type="button"
+          class="theme-tab flex-1 sm:flex-none"
+          :class="{ 'theme-tab-active': activeView === 'defaults' }"
+          :aria-pressed="activeView === 'defaults'"
+          @click="activeView = 'defaults'"
+        >
+          <SlidersHorizontal class="h-4 w-4" />
+          Defaults
+        </button>
+        <button
+          id="card-back-library-tab"
+          type="button"
+          class="theme-tab flex-1 sm:flex-none"
+          :class="{ 'theme-tab-active': activeView === 'library' }"
+          :aria-pressed="activeView === 'library'"
+          @click="activeView = 'library'"
+        >
+          <Images class="h-4 w-4" />
+          Library
+          <span class="theme-pill theme-pill-neutral px-1.5 py-0.5 text-[11px]">
+            {{ cardBacks.length }}
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <p
+      v-if="errorMessage"
+      class="theme-alert-danger"
+      role="alert"
+    >
+      {{ errorMessage }}
+    </p>
+
+    <div
+      v-if="activeView === 'defaults'"
+      class="flex flex-col gap-8"
+      role="region"
+      aria-labelledby="card-back-defaults-tab"
+    >
+      <div class="theme-card-frame-muted rounded-xl px-4 py-3">
+        <div class="flex flex-wrap items-center gap-2 text-sm">
+          <span class="theme-section-muted mr-1 text-xs font-semibold uppercase tracking-wide">
+            Resolution order
+          </span>
+          <span class="theme-pill theme-pill-neutral px-2 py-1">Individual card</span>
+          <ArrowRight class="theme-section-muted h-4 w-4" />
+          <span class="theme-pill theme-pill-neutral px-2 py-1">Role</span>
+          <ArrowRight class="theme-section-muted h-4 w-4" />
+          <span class="theme-pill theme-pill-neutral px-2 py-1">Evil faction</span>
+          <ArrowRight class="theme-section-muted h-4 w-4" />
+          <span class="theme-pill theme-pill-neutral px-2 py-1">Pool</span>
         </div>
-        <p class="theme-section-muted text-xs">
-          Defaults can share the same asset.
+        <p class="theme-section-muted mt-2 text-xs">
+          Individual overrides are edited on the Card tab. Unset defaults continue to the next level.
         </p>
       </div>
 
-      <div
-        v-if="initialLoading"
-        class="mt-4 grid gap-3 lg:grid-cols-3"
-        aria-label="Loading pool defaults"
-      >
-        <div
-          v-for="option in CARD_POOL_OPTIONS"
-          :key="option.value"
-          class="theme-card-frame-muted animate-pulse rounded-xl p-4"
-        >
-          <div class="h-4 w-20 rounded bg-[var(--color-surface-soft)]" />
-          <div class="mt-4 grid grid-cols-[minmax(0,1fr)_5rem] gap-3">
-            <div class="h-10 rounded-lg bg-[var(--color-surface-soft)]" />
-            <div class="aspect-[63/88] rounded-lg bg-[var(--color-surface-soft)]" />
-          </div>
-        </div>
-      </div>
-
-      <div
-        v-else
-        class="mt-4 grid gap-3 lg:grid-cols-3"
-      >
-        <article
-          v-for="option in CARD_POOL_OPTIONS"
-          :key="option.value"
-          class="theme-card-frame-muted rounded-xl p-4"
-        >
-          <div class="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <h4 class="theme-section-title text-sm font-semibold">
-                {{ option.label }}
-              </h4>
-              <p class="theme-section-muted mt-0.5 text-xs">
-                Default card back
-              </p>
-            </div>
-            <span
-              class="theme-pill px-2 py-0.5 text-xs"
-              :class="defaults[option.value] ? 'theme-pill-success' : 'theme-pill-neutral'"
+      <section aria-labelledby="card-back-role-defaults-heading">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h3
+              id="card-back-role-defaults-heading"
+              class="theme-section-title text-base font-semibold"
             >
-              {{ defaults[option.value] ? 'Set' : 'Missing' }}
-            </span>
+              Role defaults
+            </h3>
+            <p class="theme-section-muted mt-1 text-sm">
+              Global across every pool. Multi-role cards use the first configured role in canonical order.
+            </p>
           </div>
-          <CardBackSelect
-            :model-value="defaults[option.value]?.id ?? null"
-            :card-pool="option.value"
-            :assets="cardBacks"
-            :defaults="defaults"
-            :disabled="loading || settingPool !== null || settingRole !== null || settingFaction !== null"
-            :aria-label="`${option.label} default card back`"
-            selection-kind="default"
-            @update:model-value="setDefault(option.value, $event)"
-          />
-        </article>
-      </div>
-    </section>
+          <span class="theme-section-muted text-xs">
+            {{ configuredRoleCount }} of {{ CARD_ROLE_OPTIONS.length }} configured
+          </span>
+        </div>
 
-    <section aria-labelledby="card-back-role-defaults-heading">
-      <div class="theme-divider flex flex-wrap items-end justify-between gap-3 border-b pb-4">
-        <div>
-          <h3
-            id="card-back-role-defaults-heading"
-            class="theme-section-title text-base font-semibold"
+        <div
+          v-if="initialLoading"
+          class="mt-3 space-y-3 animate-pulse"
+          aria-label="Loading role defaults"
+        >
+          <div
+            v-for="option in CARD_ROLE_OPTIONS"
+            :key="option.value"
+            class="grid gap-3 sm:grid-cols-[minmax(8rem,0.45fr)_minmax(14rem,1fr)_7rem]"
           >
-            Role defaults
-          </h3>
-          <p class="theme-section-muted mt-1 text-sm">
-            Cards inherit the first configured role default in canonical role order before faction and pool defaults.
-          </p>
+            <div class="h-10 rounded bg-[var(--color-surface-soft)]" />
+            <div class="h-10 rounded bg-[var(--color-surface-soft)]" />
+            <div class="h-10 rounded bg-[var(--color-surface-soft)]" />
+          </div>
         </div>
-        <p class="theme-section-muted text-xs">
-          Applies across every pool. Normal is the no-role state.
-        </p>
-      </div>
 
-      <div
-        v-if="initialLoading"
-        class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
-        aria-label="Loading role defaults"
-      >
         <div
-          v-for="option in CARD_ROLE_OPTIONS"
-          :key="option.value"
-          class="theme-card-frame-muted animate-pulse rounded-xl p-4"
+          v-else
+          class="theme-divider mt-3 border-t"
         >
-          <div class="h-4 w-20 rounded bg-[var(--color-surface-soft)]" />
-          <div class="mt-4 grid grid-cols-[minmax(0,1fr)_5rem] gap-3">
-            <div class="h-10 rounded-lg bg-[var(--color-surface-soft)]" />
-            <div class="aspect-[63/88] rounded-lg bg-[var(--color-surface-soft)]" />
-          </div>
-        </div>
-      </div>
-
-      <div
-        v-else
-        class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
-      >
-        <article
-          v-for="option in CARD_ROLE_OPTIONS"
-          :key="option.value"
-          class="theme-card-frame-muted rounded-xl p-4"
-        >
-          <div class="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <h4 class="theme-section-title text-sm font-semibold">
-                {{ option.label }}
-              </h4>
-              <p class="theme-section-muted mt-0.5 text-xs">
-                Role card back
-              </p>
-            </div>
-            <span
-              class="theme-pill px-2 py-0.5 text-xs"
-              :class="roleDefaults[option.value] ? 'theme-pill-success' : 'theme-pill-neutral'"
-            >
-              {{ roleDefaults[option.value] ? 'Set' : 'Inherits' }}
-            </span>
-          </div>
-          <CardBackSelect
+          <CardBackDefaultRow
+            v-for="option in CARD_ROLE_OPTIONS"
+            :key="option.value"
             :model-value="roleDefaults[option.value]?.id ?? null"
-            card-pool="player"
+            :label="option.label"
+            :placeholder="`No ${option.label} role default`"
+            :select-label="`${option.label} role default card back`"
             :assets="cardBacks"
-            :defaults="defaults"
-            :disabled="loading || settingPool !== null || settingRole !== null || settingFaction !== null"
-            :aria-label="`${option.label} role default card back`"
-            :scope-label="`${option.label} role`"
-            inheritance-mode="per-card"
-            selection-kind="default"
+            :disabled="defaultMutationLocked"
             @update:model-value="setRoleDefault(option.value, $event)"
           />
-        </article>
-      </div>
-    </section>
-
-    <section aria-labelledby="card-back-faction-defaults-heading">
-      <div class="theme-divider flex flex-wrap items-end justify-between gap-3 border-b pb-4">
-        <div>
-          <h3
-            id="card-back-faction-defaults-heading"
-            class="theme-section-title text-base font-semibold"
-          >
-            Evil faction defaults
-          </h3>
-          <p class="theme-section-muted mt-1 text-sm">
-            Evil cards inherit the first configured default in canonical faction order, then the Evil pool default.
-          </p>
         </div>
-        <p class="theme-section-muted text-xs">
-          Order, Blood, Dark, Metal, then Fire.
-        </p>
-      </div>
+      </section>
 
-      <div
-        v-if="initialLoading"
-        class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
-        aria-label="Loading Evil faction defaults"
-      >
-        <div
-          v-for="option in CARD_FACTION_OPTIONS"
-          :key="option.value"
-          class="theme-card-frame-muted animate-pulse rounded-xl p-4"
-        >
-          <div class="h-4 w-20 rounded bg-[var(--color-surface-soft)]" />
-          <div class="mt-4 grid grid-cols-[minmax(0,1fr)_5rem] gap-3">
-            <div class="h-10 rounded-lg bg-[var(--color-surface-soft)]" />
-            <div class="aspect-[63/88] rounded-lg bg-[var(--color-surface-soft)]" />
-          </div>
-        </div>
-      </div>
-
-      <div
-        v-else
-        class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
-      >
-        <article
-          v-for="option in CARD_FACTION_OPTIONS"
-          :key="option.value"
-          class="theme-card-frame-muted rounded-xl p-4"
-        >
-          <div class="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <h4 class="theme-section-title text-sm font-semibold">
-                {{ option.label }}
-              </h4>
-              <p class="theme-section-muted mt-0.5 text-xs">
-                Faction card back
-              </p>
-            </div>
-            <span
-              class="theme-pill px-2 py-0.5 text-xs"
-              :class="factionDefaults[option.value] ? 'theme-pill-success' : 'theme-pill-neutral'"
+      <section aria-labelledby="card-back-faction-defaults-heading">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h3
+              id="card-back-faction-defaults-heading"
+              class="theme-section-title text-base font-semibold"
             >
-              {{ factionDefaults[option.value] ? 'Set' : 'Inherits' }}
-            </span>
+              Evil faction defaults
+            </h3>
+            <p class="theme-section-muted mt-1 text-sm">
+              Evil cards only. Factions use canonical order, then fall back to the Evil pool default.
+            </p>
           </div>
-          <CardBackSelect
+          <span class="theme-section-muted text-xs">
+            {{ configuredFactionCount }} of {{ CARD_FACTION_OPTIONS.length }} configured
+          </span>
+        </div>
+
+        <div
+          v-if="initialLoading"
+          class="mt-3 space-y-3 animate-pulse"
+          aria-label="Loading Evil faction defaults"
+        >
+          <div
+            v-for="option in CARD_FACTION_OPTIONS"
+            :key="option.value"
+            class="grid gap-3 sm:grid-cols-[minmax(8rem,0.45fr)_minmax(14rem,1fr)_7rem]"
+          >
+            <div class="h-10 rounded bg-[var(--color-surface-soft)]" />
+            <div class="h-10 rounded bg-[var(--color-surface-soft)]" />
+            <div class="h-10 rounded bg-[var(--color-surface-soft)]" />
+          </div>
+        </div>
+
+        <div
+          v-else
+          class="theme-divider mt-3 border-t"
+        >
+          <CardBackDefaultRow
+            v-for="option in CARD_FACTION_OPTIONS"
+            :key="option.value"
             :model-value="factionDefaults[option.value]?.id ?? null"
-            card-pool="evil"
+            :label="option.label"
+            :placeholder="`No ${option.label} faction default`"
+            :select-label="`${option.label} faction default card back`"
             :assets="cardBacks"
-            :defaults="defaults"
-            :disabled="loading || settingPool !== null || settingRole !== null || settingFaction !== null"
-            :aria-label="`${option.label} faction default card back`"
-            :scope-label="`${option.label} faction`"
-            selection-kind="default"
+            :disabled="defaultMutationLocked"
             @update:model-value="setFactionDefault(option.value, $event)"
           />
-        </article>
-      </div>
-    </section>
+        </div>
+      </section>
 
-    <section aria-labelledby="card-back-library-heading">
+      <section aria-labelledby="card-back-pool-defaults-heading">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h3
+              id="card-back-pool-defaults-heading"
+              class="theme-section-title text-base font-semibold"
+            >
+              Pool defaults
+            </h3>
+            <p class="theme-section-muted mt-1 text-sm">
+              The final fallback for cards in each pool.
+            </p>
+          </div>
+          <span class="theme-section-muted text-xs">
+            {{ configuredPoolCount }} of {{ CARD_POOL_OPTIONS.length }} configured
+          </span>
+        </div>
+
+        <div
+          v-if="initialLoading"
+          class="mt-3 space-y-3 animate-pulse"
+          aria-label="Loading pool defaults"
+        >
+          <div
+            v-for="option in CARD_POOL_OPTIONS"
+            :key="option.value"
+            class="grid gap-3 sm:grid-cols-[minmax(8rem,0.45fr)_minmax(14rem,1fr)_7rem]"
+          >
+            <div class="h-10 rounded bg-[var(--color-surface-soft)]" />
+            <div class="h-10 rounded bg-[var(--color-surface-soft)]" />
+            <div class="h-10 rounded bg-[var(--color-surface-soft)]" />
+          </div>
+        </div>
+
+        <div
+          v-else
+          class="theme-divider mt-3 border-t"
+        >
+          <CardBackDefaultRow
+            v-for="option in CARD_POOL_OPTIONS"
+            :key="option.value"
+            :model-value="defaults[option.value]?.id ?? null"
+            :label="option.label"
+            :placeholder="`No ${option.label} pool default`"
+            :select-label="`${option.label} default card back`"
+            :assets="cardBacks"
+            :disabled="defaultMutationLocked"
+            @update:model-value="setDefault(option.value, $event)"
+          />
+        </div>
+      </section>
+    </div>
+
+    <section
+      v-else
+      aria-labelledby="card-back-library-heading"
+      role="region"
+    >
       <div class="theme-divider flex flex-wrap items-end justify-between gap-4 border-b pb-4">
         <div>
           <h3
@@ -273,14 +279,6 @@
           </button>
         </div>
       </div>
-
-      <p
-        v-if="errorMessage"
-        class="theme-alert-danger mt-4"
-        role="alert"
-      >
-        {{ errorMessage }}
-      </p>
 
       <div
         v-if="initialLoading"
@@ -414,11 +412,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { ImageOff, Plus, RefreshCw } from 'lucide-vue-next';
+import { ArrowRight, ImageOff, Images, Plus, RefreshCw, SlidersHorizontal } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
 import { getApiErrorMessageWithCause as extractErrorMessage } from '@/shared/api/errors';
-import CardBackSelect from '@/domain/card-backs/components/CardBackSelect.vue';
 import {
   fetchCardBackDefaults,
   fetchCardBackFactionDefaults,
@@ -442,6 +439,7 @@ import {
 } from '@/domain/cards/cardFactions';
 import { CARD_POOL_OPTIONS, type CardPool } from '@/domain/cards/cardPools';
 import { CARD_ROLE_OPTIONS, cardRoleLabel, type CardRole } from '@/domain/cards/cardRoles';
+import CardBackDefaultRow from '@/features/admin/components/CardBackDefaultRow.vue';
 import CardBackUploadModal from '@/features/admin/components/CardBackUploadModal.vue';
 
 const emptyDefaults = (): CardBackDefaults => ({ player: null, evil: null, neutral: null });
@@ -467,6 +465,7 @@ const cardBacks = ref<CardBackRecord[]>([]);
 const defaults = ref<CardBackDefaults>(emptyDefaults());
 const factionDefaults = ref<CardBackFactionDefaults>(emptyFactionDefaults());
 const roleDefaults = ref<CardBackRoleDefaults>(emptyRoleDefaults());
+const activeView = ref<'defaults' | 'library'>('defaults');
 const loading = ref(false);
 const hasLoaded = ref(false);
 const uploading = ref(false);
@@ -480,6 +479,21 @@ const uploadErrorMessage = ref('');
 let loadRequestVersion = 0;
 
 const initialLoading = computed(() => loading.value && !hasLoaded.value);
+const defaultMutationLocked = computed(() =>
+  loading.value
+  || settingPool.value !== null
+  || settingRole.value !== null
+  || settingFaction.value !== null,
+);
+const configuredPoolCount = computed(() =>
+  Object.values(defaults.value).filter((value) => value !== null).length,
+);
+const configuredRoleCount = computed(() =>
+  Object.values(roleDefaults.value).filter((value) => value !== null).length,
+);
+const configuredFactionCount = computed(() =>
+  Object.values(factionDefaults.value).filter((value) => value !== null).length,
+);
 const filteredCardBacks = computed(() => {
   const query = searchQuery.value.trim().toLocaleLowerCase();
   if (!query) return cardBacks.value;

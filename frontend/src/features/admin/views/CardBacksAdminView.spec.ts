@@ -93,6 +93,15 @@ const mountView = async () => {
   return { container, unmount: () => { app.unmount(); container.remove(); } };
 };
 
+const openLibrary = async (container: HTMLElement): Promise<void> => {
+  const libraryButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
+    button.textContent?.includes('Library'),
+  );
+  if (!libraryButton) throw new Error('expected Library view action');
+  libraryButton.click();
+  await nextTick();
+};
+
 const mockLoads = (assets = [buildCardBack()]): void => {
   apiGet.mockImplementation((url: string) => Promise.resolve({
     data: url === '/card-backs/defaults'
@@ -111,7 +120,7 @@ describe('CardBacksAdminView', () => {
     document.body.innerHTML = '';
   });
 
-  test('loads pool defaults and the reusable asset library', async () => {
+  test('separates compact defaults from the reusable asset library', async () => {
     mockLoads();
     const mounted = await mountView();
     expect(apiGet).toHaveBeenCalledWith('/admin/card-backs');
@@ -120,7 +129,15 @@ describe('CardBacksAdminView', () => {
     expect(apiGet).toHaveBeenCalledWith('/card-backs/role-defaults');
     expect(mounted.container.textContent).toContain('Role defaults');
     expect(mounted.container.textContent).toContain('Evil faction defaults');
+    expect(mounted.container.textContent).toContain('Pool defaults');
+    expect(mounted.container.textContent).toContain('Resolution order');
+    expect(mounted.container.textContent).toContain('0 of 9 configured');
+    expect(mounted.container.textContent).toContain('0 of 5 configured');
+    expect(mounted.container.textContent).toContain('1 of 3 configured');
     expect(mounted.container.querySelector('select[aria-label="Normal role default card back"]')).toBeNull();
+    expect(mounted.container.querySelector('[role="list"][aria-label="Card-back assets"]')).toBeNull();
+
+    await openLibrary(mounted.container);
     expect(mounted.container.textContent).toContain('Default Back');
     expect(mounted.container.textContent).toContain('2 card overrides');
     expect(mounted.container.textContent).not.toContain('back.png');
@@ -137,6 +154,7 @@ describe('CardBacksAdminView', () => {
   test('filters the library by its user-facing label rather than stored identifiers', async () => {
     mockLoads();
     const mounted = await mountView();
+    await openLibrary(mounted.container);
     const filterInput = mounted.container.querySelector<HTMLInputElement>('input[aria-label="Filter card backs"]');
     if (!filterInput) throw new Error('expected card-back filter');
 
@@ -157,6 +175,7 @@ describe('CardBacksAdminView', () => {
     mockLoads([]);
     apiPost.mockResolvedValue({ data: buildCardBack({ label: 'Uploaded Back' }) });
     const mounted = await mountView();
+    await openLibrary(mounted.container);
     const openButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('Add card back'),
     );
@@ -200,6 +219,7 @@ describe('CardBacksAdminView', () => {
       resolveUpload = resolve;
     }));
     const mounted = await mountView();
+    await openLibrary(mounted.container);
     const openButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('Add card back'),
     );
@@ -231,6 +251,7 @@ describe('CardBacksAdminView', () => {
     mockLoads([]);
     apiPost.mockResolvedValue({ data: buildCardBack() });
     const mounted = await mountView();
+    await openLibrary(mounted.container);
     apiGet.mockImplementation(() => new Promise(() => {}));
     const openButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('Add card back'),
@@ -268,6 +289,7 @@ describe('CardBacksAdminView', () => {
     mockLoads([]);
     apiPost.mockResolvedValue({ data: buildCardBack() });
     const mounted = await mountView();
+    await openLibrary(mounted.container);
     const firstAssets = deferred<{ data: CardBackRecord[] }>();
     const firstDefaults = deferred<{ data: { player: CardBackRecord; evil: null; neutral: null } }>();
     const secondAssets = deferred<{ data: CardBackRecord[] }>();
@@ -425,13 +447,16 @@ describe('CardBacksAdminView', () => {
     mounted.unmount();
   });
 
-  test('clears a role default and explains its card-specific fallback', async () => {
+  test('clears a role default and shows that unset defaults continue down the hierarchy', async () => {
     const selected = buildCardBack({ default_for_pools: [], default_for_roles: ['hero'] });
+    let roleDefaultsRequestCount = 0;
     apiGet.mockImplementation((url: string) => Promise.resolve({
       data: url === '/card-backs/defaults'
         ? { player: null, evil: null, neutral: null }
         : url === '/card-backs/role-defaults'
-          ? { ...emptyRoleDefaults(), hero: selected }
+          ? (++roleDefaultsRequestCount === 1
+              ? { ...emptyRoleDefaults(), hero: selected }
+              : emptyRoleDefaults())
           : url === '/card-backs/faction-defaults'
             ? emptyFactionDefaults()
             : [selected],
@@ -449,10 +474,11 @@ describe('CardBacksAdminView', () => {
     expect(apiPut).toHaveBeenCalledWith('/admin/card-backs/role-defaults/hero', {
       card_back_id: null,
     });
-    expect(mounted.container.textContent).toContain(
-      'Falls back per card to its Evil faction default when applicable, then its pool default.',
-    );
-    expect(mounted.container.textContent).toContain('Per-card fallback');
+    expect(mounted.container.textContent).toContain('Unset defaults continue to the next level.');
+    await vi.waitFor(() => {
+      expect(mounted.container.textContent).toContain('0 of 9 configured');
+      expect(heroSelect.closest('article')?.textContent).toContain('Not set');
+    });
     mounted.unmount();
   });
 

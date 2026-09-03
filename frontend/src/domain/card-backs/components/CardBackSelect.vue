@@ -35,7 +35,7 @@
         v-else
         class="theme-section-muted flex h-full items-center justify-center p-2 text-center text-[0.65rem]"
       >
-        {{ emptyPreviewLabel }}
+        {{ effectiveAsset ? 'Missing image' : 'Unavailable' }}
       </div>
     </div>
   </div>
@@ -62,14 +62,12 @@ const props = withDefaults(defineProps<{
   ariaLabel?: string;
   selectionKind?: 'override' | 'default';
   scopeLabel?: string;
-  inheritanceMode?: 'pool' | 'per-card';
 }>(), {
   disabled: false,
   error: '',
   ariaLabel: 'Card back override',
   selectionKind: 'override',
   scopeLabel: '',
-  inheritanceMode: 'pool',
 });
 
 const emit = defineEmits<{
@@ -93,21 +91,12 @@ const placeholderLabel = computed(() =>
 const selectedAsset = computed<PublicCardBackRecord | null>(() =>
   props.assets.find((asset) => asset.id === props.modelValue) ?? null,
 );
-const effectiveAsset = computed(() => selectedAsset.value ?? (
-  props.inheritanceMode === 'pool' ? props.defaults[props.cardPool] : null
-));
-const emptyPreviewLabel = computed(() => {
-  if (effectiveAsset.value) return 'Missing image';
-  return props.inheritanceMode === 'per-card' ? 'Per-card fallback' : 'Unavailable';
-});
+const effectiveAsset = computed(() => selectedAsset.value ?? props.defaults[props.cardPool]);
 const selectionDescription = computed(() => {
   if (selectedAsset.value) {
     return props.selectionKind === 'default'
       ? `Selected ${selectionScopeLabel.value} default: ${selectedAsset.value.label}`
       : `Override: ${selectedAsset.value.label}`;
-  }
-  if (props.inheritanceMode === 'per-card') {
-    return 'Falls back per card to its Evil faction default when applicable, then its pool default.';
   }
   const inherited = props.defaults[props.cardPool];
   if (props.selectionKind === 'default' && props.scopeLabel) {
