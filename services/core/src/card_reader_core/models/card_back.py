@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from django.db import models
 
 from .base import TimestampedModel, uuid_str
-from .card import CARD_POOL_CHOICES, CardPool
+from .card import CARD_FACTION_CHOICES, CARD_POOL_CHOICES, CardFaction, CardPool
 
 if TYPE_CHECKING:
     from django.db.models.manager import Manager
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 class CardBack(TimestampedModel):
     if TYPE_CHECKING:
         card_overrides: Manager[Card]
+        faction_defaults: Manager[CardBackFactionDefault]
         pool_defaults: Manager[CardBackPoolDefault]
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     label: models.TextField[str, str] = models.TextField(default="")
@@ -46,3 +47,22 @@ class CardBackPoolDefault(TimestampedModel):
 
     class Meta:
         db_table = "card_back_pool_default"
+
+
+class CardBackFactionDefault(TimestampedModel):
+    """Default card back for one faction within the Evil card pool."""
+
+    faction: models.CharField[CardFaction, CardFaction] = models.CharField(
+        max_length=64,
+        choices=CARD_FACTION_CHOICES,
+        primary_key=True,
+    )
+    card_back: models.ForeignKey[CardBack, CardBack] = models.ForeignKey(
+        "CardBack",
+        on_delete=models.PROTECT,
+        related_name="faction_defaults",
+        db_column="card_back_id",
+    )
+
+    class Meta:
+        db_table = "card_back_faction_default"

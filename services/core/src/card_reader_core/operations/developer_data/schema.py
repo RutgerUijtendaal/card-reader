@@ -23,8 +23,8 @@ from card_reader_core.metadata import (
     normalize_mana_family_keys,
 )
 
-DEVELOPER_DATA_FORMAT_VERSION = 5
-SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, 3, 4, DEVELOPER_DATA_FORMAT_VERSION)
+DEVELOPER_DATA_FORMAT_VERSION = 6
+SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, 3, 4, 5, DEVELOPER_DATA_FORMAT_VERSION)
 TYPE_INFERRED_ROLE_POOLS: tuple[tuple[CardRole, frozenset[CardPool]], ...] = (
     ("directive", frozenset({"evil"})),
     ("reminder", frozenset({"evil"})),
@@ -287,6 +287,11 @@ class CardBackPoolDefaultRecord(StrictModel):
     card_back_checksum: str | None
 
 
+class CardBackFactionDefaultRecord(StrictModel):
+    faction: CardFaction
+    card_back_checksum: str | None
+
+
 class DeveloperDataPayload(StrictModel):
     keywords: list[CatalogRecord]
     tags: list[CatalogRecord]
@@ -300,6 +305,7 @@ class DeveloperDataPayload(StrictModel):
     card_groups: list[CardGroupRecord]
     card_backs: list[CardBackRecord]
     card_back_pool_defaults: list[CardBackPoolDefaultRecord]
+    card_back_faction_defaults: list[CardBackFactionDefaultRecord]
 
 
 class BundleFileRecord(StrictModel):
@@ -489,6 +495,12 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
     if format_version == DEVELOPER_DATA_FORMAT_VERSION:
         return value
     adopted = dict(value)
+    adopted["card_back_faction_defaults"] = [
+        {"faction": faction, "card_back_checksum": None}
+        for faction in CARD_FACTIONS
+    ]
+    if format_version == 5:
+        return adopted
     _adopt_legacy_card_back_fields(adopted)
     cards = adopted.get("cards")
     if not isinstance(cards, list):

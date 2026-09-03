@@ -242,11 +242,15 @@ Core stack:
   reuse a Card identity's assigned sheet coordinate; merges preserve source slots and resolve them
   to the target Card.
 - Card-back assets are immutable and globally reusable. `CardBackPoolDefault` owns one optional
-  assignment per code-owned pool, while `Card.card_back_override` owns an explicit per-Card choice.
-  Effective resolution is always `Card override -> pool default -> unavailable`; consumers must use
-  the bulk card-back resolver and must not reproduce this precedence in serializers, exports, or UI.
+  assignment per code-owned pool, `CardBackFactionDefault` owns one optional assignment per
+  code-owned Evil faction, and `Card.card_back_override` owns an explicit per-Card choice.
+  Effective resolution is always `Card override -> first configured Evil faction default in canonical
+  faction order -> pool default -> unavailable`; faction defaults never apply outside the Evil pool.
+  Consumers must use the bulk card-back resolver and must not reproduce this precedence in
+  serializers, exports, or UI.
   Broken explicit overrides remain explicit and never silently inherit. Card override writes stay in
-  the atomic Card edit workflow; card-back repositories own only assets and pool-default assignments.
+  the atomic Card edit workflow; card-back repositories own only assets plus pool- and
+  faction-default assignments.
 - Website TTS exports for decks, sideboards, gallery selections, and content versions all use the
   `card-reader.tts-cards.v3` persistent-sheet payload. The object importer spawns those sheets directly and must not
   depend on scripting regions, preloaded card libraries, name matching, or automatic library synchronization.

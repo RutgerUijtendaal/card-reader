@@ -15,6 +15,7 @@ from card_reader_core.models import (
     CARD_CLASSIFICATION_SOURCE_TYPE,
     CARD_CLASSIFICATION_TARGET_ROLE,
     CARD_CLASSIFICATION_TARGET_FACTION,
+    CARD_FACTIONS,
     CARD_FACTION_DEFINITIONS,
     CARD_POOL_DEFINITIONS,
     CARD_POOLS,
@@ -49,6 +50,7 @@ from .schema import (
     BundleFileRecord,
     CardAliasRecord,
     CardBackRecord,
+    CardBackFactionDefaultRecord,
     CardBackPoolDefaultRecord,
     CardGroupMemberRecord,
     CardGroupRecord,
@@ -67,7 +69,10 @@ from .schema import (
     SymbolRecord,
     TemplateRecord,
 )
-from card_reader_core.services.card_backs import get_pool_card_back_defaults
+from card_reader_core.services.card_backs import (
+    get_faction_card_back_defaults,
+    get_pool_card_back_defaults,
+)
 
 DEVELOPER_DATA_CARD_POOL = PLAYER_CARD_POOL
 DEVELOPER_DATA_EXCLUDED_POOLS = tuple(
@@ -198,9 +203,13 @@ def _build_payload(*, cards: list[Card], groups: list[CardGroup]) -> DeveloperDa
         if version.content_version is not None
     }
     pool_defaults = get_pool_card_back_defaults()
+    faction_defaults = get_faction_card_back_defaults()
     referenced_card_back_ids = {
         card_back.id for card_back in pool_defaults.values() if card_back is not None
     }
+    referenced_card_back_ids.update(
+        card_back.id for card_back in faction_defaults.values() if card_back is not None
+    )
     referenced_card_back_ids.update(
         card.card_back_override.id
         for card in cards
@@ -260,6 +269,13 @@ def _build_payload(*, cards: list[Card], groups: list[CardGroup]) -> DeveloperDa
                 card_back_checksum=_optional_card_back_checksum(pool_defaults[card_pool]),
             )
             for card_pool in CARD_POOLS
+        ],
+        card_back_faction_defaults=[
+            CardBackFactionDefaultRecord(
+                faction=faction,
+                card_back_checksum=_optional_card_back_checksum(faction_defaults[faction]),
+            )
+            for faction in CARD_FACTIONS
         ],
     )
 

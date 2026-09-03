@@ -19,6 +19,7 @@ from card_reader_core.models import (
     Card,
     CardAlias,
     CardBack,
+    CardBackFactionDefault,
     CardBackPoolDefault,
     CardClassificationRule,
     CardFactionAssignment,
@@ -81,6 +82,13 @@ def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
             {"card_pool": "evil", "card_back_checksum": None},
             {"card_pool": "neutral", "card_back_checksum": None},
         ],
+        "card_back_faction_defaults": [
+            {"faction": "order", "card_back_checksum": None},
+            {"faction": "blood", "card_back_checksum": None},
+            {"faction": "dark", "card_back_checksum": None},
+            {"faction": "metal", "card_back_checksum": None},
+            {"faction": "fire", "card_back_checksum": None},
+        ],
         "cards": [
             {
                 "key": "hero",
@@ -123,6 +131,24 @@ def test_version_one_payload_adoption_adds_mana_role_from_latest_type() -> None:
     )
 
     assert adopted["cards"][0]["card_roles"] == ["mana"]  # type: ignore[index]
+
+
+def test_version_five_payload_adoption_adds_empty_faction_defaults() -> None:
+    payload = {"cards": [], "card_back_pool_defaults": []}
+
+    adopted = adopt_payload_for_format(payload, format_version=5)
+
+    assert adopted == {
+        "cards": [],
+        "card_back_pool_defaults": [],
+        "card_back_faction_defaults": [
+            {"faction": "order", "card_back_checksum": None},
+            {"faction": "blood", "card_back_checksum": None},
+            {"faction": "dark", "card_back_checksum": None},
+            {"faction": "metal", "card_back_checksum": None},
+            {"faction": "fire", "card_back_checksum": None},
+        ],
+    }
 
 
 @pytest.mark.parametrize(
@@ -565,6 +591,14 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
             "evil",
             "neutral",
         }
+        assert {
+            row.faction for row in validated_payload.card_back_faction_defaults
+        } == {"order", "blood", "dark", "metal", "fire"}
+        assert {
+            row.faction
+            for row in validated_payload.card_back_faction_defaults
+            if row.card_back_checksum is not None
+        } == {"order", "fire"}
         mainboard_record.card_roles = ["boon"]
         assert "no active mainboard cards are included" not in validate_import_readiness(
             validated_payload
@@ -672,6 +706,9 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         ) == {"order", "blood"}
         assert imported_mainboard.card_back_override is not None
         assert imported_mainboard.card_back_override.checksum == validated_payload.card_backs[0].checksum
+        assert set(
+            CardBackFactionDefault.objects.values_list("faction", flat=True)
+        ) == {"order", "fire"}
         assert Card.objects.filter(key="synthetic-mainboard").count() == 2
         imported_group = CardGroup.objects.get(key="synthetic-group")
         assert (
@@ -1172,6 +1209,7 @@ def _build_archive_with_format_version(
         archive.extractall(extraction_root, filter="data")
     data_path = extraction_root / "data.json"
     payload = json.loads(data_path.read_text(encoding="utf-8"))
+    payload.pop("card_back_faction_defaults")
     player_default = next(
         default
         for default in payload.pop("card_back_pool_defaults")
@@ -1512,6 +1550,12 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
             for card_pool in ("player", "evil", "neutral")
         ]
     )
+    CardBackFactionDefault.objects.bulk_create(
+        [
+            CardBackFactionDefault(faction="order", card_back=card_back),
+            CardBackFactionDefault(faction="fire", card_back=card_back),
+        ]
+    )
     mainboard.card_back_override = card_back
     mainboard.save(update_fields=["card_back_override", "updated_at"])
     return {
@@ -1621,6 +1665,7 @@ def _clear_domain_data() -> None:
     ImportJob.objects.all().delete()
     CardGroup.objects.all().delete()
     Card.objects.all().delete()
+    CardBackFactionDefault.objects.all().delete()
     CardBackPoolDefault.objects.all().delete()
     CardBack.objects.all().delete()
     MetadataSuggestion.objects.all().delete()

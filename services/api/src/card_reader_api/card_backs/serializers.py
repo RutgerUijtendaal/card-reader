@@ -3,13 +3,15 @@ from __future__ import annotations
 from django.core.files.uploadedfile import UploadedFile
 from rest_framework import serializers
 
-from card_reader_core.models import CARD_POOLS, CardBack
+from card_reader_core.models import CARD_FACTIONS, CARD_POOLS, CardBack
 from card_reader_core.services.card_backs import ResolvedCardBack, resolve_card_back_image_asset_path
 
 
 def card_back_payload(card_back: CardBack) -> dict[str, object]:
     pool_defaults = list(card_back.pool_defaults.all())
     default_pool_keys = {row.card_pool for row in pool_defaults}
+    faction_defaults = list(card_back.faction_defaults.all())
+    default_faction_keys = {row.faction for row in faction_defaults}
     return {
         "id": card_back.id,
         "label": card_back.label,
@@ -20,6 +22,9 @@ def card_back_payload(card_back: CardBack) -> dict[str, object]:
         "height": card_back.height,
         "checksum": card_back.checksum,
         "default_for_pools": [pool for pool in CARD_POOLS if pool in default_pool_keys],
+        "default_for_factions": [
+            faction for faction in CARD_FACTIONS if faction in default_faction_keys
+        ],
         "override_card_count": int(getattr(card_back, "override_card_count", 0)),
         "is_usable": resolve_card_back_image_asset_path(card_back) is not None,
         "image_url": card_back_image_url(card_back),
@@ -47,10 +52,13 @@ def current_card_back_payload(card_back: CardBack | None) -> dict[str, object]:
 def resolved_card_back_payload(resolved: ResolvedCardBack | None) -> dict[str, object] | None:
     if resolved is None or resolved.source is None or resolved.card_back is None:
         return None
-    return {
+    payload: dict[str, object] = {
         "source": resolved.source,
         "asset": public_card_back_payload(resolved.card_back),
     }
+    if resolved.faction is not None:
+        payload["faction"] = resolved.faction
+    return payload
 
 
 def card_back_image_url(card_back: CardBack) -> str | None:

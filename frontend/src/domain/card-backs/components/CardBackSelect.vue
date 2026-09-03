@@ -61,11 +61,13 @@ const props = withDefaults(defineProps<{
   error?: string;
   ariaLabel?: string;
   selectionKind?: 'override' | 'default';
+  scopeLabel?: string;
 }>(), {
   disabled: false,
   error: '',
   ariaLabel: 'Card back override',
   selectionKind: 'override',
+  scopeLabel: '',
 });
 
 const emit = defineEmits<{
@@ -80,9 +82,10 @@ const options = computed(() => props.assets.map((asset) => ({
 const poolLabel = computed(() =>
   CARD_POOL_OPTIONS.find((option) => option.value === props.cardPool)?.label ?? props.cardPool,
 );
+const selectionScopeLabel = computed(() => props.scopeLabel || poolLabel.value);
 const placeholderLabel = computed(() =>
   props.selectionKind === 'default'
-    ? `No ${poolLabel.value} default`
+    ? `No ${selectionScopeLabel.value} default`
     : `Use ${poolLabel.value} default`,
 );
 const selectedAsset = computed<PublicCardBackRecord | null>(() =>
@@ -92,10 +95,15 @@ const effectiveAsset = computed(() => selectedAsset.value ?? props.defaults[prop
 const selectionDescription = computed(() => {
   if (selectedAsset.value) {
     return props.selectionKind === 'default'
-      ? `Selected ${poolLabel.value} default: ${selectedAsset.value.label}`
+      ? `Selected ${selectionScopeLabel.value} default: ${selectedAsset.value.label}`
       : `Override: ${selectedAsset.value.label}`;
   }
   const inherited = props.defaults[props.cardPool];
+  if (props.selectionKind === 'default' && props.scopeLabel) {
+    return inherited
+      ? `Falls back to ${poolLabel.value} pool default: ${inherited.label}`
+      : `${selectionScopeLabel.value} and ${poolLabel.value} pool have no default.`;
+  }
   return inherited ? `Inherited ${poolLabel.value} default: ${inherited.label}` : `${poolLabel.value} has no default.`;
 });
 

@@ -66,10 +66,86 @@
             :card-pool="option.value"
             :assets="cardBacks"
             :defaults="defaults"
-            :disabled="loading || settingPool !== null"
+            :disabled="loading || settingPool !== null || settingFaction !== null"
             :aria-label="`${option.label} default card back`"
             selection-kind="default"
             @update:model-value="setDefault(option.value, $event)"
+          />
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="card-back-faction-defaults-heading">
+      <div class="theme-divider flex flex-wrap items-end justify-between gap-3 border-b pb-4">
+        <div>
+          <h3
+            id="card-back-faction-defaults-heading"
+            class="theme-section-title text-base font-semibold"
+          >
+            Evil faction defaults
+          </h3>
+          <p class="theme-section-muted mt-1 text-sm">
+            Evil cards inherit the first configured default in canonical faction order, then the Evil pool default.
+          </p>
+        </div>
+        <p class="theme-section-muted text-xs">
+          Order, Blood, Dark, Metal, then Fire.
+        </p>
+      </div>
+
+      <div
+        v-if="initialLoading"
+        class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
+        aria-label="Loading Evil faction defaults"
+      >
+        <div
+          v-for="option in CARD_FACTION_OPTIONS"
+          :key="option.value"
+          class="theme-card-frame-muted animate-pulse rounded-xl p-4"
+        >
+          <div class="h-4 w-20 rounded bg-[var(--color-surface-soft)]" />
+          <div class="mt-4 grid grid-cols-[minmax(0,1fr)_5rem] gap-3">
+            <div class="h-10 rounded-lg bg-[var(--color-surface-soft)]" />
+            <div class="aspect-[63/88] rounded-lg bg-[var(--color-surface-soft)]" />
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-else
+        class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
+      >
+        <article
+          v-for="option in CARD_FACTION_OPTIONS"
+          :key="option.value"
+          class="theme-card-frame-muted rounded-xl p-4"
+        >
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h4 class="theme-section-title text-sm font-semibold">
+                {{ option.label }}
+              </h4>
+              <p class="theme-section-muted mt-0.5 text-xs">
+                Faction card back
+              </p>
+            </div>
+            <span
+              class="theme-pill px-2 py-0.5 text-xs"
+              :class="factionDefaults[option.value] ? 'theme-pill-success' : 'theme-pill-neutral'"
+            >
+              {{ factionDefaults[option.value] ? 'Set' : 'Inherits' }}
+            </span>
+          </div>
+          <CardBackSelect
+            :model-value="factionDefaults[option.value]?.id ?? null"
+            card-pool="evil"
+            :assets="cardBacks"
+            :defaults="defaults"
+            :disabled="loading || settingPool !== null || settingFaction !== null"
+            :aria-label="`${option.label} faction default card back`"
+            :scope-label="`${option.label} faction`"
+            selection-kind="default"
+            @update:model-value="setFactionDefault(option.value, $event)"
           />
         </article>
       </div>
@@ -218,10 +294,17 @@
                 {{ poolLabel(pool) }} default
               </span>
               <span
-                v-if="cardBack.default_for_pools.length === 0"
+                v-for="faction in cardBack.default_for_factions"
+                :key="faction"
+                class="theme-pill theme-pill-success px-2 py-0.5 text-[11px]"
+              >
+                {{ cardFactionLabel(faction) }} faction default
+              </span>
+              <span
+                v-if="cardBack.default_for_pools.length === 0 && cardBack.default_for_factions.length === 0"
                 class="theme-section-muted text-[11px]"
               >
-                Not a pool default
+                Not a default
               </span>
             </div>
 
@@ -252,22 +335,42 @@ import { getApiErrorMessageWithCause as extractErrorMessage } from '@/shared/api
 import CardBackSelect from '@/domain/card-backs/components/CardBackSelect.vue';
 import {
   fetchCardBackDefaults,
+  fetchCardBackFactionDefaults,
   fetchCardBacks,
+  setFactionCardBackDefault,
   setPoolCardBackDefault,
   uploadCardBack,
 } from '@/domain/card-backs/api';
-import type { CardBackDefaults, CardBackRecord } from '@/domain/card-backs/types';
+import type {
+  CardBackDefaults,
+  CardBackFactionDefaults,
+  CardBackRecord,
+} from '@/domain/card-backs/types';
+import {
+  CARD_FACTION_OPTIONS,
+  cardFactionLabel,
+  type CardFaction,
+} from '@/domain/cards/cardFactions';
 import { CARD_POOL_OPTIONS, type CardPool } from '@/domain/cards/cardPools';
 import CardBackUploadModal from '@/features/admin/components/CardBackUploadModal.vue';
 
 const emptyDefaults = (): CardBackDefaults => ({ player: null, evil: null, neutral: null });
+const emptyFactionDefaults = (): CardBackFactionDefaults => ({
+  order: null,
+  blood: null,
+  dark: null,
+  metal: null,
+  fire: null,
+});
 const cardBacks = ref<CardBackRecord[]>([]);
 const defaults = ref<CardBackDefaults>(emptyDefaults());
+const factionDefaults = ref<CardBackFactionDefaults>(emptyFactionDefaults());
 const loading = ref(false);
 const hasLoaded = ref(false);
 const uploading = ref(false);
 const uploadModalOpen = ref(false);
 const settingPool = ref<CardPool | null>(null);
+const settingFaction = ref<CardFaction | null>(null);
 const searchQuery = ref('');
 const errorMessage = ref('');
 const uploadErrorMessage = ref('');
@@ -293,10 +396,15 @@ const loadCardBackData = async (): Promise<void> => {
   loading.value = true;
   errorMessage.value = '';
   try {
-    const [nextCardBacks, nextDefaults] = await Promise.all([fetchCardBacks(), fetchCardBackDefaults()]);
+    const [nextCardBacks, nextDefaults, nextFactionDefaults] = await Promise.all([
+      fetchCardBacks(),
+      fetchCardBackDefaults(),
+      fetchCardBackFactionDefaults(),
+    ]);
     if (requestVersion !== loadRequestVersion) return;
     cardBacks.value = nextCardBacks;
     defaults.value = nextDefaults;
+    factionDefaults.value = nextFactionDefaults;
   } catch (error) {
     if (requestVersion !== loadRequestVersion) return;
     errorMessage.value = extractErrorMessage(error, 'Card backs could not be loaded.');
@@ -338,7 +446,11 @@ const uploadSelectedCardBack = async (payload: { file: File; label: string }): P
 };
 
 const setDefault = async (cardPool: CardPool, cardBackId: string | null): Promise<void> => {
-  if (settingPool.value !== null || (defaults.value[cardPool]?.id ?? null) === cardBackId) return;
+  if (
+    settingPool.value !== null
+    || settingFaction.value !== null
+    || (defaults.value[cardPool]?.id ?? null) === cardBackId
+  ) return;
   settingPool.value = cardPool;
   errorMessage.value = '';
   try {
@@ -350,6 +462,29 @@ const setDefault = async (cardPool: CardPool, cardBackId: string | null): Promis
     toast.error(errorMessage.value);
   } finally {
     settingPool.value = null;
+  }
+};
+
+const setFactionDefault = async (
+  faction: CardFaction,
+  cardBackId: string | null,
+): Promise<void> => {
+  if (
+    settingPool.value !== null
+    || settingFaction.value !== null
+    || (factionDefaults.value[faction]?.id ?? null) === cardBackId
+  ) return;
+  settingFaction.value = faction;
+  errorMessage.value = '';
+  try {
+    await setFactionCardBackDefault(faction, cardBackId);
+    await loadCardBackData();
+    toast.success(`${cardFactionLabel(faction)} faction default updated.`);
+  } catch (error) {
+    errorMessage.value = extractErrorMessage(error, 'Faction default could not be updated.');
+    toast.error(errorMessage.value);
+  } finally {
+    settingFaction.value = null;
   }
 };
 

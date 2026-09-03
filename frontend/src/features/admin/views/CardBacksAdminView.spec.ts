@@ -1,7 +1,7 @@
 import { createApp, nextTick } from 'vue';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import CardBacksAdminView from '@/features/admin/views/CardBacksAdminView.vue';
-import type { CardBackRecord } from '@/domain/card-backs/types';
+import type { CardBackFactionDefaults, CardBackRecord } from '@/domain/card-backs/types';
 
 Object.defineProperty(URL, 'createObjectURL', {
   configurable: true,
@@ -35,6 +35,7 @@ const buildCardBack = (overrides: Partial<CardBackRecord> = {}): CardBackRecord 
   height: 88,
   checksum: 'checksum',
   default_for_pools: ['player'],
+  default_for_factions: [],
   override_card_count: 2,
   is_usable: true,
   image_url: '/card-images/images/back.webp',
@@ -57,6 +58,14 @@ const deferred = <T>() => {
   return { promise, resolve };
 };
 
+const emptyFactionDefaults = (): CardBackFactionDefaults => ({
+  order: null,
+  blood: null,
+  dark: null,
+  metal: null,
+  fire: null,
+});
+
 const mountView = async () => {
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -71,6 +80,8 @@ const mockLoads = (assets = [buildCardBack()]): void => {
   apiGet.mockImplementation((url: string) => Promise.resolve({
     data: url === '/card-backs/defaults'
       ? { player: assets[0] ?? null, evil: null, neutral: null }
+      : url === '/card-backs/faction-defaults'
+        ? emptyFactionDefaults()
       : assets,
   }));
 };
@@ -86,6 +97,8 @@ describe('CardBacksAdminView', () => {
     const mounted = await mountView();
     expect(apiGet).toHaveBeenCalledWith('/admin/card-backs');
     expect(apiGet).toHaveBeenCalledWith('/card-backs/defaults');
+    expect(apiGet).toHaveBeenCalledWith('/card-backs/faction-defaults');
+    expect(mounted.container.textContent).toContain('Evil faction defaults');
     expect(mounted.container.textContent).toContain('Default Back');
     expect(mounted.container.textContent).toContain('2 card overrides');
     expect(mounted.container.textContent).not.toContain('back.png');
@@ -244,6 +257,9 @@ describe('CardBacksAdminView', () => {
         defaultsRequestCount += 1;
         return defaultsRequestCount === 1 ? firstDefaults.promise : secondDefaults.promise;
       }
+      if (url === '/card-backs/faction-defaults') {
+        return Promise.resolve({ data: emptyFactionDefaults() });
+      }
       assetRequestCount += 1;
       return assetRequestCount === 1 ? firstAssets.promise : secondAssets.promise;
     });
@@ -313,6 +329,50 @@ describe('CardBacksAdminView', () => {
     playerSelect.dispatchEvent(new Event('change', { bubbles: true }));
     await flushPromises();
     expect(apiPut).toHaveBeenCalledWith('/admin/card-backs/defaults/player', { card_back_id: null });
+    mounted.unmount();
+  });
+
+  test('sets an Evil faction default with the dedicated mutation', async () => {
+    const second = buildCardBack({ id: 'card-back-2', label: 'Second Back', default_for_pools: [] });
+    mockLoads([buildCardBack(), second]);
+    apiPut.mockResolvedValue({ data: second });
+    const mounted = await mountView();
+    const orderSelect = mounted.container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Order faction default card back"]',
+    );
+    if (!orderSelect) throw new Error('expected Order faction default selector');
+
+    orderSelect.value = second.id;
+    orderSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushPromises();
+    expect(apiPut).toHaveBeenCalledWith('/admin/card-backs/faction-defaults/order', {
+      card_back_id: second.id,
+    });
+    mounted.unmount();
+  });
+
+  test('clears an Evil faction default with the same authoritative mutation', async () => {
+    const selected = buildCardBack({ default_for_pools: [], default_for_factions: ['order'] });
+    apiGet.mockImplementation((url: string) => Promise.resolve({
+      data: url === '/card-backs/defaults'
+        ? { player: null, evil: null, neutral: null }
+        : url === '/card-backs/faction-defaults'
+          ? { ...emptyFactionDefaults(), order: selected }
+          : [selected],
+    }));
+    apiPut.mockResolvedValue({ data: null });
+    const mounted = await mountView();
+    const orderSelect = mounted.container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Order faction default card back"]',
+    );
+    if (!orderSelect) throw new Error('expected Order faction default selector');
+
+    orderSelect.value = '__placeholder__';
+    orderSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushPromises();
+    expect(apiPut).toHaveBeenCalledWith('/admin/card-backs/faction-defaults/order', {
+      card_back_id: null,
+    });
     mounted.unmount();
   });
 });

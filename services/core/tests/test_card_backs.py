@@ -6,12 +6,15 @@ from django.db.models.deletion import ProtectedError
 from PIL import Image
 
 from card_reader_core.config.settings import settings
-from card_reader_core.models import Card, CardBack
+from card_reader_core.models import Card, CardBack, CardFactionAssignment
 from card_reader_core.services.card_backs import (
+    clear_faction_default,
     clear_pool_default,
+    get_faction_card_back_defaults,
     get_pool_card_back_defaults,
     resolve_effective_card_backs,
     select_card_back_override,
+    set_faction_default,
     set_pool_default,
 )
 from card_reader_core.services.card_merges import merge_cards, preview_card_merge
@@ -35,13 +38,76 @@ def test_resolution_prefers_override_and_uses_bounded_queries(
         card_back_override=override,
     )
 
-    with django_assert_num_queries(2):
+    with django_assert_num_queries(4):
         resolved = resolve_effective_card_backs([inherited.id, overridden.id])
 
     assert resolved[inherited.id].source == "pool_default"
     assert resolved[inherited.id].card_back == player_default
     assert resolved[overridden.id].source == "override"
     assert resolved[overridden.id].card_back == override
+
+
+@pytest.mark.django_db
+def test_evil_faction_defaults_precede_pool_default_in_canonical_order(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+    evil_default = _create_usable_card_back("evil-default")
+    order_default = _create_usable_card_back("order-default")
+    blood_default = _create_usable_card_back("blood-default")
+    set_pool_default("evil", evil_default.id)
+    set_faction_default("order", order_default.id)
+    set_faction_default("blood", blood_default.id)
+    order_and_blood = Card.objects.create(
+        key="order-and-blood",
+        label="Order and Blood",
+        card_pool="evil",
+    )
+    CardFactionAssignment.objects.bulk_create(
+        [
+            CardFactionAssignment(card=order_and_blood, faction="blood"),
+            CardFactionAssignment(card=order_and_blood, faction="order"),
+        ]
+    )
+    no_faction = Card.objects.create(
+        key="no-faction",
+        label="No Faction",
+        card_pool="evil",
+    )
+
+    resolved = resolve_effective_card_backs([order_and_blood.id, no_faction.id])
+
+    assert resolved[order_and_blood.id].source == "faction_default"
+    assert resolved[order_and_blood.id].faction == "order"
+    assert resolved[order_and_blood.id].card_back == order_default
+    assert resolved[no_faction.id].source == "pool_default"
+    assert resolved[no_faction.id].faction is None
+    assert resolved[no_faction.id].card_back == evil_default
+
+
+@pytest.mark.django_db
+def test_faction_defaults_only_apply_inside_evil_pool(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+    player_default = _create_usable_card_back("player-default")
+    order_default = _create_usable_card_back("order-default")
+    set_pool_default("player", player_default.id)
+    set_faction_default("order", order_default.id)
+    player_card = Card.objects.create(
+        key="player-order",
+        label="Player Order",
+        card_pool="player",
+    )
+    CardFactionAssignment.objects.create(card=player_card, faction="order")
+
+    resolved = resolve_effective_card_backs([player_card.id])[player_card.id]
+
+    assert resolved.source == "pool_default"
+    assert resolved.faction is None
+    assert resolved.card_back == player_default
 
 
 @pytest.mark.django_db
@@ -94,6 +160,8 @@ def test_assignments_validate_files_and_protect_referenced_assets(
     assert select_card_back_override(None) is None
     with pytest.raises(ValueError, match="missing"):
         set_pool_default("evil", missing.id)
+    with pytest.raises(ValueError, match="missing"):
+        set_faction_default("order", missing.id)
     set_pool_default("evil", usable.id)
     with pytest.raises(ProtectedError):
         usable.delete()
@@ -113,6 +181,17 @@ def test_defaults_explicitly_include_missing_pools() -> None:
 
 
 @pytest.mark.django_db
+def test_defaults_explicitly_include_missing_factions() -> None:
+    assert get_faction_card_back_defaults() == {
+        "order": None,
+        "blood": None,
+        "dark": None,
+        "metal": None,
+        "fire": None,
+    }
+
+
+@pytest.mark.django_db
 def test_pool_default_can_be_cleared(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -124,6 +203,20 @@ def test_pool_default_can_be_cleared(
     clear_pool_default("player")
 
     assert get_pool_card_back_defaults()["player"] is None
+
+
+@pytest.mark.django_db
+def test_faction_default_can_be_cleared(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+    card_back = _create_usable_card_back("faction-default")
+    set_faction_default("dark", card_back.id)
+
+    clear_faction_default("dark")
+
+    assert get_faction_card_back_defaults()["dark"] is None
 
 
 @pytest.mark.django_db

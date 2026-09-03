@@ -194,12 +194,15 @@
   <text class="field" x="1710" y="1307">pool + role/faction/mana target</text>
   <text class="field" x="1710" y="1334">exactly one Tag, Type, or Symbol source</text>
   <text class="small" x="1710" y="1353">enabled • protected source</text>
-  <rect class="box version" x="1420" y="1430" width="270" height="90"/>
-  <text class="title-tight" x="1555" y="1462">CardBackPoolDefault</text>
-  <text class="small" x="1555" y="1492">card_pool PK • protected back</text>
-  <rect class="box version" x="1730" y="1430" width="270" height="90"/>
-  <text class="title" x="1865" y="1468">CardBack</text>
-  <text class="field" x="1865" y="1497">immutable global asset</text>
+  <rect class="box version" x="1420" y="1400" width="270" height="90"/>
+  <text class="title-tight" x="1555" y="1432">CardBackPoolDefault</text>
+  <text class="small" x="1555" y="1462">card_pool PK • protected back</text>
+  <rect class="box version" x="1420" y="1540" width="270" height="90"/>
+  <text class="title-tight" x="1555" y="1572">CardBackFactionDefault</text>
+  <text class="small" x="1555" y="1602">faction PK • Evil-only default</text>
+  <rect class="box version" x="1730" y="1470" width="270" height="90"/>
+  <text class="title" x="1865" y="1508">CardBack</text>
+  <text class="field" x="1865" y="1537">immutable global asset</text>
 
   <!-- Metadata entities -->
   <rect class="box meta" x="2120" y="610" width="390" height="90"/>
@@ -289,7 +292,7 @@
   <path class="soft-travel" d="M1305 881 L1305 939"/>
   <path class="soft-travel" d="M1305 951 L1305 1544"/>
   <path class="soft-travel" d="M1305 1556 L1305 1614"/>
-  <path class="soft" d="M1305 1626 L1305 1790 L1500 1790 L1500 1360"/>
+  <path class="soft" d="M1305 1626 L1305 1790 L1385 1790 L1385 1380 L1500 1380 L1500 1360"/>
   <text class="label" x="1318" y="1768">immutable rule snapshot</text>
 
   <!-- Relationships within the card consumer band -->
@@ -355,9 +358,9 @@
   <text class="label" x="1215" y="755" text-anchor="end">versions</text>
   <path class="soft" d="M1420 750 L1360 750 L1360 945 L1290 945"/>
   <text class="label" x="1380" y="930" transform="rotate(-90 1380 930)">latest_version</text>
-  <path class="line" d="M1690 1475 L1730 1475"/>
-  <text class="label" x="1698" y="1458" text-anchor="end">pool default</text>
-  <path class="soft" d="M1290 960 L1325 960 L1325 1720 L1865 1720 L1865 1520"/>
+  <path class="line" d="M1690 1445 L1710 1445 L1710 1500 L1730 1500"/>
+  <path class="line" d="M1690 1585 L1715 1585 L1715 1540 L1730 1540"/>
+  <path class="soft" d="M1290 960 L1325 960 L1325 1720 L1865 1720 L1865 1560"/>
   <text class="label" x="1450" y="1710">card_back_override</text>
 
   <!-- Version/review relationships -->
