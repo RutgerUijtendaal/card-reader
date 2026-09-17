@@ -55,6 +55,15 @@ class _CardUpdateState:
     destination_card_factions: tuple[CardFaction, ...] | None = None
 
 
+@dataclass(frozen=True)
+class HeroCardBackExpectation:
+    card_back_id: str | None
+
+
+class CardBackAssignmentConflict(ValueError):
+    pass
+
+
 def update_latest_card_version(
     *,
     card_id: str,
@@ -63,6 +72,7 @@ def update_latest_card_version(
     restore_metadata_groups: list[str],
     unlock_fields: list[str],
     unlock_metadata_groups: list[str],
+    hero_card_back_expectation: HeroCardBackExpectation | None = None,
 ) -> tuple[Card, CardVersion] | None:
     card = get_card(card_id)
     version = get_latest_card_version(card_id)
@@ -73,6 +83,18 @@ def update_latest_card_version(
     field_sources = decode_field_sources(version.field_sources_json)
 
     with transaction.atomic():
+        if hero_card_back_expectation is not None:
+            # A conditional write, not select_for_update (which does not lock on SQLite).
+            changed = Card.objects.filter(
+                id=card_id,
+                lifecycle_status="active",
+                role_assignments__role="hero",
+                card_back_override_id=hero_card_back_expectation.card_back_id,
+            ).update(updated_at=now_utc())
+            if changed != 1:
+                raise CardBackAssignmentConflict(
+                    "The hero or its card-back assignment changed. Review this row again."
+                )
         state = _CardUpdateState()
         _unlock_field_sources(
             field_sources,

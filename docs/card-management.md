@@ -2,6 +2,48 @@
 
 Card management separates a card's stable identity from the content extracted or edited at a particular point in time. That distinction lets the application retain history, repair parsing results, group related printings, and safely consolidate duplicates.
 
+## Card-back imports
+
+Staff can open **Admin → Card backs → Library → Import card backs** to prepare multiple
+images together. Each row has a preview, an editable required label derived from its filename,
+and an optional hero assignment. Unassigned images enter the reusable library without changing
+any pool, role, or faction default. Hero-assigned assets remain reusable too.
+
+The hero picker covers active Hero cards across all pools, independently of the selected
+workspace. Exact primary-name matches from filenames are suggestions only: select **Use this
+hero** to accept one. Ambiguous names require manual selection. A hero can appear only once
+in a prepared batch. Existing overrides require confirmation; replacement assigns a new
+immutable asset to that hero while retaining the previous back and its other uses.
+
+Rows import independently, so a rejected image or changed hero assignment does not undo
+completed rows. Rejected assignments require fresh review. Unconfirmed requests remain locked;
+**Check / retry** resolves or retries the same request without duplicating assets or repeating
+an assignment. Keep the page open until those requests are resolved. Draft files and selections
+are held only in this tab and cannot be recovered after a refresh or close.
+
+The library combines label search with **All uses**, **Card overrides**, **Defaults**, and
+**Unused** filters. Usage is derived from assignments, rather than manually maintained categories.
+
+### Import API and outcomes
+
+`POST /admin/card-backs/import-items` accepts a multipart `file`, required `label`, and
+`client_request_id` UUID, plus optional `hero_card_id`. Hero assignments must include
+`expected_override_id` (empty for no existing override). Session requests require CSRF and staff access.
+`GET /admin/card-backs/import-items/{client_request_id}` returns only the authenticated owner's result.
+
+Successful new imports return HTTP 201; replayed or rejected outcomes return HTTP 200. The
+`outcome` is `succeeded` with `asset` and the historical `hero_card_id`, `rejected` with `detail`,
+or `deleted` when a previously imported asset has been removed. A lookup 404 means no completed
+outcome is visible yet; it does not prove an in-flight request failed. Malformed inputs return 400.
+
+The asset record, optional assignment, and receipt commit together. Assignment validation uses
+a conditional write to reject stale overrides. Rejections are also recorded durably so delayed
+retries cannot apply them later. Corrected rows use a fresh request UUID. Replays return the
+original result before validating the upload body and never restore an older hero assignment.
+Temporary-source cleanup is best effort; shared content-addressed images are retained.
+The original single-image upload endpoint remains compatible. Card-back changes do not require
+rerendering TTS face sheets; subsequent exports use the current effective back.
+
 ## Cards and versions
 
 A `Card` is the durable identity referenced by decks, groups, aliases, and application URLs. A `CardVersion` contains versioned content such as parsed text, images, template selection, symbols, and metadata relations.

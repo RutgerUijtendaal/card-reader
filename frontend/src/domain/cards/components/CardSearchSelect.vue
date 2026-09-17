@@ -79,6 +79,7 @@ const props = withDefaults(defineProps<{
   pageSize?: number;
   selectionMode?: 'single' | 'multi';
   cardPool?: CardPool;
+  candidates?: CardListItem[];
 }>(), {
   placeholder: 'Search cards...',
   disabled: false,
@@ -87,6 +88,7 @@ const props = withDefaults(defineProps<{
   pageSize: 12,
   selectionMode: 'single',
   cardPool: 'player',
+  candidates: undefined,
 });
 
 const emit = defineEmits<{
@@ -120,6 +122,12 @@ const runSearch = async (): Promise<void> => {
   const searchTerm = query.value.trim();
   if (props.disabled || searchTerm.length === 0) {
     cardSearch.clear();
+    return;
+  }
+  if (props.candidates !== undefined) {
+    results.value = props.candidates.filter((card) =>
+      card.name.toLocaleLowerCase().includes(searchTerm.toLocaleLowerCase()),
+    );
     return;
   }
   await cardSearch.search(searchTerm);

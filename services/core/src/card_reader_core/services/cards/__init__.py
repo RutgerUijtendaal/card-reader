@@ -1,3 +1,4 @@
+from .card_back_imports import get_card_back_import_result, import_card_back
 from .image_conversion import (
     CardImageConversionFailure,
     CardImageConversionResult,
@@ -18,6 +19,8 @@ from .service import (
 )
 
 __all__ = [
+    "get_card_back_import_result",
+    "import_card_back",
     "CardImageConversionFailure",
     "CardImageConversionResult",
     "CardEditState",

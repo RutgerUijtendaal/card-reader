@@ -2,6 +2,8 @@ import { api } from '@/shared/api/client';
 import type { CardPool } from '@/domain/cards/cardPools';
 import type {
   CardBackCurrentResponse,
+  CardBackImportAttempt,
+  CardBackImportResult,
   CardBackDefaults,
   CardBackFactionDefaults,
   CardBackRecord,
@@ -9,6 +11,24 @@ import type {
 } from '@/domain/card-backs/types';
 import type { CardFaction } from '@/domain/cards/cardFactions';
 import type { CardRole } from '@/domain/cards/cardRoles';
+
+export const importCardBack = async (attempt: CardBackImportAttempt): Promise<CardBackImportResult> => {
+  const data = new FormData();
+  data.append('client_request_id', attempt.clientRequestId);
+  data.append('file', attempt.file);
+  data.append('label', attempt.label);
+  if (attempt.heroCardId !== null) {
+    data.append('hero_card_id', attempt.heroCardId);
+    data.append('expected_override_id', attempt.expectedOverrideId ?? '');
+  }
+  const response = await api.post<CardBackImportResult>('/admin/card-backs/import-items', data, { timeout: 60_000 });
+  return response.data;
+};
+
+export const fetchCardBackImportResult = async (requestId: string): Promise<CardBackImportResult> => {
+  const response = await api.get<CardBackImportResult>(`/admin/card-backs/import-items/${requestId}`, { timeout: 15_000 });
+  return response.data;
+};
 
 export const fetchCurrentCardBack = async (): Promise<CardBackCurrentResponse> => {
   const response = await api.get<CardBackCurrentResponse>('/card-backs/current');

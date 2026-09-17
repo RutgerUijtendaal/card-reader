@@ -206,6 +206,12 @@
   <rect class="box version" x="1730" y="1495" width="270" height="90"/>
   <text class="title" x="1865" y="1533">CardBack</text>
   <text class="field" x="1865" y="1562">immutable global asset</text>
+  <rect class="box import" x="1730" y="1640" width="270" height="90"/>
+  <text class="title-tight" x="1865" y="1666">CardBackImportReceipt</text>
+  <text class="small" x="1865" y="1690">owner + request UUID (unique)</text>
+  <text class="small" x="1865" y="1713">historical hero ID • outcome</text>
+  <path class="soft" d="M1940 1640 L1940 1585"/>
+  <text class="label" x="1950" y="1623">asset</text>
 
   <!-- Metadata entities -->
   <rect class="box meta" x="2120" y="610" width="390" height="90"/>
@@ -364,7 +370,7 @@
   <path class="line" d="M1690 1425 L1710 1425 L1710 1515 L1730 1515"/>
   <path class="line" d="M1690 1535 L1730 1535"/>
   <path class="line" d="M1690 1645 L1715 1645 L1715 1560 L1730 1560"/>
-  <path class="soft" d="M1290 960 L1325 960 L1325 1760 L1865 1760 L1865 1585"/>
+  <path class="soft" d="M1290 960 L1325 960 L1325 1760 L2018 1760 L2018 1548 L2000 1548"/>
   <text class="label" x="1450" y="1750">card_back_override</text>
 
   <!-- Version/review relationships -->
