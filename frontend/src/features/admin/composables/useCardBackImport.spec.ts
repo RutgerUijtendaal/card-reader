@@ -145,7 +145,7 @@ describe('card-back import outcomes', () => {
     expect(send).toHaveBeenCalledTimes(2);
     expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ expectedOverrideId: 'back' }));
   });
-  test.each([401, 403])('allows discarding a row rejected before mutation with HTTP %s', async (status) => {
+  test.each([401, 403, 413, 415])('allows discarding a row rejected before mutation with HTTP %s', async (status) => {
     const flow = setup();
     flow.addFiles([file()]);
     send.mockRejectedValueOnce({ isAxiosError: true, response: { status } });
@@ -157,13 +157,13 @@ describe('card-back import outcomes', () => {
     flow.removeRow(row);
     expect(flow.hasUnsaved.value).toBe(false);
   });
-  test('keeps an earlier uncertain request locked when authorization is lost on retry', async () => {
+  test.each([403, 413, 415])('keeps an earlier uncertain request locked after HTTP %s on retry', async (status) => {
     const flow = setup();
     flow.addFiles([file()]);
     await flow.selectHero(flow.rows.value[0]!, 'hero');
     send.mockRejectedValueOnce(new Error('timeout'));
     await flow.submit();
-    send.mockRejectedValueOnce({ isAxiosError: true, response: { status: 403 } });
+    send.mockRejectedValueOnce({ isAxiosError: true, response: { status } });
     await flow.retry(flow.rows.value[0]!);
     expect(flow.unresolved.value).toBe(true);
     expect(flow.usedHeroIds.value).toEqual(['hero']);

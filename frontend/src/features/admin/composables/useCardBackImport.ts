@@ -148,7 +148,12 @@ export const useCardBackImport = () => {
     try {
       result = await importCardBack(attempt);
     } catch (error) {
-      if (!retry && isAxiosError(error) && [401, 403].includes(error.response?.status ?? 0)) {
+      const status = isAxiosError(error) ? error.response?.status : undefined;
+      if (!retry && (status === 413 || status === 415)) {
+        row.state = { kind: 'rejected', message: status === 413
+          ? 'This image exceeds the upload size limit. Remove it and choose a smaller image.'
+          : 'This image format is not supported. Remove it and choose a supported image.' };
+      } else if (!retry && (status === 401 || status === 403)) {
         row.state = { kind: 'rejected', message: 'Staff access is required. Sign in again before retrying.' };
       } else if (!retry && isAxiosError(error) && error.response?.status === 400
         && error.response.data?.outcome === 'invalid') {
