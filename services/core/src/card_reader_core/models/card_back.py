@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
+from django.conf import settings
 from django.db import models
 
 from .base import TimestampedModel, uuid_str
@@ -15,9 +17,36 @@ from .card import (
 )
 
 if TYPE_CHECKING:
+    from django.contrib.auth.base_user import AbstractBaseUser
     from django.db.models.manager import Manager
 
     from .card import Card
+
+
+class CardBackImportReceipt(TimestampedModel):
+    """A used request key survives deletion of its immutable asset."""
+
+    if TYPE_CHECKING:
+        card_back_id: str | None
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    owner: models.ForeignKey[AbstractBaseUser, AbstractBaseUser] = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="card_back_imports"
+    )
+    client_request_id: models.UUIDField[UUID, UUID] = models.UUIDField()
+    card_back: models.ForeignKey[CardBack | None, CardBack | None] = models.ForeignKey(
+        "CardBack", on_delete=models.SET_NULL, null=True, related_name="import_receipts"
+    )
+    # Historical result, deliberately not an FK: a later merge/deletion must not rewrite it.
+    hero_card_id: models.TextField[str | None, str | None] = models.TextField(null=True)
+    error: models.TextField[str, str] = models.TextField(default="")
+
+    class Meta:
+        db_table = "card_back_import_receipt"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("owner", "client_request_id"), name="ux_card_back_import_owner_key"
+            )
+        ]
 
 
 class CardBack(TimestampedModel):

@@ -269,14 +269,18 @@
             />
             Refresh
           </button>
-          <button
+          <RouterLink
             class="btn-primary inline-flex items-center gap-2"
-            type="button"
-            @click="openUploadModal"
+            to="/admin/card-backs/import"
           >
             <Plus class="h-4 w-4" />
-            Add card back
-          </button>
+            Import card backs
+          </RouterLink>
+          <AppSelect
+            v-model="usageFilter"
+            :options="usageOptions"
+            aria-label="Card-back usage"
+          />
         </div>
       </div>
 
@@ -308,15 +312,14 @@
             ? 'Add the first image to start the reusable card-back library.'
             : 'Try a different label.' }}
         </p>
-        <button
+        <RouterLink
           v-if="cardBacks.length === 0"
           class="btn-primary mt-4 inline-flex items-center gap-2"
-          type="button"
-          @click="openUploadModal"
+          to="/admin/card-backs/import"
         >
           <Plus class="h-4 w-4" />
-          Add card back
-        </button>
+          Import card backs
+        </RouterLink>
       </div>
 
       <div
@@ -399,19 +402,14 @@
         </article>
       </div>
     </section>
-
-    <CardBackUploadModal
-      :open="uploadModalOpen"
-      :uploading="uploading"
-      :error-message="uploadErrorMessage"
-      @close="closeUploadModal"
-      @submit="uploadSelectedCardBack"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { RouterLink } from 'vue-router';
+import AppSelect from '@/shared/components/app/AppSelect.vue';
+import { matchesCardBackUsage, type CardBackUsage } from '@/features/admin/utils/cardBackImport';
 import { ArrowRight, ImageOff, Images, Plus, RefreshCw, SlidersHorizontal } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
@@ -424,7 +422,6 @@ import {
   setFactionCardBackDefault,
   setPoolCardBackDefault,
   setRoleCardBackDefault,
-  uploadCardBack,
 } from '@/domain/card-backs/api';
 import type {
   CardBackDefaults,
@@ -440,7 +437,6 @@ import {
 import { CARD_POOL_OPTIONS, type CardPool } from '@/domain/cards/cardPools';
 import { CARD_ROLE_OPTIONS, cardRoleLabel, type CardRole } from '@/domain/cards/cardRoles';
 import CardBackDefaultRow from '@/features/admin/components/CardBackDefaultRow.vue';
-import CardBackUploadModal from '@/features/admin/components/CardBackUploadModal.vue';
 
 const emptyDefaults = (): CardBackDefaults => ({ player: null, evil: null, neutral: null });
 const emptyFactionDefaults = (): CardBackFactionDefaults => ({
@@ -468,14 +464,18 @@ const roleDefaults = ref<CardBackRoleDefaults>(emptyRoleDefaults());
 const activeView = ref<'defaults' | 'library'>('defaults');
 const loading = ref(false);
 const hasLoaded = ref(false);
-const uploading = ref(false);
-const uploadModalOpen = ref(false);
 const settingPool = ref<CardPool | null>(null);
 const settingRole = ref<CardRole | null>(null);
 const settingFaction = ref<CardFaction | null>(null);
 const searchQuery = ref('');
 const errorMessage = ref('');
-const uploadErrorMessage = ref('');
+const usageFilter = ref<CardBackUsage>('all');
+const usageOptions = [
+  { value: 'all', label: 'All uses' },
+  { value: 'overrides', label: 'Card overrides' },
+  { value: 'defaults', label: 'Defaults' },
+  { value: 'unused', label: 'Unused' },
+];
 let loadRequestVersion = 0;
 
 const initialLoading = computed(() => loading.value && !hasLoaded.value);
@@ -496,13 +496,13 @@ const configuredFactionCount = computed(() =>
 );
 const filteredCardBacks = computed(() => {
   const query = searchQuery.value.trim().toLocaleLowerCase();
-  if (!query) return cardBacks.value;
-  return cardBacks.value.filter((asset) => asset.label.toLocaleLowerCase().includes(query));
+  return cardBacks.value.filter((asset) => asset.label.toLocaleLowerCase().includes(query)
+    && matchesCardBackUsage(asset, usageFilter.value));
 });
 const librarySummary = computed(() => {
   const total = cardBacks.value.length;
   const noun = total === 1 ? 'card back' : 'card backs';
-  if (searchQuery.value.trim()) {
+  if (searchQuery.value.trim() || usageFilter.value !== 'all') {
     return `${filteredCardBacks.value.length} of ${total} ${noun}`;
   }
   return `${total} ${noun}`;
@@ -533,35 +533,6 @@ const loadCardBackData = async (): Promise<void> => {
       hasLoaded.value = true;
     }
   }
-};
-
-const openUploadModal = (): void => {
-  uploadErrorMessage.value = '';
-  uploadModalOpen.value = true;
-};
-
-const closeUploadModal = (): void => {
-  if (uploading.value) return;
-  uploadModalOpen.value = false;
-  uploadErrorMessage.value = '';
-};
-
-const uploadSelectedCardBack = async (payload: { file: File; label: string }): Promise<void> => {
-  if (uploading.value) return;
-  uploading.value = true;
-  uploadErrorMessage.value = '';
-  try {
-    await uploadCardBack(payload.file, payload.label);
-  } catch (error) {
-    uploadErrorMessage.value = extractErrorMessage(error, 'Card back could not be uploaded.');
-    toast.error(uploadErrorMessage.value);
-    return;
-  } finally {
-    uploading.value = false;
-  }
-  uploadModalOpen.value = false;
-  toast.success('Card-back asset uploaded.');
-  await loadCardBackData();
 };
 
 const setDefault = async (cardPool: CardPool, cardBackId: string | null): Promise<void> => {

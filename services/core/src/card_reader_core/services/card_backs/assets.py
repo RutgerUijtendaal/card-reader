@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 
@@ -19,6 +21,38 @@ from card_reader_core.storage import (
 )
 
 ALLOWED_CARD_BACK_UPLOAD_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class PreparedCardBack:
+    label: str
+    original_filename: str
+    source_file: str
+    stored_path: str
+    width: int
+    height: int
+    checksum: str
+
+
+def discard_card_back_source(source_file: str) -> None:
+    """Best-effort cleanup; content-addressed images may be shared and are retained."""
+    try:
+        resolve_storage_path(source_file).unlink(missing_ok=True)
+    except OSError:
+        logger.exception("Could not clean up card-back upload")
+
+
+def create_prepared_card_back(prepared: PreparedCardBack) -> CardBack:
+    return create_card_back_record(
+        label=prepared.label,
+        original_filename=prepared.original_filename,
+        source_file=prepared.source_file,
+        stored_path=prepared.stored_path,
+        width=prepared.width,
+        height=prepared.height,
+        checksum=prepared.checksum,
+    )
 
 
 def list_card_back_assets() -> list[CardBack]:
@@ -31,6 +65,20 @@ def upload_card_back_asset(
     chunks: Iterable[bytes],
     label: str | None = None,
 ) -> CardBack:
+    prepared = prepare_card_back_asset(filename=filename, chunks=chunks, label=label)
+    try:
+        return create_prepared_card_back(prepared)
+    except Exception:
+        discard_card_back_source(prepared.source_file)
+        raise
+
+
+def prepare_card_back_asset(
+    *,
+    filename: str,
+    chunks: Iterable[bytes],
+    label: str | None = None,
+) -> PreparedCardBack:
     original_filename = Path(filename).name
     suffix = Path(original_filename).suffix.lower()
     if suffix not in ALLOWED_CARD_BACK_UPLOAD_SUFFIXES:
@@ -43,7 +91,7 @@ def upload_card_back_asset(
     )
     source_path = resolve_storage_path(source_file)
     if source_path.stat().st_size == 0:
-        source_path.unlink(missing_ok=True)
+        discard_card_back_source(source_file)
         raise ValueError("Uploaded file is empty.")
 
     try:
@@ -51,22 +99,18 @@ def upload_card_back_asset(
         checksum = calculate_checksum(source_path)
         stored_path = store_image(source_path, checksum)
     except (OSError, UnidentifiedImageError, ValueError) as exc:
-        source_path.unlink(missing_ok=True)
+        discard_card_back_source(source_file)
         raise ValueError("Uploaded file must be a readable image.") from exc
 
-    try:
-        return create_card_back_record(
-            label=_normalize_label(label, original_filename),
-            original_filename=original_filename,
-            source_file=relativize_storage_path(source_file, default_root="uploads"),
-            stored_path=stored_path,
-            width=width,
-            height=height,
-            checksum=checksum,
-        )
-    except Exception:
-        source_path.unlink(missing_ok=True)
-        raise
+    return PreparedCardBack(
+        label=_normalize_label(label, original_filename),
+        original_filename=original_filename,
+        source_file=relativize_storage_path(source_file, default_root="uploads"),
+        stored_path=stored_path,
+        width=width,
+        height=height,
+        checksum=checksum,
+    )
 
 
 def resolve_card_back_image_asset_path(card_back: CardBack) -> str | None:
@@ -97,9 +141,13 @@ def _save_source_upload(*, original_filename: str, suffix: str, chunks: Iterable
     )
     target_path = resolve_storage_path(relative_path)
     target_path.parent.mkdir(parents=True, exist_ok=True)
-    with target_path.open("wb") as stream:
-        for chunk in chunks:
-            stream.write(chunk)
+    try:
+        with target_path.open("wb") as stream:
+            for chunk in chunks:
+                stream.write(chunk)
+    except Exception:
+        discard_card_back_source(relative_path)
+        raise
     return relative_path
 
 

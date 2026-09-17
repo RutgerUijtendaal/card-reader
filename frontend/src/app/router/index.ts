@@ -18,6 +18,7 @@ import NotificationsPage from '@/features/notifications/NotificationsPage.vue';
 import ReviewQueuePage from '@/features/review-queue/ReviewQueuePage.vue';
 import SettingsPage from '@/features/settings/SettingsPage.vue';
 import AdminPage from '@/features/admin/AdminPage.vue';
+import CardBackImportPage from '@/features/admin/CardBackImportPage.vue';
 import { isCardPool, type CardPool } from '@/domain/cards/cardPools';
 import {
   buildWorkspaceGalleryLocation,
@@ -28,6 +29,7 @@ const APP_TITLE = "Maity's Card Game";
 const buildDocumentTitle = (pageTitle?: string): string => (pageTitle ? `${pageTitle} | ${APP_TITLE}` : APP_TITLE);
 
 export const APP_ROUTES: RouteRecordRaw[] = [
+  { path: '/admin/card-backs/import', component: CardBackImportPage, meta: { requiresStaff: true, title: 'Import card backs', workspaceCapability: 'global' } },
   { path: '/', component: HomePage, meta: { workspaceCapability: 'global', title: 'Home' } },
   { path: '/cards', component: CardGalleryPage, meta: { workspaceCapability: 'gallery', title: 'Gallery' } },
   { path: '/cards/:id', component: CardPublicDetailPage, props: true, meta: { workspaceCapability: 'resource', title: 'Card' } },

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from django.urls import path
 
+from .imports import AdminCardBackImportResultView, AdminCardBackImportView
+
 from .views import (
     AdminCardBackDefaultView,
     AdminCardBackFactionDefaultView,
@@ -15,6 +17,8 @@ from .views import (
 )
 
 urlpatterns = [
+    path("admin/card-backs/import-items", AdminCardBackImportView.as_view()),
+    path("admin/card-backs/import-items/<uuid:client_request_id>", AdminCardBackImportResultView.as_view()),
     path("card-backs/current", CurrentCardBackView.as_view()),
     path("card-backs/defaults", CardBackDefaultsView.as_view()),
     path("card-backs/faction-defaults", CardBackFactionDefaultsView.as_view()),

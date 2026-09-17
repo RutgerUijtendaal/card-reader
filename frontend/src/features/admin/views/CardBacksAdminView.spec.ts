@@ -1,4 +1,5 @@
 import { createApp, nextTick } from 'vue';
+import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import CardBacksAdminView from '@/features/admin/views/CardBacksAdminView.vue';
 import type {
@@ -87,6 +88,10 @@ const mountView = async () => {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const app = createApp(CardBacksAdminView);
+  const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }] });
+  app.use(router);
+  await router.push('/admin');
+  await router.isReady();
   app.mount(container);
   await flushPromises();
   await nextTick();
@@ -171,187 +176,39 @@ describe('CardBacksAdminView', () => {
     mounted.unmount();
   });
 
-  test('uploads an asset without changing a default', async () => {
+  test('opens the dedicated import flow without mutating defaults', async () => {
     mockLoads([]);
-    apiPost.mockResolvedValue({ data: buildCardBack({ label: 'Uploaded Back' }) });
     const mounted = await mountView();
     await openLibrary(mounted.container);
-    const openButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Add card back'),
-    );
-    if (!openButton) throw new Error('expected add card back action');
-    openButton.click();
-    await nextTick();
-    const dialogPanel = document.body.querySelector('[role="dialog"] > div');
-    expect(dialogPanel?.className).toContain('app-scrollbar');
-    expect(dialogPanel?.className).toContain('max-h-[90vh]');
-    expect(dialogPanel?.className).toContain('overflow-y-auto');
-    const labelInput = document.body.querySelector<HTMLInputElement>('input[placeholder="Card back name"]');
-    const fileInput = document.body.querySelector<HTMLInputElement>('input[type="file"]');
-    const submitButton = Array.from(document.body.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Add to library'),
-    );
-    if (!labelInput || !fileInput || !submitButton) throw new Error('expected upload dialog controls');
-    labelInput.value = 'Uploaded Back';
-    labelInput.dispatchEvent(new Event('input', { bubbles: true }));
-    Object.defineProperty(fileInput, 'files', {
-      value: [new File(['image'], 'uploaded.png', { type: 'image/png' })],
-      configurable: true,
-    });
-    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-    await nextTick();
-    expect(document.body.querySelector('img[alt="Selected card back preview"]')?.getAttribute('src'))
-      .toBe('blob:card-back-preview');
-    submitButton.click();
-    await flushPromises();
-    expect(apiPost).toHaveBeenCalledWith('/admin/card-backs/upload', expect.any(FormData));
+    expect(mounted.container.querySelector('a[href="/admin/card-backs/import"]')?.textContent).toContain('Import card backs');
     expect(apiPut).not.toHaveBeenCalled();
-    await vi.waitFor(() => {
-      expect(toastSuccess).toHaveBeenCalledWith('Card-back asset uploaded.');
-    });
     mounted.unmount();
   });
 
-  test('locks every editable upload field to its submitted payload', async () => {
-    mockLoads([]);
-    let resolveUpload: ((value: unknown) => void) | undefined;
-    apiPost.mockImplementation(() => new Promise((resolve) => {
-      resolveUpload = resolve;
-    }));
+  test('combines usage filters with label search', async () => {
+    mockLoads([
+      buildCardBack({ id: 'both', label: 'Hero shared' }),
+      buildCardBack({ id: 'unused', label: 'Hero unused', default_for_pools: [], override_card_count: 0 }),
+      buildCardBack({ id: 'default', label: 'General', override_card_count: 0 }),
+    ]);
     const mounted = await mountView();
     await openLibrary(mounted.container);
-    const openButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Add card back'),
-    );
-    if (!openButton) throw new Error('expected add card back action');
-    openButton.click();
+    const usage = mounted.container.querySelector<HTMLSelectElement>('select[aria-label="Card-back usage"]')!;
+    usage.value = 'unused';
+    usage.dispatchEvent(new Event('change'));
     await nextTick();
-    const labelInput = document.body.querySelector<HTMLInputElement>('input[placeholder="Card back name"]');
-    const fileInput = document.body.querySelector<HTMLInputElement>('input[type="file"]');
-    const submitButton = Array.from(document.body.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Add to library'),
-    );
-    if (!labelInput || !fileInput || !submitButton) throw new Error('expected upload dialog controls');
-    Object.defineProperty(fileInput, 'files', {
-      value: [new File(['image'], 'uploaded.png', { type: 'image/png' })],
-      configurable: true,
-    });
-    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(mounted.container.querySelector('[role="list"]')?.textContent).toContain('Hero unused');
+    expect(mounted.container.querySelector('[role="list"]')?.textContent).not.toContain('Hero shared');
+    usage.value = 'defaults';
+    usage.dispatchEvent(new Event('change'));
+    const search = mounted.container.querySelector<HTMLInputElement>('input[aria-label="Filter card backs"]')!;
+    search.value = 'Hero';
+    search.dispatchEvent(new Event('input'));
     await nextTick();
-    submitButton.click();
-    await nextTick();
-    expect(labelInput.disabled).toBe(true);
-
-    resolveUpload?.({ data: buildCardBack() });
-    await flushPromises();
+    expect(mounted.container.querySelector('[role="list"]')?.textContent).toContain('Hero shared');
+    expect(mounted.container.querySelector('[role="list"]')?.textContent).not.toContain('General');
     mounted.unmount();
   });
-
-  test('releases the upload lock before the library refresh settles', async () => {
-    mockLoads([]);
-    apiPost.mockResolvedValue({ data: buildCardBack() });
-    const mounted = await mountView();
-    await openLibrary(mounted.container);
-    apiGet.mockImplementation(() => new Promise(() => {}));
-    const openButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Add card back'),
-    );
-    if (!openButton) throw new Error('expected add card back action');
-    openButton.click();
-    await nextTick();
-    const fileInput = document.body.querySelector<HTMLInputElement>('input[type="file"]');
-    const submitButton = Array.from(document.body.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Add to library'),
-    );
-    if (!fileInput || !submitButton) throw new Error('expected upload dialog controls');
-    Object.defineProperty(fileInput, 'files', {
-      value: [new File(['image'], 'uploaded.png', { type: 'image/png' })],
-      configurable: true,
-    });
-    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-    await nextTick();
-    submitButton.click();
-    await flushPromises();
-
-    openButton.click();
-    await nextTick();
-    const reopenedLabel = document.body.querySelector<HTMLInputElement>('input[placeholder="Card back name"]');
-    const closeButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="Close add card back dialog"]');
-    expect(reopenedLabel?.disabled).toBe(false);
-    expect(closeButton?.disabled).toBe(false);
-    closeButton?.click();
-    await nextTick();
-    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
-    mounted.unmount();
-  });
-
-  test('ignores an older post-upload refresh that finishes after a newer one', async () => {
-    mockLoads([]);
-    apiPost.mockResolvedValue({ data: buildCardBack() });
-    const mounted = await mountView();
-    await openLibrary(mounted.container);
-    const firstAssets = deferred<{ data: CardBackRecord[] }>();
-    const firstDefaults = deferred<{ data: { player: CardBackRecord; evil: null; neutral: null } }>();
-    const secondAssets = deferred<{ data: CardBackRecord[] }>();
-    const secondDefaults = deferred<{ data: { player: CardBackRecord; evil: null; neutral: null } }>();
-    let assetRequestCount = 0;
-    let defaultsRequestCount = 0;
-    apiGet.mockImplementation((url: string) => {
-      if (url === '/card-backs/defaults') {
-        defaultsRequestCount += 1;
-        return defaultsRequestCount === 1 ? firstDefaults.promise : secondDefaults.promise;
-      }
-      if (url === '/card-backs/faction-defaults') {
-        return Promise.resolve({ data: emptyFactionDefaults() });
-      }
-      if (url === '/card-backs/role-defaults') {
-        return Promise.resolve({ data: emptyRoleDefaults() });
-      }
-      assetRequestCount += 1;
-      return assetRequestCount === 1 ? firstAssets.promise : secondAssets.promise;
-    });
-
-    const submitUpload = async (filename: string): Promise<void> => {
-      const openButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
-        button.textContent?.includes('Add card back'),
-      );
-      if (!openButton) throw new Error('expected add card back action');
-      openButton.click();
-      await nextTick();
-      const fileInput = document.body.querySelector<HTMLInputElement>('input[type="file"]');
-      const submitButton = Array.from(document.body.querySelectorAll('button')).find((button) =>
-        button.textContent?.includes('Add to library'),
-      );
-      if (!fileInput || !submitButton) throw new Error('expected upload dialog controls');
-      Object.defineProperty(fileInput, 'files', {
-        value: [new File(['image'], filename, { type: 'image/png' })],
-        configurable: true,
-      });
-      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-      await nextTick();
-      submitButton.click();
-      await flushPromises();
-    };
-
-    await submitUpload('first.png');
-    await submitUpload('second.png');
-    const newer = buildCardBack({ id: 'newer', label: 'Newer Back' });
-    secondAssets.resolve({ data: [newer] });
-    secondDefaults.resolve({ data: { player: newer, evil: null, neutral: null } });
-    await flushPromises();
-    await nextTick();
-    expect(mounted.container.textContent).toContain('Newer Back');
-
-    const older = buildCardBack({ id: 'older', label: 'Older Back' });
-    firstAssets.resolve({ data: [older] });
-    firstDefaults.resolve({ data: { player: older, evil: null, neutral: null } });
-    await flushPromises();
-    await nextTick();
-    expect(mounted.container.textContent).toContain('Newer Back');
-    expect(mounted.container.textContent).not.toContain('Older Back');
-    mounted.unmount();
-  });
-
   test('sets one pool default with the dedicated mutation', async () => {
     const second = buildCardBack({ id: 'card-back-2', label: 'Second Back', default_for_pools: [] });
     mockLoads([buildCardBack(), second]);

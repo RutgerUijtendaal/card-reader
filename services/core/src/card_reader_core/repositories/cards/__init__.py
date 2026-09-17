@@ -73,10 +73,11 @@ from .types import (
 )
 
 if TYPE_CHECKING:
-    from .edits import promote_card_version, update_latest_card_version
+    from .edits import HeroCardBackExpectation, promote_card_version, update_latest_card_version
     from .writes import save_parsed_card, save_parsed_card_result
 
 _LAZY_MUTATION_EXPORTS = {
+    "HeroCardBackExpectation": ".edits",
     "promote_card_version": ".edits",
     "save_parsed_card": ".writes",
     "save_parsed_card_result": ".writes",
@@ -93,6 +94,7 @@ def __getattr__(name: str) -> Any:
 
 
 __all__ = [
+    "HeroCardBackExpectation",
     "CardListRow",
     "CardListCandidate",
     "CardFilterParams",

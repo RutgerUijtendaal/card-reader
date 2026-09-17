@@ -8,6 +8,9 @@ from card_reader_core.services.card_backs import ResolvedCardBack, resolve_card_
 
 
 def card_back_payload(card_back: CardBack) -> dict[str, object]:
+    override_count = getattr(card_back, "override_card_count", None)
+    if override_count is None:
+        override_count = card_back.card_overrides.count()
     pool_defaults = list(card_back.pool_defaults.all())
     default_pool_keys = {row.card_pool for row in pool_defaults}
     faction_defaults = list(card_back.faction_defaults.all())
@@ -28,7 +31,7 @@ def card_back_payload(card_back: CardBack) -> dict[str, object]:
             faction for faction in CARD_FACTIONS if faction in default_faction_keys
         ],
         "default_for_roles": [role for role in CARD_ROLES if role in default_role_keys],
-        "override_card_count": int(getattr(card_back, "override_card_count", 0)),
+        "override_card_count": int(override_count),
         "is_usable": resolve_card_back_image_asset_path(card_back) is not None,
         "image_url": card_back_image_url(card_back),
         "created_at": card_back.created_at.isoformat(),

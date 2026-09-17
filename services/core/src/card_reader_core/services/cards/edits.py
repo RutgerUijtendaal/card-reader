@@ -7,6 +7,7 @@ from django.db import transaction
 
 from card_reader_core.models import Card, CardVersion
 from card_reader_core.repositories.cards import (
+    HeroCardBackExpectation,
     promote_card_version,
     update_latest_card_version,
 )
@@ -50,6 +51,7 @@ def update_latest_card_version_with_notifications(
     unlock_fields: list[str],
     unlock_metadata_groups: list[str],
     actor_id: str | None = None,
+    hero_card_back_expectation: HeroCardBackExpectation | None = None,
 ) -> tuple[Card, CardVersion] | None:
     resolved_updates = dict(updates)
     if "card_back_override_id" in resolved_updates:
@@ -64,6 +66,7 @@ def update_latest_card_version_with_notifications(
         restore_metadata_groups=restore_metadata_groups,
         unlock_fields=unlock_fields,
         unlock_metadata_groups=unlock_metadata_groups,
+        hero_card_back_expectation=hero_card_back_expectation,
     )
     if updated is not None and "card_pool" in resolved_updates:
         card, _version = updated

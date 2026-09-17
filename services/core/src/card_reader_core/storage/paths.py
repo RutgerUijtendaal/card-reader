@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import shutil
 from pathlib import Path, PurePosixPath
+from uuid import uuid4
 
 from PIL import Image, UnidentifiedImageError
 
@@ -10,6 +12,7 @@ from card_reader_core.config.settings import settings
 
 _KNOWN_STORAGE_ROOTS = ("images", "uploads", "symbols", "debug-crops", "maintenance", "logs")
 WEBP_IMAGE_QUALITY = 90
+logger = logging.getLogger(__name__)
 
 
 def calculate_checksum(file_path: Path) -> str:
@@ -82,7 +85,7 @@ def store_image(source_file: Path, checksum: str) -> str:
     if not target_path.exists():
         target_path.parent.mkdir(parents=True, exist_ok=True)
         if source_file.suffix.lower() == ".webp":
-            shutil.copy2(source_file, target_path)
+            _copy_image_atomically(source_file, target_path)
         else:
             try:
                 convert_image_to_webp(source_file, target_path)
@@ -90,7 +93,7 @@ def store_image(source_file: Path, checksum: str) -> str:
                 relative_path = _build_original_format_image_storage_path(source_file, checksum)
                 target_path = resolve_storage_path(relative_path)
                 if not target_path.exists():
-                    shutil.copy2(source_file, target_path)
+                    _copy_image_atomically(source_file, target_path)
     return relative_path
 
 
@@ -101,15 +104,30 @@ def _build_original_format_image_storage_path(source_file: Path, checksum: str) 
 
 def convert_image_to_webp(source_file: Path, target_path: Path) -> None:
     target_path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = target_path.with_name(f".{target_path.name}.tmp")
+    temp_path = target_path.with_name(f".{target_path.name}.{uuid4().hex}.tmp")
     try:
         with Image.open(source_file) as image:
             output = _prepare_webp_image(image)
             output.save(temp_path, format="WEBP", quality=WEBP_IMAGE_QUALITY, method=6)
         temp_path.replace(target_path)
-    except Exception:
-        temp_path.unlink(missing_ok=True)
-        raise
+    finally:
+        _discard_temporary_image(temp_path)
+
+
+def _copy_image_atomically(source_file: Path, target_path: Path) -> None:
+    temp_path = target_path.with_name(f".{target_path.name}.{uuid4().hex}.tmp")
+    try:
+        shutil.copy2(source_file, temp_path)
+        temp_path.replace(target_path)
+    finally:
+        _discard_temporary_image(temp_path)
+
+
+def _discard_temporary_image(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        logger.exception("Could not clean up temporary image")
 
 
 def _prepare_webp_image(image: Image.Image) -> Image.Image:

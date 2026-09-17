@@ -106,6 +106,7 @@ if TYPE_CHECKING:
     )
     from .card_back import (
         CardBack,
+        CardBackImportReceipt,
         CardBackFactionDefault,
         CardBackPoolDefault,
         CardBackRoleDefault,
@@ -232,6 +233,7 @@ _EXPORTS = {
     "ImportJobItem": ".import_job",
     "Card": ".card",
     "CardBack": ".card_back",
+    "CardBackImportReceipt": ".card_back",
     "CardBackFactionDefault": ".card_back",
     "CardBackPoolDefault": ".card_back",
     "CardBackRoleDefault": ".card_back",
@@ -404,6 +406,7 @@ __all__ = [
     "ImportJobItem",
     "Card",
     "CardBack",
+    "CardBackImportReceipt",
     "CardBackFactionDefault",
     "CardBackPoolDefault",
     "CardBackRoleDefault",

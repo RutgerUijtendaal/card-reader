@@ -1,3 +1,4 @@
+from .import_receipts import claim_import_receipt, finish_import_receipt, get_import_receipt
 from .queries import (
     get_card_back,
     get_cards_for_card_back_resolution,
@@ -17,6 +18,9 @@ from .writes import (
 )
 
 __all__ = [
+    "claim_import_receipt",
+    "finish_import_receipt",
+    "get_import_receipt",
     "create_card_back_record",
     "delete_faction_default",
     "delete_pool_default",

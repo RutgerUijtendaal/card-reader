@@ -6,6 +6,10 @@ website.
 
 ## Contents and exclusions
 
+Card-back import receipts are operational records containing user-scoped request keys and
+historical outcomes. They are excluded from bundles; referenced immutable card-back assets and
+current assignments continue to use the existing bundle format.
+
 The reviewed `dev-data/selection.json` contains stable must-include keys, inclusion policy, and
 coverage requirements. The current policy includes the complete Player card and Player card-group
 catalog at build time; Evil and Neutral cards are excluded as an intentional onboarding product contract. The explicit

@@ -1,11 +1,53 @@
 from __future__ import annotations
 
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+
+import pytest
 
 from PIL import Image
 
 from card_reader_core.config.settings import settings
 from card_reader_core.storage import resolve_storage_path, store_image
+
+
+@pytest.mark.parametrize("suffix", [".png", ".webp"])
+def test_concurrent_identical_uploads_publish_complete_images_atomically(tmp_path: Path, monkeypatch, suffix: str) -> None:
+    from card_reader_core.storage import paths
+
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+    source = tmp_path / f"source{suffix}"
+    Image.new("RGB", (8, 8), color=(30, 40, 50)).save(source)
+    target = resolve_storage_path("images/same.webp")
+    barrier = Barrier(2)
+    destinations: list[Path] = []
+    save = Image.Image.save
+    copy = paths.shutil.copy2
+
+    def completed_temp(destination) -> None:
+        destinations.append(Path(destination))
+        assert not target.exists(), "An incomplete image must not be published"
+        barrier.wait(timeout=10)
+
+    def synchronized_save(image, destination, *args, **kwargs):
+        save(image, destination, *args, **kwargs)
+        completed_temp(destination)
+
+    def synchronized_copy(source_path, destination, *args, **kwargs):
+        result = copy(source_path, destination, *args, **kwargs)
+        completed_temp(destination)
+        return result
+
+    monkeypatch.setattr(Image.Image, "save", synchronized_save)
+    monkeypatch.setattr(paths.shutil, "copy2", synchronized_copy)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(store_image, source, "same") for _ in range(2)]
+        assert [future.result(timeout=15) for future in futures] == ["images/same.webp"] * 2
+    assert len(set(destinations)) == 2
+    assert all(not path.exists() for path in destinations)
+    with Image.open(target) as image:
+        image.verify()
 
 
 def _write_png(path: Path) -> None:

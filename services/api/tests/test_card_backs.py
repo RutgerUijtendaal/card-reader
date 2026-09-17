@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -13,6 +14,7 @@ from card_reader_core.config.settings import settings
 from card_reader_core.models import (
     Card,
     CardBack,
+    CardBackImportReceipt,
     CardBackFactionDefault,
     CardBackPoolDefault,
     CardBackRoleDefault,
@@ -22,6 +24,250 @@ from card_reader_core.models import (
     Template,
 )
 from card_reader_core.storage import resolve_storage_path
+from card_reader_core.services.card_backs import resolve_effective_card_backs
+
+
+def _import_hero(*, pool: str = "player", override: CardBack | None = None) -> Card:
+    card = Card.objects.create(key=str(uuid4()), label="Import Hero", card_pool=pool, card_back_override=override)
+    template = Template.objects.first()
+    version = CardVersion.objects.create(card=card, template=template, image_hash=str(uuid4()), name="Import Hero")
+    card.latest_version = version
+    card.save(update_fields=["latest_version"])
+    CardRoleAssignment.objects.create(card=card, role="hero")
+    return card
+
+
+def _import_row(client: Client, csrf: str, key: str, **fields: object):
+    return client.post(
+        "/admin/card-backs/import-items",
+        data={
+            "client_request_id": key, "label": "Hero back",
+            "file": SimpleUploadedFile("hero.png", _png_bytes(), content_type="image/png"),
+            **fields,
+        },
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+
+def test_import_unassigned_asset_replays_before_body_validation_and_survives_deletion() -> None:
+    client, csrf = _staff_client("import-library")
+    key = str(uuid4())
+    first = _import_row(client, csrf, key)
+    assert first.status_code == 201
+    assert first.json()["outcome"] == "succeeded"
+    assert first.json()["hero_card_id"] is None
+    assert not CardBackPoolDefault.objects.exists()
+    assert not CardBackRoleDefault.objects.exists()
+    assert not CardBackFactionDefault.objects.exists()
+    replay = client.post("/admin/card-backs/import-items", data={"client_request_id": key}, HTTP_X_CSRFTOKEN=csrf)
+    assert replay.status_code == 200
+    assert replay.json() == first.json()
+    assert CardBack.objects.count() == 1
+    CardBack.objects.get().delete()
+    deleted = _import_row(client, csrf, key)
+    assert deleted.json()["outcome"] == "deleted"
+    assert CardBack.objects.count() == 0
+    assert CardBackImportReceipt.objects.count() == 1
+
+
+@pytest.mark.parametrize("pool", ["player", "evil", "neutral"])
+def test_import_assigns_hero_across_pools_without_changing_defaults(pool: str) -> None:
+    client, csrf = _staff_client("import-hero")
+    previous = _create_card_back(label="previous", write_image=True)
+    CardBackPoolDefault.objects.create(card_pool=pool, card_back=previous)
+    hero = _import_hero(pool=pool, override=previous)
+    key = str(uuid4())
+    result = _import_row(client, csrf, key, hero_card_id=hero.id, expected_override_id=previous.id)
+    assert result.json()["outcome"] == "succeeded"
+    hero.refresh_from_db()
+    new_back_id = result.json()["asset"]["id"]
+    assert hero.card_back_override_id == new_back_id
+    assert CardBack.objects.filter(id=previous.id).exists()
+    assert CardBackPoolDefault.objects.get(card_pool=pool).card_back_id == previous.id
+    resolved = resolve_effective_card_backs([hero.id])[hero.id]
+    assert resolved.source == "override"
+    assert resolved.card_back is not None
+    assert resolved.card_back.id == new_back_id
+
+    # A lost-response retry must not undo a later staff edit.
+    hero.card_back_override = previous
+    hero.save(update_fields=["card_back_override"])
+    replay = _import_row(client, csrf, key, hero_card_id=hero.id, expected_override_id=previous.id)
+    hero.refresh_from_db()
+    assert replay.json()["asset"]["id"] == new_back_id
+    assert hero.card_back_override_id == previous.id
+    lookup = client.get(f"/admin/card-backs/import-items/{key}")
+    assert lookup.json() == replay.json()
+    assert CardBack.objects.count() == 2
+
+
+def test_import_null_override_from_multipart_is_supported() -> None:
+    client, csrf = _staff_client("import-empty-override")
+    hero = _import_hero()
+    result = _import_row(client, csrf, str(uuid4()), hero_card_id=hero.id, expected_override_id="")
+    assert result.json()["outcome"] == "succeeded"
+    hero.refresh_from_db()
+    assert hero.card_back_override_id == result.json()["asset"]["id"]
+
+
+@pytest.mark.parametrize("invalid", ["stale", "deprecated", "not_hero", "deleted"])
+def test_import_rejects_changed_hero_atomically_and_records_terminal_rejection(invalid: str) -> None:
+    client, csrf = _staff_client("import-conflict")
+    previous = _create_card_back(label="previous", write_image=True)
+    hero = _import_hero(override=previous)
+    hero_id = hero.id
+    expected = previous.id
+    if invalid == "stale":
+        expected = ""
+    elif invalid == "deprecated":
+        hero.lifecycle_status = "deprecated"
+        hero.save(update_fields=["lifecycle_status"])
+    elif invalid == "not_hero":
+        hero.role_assignments.all().delete()
+    else:
+        hero.delete()
+    key = str(uuid4())
+    response = _import_row(client, csrf, key, hero_card_id=hero_id, expected_override_id=expected)
+    assert response.json()["outcome"] == "rejected"
+    assert CardBack.objects.count() == 1
+    assert not list(resolve_storage_path("uploads/card-backs").glob("*"))
+    # Repairing/changing the hero cannot make the same key execute later.
+    replay = _import_row(client, csrf, key)
+    assert replay.json() == response.json()
+    assert CardBack.objects.count() == 1
+    assert CardBackImportReceipt.objects.get().error
+
+
+@pytest.mark.parametrize("fields", [
+    {"label": " "},
+    {"file": SimpleUploadedFile("broken.png", b"not an image")},
+    {"hero_card_id": "missing", "expected_override_id": ""},
+])
+def test_import_invalid_rows_do_not_create_assets(fields: dict[str, object]) -> None:
+    client, csrf = _staff_client("import-invalid")
+    response = _import_row(client, csrf, str(uuid4()), **fields)
+    assert response.status_code == 400 or response.json()["outcome"] == "rejected"
+    assert not CardBack.objects.exists()
+
+
+def test_import_requires_explicit_expected_override() -> None:
+    client, csrf = _staff_client("import-missing-expectation")
+    hero = _import_hero()
+    response = _import_row(client, csrf, str(uuid4()), hero_card_id=hero.id)
+    assert response.status_code == 400
+    assert not CardBack.objects.exists()
+
+
+def test_import_receipts_are_owner_scoped_and_staff_csrf_protected() -> None:
+    first, csrf = _staff_client("import-first")
+    key = str(uuid4())
+    assert _import_row(first, csrf, key).status_code == 201
+    second, second_csrf = _staff_client("import-second")
+    assert second.get(f"/admin/card-backs/import-items/{key}").status_code == 404
+    assert _import_row(second, "", str(uuid4())).status_code == 403
+    assert _import_row(second, second_csrf, key).status_code == 201
+    assert CardBack.objects.count() == 2
+    anonymous = Client(HTTP_HOST="localhost")
+    assert anonymous.get(f"/admin/card-backs/import-items/{key}").status_code == 403
+    assert _import_row(anonymous, "", str(uuid4())).status_code == 403
+    _create_user("ordinary-importer", "password", is_staff=False)
+    ordinary = Client(HTTP_HOST="localhost")
+    ordinary.force_login(get_user_model().objects.get(username="ordinary-importer"))
+    assert _import_row(ordinary, "", str(uuid4())).status_code == 403
+
+
+def test_import_unexpected_assignment_failure_rolls_back_asset_and_receipt(monkeypatch: pytest.MonkeyPatch) -> None:
+    from card_reader_core.services.cards import card_back_imports
+    client, csrf = _staff_client("import-rollback")
+    hero = _import_hero()
+
+    def fail(**_kwargs: object) -> None:
+        raise RuntimeError("unexpected assignment failure")
+
+    monkeypatch.setattr(card_back_imports, "update_latest_card_version_with_notifications", fail)
+    with pytest.raises(RuntimeError, match="unexpected assignment"):
+        _import_row(client, csrf, str(uuid4()), hero_card_id=hero.id, expected_override_id="")
+    assert not CardBack.objects.exists()
+    assert not CardBackImportReceipt.objects.exists()
+    hero.refresh_from_db()
+    assert hero.card_back_override_id is None
+    assert not list(resolve_storage_path("uploads/card-backs").glob("*"))
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_import_requests_create_one_asset(monkeypatch: pytest.MonkeyPatch) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    from django.db import OperationalError, close_old_connections
+    from card_reader_core.services.cards import card_back_imports
+
+    user = _create_user("import-race", "password", is_staff=True)
+    key = uuid4()
+    barrier = Barrier(2)
+    prepare = card_back_imports.prepare_card_back_asset
+
+    def synchronized_prepare(**kwargs):
+        prepared = prepare(**kwargs)
+        barrier.wait(timeout=10)
+        return prepared
+
+    monkeypatch.setattr(card_back_imports, "prepare_card_back_asset", synchronized_prepare)
+
+    def run():
+        close_old_connections()
+        try:
+            receipt, _created = card_back_imports.import_card_back(
+                owner_id=str(user.pk), client_request_id=key, filename="race.png",
+                chunks=[_png_bytes()], label="Race", hero_card_id=None, expected_override_id=None,
+            )
+            return receipt.card_back_id
+        except OperationalError as exc:
+            # Shared in-memory SQLite can report busy instead of waiting for the writer.
+            if "locked" not in str(exc):
+                raise
+            return None
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(run), executor.submit(run)]
+        results = [future.result(timeout=20) for future in futures]
+    monkeypatch.setattr(card_back_imports, "prepare_card_back_asset", prepare)
+    results = [result if result is not None else run() for result in results]
+    assert results[0] == results[1]
+    assert CardBack.objects.count() == 1
+    assert CardBackImportReceipt.objects.count() == 1
+    assert len(list(resolve_storage_path("uploads/card-backs").glob("*"))) == 1
+
+
+def test_import_cleanup_failure_preserves_terminal_rejection(monkeypatch: pytest.MonkeyPatch) -> None:
+    from card_reader_core.services.card_backs import assets
+    client, csrf = _staff_client("import-cleanup")
+    hero = _import_hero()
+    hero.role_assignments.all().delete()
+    original_unlink = Path.unlink
+
+    def fail_source_unlink(path: Path, *args, **kwargs):
+        if "card-backs" in path.parts:
+            raise OSError("cleanup unavailable")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(assets.Path, "unlink", fail_source_unlink)
+    key = str(uuid4())
+    response = _import_row(client, csrf, key, hero_card_id=hero.id, expected_override_id="")
+    assert response.json()["outcome"] == "rejected"
+    assert client.get(f"/admin/card-backs/import-items/{key}").json() == response.json()
+    assert not CardBack.objects.exists()
+
+
+def test_import_receipts_are_not_developer_data() -> None:
+    from card_reader_core.operations.developer_data.exporter import _build_payload
+    client, csrf = _staff_client("import-private-receipt")
+    _import_row(client, csrf, str(uuid4()))
+    payload = _build_payload(cards=[], groups=[]).model_dump(mode="json")
+    assert "card_back_import_receipts" not in payload
+    assert "import_receipts" not in payload
+    assert "client_request_id" not in str(payload)
 
 
 def _png_bytes(*, width: int = 7, height: int = 11) -> bytes:

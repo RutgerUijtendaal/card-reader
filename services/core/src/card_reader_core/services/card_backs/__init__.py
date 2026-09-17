@@ -1,5 +1,8 @@
 from .assets import (
     ALLOWED_CARD_BACK_UPLOAD_SUFFIXES,
+    create_prepared_card_back,
+    discard_card_back_source,
+    prepare_card_back_asset,
     list_card_back_assets,
     resolve_card_back_image_asset_path,
     upload_card_back_asset,
@@ -23,6 +26,9 @@ from .resolution import (
 )
 
 __all__ = [
+    "create_prepared_card_back",
+    "discard_card_back_source",
+    "prepare_card_back_asset",
     "ALLOWED_CARD_BACK_UPLOAD_SUFFIXES",
     "CardBackResolutionSource",
     "ResolvedCardBack",

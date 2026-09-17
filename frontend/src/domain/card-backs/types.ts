@@ -57,3 +57,15 @@ export type CardBackSelectionFields = {
   card_back_override_id: string | null;
   effective_card_back: ResolvedCardBackPayload;
 };
+
+export type CardBackImportAttempt = Readonly<{
+  clientRequestId: string;
+  file: File;
+  label: string;
+  heroCardId: string | null;
+  expectedOverrideId: string | null;
+}>;
+
+export type CardBackImportResult =
+  | { outcome: 'succeeded'; asset: CardBackRecord; hero_card_id: string | null }
+  | { outcome: 'rejected' | 'deleted'; detail: string };
