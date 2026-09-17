@@ -128,6 +128,47 @@ describe('card-back import preparation', () => {
 });
 
 describe('card-back import outcomes', () => {
+  test('releases completed hero targets for a later batch with fresh replacement review', async () => {
+    const flow = setup();
+    flow.addFiles([file()]);
+    await flow.selectHero(flow.rows.value[0]!, 'hero');
+    await flow.submit();
+    expect(flow.usedHeroIds.value).toEqual([]);
+    flow.addFiles([file('new-back.png')]);
+    fetchCard.mockResolvedValue(hero('hero', 'back'));
+    const row = flow.rows.value[1]!;
+    await flow.selectHero(row, 'hero');
+    expect(flow.rowError(row)).toContain('Confirm replacing');
+    if (row.selection.kind !== 'selected') throw new Error('expected selected hero');
+    row.selection.replacementConfirmed = true;
+    await flow.submit();
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ expectedOverrideId: 'back' }));
+  });
+  test.each([401, 403])('allows discarding a row rejected before mutation with HTTP %s', async (status) => {
+    const flow = setup();
+    flow.addFiles([file()]);
+    send.mockRejectedValueOnce({ isAxiosError: true, response: { status } });
+    await flow.submit();
+    const row = flow.rows.value[0]!;
+    expect(row.state.kind).toBe('rejected');
+    expect(flow.unresolved.value).toBe(false);
+    expect(lookup).not.toHaveBeenCalled();
+    flow.removeRow(row);
+    expect(flow.hasUnsaved.value).toBe(false);
+  });
+  test('keeps an earlier uncertain request locked when authorization is lost on retry', async () => {
+    const flow = setup();
+    flow.addFiles([file()]);
+    await flow.selectHero(flow.rows.value[0]!, 'hero');
+    send.mockRejectedValueOnce(new Error('timeout'));
+    await flow.submit();
+    send.mockRejectedValueOnce({ isAxiosError: true, response: { status: 403 } });
+    await flow.retry(flow.rows.value[0]!);
+    expect(flow.unresolved.value).toBe(true);
+    expect(flow.usedHeroIds.value).toEqual(['hero']);
+    expect(send.mock.calls[1]?.[0]).toBe(send.mock.calls[0]?.[0]);
+  });
   test('captures the entire batch before sending and prevents double submission', async () => {
     const flow = setup();
     flow.addFiles([file(), file('second.png')]);

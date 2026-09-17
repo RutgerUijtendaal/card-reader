@@ -40,7 +40,8 @@ export const useCardBackImport = () => {
     row.state.kind === 'submitting' || row.state.kind === 'uncertain'));
   const hasUnsaved = computed(() => rows.value.some((row) => isEditableRow(row)
     || row.state.kind === 'uncertain' || row.state.kind === 'submitting'));
-  const usedHeroIds = computed(() => rows.value.flatMap((row) =>
+  const usedHeroIds = computed(() => rows.value.filter((row) =>
+    row.state.kind !== 'succeeded' && row.state.kind !== 'deleted').flatMap((row) =>
     row.selection.kind === 'selected' ? [row.selection.hero.id] : []));
 
   const loadHeroes = async (): Promise<void> => {
@@ -147,7 +148,9 @@ export const useCardBackImport = () => {
     try {
       result = await importCardBack(attempt);
     } catch (error) {
-      if (!retry && isAxiosError(error) && error.response?.status === 400
+      if (!retry && isAxiosError(error) && [401, 403].includes(error.response?.status ?? 0)) {
+        row.state = { kind: 'rejected', message: 'Staff access is required. Sign in again before retrying.' };
+      } else if (!retry && isAxiosError(error) && error.response?.status === 400
         && error.response.data?.outcome === 'invalid') {
         row.state = { kind: 'rejected', message: 'The request was invalid. Review its label and hero selection.' };
       } else {
