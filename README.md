@@ -227,6 +227,38 @@ Runtime application secrets stay in the server-managed env file and are not stor
 Staff can monitor parser, developer-data, and TTS worker heartbeats plus recent queue activity from
 the `/operations` page. Import creation and active import cancellation live at `/imports`.
 
+### Health and operational logs
+
+`GET /internal/monitoring` returns the version-1 operational summary used by host
+collectors. Set `CARD_READER_MONITORING_TOKEN` to a dedicated random URL-safe
+credential (32–128 characters); an unset token disables access. Send it as a bearer
+header. This endpoint does not use staff sessions, update user activity or write
+application data. Keep it private at the reverse proxy. Public `/health` and the
+staff operations API retain their existing behaviour.
+
+The summary includes the release revision, observation time, database availability
+and three worker pools with original heartbeat timestamps, activity, instance
+counts and normalized queue counts. Idle workers with empty queues are healthy;
+historical failed jobs are informational. A database failure returns HTTP 200 with
+`database=unavailable` and `workers=null`. Diagnostic reads have a 500 ms lock
+wait and a three-second query execution budget. Work identifiers, usernames,
+paths and job contents are excluded.
+
+Shared Python logging writes one JSON record per stdout line with UTC timestamp,
+level, logger and message, including exception text. Django, the parser and
+management-command workers share this configuration. Gunicorn/runtime output
+remains available on stdout/stderr. The application no longer opens the shared
+`api.log`; retain existing files while draining any older collector.
+
+`docker-compose.yml` uses the per-container
+`CARD_READER_LOG_DRIVER` setting (default `json-file`, production `journald`).
+Changing the driver requires recreating the containers. A host journal collector
+can allowlist the four container names and ship to a remote log store without
+Docker socket access. Stable service labels are `api`, `parser`,
+`developer-data-builder` and `tts-sheet-renderer`, with `project=card-reader`.
+Collectors, dashboards and remote storage are optional consumers: application
+processing has no dependency on their availability.
+
 ## Storage
 
 Default storage locations:

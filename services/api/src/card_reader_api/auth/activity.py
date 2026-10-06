@@ -21,6 +21,8 @@ class UserActivityMiddleware:
         return response
 
     def _touch_authenticated_user(self, request: HttpRequest) -> None:
+        if request.path_info == "/internal/monitoring":
+            return
         user = getattr(request, "user", None)
         if user is None or not getattr(user, "is_authenticated", False):
             return
