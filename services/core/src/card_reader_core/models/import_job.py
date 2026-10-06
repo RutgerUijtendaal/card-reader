@@ -160,6 +160,9 @@ class ImportJobItem(TimestampedModel):
         )
     )
     status: models.TextField[str, str] = models.TextField(default=ImportJobStatus.queued)
+    attempt_count: models.PositiveIntegerField[int, int] = models.PositiveIntegerField(
+        default=0, db_default=0
+    )
     error_message: models.TextField[str | None, str | None] = models.TextField(
         default=None,
         null=True,

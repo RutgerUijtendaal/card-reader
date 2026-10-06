@@ -12,6 +12,7 @@ from .queries import (
 from .status import (
     bump_job_processed,
     count_terminal_items,
+    finalize_import_job,
     mark_job_canceling,
     mark_job_cancelled,
     mark_job_complete,
@@ -51,6 +52,7 @@ __all__ = [
     "fetch_import_item_target_state",
     "fetch_job",
     "fetch_job_by_creation_key",
+    "finalize_import_job",
     "get_next_queued_job",
     "list_import_jobs",
     "mark_job_canceling",
