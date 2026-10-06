@@ -197,6 +197,24 @@ def test_recovery_finalizes_exhausted_last_item_without_more_parsing(job: Import
     assert (first.status, first.attempt_count) == ("completed", 1)
 
 
+def test_another_workers_claim_stays_visible_to_startup_recovery(job: ImportJob) -> None:
+    first, _ = fetch_items_for_job(job.id)
+    ImportJob.objects.filter(id=job.id).update(status="running")
+    ImportJobItem.objects.filter(id=first.id).update(status="running", attempt_count=3)
+    # A second worker skips the already claimed first item and finishes the second.
+    parser = StubParser()
+    ImportProcessorService(parser).process_job(job.id)
+    job.refresh_from_db()
+    assert parser.calls == ["second.png"]
+    assert (job.status, job.processed_items) == ("running", 1)
+    # If the first worker now dies, the item must remain discoverable for recovery.
+    assert requeue_running_import_jobs() == (1, 1)
+    job.refresh_from_db()
+    first.refresh_from_db()
+    assert (job.status, job.processed_items) == ("failed", 2)
+    assert (first.status, first.attempt_count) == ("failed", 3)
+
+
 def test_exit_after_saved_success_does_not_replay_card(
     job: ImportJob, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

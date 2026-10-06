@@ -25,7 +25,9 @@ def finalize_import_job(job: ImportJob) -> None:
             return
         items = fetch_items_for_job(job.id)
         job.processed_items = count_terminal_items(items)
-        if any(item.status in {ImportJobStatus.queued, ImportJobStatus.running} for item in items):
+        if any(item.status == ImportJobStatus.running for item in items):
+            job.status = ImportJobStatus.running
+        elif any(item.status == ImportJobStatus.queued for item in items):
             job.status = ImportJobStatus.queued
         elif any(item.status == ImportJobStatus.failed for item in items):
             job.status = ImportJobStatus.failed
