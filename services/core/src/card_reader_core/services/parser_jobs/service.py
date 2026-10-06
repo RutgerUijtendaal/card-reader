@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 from typing import Callable, TypeVar, cast
 
+from card_reader_core.imports import try_import_job_lock
 from card_reader_core.models import (
     CardFaction,
     CardPool,
@@ -71,6 +72,18 @@ class ImportProcessorService:
         job_id: str,
         *,
         should_stop: Callable[[], bool] | None = None,
+    ) -> None:
+        with try_import_job_lock(job_id) as acquired:
+            if not acquired:
+                logger.info("Import job is owned by another parser. job_id=%s", job_id)
+                return
+            self._process_job_locked(job_id, should_stop=should_stop)
+
+    def _process_job_locked(
+        self,
+        job_id: str,
+        *,
+        should_stop: Callable[[], bool] | None,
     ) -> None:
         job = fetch_job(job_id)
         if job is None:

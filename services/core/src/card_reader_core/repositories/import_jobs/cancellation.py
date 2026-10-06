@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.db import transaction
 
+from card_reader_core.imports import try_import_job_lock
 from card_reader_core.models import ImportJob, ImportJobItem, ImportJobStatus, now_utc
 
 from .queries import fetch_items_for_job
@@ -57,7 +58,9 @@ def requeue_running_import_jobs() -> tuple[int, int]:
 
     for job_id in job_ids:
         # Keep recovery and cancellation from publishing contradictory item/job states.
-        with transaction.atomic():
+        with try_import_job_lock(job_id) as acquired, transaction.atomic():
+            if not acquired:
+                continue
             job = interrupted.select_for_update().filter(id=job_id).first()
             if job is None:
                 continue

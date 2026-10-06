@@ -52,6 +52,14 @@ and final status include persisted failures from earlier worker runs. Retrying a
 exhausted item requires an explicit new import or reparse. Existing items begin counting
 at zero when the attempt-count migration is applied; earlier attempts cannot be reconstructed.
 
+Processing and recovery acquire the same nonblocking OS-backed per-job lock under
+`uploads/.parser-locks` in the shared storage root. Recovery skips jobs owned by a live
+parser, and duplicate workers cannot parse the same batch simultaneously. A process exit
+(including an OOM kill) releases ownership automatically. All parser instances must use
+the same local shared storage filesystem, as they do for the SQLite database and images.
+When upgrading from a version without these locks, stop old parser instances before
+starting the new version. Worker heartbeats remain telemetry rather than ownership leases.
+
 Upload creation is idempotent. The browser retains one creation key and the exact submit payload until the server confirms the job, the browser reconciles it through the creation-key lookup, or the user explicitly abandons the attempt. In-app navigation is blocked while submission or reconciliation is active. An uncertain attempt is locked against edits, protected by route and browser-unload prompts, and can only be retried unchanged, preventing a lost HTTP response from creating duplicate content versions or parser work.
 
 Staged uploads are unclaimed until the core transaction confirms durable ownership. Definitive validation or creation rejection removes only checksum-matching files from that exact fingerprint stage; an exact retry also removes a preserved stage after confirming that rejection and the absence of a durable job. Confirmed success never cleans its source files. If an unexpected infrastructure failure leaves ownership genuinely unknown, the isolated stage is preserved and logged instead of risking deletion of committed work; abandoned uncertain stages currently require operator cleanup. Cleanup errors are reported separately and cannot replace a confirmed success, conflict, or validation response.

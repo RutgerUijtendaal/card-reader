@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from hashlib import sha256
 from pathlib import Path
+import subprocess
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -212,6 +214,68 @@ def test_another_workers_claim_stays_visible_to_startup_recovery(job: ImportJob)
     job.refresh_from_db()
     first.refresh_from_db()
     assert (job.status, job.processed_items) == ("failed", 2)
+    assert (first.status, first.attempt_count) == ("failed", 3)
+
+
+@pytest.mark.parametrize("previous_attempts", [0, 2])
+def test_live_parser_ownership_blocks_recovery_and_duplicate_processing(
+    job: ImportJob, previous_attempts: int,
+) -> None:
+    first, _ = fetch_items_for_job(job.id)
+    ImportJobItem.objects.filter(id=first.id).update(attempt_count=previous_attempts)
+    duplicate = StubParser()
+
+    class OverlappingParser(StubParser):
+        def parse(self, image_path: Path, template_id: str, **kwargs: object) -> SimpleNamespace:
+            assert requeue_running_import_jobs() == (0, 0)
+            ImportProcessorService(duplicate).process_job(job.id)
+            return super().parse(image_path, template_id, **kwargs)
+
+    ImportProcessorService(OverlappingParser()).process_job(job.id)
+    job.refresh_from_db()
+    first.refresh_from_db()
+    assert duplicate.calls == []
+    assert (job.status, job.processed_items) == ("completed", 2)
+    assert first.attempt_count == previous_attempts + 1
+    assert CardVersion.objects.count() == 2
+
+
+def test_killing_lock_owner_allows_recovery_even_with_a_leftover_lock_file(job: ImportJob) -> None:
+    first, _ = fetch_items_for_job(job.id)
+    ImportJob.objects.filter(id=job.id).update(status="running")
+    ImportJobItem.objects.filter(id=first.id).update(status="running", attempt_count=3)
+    code = """
+import os
+import sys
+import time
+from pathlib import Path
+os.environ['DJANGO_SETTINGS_MODULE'] = 'card_reader_core.django_settings'
+import django
+django.setup()
+from card_reader_core.config.settings import settings
+from card_reader_core.imports import try_import_job_lock
+settings.app_data_dir = Path(sys.argv[1])
+with try_import_job_lock(sys.argv[2]) as acquired:
+    print('locked' if acquired else 'busy', flush=True)
+    time.sleep(30)
+"""
+    with subprocess.Popen(
+        [sys.executable, "-c", code, str(settings.storage_root_dir), job.id],
+        stdout=subprocess.PIPE,
+        text=True,
+    ) as worker:
+        try:
+            assert worker.stdout is not None
+            assert worker.stdout.readline().strip() == "locked"
+            assert requeue_running_import_jobs() == (0, 0)
+            first.refresh_from_db()
+            assert (first.status, first.attempt_count) == ("running", 3)
+        finally:
+            if worker.poll() is None:
+                worker.kill()
+            worker.wait(timeout=10)
+    assert requeue_running_import_jobs() == (1, 1)
+    first.refresh_from_db()
     assert (first.status, first.attempt_count) == ("failed", 3)
 
 
