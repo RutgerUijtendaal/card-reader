@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "observed_at": 1791288000,
+  "revision": "fixture",
+  "database": "available",
+  "stale_after_seconds": 60,
+  "workers": [
+    {
+      "key": "parser",
+      "health": "online",
+      "activity": "idle",
+      "active_instances": 1,
+      "last_seen_at": 1791288000,
+      "queue": {
+        "scheduled": 0,
+        "queued": 0,
+        "running": 0,
+        "canceling": 0,
+        "retrying": 0,
+        "completed": 0,
+        "failed": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "key": "developer-data-builder",
+      "health": "online",
+      "activity": "idle",
+      "active_instances": 1,
+      "last_seen_at": 1791288000,
+      "queue": {
+        "scheduled": 0,
+        "queued": 0,
+        "running": 0,
+        "canceling": 0,
+        "retrying": 0,
+        "completed": 0,
+        "failed": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "key": "tts-sheet-renderer",
+      "health": "online",
+      "activity": "idle",
+      "active_instances": 1,
+      "last_seen_at": 1791288000,
+      "queue": {
+        "scheduled": 0,
+        "queued": 0,
+        "running": 0,
+        "canceling": 0,
+        "retrying": 0,
+        "completed": 0,
+        "failed": 0,
+        "cancelled": 0
+      }
+    }
+  ]
+}

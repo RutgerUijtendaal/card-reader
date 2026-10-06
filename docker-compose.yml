@@ -1,5 +1,7 @@
 services:
   api:
+    logging:
+      driver: ${CARD_READER_LOG_DRIVER:-json-file}
     image: ${CARD_READER_API_IMAGE:-card-reader-api:local}
     build:
       context: .
@@ -38,6 +40,8 @@ services:
       start_period: 30s
 
   developer-data-builder:
+    logging:
+      driver: ${CARD_READER_LOG_DRIVER:-json-file}
     image: ${CARD_READER_API_IMAGE:-card-reader-api:local}
     build:
       context: .
@@ -73,6 +77,8 @@ services:
         condition: service_healthy
 
   tts-sheet-renderer:
+    logging:
+      driver: ${CARD_READER_LOG_DRIVER:-json-file}
     image: ${CARD_READER_API_IMAGE:-card-reader-api:local}
     build:
       context: .
@@ -106,6 +112,8 @@ services:
         condition: service_healthy
 
   parser:
+    logging:
+      driver: ${CARD_READER_LOG_DRIVER:-json-file}
     image: ${CARD_READER_PARSER_IMAGE:-card-reader-parser:local}
     platform: ${CARD_READER_PARSER_PLATFORM:-linux/amd64}
     build:

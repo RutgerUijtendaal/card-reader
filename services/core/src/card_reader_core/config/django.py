@@ -6,6 +6,9 @@ from pathlib import Path
 
 from card_reader_core.database.connection import DATABASE_PATH, SQLITE_DATABASE_TIMEOUT_SECONDS
 from card_reader_core.config.settings import settings as core_settings
+from card_reader_core.config.logging import logging_config
+
+LOGGING = logging_config()
 
 
 def _string_list_env(name: str, default: list[str]) -> list[str]:

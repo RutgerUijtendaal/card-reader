@@ -1,37 +1,49 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+import json
 import logging
+from logging.config import dictConfig
+from typing import Any
 
-from .settings import settings
 
-_CONFIGURED = False
+class JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        message = record.getMessage()
+        if record.exc_info:
+            message += "\n" + self.formatException(record.exc_info)
+        if record.stack_info:
+            message += "\n" + self.formatStack(record.stack_info)
+        return json.dumps(
+            {
+                "timestamp": datetime.fromtimestamp(record.created, UTC).isoformat(),
+                "level": record.levelname.lower(),
+                "logger": record.name,
+                "message": message,
+            },
+            ensure_ascii=False,
+        )
+
+
+def logging_config() -> dict[str, Any]:
+    return {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {"json": {"()": JsonFormatter}},
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "stream": "ext://sys.stdout",
+                "formatter": "json",
+            }
+        },
+        "root": {"handlers": ["console"], "level": "INFO"},
+        "loggers": {
+            "django": {"handlers": [], "propagate": True, "level": "INFO"},
+            "django.server": {"handlers": [], "propagate": True, "level": "INFO"},
+        },
+    }
 
 
 def configure_logging() -> None:
-    global _CONFIGURED
-    if _CONFIGURED:
-        return
-
-    logs_dir = settings.storage_root_dir / "logs"
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    log_file = logs_dir / "api.log"
-
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-
-    formatter = logging.Formatter(
-        fmt="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    stream_handler = logging.StreamHandler()
-    stream_handler.setFormatter(formatter)
-
-    file_handler = logging.FileHandler(log_file, encoding="utf-8")
-    file_handler.setFormatter(formatter)
-
-    root_logger.handlers.clear()
-    root_logger.addHandler(stream_handler)
-    root_logger.addHandler(file_handler)
-
-    logging.getLogger(__name__).info("Logging configured. log_file=%s", log_file)
-    _CONFIGURED = True
-
+    dictConfig(logging_config())

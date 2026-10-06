@@ -2,7 +2,7 @@ from pathlib import Path
 import os
 import sys
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # services/core/src/card_reader_core/config/settings.py -> parents[5] is repo root
@@ -24,6 +24,8 @@ class Settings(BaseSettings):
 
     api_host: str = "127.0.0.1"
     api_port: int = 8000
+    monitoring_token: str = ""
+    release_revision: str = Field(default="unknown", pattern=r"^[A-Za-z0-9_.-]{1,64}$")
     cors_origins: list[str] = DEFAULT_CORS_ORIGINS.copy()
     environment: str = os.getenv("CARD_READER_ENV", "development")
     database_path: Path = Path("card_reader.db")
