@@ -12,14 +12,26 @@ import pytest
 from django.db import connection, OperationalError
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
+from pydantic import ValidationError
 
 from card_reader_core.config.logging import JsonFormatter, configure_logging
-from card_reader_core.config.settings import settings
+from card_reader_core.config.settings import Settings, settings
 from card_reader_core.models import ImportJob, Template, WorkerHeartbeat, now_utc
-from card_reader_core.repositories.operations.monitoring import monitoring_reads
+from card_reader_core.repositories.operations import monitoring_reads
 from card_reader_core.services.operations import MonitoringService
 
 TOKEN = "monitoring-test-" + "x" * 32
+
+
+@pytest.mark.parametrize("token", ["x", "a" * 31, "a" * 129, "a" * 31 + "!", "a" * 32 + "\n"])
+def test_invalid_monitoring_configuration_is_rejected(token: str) -> None:
+    with pytest.raises(ValidationError):
+        Settings(monitoring_token=token)
+
+
+@pytest.mark.parametrize("token", ["", "a" * 32, "A0_-" * 32])
+def test_monitoring_configuration_allows_disabled_and_valid_tokens(token: str) -> None:
+    assert Settings(monitoring_token=token).monitoring_token == token
 
 
 @pytest.fixture

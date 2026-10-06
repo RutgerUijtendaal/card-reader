@@ -9,7 +9,7 @@ from django.db import DatabaseError
 from card_reader_core.config.settings import settings
 from card_reader_core.models import now_utc
 from card_reader_core.operations.workers import WORKER_HEARTBEAT_STALE_AFTER
-from card_reader_core.repositories.operations.monitoring import monitoring_reads
+from card_reader_core.repositories.operations import monitoring_reads
 
 from .overview import OperationsOverviewService
 

@@ -24,7 +24,7 @@ class Settings(BaseSettings):
 
     api_host: str = "127.0.0.1"
     api_port: int = 8000
-    monitoring_token: str = ""
+    monitoring_token: str = Field(default="", pattern=r"^(?:[A-Za-z0-9_-]{32,128})?$")
     release_revision: str = Field(default="unknown", pattern=r"^[A-Za-z0-9_.-]{1,64}$")
     cors_origins: list[str] = DEFAULT_CORS_ORIGINS.copy()
     environment: str = os.getenv("CARD_READER_ENV", "development")
