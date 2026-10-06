@@ -41,6 +41,17 @@ Template regions use one of these parser types: `name`, `name_mana_cost`, `type_
 
 An import job is the user-facing batch, while import items are the individual units claimed by workers. Item state is durable, allowing the UI to show queued, processing, completed, failed, or cancelled work even if a process restarts.
 
+Each item has a durable limit of three processing attempts (the initial attempt plus two
+retries after an interruption). Core increments `ImportJobItem.attempt_count` atomically
+when claiming an item, before OCR starts, so an abrupt worker exit cannot reset the budget.
+At parser startup, interrupted items below the limit are requeued; exhausted items fail
+with an explanatory error and the remaining items continue. Ordinary caught parsing
+errors still fail immediately. Completed items are never replayed by startup recovery,
+and graceful shutdown between items does not consume another attempt. Batch progress
+and final status include persisted failures from earlier worker runs. Retrying an
+exhausted item requires an explicit new import or reparse. Existing items begin counting
+at zero when the attempt-count migration is applied; earlier attempts cannot be reconstructed.
+
 Upload creation is idempotent. The browser retains one creation key and the exact submit payload until the server confirms the job, the browser reconciles it through the creation-key lookup, or the user explicitly abandons the attempt. In-app navigation is blocked while submission or reconciliation is active. An uncertain attempt is locked against edits, protected by route and browser-unload prompts, and can only be retried unchanged, preventing a lost HTTP response from creating duplicate content versions or parser work.
 
 Staged uploads are unclaimed until the core transaction confirms durable ownership. Definitive validation or creation rejection removes only checksum-matching files from that exact fingerprint stage; an exact retry also removes a preserved stage after confirming that rejection and the absence of a durable job. Confirmed success never cleans its source files. If an unexpected infrastructure failure leaves ownership genuinely unknown, the isolated stage is preserved and logged instead of risking deletion of committed work; abandoned uncertain stages currently require operator cleanup. Cleanup errors are reported separately and cannot replace a confirmed success, conflict, or validation response.
