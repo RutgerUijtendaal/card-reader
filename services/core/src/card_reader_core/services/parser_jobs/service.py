@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 from typing import Callable, TypeVar, cast
 
+from card_reader_core.imports import try_import_job_lock
 from card_reader_core.models import (
     CardFaction,
     CardPool,
@@ -21,12 +22,10 @@ from card_reader_core.repositories.import_jobs import (
     fetch_import_item_target_state,
     fetch_job,
     fetch_items_for_job,
+    finalize_import_job,
     mark_job_cancelled,
-    mark_job_complete,
-    mark_job_failed,
     mark_job_item_failed,
     mark_job_item_running,
-    mark_job_queued,
     mark_job_running,
 )
 from card_reader_core.repositories.metadata import (
@@ -54,8 +53,6 @@ def _never_stop() -> bool:
 
 @dataclass(frozen=True)
 class _JobRunOutcome:
-    failed_items: int = 0
-    shutdown_requested: bool = False
     cancel_requested: bool = False
     job_missing: bool = False
 
@@ -75,6 +72,18 @@ class ImportProcessorService:
         job_id: str,
         *,
         should_stop: Callable[[], bool] | None = None,
+    ) -> None:
+        with try_import_job_lock(job_id) as acquired:
+            if not acquired:
+                logger.info("Import job is owned by another parser. job_id=%s", job_id)
+                return
+            self._process_job_locked(job_id, should_stop=should_stop)
+
+    def _process_job_locked(
+        self,
+        job_id: str,
+        *,
+        should_stop: Callable[[], bool] | None,
     ) -> None:
         job = fetch_job(job_id)
         if job is None:
@@ -104,45 +113,32 @@ class ImportProcessorService:
         resources: ParserResources,
         stop_requested: Callable[[], bool],
     ) -> _JobRunOutcome:
-        failed_items = 0
         for item in fetch_items_for_job(job.id):
             current_job = fetch_job(job.id)
             if current_job is None:
                 logger.warning("Stopping processing for missing job during run. job_id=%s", job.id)
-                return _JobRunOutcome(failed_items=failed_items, job_missing=True)
+                return _JobRunOutcome(job_missing=True)
             if current_job.status in {ImportJobStatus.canceling, ImportJobStatus.cancelled}:
-                return _JobRunOutcome(
-                    failed_items=failed_items,
-                    cancel_requested=True,
-                )
+                return _JobRunOutcome(cancel_requested=True)
             if stop_requested():
-                return _JobRunOutcome(
-                    failed_items=failed_items,
-                    shutdown_requested=True,
-                )
+                return _JobRunOutcome()
             item.refresh_from_db(fields=["status", "error_message", "updated_at"])
             if item.status != ImportJobStatus.queued:
                 continue
-            mark_job_item_running(item)
-            failed_items += self._process_item_with_failure_tracking(job, item, options, resources)
+            if not mark_job_item_running(item):
+                continue
+            self._process_item_with_failure_tracking(job, item, options, resources)
             bump_job_processed(job)
             current_job = fetch_job(job.id)
             if current_job is not None and current_job.status == ImportJobStatus.canceling:
-                return _JobRunOutcome(
-                    failed_items=failed_items,
-                    cancel_requested=True,
-                )
-        return _JobRunOutcome(failed_items=failed_items)
+                return _JobRunOutcome(cancel_requested=True)
+        return _JobRunOutcome()
 
     def _finalize_job(self, job: ImportJob, *, outcome: _JobRunOutcome) -> None:
         if outcome.cancel_requested:
             mark_job_cancelled(job)
-        elif outcome.failed_items > 0:
-            mark_job_failed(job)
-        elif outcome.shutdown_requested:
-            mark_job_queued(job)
         else:
-            mark_job_complete(job)
+            finalize_import_job(job)
 
     def _process_item_with_failure_tracking(
         self,
@@ -150,11 +146,10 @@ class ImportProcessorService:
         item: ImportJobItem,
         options: JobOptions,
         resources: ParserResources,
-    ) -> int:
+    ) -> None:
         try:
             result = self._process_queued_item(job, item, options, resources)
             self._log_item_processed(job, item, result)
-            return 0
         except Exception as exc:
             item.refresh_from_db(fields=["status", "error_message", "updated_at"])
             if item.status == ImportJobStatus.completed:
@@ -164,7 +159,7 @@ class ImportProcessorService:
                     job.id,
                     item.id,
                 )
-                return 0
+                return
             mark_job_item_failed(item, str(exc))
             logger.exception(
                 "Failed to parse import item. job_id=%s item_id=%s source_file=%s",
@@ -172,7 +167,6 @@ class ImportProcessorService:
                 item.id,
                 item.source_file,
             )
-            return 1
 
     def _process_queued_item(
         self,

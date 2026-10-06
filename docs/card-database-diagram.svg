@@ -66,7 +66,7 @@
   <rect class="box import" x="880" y="230" width="270" height="90"/>
   <text class="title" x="1015" y="263">ImportJobItem</text>
   <text class="field" x="1015" y="290">target • classification result</text>
-  <text class="small" x="1015" y="311">warnings • audit</text>
+  <text class="small" x="1015" y="311">attempt_count • warnings • audit</text>
   <rect class="box version" x="1270" y="230" width="240" height="90"/>
   <text class="title" x="1390" y="268">Template</text>
   <text class="field" x="1390" y="296">parser definition</text>
