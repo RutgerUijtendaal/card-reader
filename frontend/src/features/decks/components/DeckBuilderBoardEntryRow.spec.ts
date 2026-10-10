@@ -67,7 +67,7 @@ const buildMoveDestinations = (): DeckBoardMoveDestination[] => [
   {
     boardId: 'sideboard-2',
     label: 'Flex Board',
-    description: 'Sideboard copy limit is 100.',
+    description: 'Sideboard copy limit is 200.',
     disabled: true,
   },
 ];

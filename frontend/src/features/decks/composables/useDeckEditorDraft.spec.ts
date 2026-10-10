@@ -342,9 +342,9 @@ describe('useDeckEditorDraft', () => {
 
     controller.addSideboard();
     const sideboardId = controller.activeBoardId.value;
-    controller.activeSideboard.value?.entries.push({ card_id: 'cardA', quantity: 100 });
+    controller.activeSideboard.value?.entries.push({ card_id: 'cardA', quantity: 200 });
     controller.handleBoardRowAction('cardA', sideboardId);
-    expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 100 }]);
+    expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 200 }]);
   });
 
   test('legendary cards warn without blocking actions by default', () => {
@@ -556,7 +556,7 @@ describe('useDeckEditorDraft', () => {
       ...buildCard('capRaiser', 'Cap Raiser', 2),
       deck_building_config: {
         overrides: {
-          mainboard_card_count: { max: 101 },
+          mainboard_card_count: { max: 201 },
         },
       },
     };
@@ -572,7 +572,7 @@ describe('useDeckEditorDraft', () => {
     });
 
     controller.form.hero_card_id = 'hero';
-    controller.form.entries = [{ card_id: 'filler', quantity: 100 }];
+    controller.form.entries = [{ card_id: 'filler', quantity: 200 }];
 
     expect(controller.galleryActionDisabled({ ...capRaiser, result_type: 'card' })).toBe(false);
     controller.handleGalleryAction({ ...capRaiser, result_type: 'card' });
@@ -633,7 +633,7 @@ describe('useDeckEditorDraft', () => {
     });
 
     controller.form.hero_card_id = 'hero';
-    controller.form.entries = [{ card_id: 'filler', quantity: 100 }];
+    controller.form.entries = [{ card_id: 'filler', quantity: 200 }];
 
     expect(controller.galleryActionDisabled({ ...cardLookup.value.cardA, result_type: 'card' })).toBe(false);
     controller.handleGalleryAction({ ...cardLookup.value.cardA, result_type: 'card' });
@@ -874,7 +874,7 @@ describe('useDeckEditorDraft', () => {
     controller.form.entries = [{ card_id: 'legendary', quantity: 1 }];
     controller.addSideboard();
 
-    expect(controller.getCardQuantityLimit('legendary')).toBe(100);
+    expect(controller.getCardQuantityLimit('legendary')).toBe(200);
     expect(controller.galleryActionDisabled({ ...legendary, result_type: 'card' })).toBe(false);
   });
 
@@ -1043,11 +1043,11 @@ describe('useDeckEditorDraft', () => {
     controller.form.entries = [{ card_id: 'cardA', quantity: 2 }];
     controller.addSideboard();
     const destinationBoardId = controller.activeBoardId.value;
-    controller.activeSideboard.value?.entries.push({ card_id: 'cardA', quantity: 100 });
+    controller.activeSideboard.value?.entries.push({ card_id: 'cardA', quantity: 200 });
 
     expect(controller.moveEntryToBoard('cardA', destinationBoardId, 'mainboard')).toBe(false);
     expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 2 }]);
-    expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 100 }]);
+    expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 200 }]);
   });
 
   test('blocks moving legendary cards into a board when another copy remains elsewhere', () => {

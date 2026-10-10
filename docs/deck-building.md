@@ -32,6 +32,8 @@ Conditional storage revisions and an owner-scoped browser lock make each compare
 
 The backend exposes the current constraint definitions through `GET /decks/rules`. The frontend uses that response for limits, descriptions, examples, and action behavior, retaining local defaults only as load-error resilience.
 
+By default, the mainboard allows up to 200 cards, and each sideboard entry allows up to 200 copies. These limits leave room to collect candidates before cutting down a deck. The default mainboard copy limit remains four per card; card-specific overrides can change the effective rules.
+
 Supported rules currently include:
 
 - `mainboard_copy_limit`

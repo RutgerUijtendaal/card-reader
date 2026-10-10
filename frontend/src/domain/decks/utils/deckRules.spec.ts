@@ -21,6 +21,8 @@ describe('deckRules', () => {
       supportedRuleIds.slice().sort(),
     );
     expect(fallbackRules.mainboard_copy_limit.max).toBe(4);
+    expect(fallbackRules.mainboard_card_count.max).toBe(200);
+    expect(fallbackRules.sideboard_entry_quantity.max).toBe(200);
     expect(fallbackRules.mana_type_count.min).toBe(3);
     expect(fallbackRules.legendary_copy_limit.severity).toBe('soft');
     expect(fallbackRules.legendary_copy_limit.scope).toBe('mainboard');

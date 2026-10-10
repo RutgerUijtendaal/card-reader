@@ -247,6 +247,8 @@ def test_deck_rules_metadata_endpoint_returns_backend_owned_defaults() -> None:
         "sideboard_entry_quantity",
     }
     assert payload["default_rules"]["mainboard_copy_limit"]["max"] == 4
+    assert payload["default_rules"]["mainboard_card_count"]["max"] == 200
+    assert payload["default_rules"]["sideboard_entry_quantity"]["max"] == 200
     assert payload["default_rules"]["mainboard_copy_limit"]["severity"] == "hard"
     assert payload["default_rules"]["mana_type_count"]["min"] == 3
     assert payload["default_rules"]["legendary_copy_limit"]["severity"] == "soft"
@@ -2325,7 +2327,7 @@ def test_sideboards_reject_hero_cards() -> None:
     assert response.json()["detail"] == "Hero cards cannot appear in sideboards."
 
 
-def test_sideboards_reject_quantities_above_100() -> None:
+def test_sideboards_reject_quantities_above_200() -> None:
     username = "deck-sideboard-quantity-user"
     password = "password"
     _create_user(username, password)
@@ -2346,7 +2348,7 @@ def test_sideboards_reject_quantities_above_100() -> None:
             "sideboards": [
                 {
                     "name": "Overflow",
-                    "entries": [{"card_id": sideboard_card.id, "quantity": 101}],
+                    "entries": [{"card_id": sideboard_card.id, "quantity": 201}],
                 }
             ],
         },
@@ -2470,7 +2472,7 @@ def test_deck_create_allows_one_legendary_copy_and_large_non_legendary_sideboard
             "sideboards": [
                 {
                     "name": "Overflow",
-                    "entries": [{"card_id": sideboard_card.id, "quantity": 100}],
+                    "entries": [{"card_id": sideboard_card.id, "quantity": 200}],
                 }
             ],
         },
