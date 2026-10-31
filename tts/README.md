@@ -1,6 +1,6 @@
 # Tabletop Simulator importer
 
-Card Reader uses one website-to-TTS import flow for decks, sideboards, gallery selections, and content versions.
+Card Reader uses one website-to-TTS import flow for decks, sideboards, Encounters, gallery selections, and content versions.
 Every export is a Base64-encoded `card-reader.tts-cards.v3` payload that references persistent Card Reader sheet
 atlases. The scripted importer creates a native TTS custom deck directly from those sheets; it does not require a
 preloaded card library or scripting regions.
@@ -18,7 +18,7 @@ Global: its `onLoad()` callback uses `self.createInput` and `self.createButton`.
 
 ## Import an export
 
-1. Use a TTS export action on a deck, sideboard, gallery, or content version in Card Reader.
+1. Use a TTS export action on a deck, sideboard, Encounter, gallery, or content version in Card Reader.
 2. Paste the copied Base64 string into the importer object's text input.
 3. Press **Import**.
 
@@ -27,6 +27,10 @@ at `CONFIG.spawn_position`. Version 2 is normalized internally to its collection
 Legacy `card-reader.tts-deck.v1` and `card-reader.tts-cards.v1` strings are rejected with an instruction to re-export them.
 
 ## Payload contract
+
+Encounter exports use the same v3 format and single-pile construction. Their source type is `encounter`, with `encounter_id`, `boss_card_id`, nullable `boss_group_id`, and canonical `factions`. Boss selection cards appear once in current group order with role `boss`, followed by saved entries with role `mainboard` and their original quantities. Deliberate extra copies remain in the mainboard. The importer preserves the Encounter's collection description just as it does for Player decks.
+
+Public Encounter exports require public visibility and current validity. Staff can test unfinished Encounters, but incompatible groups, deprecated/non-Evil references, and unavailable boss artwork or card backs block export. Unavailable ordinary artwork uses the standard skipped-card report. See [Encounters](../docs/encounters.md).
 
 All website exports share this shape:
 

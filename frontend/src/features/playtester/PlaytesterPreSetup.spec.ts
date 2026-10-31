@@ -54,7 +54,7 @@ vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
   }),
 }));
 
-vi.mock('@/domain/decks/components/DeckLoadingSkeleton.vue', () => ({
+vi.mock('@/shared/components/CollectionLoadingSkeleton.vue', () => ({
   default: defineComponent({
     props: {
       density: { type: String, default: 'default' },

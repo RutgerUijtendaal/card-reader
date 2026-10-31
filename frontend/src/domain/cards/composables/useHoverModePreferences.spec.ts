@@ -167,6 +167,7 @@ describe('useHoverModePreferences', () => {
   test('resolves route paths to hover mode surfaces', () => {
     expect(resolveHoverModeSurfacePath('/cards')).toBe('gallery');
     expect(resolveHoverModeSurfacePath('/decks/deck-1')).toBe('deckDetail');
+    expect(resolveHoverModeSurfacePath('/encounters/encounter-1')).toBe('deckDetail');
     expect(resolveHoverModeSurfacePath('/my/decks/deck-1')).toBe('deckDetail');
     expect(resolveHoverModeSurfacePath('/my/decks/new')).toBe('deckBuilder');
     expect(resolveHoverModeSurfacePath('/my/decks/deck-1/edit')).toBe('deckBuilder');

@@ -44,7 +44,7 @@ vi.mock('@/features/decks/components/DeckManaCurve.vue', () => ({
   }),
 }));
 
-vi.mock('@/features/decks/components/DeckBuilderBoardEntryRow.vue', () => ({
+vi.mock('@/domain/cards/components/CardBuilderEntryRow.vue', () => ({
   default: defineComponent({
     props: {
       entry: { type: Object, required: true },

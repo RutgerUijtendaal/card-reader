@@ -60,7 +60,7 @@ import { computed } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import type { CardDeckReferenceSummary } from '@/domain/card-deck-references/types';
 import { buildCardReturnContextLocation } from '@/domain/card-navigation/cardReturnState';
-import DeckLoadingSkeleton from '@/domain/decks/components/DeckLoadingSkeleton.vue';
+import DeckLoadingSkeleton from '@/shared/components/CollectionLoadingSkeleton.vue';
 import DeckListCard from '@/domain/decks/components/DeckListCard.vue';
 
 const props = defineProps<{

@@ -46,7 +46,7 @@ export const resolveHoverModeSurfacePath = (path: string): HoverModeSurface | nu
   if (path === '/my/decks/new' || /^\/my\/decks\/[^/]+\/edit$/.test(path)) {
     return 'deckBuilder';
   }
-  if (/^\/decks\/[^/]+$/.test(path) || /^\/my\/decks\/[^/]+$/.test(path)) {
+  if (/^\/decks\/[^/]+$/.test(path) || /^\/my\/decks\/[^/]+$/.test(path) || /^\/encounters\/[^/]+$/.test(path)) {
     return 'deckDetail';
   }
   return null;

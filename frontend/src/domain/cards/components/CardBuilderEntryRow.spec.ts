@@ -1,9 +1,8 @@
 /* eslint-disable vue/one-component-per-file */
 import { createApp, defineComponent, h, nextTick, ref } from 'vue';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import type { DeckBoardMoveDestination } from '@/features/decks/composables/deckEditorDraftTypes';
-import type { DeckEntrySummary } from '@/domain/decks/types';
-import DeckBuilderBoardEntryRow from '@/features/decks/components/DeckBuilderBoardEntryRow.vue';
+import type { CardBuilderEntry as DeckEntrySummary, CardBuilderMoveDestination as DeckBoardMoveDestination } from '@/domain/cards/types/cardBuilder';
+import DeckBuilderBoardEntryRow from '@/domain/cards/components/CardBuilderEntryRow.vue';
 
 vi.mock('@/domain/cards/components/CardHoverTooltip.vue', () => ({
   default: defineComponent({

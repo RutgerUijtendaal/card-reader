@@ -311,7 +311,7 @@ import {
   updateDeck,
 } from '@/domain/decks/api';
 import DeckBrowseFiltersPanel from '@/features/decks/components/DeckBrowseFiltersPanel.vue';
-import DeckLoadingSkeleton from '@/domain/decks/components/DeckLoadingSkeleton.vue';
+import DeckLoadingSkeleton from '@/shared/components/CollectionLoadingSkeleton.vue';
 import DeckListCard from '@/domain/decks/components/DeckListCard.vue';
 import DeckTagManagementModal from '@/domain/decks/components/DeckTagManagementModal.vue';
 import { useDeckBrowseFilters } from '@/features/decks/composables/useDeckBrowseFilters';

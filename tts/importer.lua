@@ -322,7 +322,7 @@ function buildSheetDeckData(collection, deck_ids, custom_deck, contained)
 end
 
 function collectionIsDeck(collection)
-    return type(collection.source) == "table" and collection.source.type == "deck"
+    return type(collection.source) == "table" and (collection.source.type == "deck" or collection.source.type == "encounter")
 end
 
 function collectionDescription(collection)

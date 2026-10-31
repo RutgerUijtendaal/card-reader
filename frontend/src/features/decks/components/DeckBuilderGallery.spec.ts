@@ -36,7 +36,7 @@ vi.mock('@/domain/cards/components/CardGalleryItem.vue', () => ({
   }),
 }));
 
-vi.mock('@/features/decks/components/DeckCardCountBadge.vue', () => ({
+vi.mock('@/domain/cards/components/CardCountBadge.vue', () => ({
   default: defineComponent({
     props: {
       quantity: { type: Number, required: true },

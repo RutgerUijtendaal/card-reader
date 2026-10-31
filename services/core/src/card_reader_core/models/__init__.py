@@ -15,6 +15,7 @@ _REGISTERED_MODEL_MODULES = (
     import_module(".classification_review", __name__),
     import_module(".parse_flag", __name__),
     import_module(".deck", __name__),
+    import_module(".encounter", __name__),
     import_module(".deck_tag", __name__),
     import_module(".developer_data", __name__),
     import_module(".notification", __name__),
@@ -139,6 +140,7 @@ if TYPE_CHECKING:
         DeckSideboardEntry,
         DeckVisibility,
     )
+    from .encounter import Encounter, EncounterEntry, EncounterCreation
     from .deck_tag import (
         DECK_TAG_KINDS,
         DECK_TAG_SUGGESTION_STATUSES,
@@ -220,6 +222,9 @@ if TYPE_CHECKING:
     from .worker_heartbeat import WorkerActivity, WorkerHeartbeat
 
 _EXPORTS = {
+    "Encounter": ".encounter",
+    "EncounterEntry": ".encounter",
+    "EncounterCreation": ".encounter",
     "now_utc": ".base",
     "ImportJobStatus": ".import_job",
     "ImportClassificationMode": ".import_job",
@@ -393,6 +398,7 @@ _EXPORTS = {
 }
 
 __all__ = [
+    "Encounter", "EncounterEntry", "EncounterCreation",
     "now_utc",
     "ImportJobStatus",
     "ImportClassificationMode",

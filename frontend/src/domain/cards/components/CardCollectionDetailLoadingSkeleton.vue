@@ -1,12 +1,12 @@
 <template>
   <section
     class="flex flex-col gap-5"
-    aria-label="Loading deck detail"
+    :aria-label="`Loading ${resourceLabel.toLowerCase()} detail`"
     aria-busy="true"
   >
     <AppPageHeader
-      :icon="BookOpenText"
-      title="Deck name"
+      :icon="icon || BookOpenText"
+      :title="`${resourceLabel} name`"
       :back-to="backTo"
       :back-label="backLabel"
       title-tag="h2"
@@ -39,7 +39,9 @@
           <div class="space-y-4">
             <span class="deck-detail-loading-line h-5 w-20" />
             <div class="space-y-3">
-              <div class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-2xl">
+              <div
+                class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-2xl"
+              >
                 <CardLoadingSkeleton />
               </div>
               <span class="deck-detail-loading-line h-6 w-52 max-w-full" />
@@ -55,7 +57,10 @@
             </div>
           </div>
 
-          <div class="!mt-auto space-y-3">
+          <div
+            v-if="showStatistics"
+            class="!mt-auto space-y-3"
+          >
             <span class="deck-detail-loading-line h-4 w-28" />
             <div class="theme-muted-panel space-y-2 p-3">
               <div
@@ -144,20 +149,26 @@
 
 <script setup lang="ts">
 import { BookOpenText } from 'lucide-vue-next';
-import type { StyleValue } from 'vue';
+import type { StyleValue, Component } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppStickyAside from '@/shared/components/app/AppStickyAside.vue';
 import CardLoadingSkeleton from '@/domain/cards/components/CardLoadingSkeleton.vue';
 
-defineProps<{
-  backTo: RouteLocationRaw;
-  backLabel: string;
-  gridStyle: StyleValue;
-  cardStyle: StyleValue;
-  groupByType: boolean;
-}>();
+withDefaults(
+  defineProps<{
+    resourceLabel?: string;
+    icon?: Component;
+    showStatistics?: boolean;
+    backTo: RouteLocationRaw;
+    backLabel: string;
+    gridStyle: StyleValue;
+    cardStyle: StyleValue;
+    groupByType: boolean;
+  }>(),
+  { resourceLabel: 'Deck', icon: undefined, showStatistics: true },
+);
 
 const curveWidthClass = (index: number): string => {
   const widths = ['w-1/2', 'w-3/4', 'w-2/3', 'w-1/3', 'w-5/6'];

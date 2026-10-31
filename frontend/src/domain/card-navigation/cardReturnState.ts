@@ -91,6 +91,15 @@ const buildReviewReturnLocation = (query: LocationQuery): RouteLocationRaw => ({
 });
 
 export const buildCardReturnLocation = (query: LocationQuery): RouteLocationRaw => {
+  if (queryString(query.return_to) === 'encounter' && queryString(query.encounter_id)) {
+    return {
+      path: `/encounters/${queryString(query.encounter_id)}`,
+      query:
+        queryString(query.encounter_library) === 'staff'
+          ? { return_to: 'staff_encounters' }
+          : { return_to: 'encounters' },
+    };
+  }
   if (isNotificationsReturnQuery(query)) {
     return buildNotificationsReturnLocation();
   }
@@ -111,7 +120,10 @@ export const buildCardReturnLocation = (query: LocationQuery): RouteLocationRaw 
 
 export const getCardReturnLabel = (
   query: LocationQuery,
-): 'Gallery' | 'Admin' | 'Deck' | 'Card' | 'Review' | 'Notifications' => {
+): 'Gallery' | 'Admin' | 'Deck' | 'Encounter' | 'Card' | 'Review' | 'Notifications' => {
+  if (queryString(query.return_to) === 'encounter' && queryString(query.encounter_id)) {
+    return 'Encounter';
+  }
   if (isNotificationsReturnQuery(query)) {
     return 'Notifications';
   }

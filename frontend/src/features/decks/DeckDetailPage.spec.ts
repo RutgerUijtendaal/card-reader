@@ -147,7 +147,7 @@ vi.mock('@/features/decks/components/DeckManaDistribution.vue', () => ({
   }),
 }));
 
-vi.mock('@/features/decks/components/DeckCardCountBadge.vue', () => ({
+vi.mock('@/domain/cards/components/CardCountBadge.vue', () => ({
   default: defineComponent({
     props: {
       quantity: { type: Number, required: true },
@@ -294,7 +294,7 @@ const mountPage = async (path = '/decks/deck-1') => {
 };
 
 const readTypeGroupKeys = (container: HTMLElement): string[] =>
-  Array.from(container.querySelectorAll('[data-testid="deck-type-group"]')).map(
+  Array.from(container.querySelectorAll('[data-testid="card-type-group"]')).map(
     (element) => element.getAttribute('data-type-group-key') ?? '',
   );
 
@@ -524,7 +524,7 @@ describe('DeckDetailPage type grouping', () => {
     const longDescription = mounted.container.querySelector<HTMLElement>('[data-testid="deck-long-description"]');
     expect(summarySection.getAttribute('aria-expanded')).toBe('true');
     expect(manaSection.getAttribute('aria-expanded')).toBe('false');
-    expect(mounted.container.querySelector('.deck-detail-layout-expanded')).not.toBeNull();
+    expect(mounted.container.querySelector('.collection-detail-layout-expanded')).not.toBeNull();
     expect(longDescription?.textContent).toContain('About this deck');
     expect(longDescription?.textContent).toContain('Opening plan');
     expect(longDescription?.textContent).toContain('Sideboard notes');
@@ -564,7 +564,7 @@ describe('DeckDetailPage type grouping', () => {
     await nextTick();
 
     expect(manaSection.getAttribute('aria-expanded')).toBe('false');
-    expect(mounted.container.querySelector('.deck-detail-layout-expanded')).toBeNull();
+    expect(mounted.container.querySelector('.collection-detail-layout-expanded')).toBeNull();
     mounted.unmount();
   });
 
@@ -575,7 +575,7 @@ describe('DeckDetailPage type grouping', () => {
 
     expect(summarySection?.getAttribute('aria-expanded')).toBe('false');
     expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).toBeNull();
-    expect(mounted.container.querySelector('.deck-detail-layout-expanded')).toBeNull();
+    expect(mounted.container.querySelector('.collection-detail-layout-expanded')).toBeNull();
 
     summarySection?.click();
     await nextTick();
@@ -595,14 +595,14 @@ describe('DeckDetailPage type grouping', () => {
 
     expect(mounted.container.querySelector('[data-testid="deck-summary-details-button"]')).toBeNull();
     expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).toBeNull();
-    expect(mounted.container.querySelector('.deck-detail-distribution-aside')).toBeNull();
+    expect(mounted.container.querySelector('.collection-detail-distribution-aside')).toBeNull();
 
     manaDetailsButton?.click();
     await nextTick();
 
     expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).toBeNull();
     expect(mounted.container.querySelector('[data-testid="mana-distribution"]')).not.toBeNull();
-    expect(mounted.container.querySelector('.deck-detail-distribution-aside')).not.toBeNull();
+    expect(mounted.container.querySelector('.collection-detail-distribution-aside')).not.toBeNull();
     expect(mounted.container.querySelector('[data-testid="deck-detail-close-button"]')).not.toBeNull();
 
     mounted.unmount();

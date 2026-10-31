@@ -1,3 +1,6 @@
+import EncounterIndexPage from '@/features/encounters/EncounterIndexPage.vue';
+import EncounterDetailPage from '@/features/encounters/EncounterDetailPage.vue';
+import EncounterEditorPage from '@/features/encounters/EncounterEditorPage.vue';
 import { createRouter, createWebHistory } from 'vue-router';
 import type { RouteRecordRaw, RouterHistory } from 'vue-router';
 import { useAuthStore } from '@/domain/session/store';
@@ -34,6 +37,11 @@ export const APP_ROUTES: RouteRecordRaw[] = [
   { path: '/cards', component: CardGalleryPage, meta: { workspaceCapability: 'gallery', title: 'Gallery' } },
   { path: '/cards/:id', component: CardPublicDetailPage, props: true, meta: { workspaceCapability: 'resource', title: 'Card' } },
   { path: '/card-groups/:id', component: CardGroupDetailPage, props: true, meta: { workspaceCapability: 'resource', title: 'Card Group' } },
+  { path: '/encounters', component: EncounterIndexPage, meta: { title: 'Encounters', workspaceCapability: 'evil-only' } },
+  { path: '/encounters/:id', component: EncounterDetailPage, meta: { title: 'Encounter', workspaceCapability: 'evil-only' } },
+  { path: '/staff/encounters', component: EncounterIndexPage, meta: { title: 'Staff Encounters', workspaceCapability: 'evil-only', requiresStaff: true } },
+  { path: '/staff/encounters/new', component: EncounterEditorPage, meta: { title: 'Build Encounter', workspaceCapability: 'evil-only', requiresStaff: true } },
+  { path: '/staff/encounters/:id/edit', component: EncounterEditorPage, meta: { title: 'Edit Encounter', workspaceCapability: 'evil-only', requiresStaff: true } },
   { path: '/decks', component: DeckIndexPage, meta: { title: 'Decks', workspaceCapability: 'player-only' } },
   { path: '/decks/:id', component: DeckDetailPage, props: true, meta: { title: 'Deck', workspaceCapability: 'player-only' } },
   { path: '/playtester', component: PlaytesterPage, meta: { title: 'Playtester', workspaceCapability: 'player-only' } },
@@ -102,7 +110,7 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
       };
     }
 
-    if (to.meta.workspaceCapability === 'player-only') {
+    if (to.meta.workspaceCapability === 'player-only' || to.meta.workspaceCapability === 'evil-only') {
       if (rawRequestedPool !== undefined) {
         const query = { ...to.query };
         delete query.card_pool;
@@ -143,6 +151,8 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
     let acceptedWorkspacePool: CardPool | undefined;
     if (to.meta.workspaceCapability === 'gallery') {
       acceptedWorkspacePool = isCardPool(to.query.card_pool) ? to.query.card_pool : 'player';
+    } else if (to.meta.workspaceCapability === 'evil-only') {
+      acceptedWorkspacePool = 'evil';
     } else if (to.meta.workspaceCapability === 'player-only') {
       acceptedWorkspacePool = 'player';
     } else if (to.meta.workspaceCapability === 'resource') {

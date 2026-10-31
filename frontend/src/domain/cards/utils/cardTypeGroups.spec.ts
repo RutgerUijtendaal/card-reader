@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { groupDeckEntriesByType } from '@/domain/decks/utils/deckTypeGroups';
+import { groupCardEntriesByType } from '@/domain/cards/utils/cardTypeGroups';
 
 const buildEntry = (
   id: string,
@@ -23,9 +23,9 @@ const typeBuckets = [
   { key: 'attachment', label: 'Attachment', linked_card_count: 1 },
 ];
 
-describe('groupDeckEntriesByType', () => {
+describe('groupCardEntriesByType', () => {
   test('uses the highest-priority matching type for multi-type cards', () => {
-    const groups = groupDeckEntriesByType(
+    const groups = groupCardEntriesByType(
       [
         buildEntry('multi', 'Arcane Multi', [
           { key: 'creature', label: 'Creature' },
@@ -41,7 +41,7 @@ describe('groupDeckEntriesByType', () => {
   });
 
   test('places catalog-missing and untyped cards before mana cards and omits empty buckets', () => {
-    const groups = groupDeckEntriesByType(
+    const groups = groupCardEntriesByType(
       [
         buildEntry('mana-card', 'Mana Card', [{ key: 'mana', label: 'Mana' }]),
         buildEntry('unknown-card', 'Unknown Card', [{ key: 'unknown', label: 'Unknown' }]),
@@ -59,7 +59,7 @@ describe('groupDeckEntriesByType', () => {
   });
 
   test('creates a bucket for a card Type missing from the active catalog', () => {
-    const groups = groupDeckEntriesByType(
+    const groups = groupCardEntriesByType(
       [
         buildEntry('deprecated-card', 'Deprecated Card', [
           { key: 'legacy-type', label: 'Legacy Type' },
@@ -73,7 +73,7 @@ describe('groupDeckEntriesByType', () => {
   });
 
   test('keeps cards inside a bucket in name, label, id order', () => {
-    const groups = groupDeckEntriesByType(
+    const groups = groupCardEntriesByType(
       [
         buildEntry('card-c', 'Beta', [{ key: 'spell', label: 'Spell' }]),
         buildEntry('card-b', 'Alpha', [{ key: 'spell', label: 'Spell' }]),
@@ -87,7 +87,7 @@ describe('groupDeckEntriesByType', () => {
   });
 
   test('uses a provided comparator only within each bucket', () => {
-    const groups = groupDeckEntriesByType(
+    const groups = groupCardEntriesByType(
       [
         buildEntry('spell-low', 'Spell Low', [{ key: 'spell', label: 'Spell' }]),
         buildEntry('creature', 'Creature', [{ key: 'creature', label: 'Creature' }]),

@@ -98,7 +98,7 @@
 
 <script setup lang="ts">
 import CardLoadingSkeleton from '@/domain/cards/components/CardLoadingSkeleton.vue';
-import DeckLoadingSkeleton from '@/domain/decks/components/DeckLoadingSkeleton.vue';
+import DeckLoadingSkeleton from '@/shared/components/CollectionLoadingSkeleton.vue';
 
 defineProps<{
   showPager?: boolean;

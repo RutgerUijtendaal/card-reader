@@ -178,7 +178,7 @@
 import { Play, RotateCcw } from 'lucide-vue-next';
 import AppSearchInput from '@/shared/components/app/AppSearchInput.vue';
 import DeckCompactCard from '@/domain/decks/components/DeckCompactCard.vue';
-import DeckLoadingSkeleton from '@/domain/decks/components/DeckLoadingSkeleton.vue';
+import DeckLoadingSkeleton from '@/shared/components/CollectionLoadingSkeleton.vue';
 import PlaytestLowerBar, { type PlaytestLowerBarStackZone } from '@/features/playtester/components/PlaytestLowerBar.vue';
 import PlaytestStackPopover from '@/features/playtester/components/PlaytestStackPopover.vue';
 import PlaytestTableSurface from '@/features/playtester/components/PlaytestTableSurface.vue';

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 const frontendRoot = fileURLToPath(new URL('.', import.meta.url));
 
 export const domainDependencies = {
+  encounters: ['cards'],
   'access-requests': ['session'],
   'card-backs': ['cards'],
   'card-deck-references': ['card-navigation', 'decks'],

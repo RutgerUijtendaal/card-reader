@@ -200,7 +200,7 @@ vi.mock('@/features/decks/components/DeckDetailsForm.vue', () => ({
   }),
 }));
 
-vi.mock('@/features/decks/components/DeckDraftRecoveryModal.vue', () => ({
+vi.mock('@/shared/components/builders/BuilderDraftRecoveryModal.vue', () => ({
   default: defineComponent({
     props: {
       open: { type: Boolean, required: true },
@@ -216,7 +216,7 @@ vi.mock('@/features/decks/components/DeckDraftRecoveryModal.vue', () => ({
   }),
 }));
 
-vi.mock('@/features/decks/components/DeckDraftConflictModal.vue', () => ({
+vi.mock('@/shared/components/builders/BuilderDraftConflictModal.vue', () => ({
   default: defineComponent({
     props: {
       open: { type: Boolean, required: true },
@@ -300,7 +300,7 @@ describe('DeckEditorPage', () => {
     expect(statusBar?.textContent).toContain('42');
     expect(statusBar?.textContent).toContain('Ready');
     expect(autosyncCheckbox?.disabled).toBe(false);
-    expect(gallery.parentElement?.classList.contains('deck-builder-gallery-scroll')).toBe(true);
+    expect(gallery.parentElement?.classList.contains('builder-gallery-scroll')).toBe(true);
     expect(gallery.parentElement?.classList.contains('app-scrollbar')).toBe(true);
 
     mounted.unmount();
@@ -318,7 +318,7 @@ describe('DeckEditorPage', () => {
     expect(
       mounted.container
         .querySelector('[data-testid="builder-gallery"]')
-        ?.parentElement?.classList.contains('deck-builder-gallery-scroll'),
+        ?.parentElement?.classList.contains('builder-gallery-scroll'),
     ).toBe(true);
     expect(mounted.container.querySelector('[data-testid="hero-selection-panel"]')).not.toBeNull();
     expect(mounted.container.textContent).toContain('Filters');
@@ -336,6 +336,10 @@ describe('DeckEditorPage', () => {
 
     expect(mounted.container.querySelector('[data-testid="details-hero-panel"]')).not.toBeNull();
     expect(mounted.container.querySelector('[data-testid="details-form"]')).not.toBeNull();
+    const status = mounted.container.querySelector('[aria-label="Deck save status"]');
+    expect(status?.textContent).toContain('Unsaved');
+    expect(status?.textContent).toContain('Autosync');
+    expect(status?.nextElementSibling?.querySelector('[data-testid="details-form"]')).not.toBeNull();
     expect(mounted.container.querySelector('[data-testid="builder-gallery"]')).toBeNull();
     expect(mounted.container.textContent).not.toContain('Filters');
     expect(mounted.container.textContent).not.toContain('Summary');
@@ -368,7 +372,7 @@ describe('DeckEditorPage', () => {
 
     expect(mounted.container.querySelectorAll('.deck-builder-loading-panel')).toHaveLength(2);
     expect(gallery?.getAttribute('data-loading')).toBe('true');
-    expect(mounted.container.querySelector('.deck-builder-gallery-scroll')).not.toBeNull();
+    expect(mounted.container.querySelector('.builder-gallery-scroll')).not.toBeNull();
     expect(mounted.container.querySelector('[aria-label="Deck builder status"]')).toBeNull();
     expect(mounted.container.querySelector('[data-testid="details-form"]')).toBeNull();
 

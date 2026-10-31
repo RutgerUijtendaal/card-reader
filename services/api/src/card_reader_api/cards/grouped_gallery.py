@@ -46,7 +46,7 @@ class GroupedGalleryItem(GroupedCardListReference):
     types: list["Type"]
 
 
-def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
+def grouped_gallery_payload(filters: CardListFilterParams, *, anchor_role: str | None = None, require_active_pool_members: bool = False) -> dict[str, object]:
     page = filters["page"]
     page_size = filters["page_size"]
     if filters["sort"] == CARD_SORT_DEFAULT:
@@ -54,6 +54,8 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
             filters,
             page=page,
             page_size=page_size,
+            anchor_role=anchor_role,
+            require_active_pool_members=require_active_pool_members,
         )
     matching_rows = list_matching_card_candidates(
         query=filters["query"],
@@ -106,6 +108,13 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
         if filters["card_pool"] is None
         or group.anchor_card.card_pool == filters["card_pool"]
     ]
+    if anchor_role is not None:
+        groups = [group for group in groups if anchor_role in card_role_keys(group.anchor_card)]
+    if require_active_pool_members:
+        groups = [group for group in groups if all(
+            member.card.card_pool == filters["card_pool"] and member.card.lifecycle_status == "active"
+            for member in group.members.all()
+        )]
     lifecycle_status = filters["lifecycle_status"]
 
     participant_card_ids = {
@@ -216,6 +225,8 @@ def _default_grouped_gallery_payload(
     *,
     page: int,
     page_size: int,
+    anchor_role: str | None = None,
+    require_active_pool_members: bool = False,
 ) -> dict[str, object]:
     card_pool = filters["card_pool"]
     if card_pool is None:
@@ -224,6 +235,8 @@ def _default_grouped_gallery_payload(
         filters,
         page=page,
         page_size=page_size,
+        anchor_role=anchor_role,
+        require_active_pool_members=require_active_pool_members,
     )
     group_ids = [
         reference["group_id"]

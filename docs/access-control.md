@@ -15,6 +15,7 @@ The main access levels are:
 - Public visitors can browse Player, Evil, and Neutral cards, groups, generations, and direct assets, plus public deck surfaces.
 - Active authenticated users can use account-scoped features and other capabilities granted to ordinary members.
 - Staff users can access administrative workflows including imports, review, catalogs, templates, exports, user management, and developer-data publishing.
+- Everyone can view and export Encounters only while they are both public and currently valid. All active staff can inspect, edit, and delete every saved Encounter, including incomplete or staff-only records. Staff may export unfinished Encounters that remain structurally usable. See [Encounters](encounters.md) for the endpoint and revision contracts.
 - Admin and Review operate across all card pools; changing the shell workspace never narrows their catalogs, previews, counts, or queues. Imports require a fresh explicit card-pool selection and do not inherit the shell workspace.
 - Superusers can access maintenance operations and the most sensitive administrative views.
 - Developer users can download developer-data bundles even when they are not staff. Staff receive this capability automatically.

@@ -63,8 +63,9 @@ export const canCreateFromPersistenceState = (state: DeckDraftPersistenceState):
 export const isDeckMutationLocked = (
   persistence: DeckDraftPersistenceState,
   creation: DeckCreationState,
-): boolean => persistence.status === 'checking'
-  || persistence.status === 'recovery'
-  || persistence.status === 'conflict'
-  || creation.status === 'creating'
-  || creation.status === 'unknown';
+): boolean =>
+  persistence.status === 'checking' ||
+  persistence.status === 'recovery' ||
+  persistence.status === 'conflict' ||
+  creation.status === 'creating' ||
+  creation.status === 'unknown';

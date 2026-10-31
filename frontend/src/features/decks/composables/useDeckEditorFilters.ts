@@ -10,6 +10,7 @@ import { buildCardFilterApiSearchParams } from '@/domain/cards/utils/filters/car
 import type { HoverMode } from '@/domain/cards/utils/gallery/hoverMode';
 import { appendCardSortSearchParam } from '@/domain/cards/utils/gallery/cardSort';
 import { useCardFilterController } from '@/domain/cards/composables/filters/useCardFilterController';
+import { useCardIdFilter } from '@/domain/cards/composables/useCardIdFilter';
 import { useGalleryOptions } from '@/domain/cards/composables/useGalleryOptions';
 import { useHoverModeSurface } from '@/domain/cards/composables/useHoverModePreferences';
 import { useCardSortSurface } from '@/domain/cards/composables/useCardSortPreferences';
@@ -23,8 +24,6 @@ type UseDeckEditorFiltersOptions = {
 };
 
 const EMPTY_DECK_SENTINEL_CARD_ID = '__deck-builder-empty__';
-const EMPTY_CARD_IDS: string[] = [];
-const EMPTY_DECK_SENTINEL_CARD_IDS = [EMPTY_DECK_SENTINEL_CARD_ID];
 
 export const useDeckEditorFilters = ({ deckCardIds, editorMode }: UseDeckEditorFiltersOptions) => {
   const filterController = useCardFilterController();
@@ -57,33 +56,11 @@ export const useDeckEditorFilters = ({ deckCardIds, editorMode }: UseDeckEditorF
     currentDeckOnly.value = value;
   };
 
-  let previousCurrentDeckCardIdsSignature = '';
-  let previousCurrentDeckCardIds = EMPTY_CARD_IDS;
-
-  const currentDeckCardIds = computed(() => {
-    if (!currentDeckOnly.value || editorMode.value !== 'cards') {
-      previousCurrentDeckCardIdsSignature = '';
-      previousCurrentDeckCardIds = EMPTY_CARD_IDS;
-      return EMPTY_CARD_IDS;
-    }
-
-    if (deckCardIds.value.length === 0) {
-      previousCurrentDeckCardIdsSignature = EMPTY_DECK_SENTINEL_CARD_ID;
-      previousCurrentDeckCardIds = EMPTY_DECK_SENTINEL_CARD_IDS;
-      return EMPTY_DECK_SENTINEL_CARD_IDS;
-    }
-
-    const normalizedCardIds = [...new Set(deckCardIds.value)].sort((left, right) => left.localeCompare(right));
-    const signature = normalizedCardIds.join('\u0000');
-
-    if (signature === previousCurrentDeckCardIdsSignature) {
-      return previousCurrentDeckCardIds;
-    }
-
-    previousCurrentDeckCardIdsSignature = signature;
-    previousCurrentDeckCardIds = normalizedCardIds;
-    return normalizedCardIds;
-  });
+  const currentDeckCardIds = useCardIdFilter(
+    deckCardIds,
+    computed(() => currentDeckOnly.value && editorMode.value === 'cards'),
+    EMPTY_DECK_SENTINEL_CARD_ID,
+  );
 
   const resetFilters = (): void => {
     filterController.resetFilters();

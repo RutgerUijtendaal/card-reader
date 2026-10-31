@@ -1,7 +1,7 @@
 import { toast } from 'vue-sonner';
 import { exportDeckTts } from '@/domain/decks/api';
 import { getApiErrorMessage } from '@/shared/api/errors';
-import { ttsExportSheetDescription } from '@/domain/cards/utils/ttsExportResponse';
+import { copyTtsExport } from '@/domain/cards/utils/copyTtsExport';
 
 export type UseDeckExportResult = {
   exportTtsDeck: (deckId: string, options?: ExportTtsDeckOptions) => Promise<void>;
@@ -19,14 +19,7 @@ export const useDeckExport = (): UseDeckExportResult => {
   ): Promise<void> => {
     try {
       const result = await exportDeckTts(deckId, options.sideboardId);
-      await navigator.clipboard.writeText(result.encodedPayload);
-
-      toast.success(options.successMessage ?? 'TTS deck copied to clipboard', {
-        description: [
-          `${result.exportedCount} card${result.exportedCount === 1 ? '' : 's'} copied.`,
-          ttsExportSheetDescription(result),
-        ].join(' '),
-      });
+      await copyTtsExport(result, options.successMessage ?? 'TTS deck copied to clipboard');
     } catch (error) {
       console.error('TTS deck export failed', error);
       toast.error('TTS deck export failed', {

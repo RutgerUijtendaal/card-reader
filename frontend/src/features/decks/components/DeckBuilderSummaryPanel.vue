@@ -10,75 +10,19 @@
         ref="heroDetailsTriggerRef"
         class="overflow-hidden"
       >
-        <div class="relative">
-          <div
-            v-if="controller.deck.selectedHero.value?.image_url"
-            class="absolute inset-0"
-          >
-            <img
-              :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
-              :alt="controller.deck.selectedHero.value.name"
-              class="h-full w-full object-cover"
-              :style="{
-                objectPosition: heroHeaderObjectPosition,
-                transform: heroHeaderTransform,
-                opacity: heroHeaderOpacity,
-              }"
-            >
-          </div>
-          <div
-            v-else
-            class="absolute inset-0 theme-card-frame-muted"
-          />
-          <div
-            class="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-900/74 to-slate-900/28"
-          />
-
-          <div class="relative flex min-h-[5.5rem] items-start gap-2 px-4 py-3">
-            <button
-              type="button"
-              class="flex min-w-0 flex-1 items-start gap-3 text-left"
-              @click="handleHeroHeaderClick()"
-            >
-              <div class="min-w-0 space-y-1">
-                <p class="truncate text-lg font-semibold text-white">
-                  {{ controller.deck.form.name || 'Untitled Deck' }}
-                </p>
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-100/90">
-                  <span class="font-semibold uppercase tracking-[0.18em] text-slate-200/70">{{
-                    activeBoardLabel
-                  }}</span>
-                  <span class="font-semibold">{{ activeBoardCount }}</span>
-                  <span
-                    v-if="controller.deck.selectedHero.value"
-                    class="truncate"
-                  >
-                    {{ controller.deck.selectedHero.value.name }}
-                  </span>
-                  <span v-else>Choose hero</span>
-                </div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              class="theme-card-frame-muted theme-section-title inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition"
-              :aria-label="
-                controller.deck.selectedHero.value
-                  ? heroDetailsExpanded
-                    ? 'Collapse hero details'
-                    : 'Expand hero details'
-                  : 'Choose hero'
-              "
-              @click="handleHeroHeaderClick()"
-            >
-              <ChevronDown
-                class="h-4 w-4 transition-transform"
-                :class="heroDetailsExpanded ? 'rotate-180' : ''"
-              />
-            </button>
-          </div>
-        </div>
+        <CardBuilderSummaryHeader
+          :name="controller.deck.form.name || 'Untitled Deck'"
+          :card="controller.deck.selectedHero.value"
+          :board-label="activeBoardLabel"
+          :count="activeBoardCount"
+          empty-label="Choose hero"
+          :action-label="controller.deck.selectedHero.value ? heroDetailsExpanded ? 'Collapse hero details' : 'Expand hero details' : 'Choose hero'"
+          :expanded="heroDetailsExpanded"
+          :object-position="heroHeaderObjectPosition"
+          :image-transform="heroHeaderTransform"
+          :image-opacity="heroHeaderOpacity"
+          @activate="handleHeroHeaderClick()"
+        />
       </section>
 
       <div class="space-y-3 px-5">
@@ -319,11 +263,12 @@
 <script setup lang="ts">
 import { useSortable } from '@vueuse/integrations/useSortable';
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
-import { ChevronDown, Ellipsis, Pencil, Plus, Trash2 } from 'lucide-vue-next';
+import { Ellipsis, Pencil, Plus, Trash2 } from 'lucide-vue-next';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
 import { useFloatingPopover } from '@/shared/composables/useFloatingPopover';
 import ConfirmModal from '@/shared/components/modals/ConfirmModal.vue';
-import DeckBuilderBoardEntryRow from '@/features/decks/components/DeckBuilderBoardEntryRow.vue';
+import CardBuilderSummaryHeader from '@/domain/cards/components/CardBuilderSummaryHeader.vue';
+import DeckBuilderBoardEntryRow from '@/domain/cards/components/CardBuilderEntryRow.vue';
 import DeckManaCurve from '@/features/decks/components/DeckManaCurve.vue';
 import type { DeckEditorController } from '@/features/decks/composables/useDeckEditor';
 import type { DeckBoardMoveDestination } from '@/features/decks/composables/deckEditorDraftTypes';
