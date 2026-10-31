@@ -29,7 +29,11 @@ def stable_id(value: str) -> str:
 
 
 def seed(
-    card_count: int, deck_count: int, storage: Path, snapshot_bytes: int
+    card_count: int,
+    deck_count: int,
+    storage: Path,
+    snapshot_bytes: int,
+    encounter_count: int = 0,
 ) -> object:
     from django.contrib.auth import get_user_model
     from django.db import transaction
@@ -55,7 +59,9 @@ def seed(
         description="Benchmark",
         **stamps,
     )
-    owner = get_user_model().objects.create_user(username="benchmark", password=None)
+    owner = get_user_model().objects.create_user(
+        username="benchmark", password=None, is_staff=True
+    )
     image_path = storage / "images" / "benchmark.png"
     image_path.parent.mkdir(parents=True)
     image_path.write_bytes(b"benchmark-image-placeholder")
@@ -237,7 +243,76 @@ def seed(
                     for offset in range(3)
                 ]
             )
+        if encounter_count:
+            seed_encounters(cards, owner, encounter_count, stamps)
     return owner
+
+
+def seed_encounters(cards: list, owner: object, count: int, stamps: dict) -> None:
+    from card_reader_core.models import CardGroup, CardGroupMember
+    from card_reader_core.models.encounter import Encounter, EncounterEntry
+
+    evil = [
+        card
+        for card in cards
+        if card.card_pool == "evil" and card.lifecycle_status == "active"
+    ]
+    bosses = [
+        card
+        for index, card in enumerate(cards)
+        if card.card_pool == "evil"
+        and card.lifecycle_status == "active"
+        and index % 17 == 0
+    ]
+    if not bosses:
+        raise ValueError("Encounter fixture requires at least one active Evil boss")
+    groups = []
+    for index, boss in enumerate(bosses):
+        group = CardGroup.objects.create(
+            id=stable_id(f"encounter-group-{index}"),
+            key=f"encounter-group-{index}",
+            name=f"Boss group {index}",
+            anchor_card=boss,
+            **stamps,
+        )
+        members = [boss, *[card for card in evil[:4] if card.id != boss.id][:2]]
+        CardGroupMember.objects.bulk_create(
+            [
+                CardGroupMember(group=group, card=card, position=position)
+                for position, card in enumerate(members)
+            ]
+        )
+        groups.append(group)
+    records, entries = [], []
+    for index in range(count):
+        boss_index = index % len(bosses)
+        record = Encounter(
+            id=stable_id(f"encounter-{index}"),
+            creator=owner,
+            name="" if index % 11 == 10 else f"Encounter {index:04}",
+            boss_card=bosses[boss_index],
+            boss_group=groups[boss_index] if index % 2 == 0 else None,
+            visibility="private" if index > 0 and index % 10 == 0 else "public",
+            factions=["order"],
+            **stamps,
+        )
+        records.append(record)
+        selected = [
+            evil[(index * 7 + offset) % len(evil)]
+            for offset in range(min(40, len(evil)))
+        ]
+        entries.extend(
+            EncounterEntry(
+                id=stable_id(f"encounter-entry-{index}-{position}"),
+                encounter=record,
+                card=card,
+                quantity=2,
+                position=position,
+            )
+            for position, card in enumerate(selected)
+        )
+    Encounter.objects.bulk_create(records)
+    EncounterEntry.objects.bulk_create(entries)
 
 
 def benchmark(options: argparse.Namespace, storage: Path) -> dict[str, object]:
@@ -266,7 +341,13 @@ def benchmark(options: argparse.Namespace, storage: Path) -> dict[str, object]:
 
     settings.DEBUG = False
     call_command("migrate", verbosity=0, interactive=False)
-    owner = seed(options.cards, options.decks, storage, options.snapshot_bytes)
+    owner = seed(
+        options.cards,
+        options.decks,
+        storage,
+        options.snapshot_bytes,
+        options.encounters,
+    )
     factory = APIRequestFactory()
     cases = []
     for pool in ("player", "evil", "neutral"):
@@ -365,6 +446,65 @@ def benchmark(options: argparse.Namespace, storage: Path) -> dict[str, object]:
             ),
         ]
     )
+    if options.encounters:
+        from card_reader_api.encounters.views import (
+            EncounterBossPickerView,
+            PublicEncounterDetailView,
+            PublicEncounterListView,
+            StaffEncounterDetailView,
+            StaffEncounterListView,
+        )
+
+        cases.extend(
+            [
+                (
+                    "encounter_detail_group",
+                    PublicEncounterDetailView,
+                    {},
+                    {"encounter_id": stable_id("encounter-0")},
+                    False,
+                ),
+                (
+                    "encounter_detail_single",
+                    PublicEncounterDetailView,
+                    {},
+                    {"encounter_id": stable_id("encounter-1")},
+                    False,
+                ),
+                (
+                    "encounter_staff_detail",
+                    StaffEncounterDetailView,
+                    {},
+                    {"encounter_id": stable_id("encounter-10")},
+                    True,
+                ),
+                (
+                    "encounters_public",
+                    PublicEncounterListView,
+                    {"page_size": 24},
+                    {},
+                    False,
+                ),
+                (
+                    "encounters_staff",
+                    StaffEncounterListView,
+                    {"page_size": 24},
+                    {},
+                    True,
+                ),
+                (
+                    "encounter_boss_picker",
+                    EncounterBossPickerView,
+                    {"page_size": 60, "sort": "default"},
+                    {},
+                    True,
+                ),
+            ]
+        )
+    if options.scenario_prefix:
+        cases = [case for case in cases if case[0].startswith(options.scenario_prefix)]
+    if not cases:
+        raise ValueError("No benchmark scenarios selected")
     results = {}
     try:
         for name, view, params, kwargs, authenticated in cases:
@@ -426,6 +566,7 @@ def benchmark(options: argparse.Namespace, storage: Path) -> dict[str, object]:
             "cards": options.cards,
             "versions_per_card": 3,
             "decks": options.decks,
+            "encounters": options.encounters,
             "snapshot_bytes": options.snapshot_bytes,
             "repeats": options.repeats,
             "results": results,
@@ -438,6 +579,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cards", type=int, default=3000)
     parser.add_argument("--decks", type=int, default=120)
+    parser.add_argument("--encounters", type=int, default=0)
+    parser.add_argument(
+        "--scenario-prefix",
+        default="",
+        help="Only measure scenario names starting with this prefix",
+    )
     parser.add_argument("--snapshot-bytes", type=int, default=4096)
     parser.add_argument("--repeats", type=int, default=15)
     parser.add_argument("--output", type=Path, required=True)
@@ -453,11 +600,14 @@ def main() -> None:
         help="Require response hashes to match this baseline report",
     )
     options = parser.parse_args()
+    if 0 < options.encounters < 11:
+        parser.error("encounters must be 0 or at least 11 for the detail scenarios")
     if (
         options.cards < 150
         or options.decks < 1
         or options.repeats < 1
         or options.snapshot_bytes < 0
+        or options.encounters < 0
     ):
         parser.error("require cards >= 150, decks/repeats >= 1, snapshot-bytes >= 0")
     for service in ("core", "api"):
@@ -475,6 +625,8 @@ def main() -> None:
         for key in ("cards", "decks", "snapshot_bytes", "versions_per_card"):
             if report[key] != baseline[key]:
                 raise RuntimeError(f"Baseline fixture differs: {key}")
+        if report["encounters"] != baseline.get("encounters", 0):
+            raise RuntimeError("Baseline fixture differs: encounters")
         if report["results"].keys() != baseline["results"].keys():
             raise RuntimeError("Baseline scenarios differ")
         for name, result in report["results"].items():

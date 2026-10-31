@@ -120,6 +120,8 @@ views after a warmup. It records median/p95 latency, query counts, SQL plans, an
 response hashes. It excludes HTTP, session middleware, and image transfer; the
 synthetic timings are comparison measurements, not production latency promises.
 Use `--cards`, `--decks`, `--snapshot-bytes`, and `--repeats` to vary the workload.
+Add `--encounters 120` to seed and measure Encounter detail, public/staff lists,
+and the boss picker; use `--scenario-prefix encounter` to measure only those cases.
 Use `--source-root <baseline-checkout>` to measure another checkout with the same
 fixture, then `--compare <baseline-report.json>` to require identical response
 hashes. Keep reports under `.tmp/`; the benchmark never uses the configured app

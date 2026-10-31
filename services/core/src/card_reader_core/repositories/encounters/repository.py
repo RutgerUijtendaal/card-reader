@@ -7,8 +7,9 @@ from django.db import transaction
 from django.db.models import Exists, F, OuterRef, Prefetch, Q, QuerySet, Subquery, Sum
 from django.db.models.functions import Coalesce, Trim
 
-from card_reader_core.models import Card, CardGroup, CardGroupMember, CardRoleAssignment, now_utc
+from card_reader_core.models import Card, CardGroup, CardGroupMember, CardRoleAssignment, CardVersionImage, now_utc
 from card_reader_core.models.encounter import Encounter, EncounterCreation, EncounterEntry
+from card_reader_core.repositories.cards import card_version_metadata_prefetches
 
 
 class EncounterConflict(ValueError):
@@ -21,16 +22,17 @@ class EncounterDeleted(ValueError):
 
 def card_queryset() -> QuerySet[Card]:
     return Card.objects.select_related(
-        "latest_version", "latest_version__template", "latest_version__previous_version"
+        "latest_version", "latest_version__template", "latest_version__content_version"
+    ).defer(
+        "latest_version__parsed_snapshot_json",
+        "latest_version__field_sources_json",
+        "latest_version__template__definition_json",
     ).prefetch_related(
         "role_assignments",
         "faction_assignments",
         "mana_family_assignments",
-        "latest_version__images",
-        "latest_version__card_version_symbols__symbol",
-        "latest_version__card_version_keywords__keyword",
-        "latest_version__card_version_tags__tag",
-        "latest_version__card_version_types__type",
+        Prefetch("latest_version__images", queryset=CardVersionImage.objects.order_by("-created_at")),
+        *card_version_metadata_prefetches("latest_version"),
     )
 
 

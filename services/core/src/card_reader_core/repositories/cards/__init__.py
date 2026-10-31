@@ -9,6 +9,7 @@ from .images import (
     select_usable_card_image,
 )
 from .classification import set_card_mana_families
+from .prefetch import card_version_metadata_prefetches
 from .identity import (
     change_card_identity,
     conflicting_card_id_for_key,
@@ -94,6 +95,7 @@ def __getattr__(name: str) -> Any:
 
 
 __all__ = [
+    "card_version_metadata_prefetches",
     "HeroCardBackExpectation",
     "CardListRow",
     "CardListCandidate",

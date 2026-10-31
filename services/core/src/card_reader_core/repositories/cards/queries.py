@@ -51,6 +51,7 @@ from card_reader_core.models import (
 from card_reader_core.search.cards import apply_card_search
 
 from .images import resolve_image_file_path, select_usable_card_image
+from .prefetch import card_version_metadata_prefetches
 from .sorting import (
     apply_default_card_group_sort,
     apply_default_card_sort,
@@ -1468,24 +1469,7 @@ def _card_list_prefetches() -> tuple[Any, ...]:
         "card__faction_assignments",
         "card__mana_family_assignments",
         Prefetch("images", queryset=CardVersionImage.objects.order_by("-created_at")),
-        Prefetch(
-            "card_version_keywords",
-            queryset=CardVersionKeyword.objects.select_related("keyword").order_by(
-                "keyword__label"
-            ),
-        ),
-        Prefetch(
-            "card_version_tags",
-            queryset=CardVersionTag.objects.select_related("tag").order_by("tag__label"),
-        ),
-        Prefetch(
-            "card_version_symbols",
-            queryset=CardVersionSymbol.objects.select_related("symbol").order_by("symbol__label"),
-        ),
-        Prefetch(
-            "card_version_types",
-            queryset=CardVersionType.objects.select_related("type").order_by("type__label"),
-        ),
+        *card_version_metadata_prefetches(),
     )
 
 

@@ -5,9 +5,7 @@ from django.db.models import Prefetch, QuerySet
 from card_reader_core.models import (
     Card,
     CardVersionImage,
-    CardVersionKeyword,
     CardVersionSymbol,
-    CardVersionTag,
     CardVersionType,
     Deck,
     DeckEntry,
@@ -16,6 +14,7 @@ from card_reader_core.models import (
     DeckTagAssignment,
     DeckTagSuggestionDeck,
 )
+from card_reader_core.repositories.cards import card_version_metadata_prefetches
 
 
 def deck_queryset() -> QuerySet[Deck]:
@@ -26,7 +25,7 @@ def deck_queryset() -> QuerySet[Deck]:
             "latest_version__images",
             queryset=CardVersionImage.objects.order_by("-created_at"),
         ),
-        *latest_version_metadata_prefetches("latest_version"),
+        *card_version_metadata_prefetches("latest_version"),
     )
     return _decks_with_cards(cards, cards).select_related("owner").prefetch_related(
         *deck_metadata_prefetches(),
@@ -100,27 +99,6 @@ def deck_metadata_prefetches() -> tuple[Prefetch[str], ...]:
             queryset=DeckTagSuggestionDeck.objects.select_related("suggestion")
             .filter(suggestion__status="pending", is_active=True)
             .order_by("suggestion__display_value"),
-        ),
-    )
-
-
-def latest_version_metadata_prefetches(prefix: str) -> tuple[Prefetch[str], ...]:
-    return (
-        Prefetch(
-            f"{prefix}__card_version_keywords",
-            queryset=CardVersionKeyword.objects.select_related("keyword").order_by("keyword__label"),
-        ),
-        Prefetch(
-            f"{prefix}__card_version_tags",
-            queryset=CardVersionTag.objects.select_related("tag").order_by("tag__label"),
-        ),
-        Prefetch(
-            f"{prefix}__card_version_symbols",
-            queryset=CardVersionSymbol.objects.select_related("symbol").order_by("symbol__label"),
-        ),
-        Prefetch(
-            f"{prefix}__card_version_types",
-            queryset=CardVersionType.objects.select_related("type").order_by("type__label"),
         ),
     )
 
