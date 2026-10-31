@@ -30,7 +30,7 @@ Conditional storage revisions and an owner-scoped browser lock make each compare
 
 ## Collection views
 
-Player and Encounter lists share `CollectionListCard` and `CollectionLoadingSkeleton` under `frontend/src/shared/components/`. Detail pages share `CollectionDetailLayout` for the expandable information panels, plus the cards-domain `CardCollectionGrid`, `CardCollectionViewOptions`, `CardCollectionDetailLoadingSkeleton`, and `useCardCollectionGrid`. Each feature retains its own metadata, actions, construction rules, and card pool; sorting receives that pool explicitly.
+Player and Encounter lists share `CollectionListCard` and `CollectionLoadingSkeleton` under `frontend/src/shared/components/`. Detail pages share `CollectionDetailLayout` for the expandable information panels, plus the cards-domain `CardCollectionGrid`, `CardCollectionViewOptions`, `CardCollectionDetailLoadingSkeleton`, and `useCardCollectionGrid`. The builders also share `CardBuilderBoards` and `useCardCollectionBoards` in the cards domain for sideboard controls, selection, ordering, and card movement. Each feature retains its own metadata, actions, construction rules, and card pool; sorting receives that pool explicitly.
 
 ## Constraint model
 

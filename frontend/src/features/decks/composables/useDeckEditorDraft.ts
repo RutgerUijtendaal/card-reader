@@ -9,10 +9,7 @@ import type {
   DeckRecord,
   DeckVisibility,
 } from '@/domain/decks/types';
-import type {
-  DeckEditorMode,
-  DeckForm,
-} from '@/features/decks/composables/deckEditorDraftTypes';
+import type { DeckEditorMode, DeckForm } from '@/features/decks/composables/deckEditorDraftTypes';
 import {
   buildDeckCardLookup,
   buildDeckUpsertPayload,
@@ -21,8 +18,8 @@ import {
 } from '@/features/decks/composables/deckEditorDraftModel';
 import {
   MAINBOARD_ID,
-  useDeckEditorBoards,
-} from '@/features/decks/composables/useDeckEditorBoards';
+  useCardCollectionBoards,
+} from '@/domain/cards/composables/useCardCollectionBoards';
 import { useDeckEditorMetrics } from '@/features/decks/composables/useDeckEditorMetrics';
 import { useDeckEditorConstraints } from '@/features/decks/composables/useDeckEditorConstraints';
 
@@ -45,10 +42,10 @@ export const useDeckEditorDraft = ({
   const isDetailsStep = computed(() => editorMode.value === 'details');
   const isCardsStep = computed(() => editorMode.value === 'cards');
   const selectedHero = computed(() =>
-    form.hero_card_id ? cardLookup.value[form.hero_card_id] ?? null : null,
+    form.hero_card_id ? (cardLookup.value[form.hero_card_id] ?? null) : null,
   );
 
-  const boards = useDeckEditorBoards(form);
+  const boards = useCardCollectionBoards(form);
   const metrics = useDeckEditorMetrics({
     form,
     cardLookup,
@@ -208,10 +205,7 @@ export const useDeckEditorDraft = ({
     if (boards.getEntryQuantity(cardId, boardId) <= 1) boards.removeEntry(cardId, boardId);
     else changeQuantity(cardId, -1, boardId);
   };
-  const handleBoardRowAction = (
-    cardId: string,
-    boardId = boards.activeBoardId.value,
-  ): void => {
+  const handleBoardRowAction = (cardId: string, boardId = boards.activeBoardId.value): void => {
     if (!constraints.boardRowActionDisabled(cardId, boardId)) changeQuantity(cardId, 1, boardId);
   };
   const handleBoardRowSecondaryAction = (

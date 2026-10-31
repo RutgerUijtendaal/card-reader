@@ -28,7 +28,7 @@ Legacy `card-reader.tts-deck.v1` and `card-reader.tts-cards.v1` strings are reje
 
 ## Payload contract
 
-Encounter exports use the same v3 format and single-pile construction. Their source type is `encounter`, with `encounter_id`, `boss_card_id`, nullable `boss_group_id`, and canonical `factions`. Boss selection cards appear once in current group order with role `boss`, followed by saved entries with role `mainboard` and their original quantities. Deliberate extra copies remain in the mainboard. The importer preserves the Encounter's collection description just as it does for Player decks.
+Encounter exports use the same v3 format and single-pile construction. Their source type is `encounter`, with `encounter_id`, `boss_card_id`, nullable `boss_group_id`, and canonical `factions`. Boss selection cards appear once in current group order with role `boss`, followed by saved entries with role `mainboard` and their original quantities. Deliberate extra copies remain in the mainboard. The importer preserves the Encounter's collection description just as it does for Player decks. A selected Encounter sideboard exports independently as one pile, preserving quantities and order with `sideboard` roles and adding `sideboard_id` and `sideboard_name` to source metadata. It excludes boss and mainboard cards. Staff sideboard exports do not require a boss; public exports require validity of the whole Encounter.
 
 Public Encounter exports require public visibility and current validity. Staff can test unfinished Encounters, but incompatible groups, deprecated/non-Evil references, and unavailable boss artwork or card backs block export. Unavailable ordinary artwork uses the standard skipped-card report. See [Encounters](../docs/encounters.md).
 

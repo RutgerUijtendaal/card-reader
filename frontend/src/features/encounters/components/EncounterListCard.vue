@@ -57,6 +57,7 @@
       <div class="collection-list-card-footer-meta theme-section-muted text-xs">
         <span class="collection-list-card-footer-meta-item"><Crown class="h-4 w-4" />{{ encounter.boss_card?.name || 'No boss selected' }}</span>
         <span class="collection-list-card-footer-meta-item"><LibraryBig class="h-4 w-4" />Maindeck {{ encounter.total_cards }}</span>
+        <span class="collection-list-card-footer-meta-item"><PanelRight class="h-4 w-4" />Sideboards {{ encounter.sideboard_count }}</span>
         <span
           v-if="staff"
           class="collection-list-card-footer-meta-item"
@@ -69,7 +70,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
-import { CalendarDays, Crown, LibraryBig, Pencil, UserRound } from 'lucide-vue-next';
+import { CalendarDays, Crown, LibraryBig, PanelRight, Pencil, UserRound } from 'lucide-vue-next';
 import type { EncounterSummary } from '@/domain/encounters/types';
 import { cardFactionLabel } from '@/domain/cards/cardFactions';
 import { toAbsoluteApiUrl } from '@/shared/api/client';

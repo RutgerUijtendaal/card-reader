@@ -48,7 +48,11 @@ class EncounterBossPickerView(APIView):
         serializer = CardFiltersQuerySerializer(data=data)
         serializer.is_valid(raise_exception=True)
         return Response(
-            grouped_gallery_payload(serializer.validated_list_filters(), anchor_role="boss", require_active_pool_members=True)
+            grouped_gallery_payload(
+                serializer.validated_list_filters(),
+                anchor_role="boss",
+                require_active_pool_members=True,
+            )
         )
 
 
@@ -182,7 +186,9 @@ class EncounterTtsView(APIView):
         if record is None:
             return Response(status=404)
         try:
-            data = TtsCardExportService().build_encounter_export(record)
+            data = TtsCardExportService().build_encounter_export(
+                record, sideboard_id=request.query_params.get("sideboard_id")
+            )
 
             def absolute_url(path: str) -> str:
                 return build_public_api_url(request, path)

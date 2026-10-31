@@ -33,15 +33,21 @@ def validation_issues(encounter: Encounter, *, export: bool = False) -> list[str
         missing_boss_member = encounter.boss_group is not None and not getattr(
             encounter, "boss_in_group"
         )
-        bad_contents = getattr(encounter, "bad_entries") or getattr(encounter, "bad_members")
+        bad_contents = (
+            getattr(encounter, "bad_entries")
+            or getattr(encounter, "bad_members")
+            or getattr(encounter, "bad_sideboards")
+        )
     else:
         cards = boss_cards(encounter)
         entries = list(encounter.entries.all())
         total = sum(entry.quantity for entry in entries)
         missing_boss_member = boss is not None and not any(card.id == boss.id for card in cards)
+        cards.extend(entry.card for entry in entries)
+        for board in encounter.sideboards.all():
+            cards.extend(entry.card for entry in board.entries.all())
         bad_contents = any(
-            card.card_pool != "evil" or card.lifecycle_status != "active"
-            for card in [*cards, *[entry.card for entry in entries]]
+            card.card_pool != "evil" or card.lifecycle_status != "active" for card in cards
         )
     if missing_boss_member:
         issues.append("The boss is no longer in its selected group.")
@@ -55,7 +61,7 @@ def validation_issues(encounter: Encounter, *, export: bool = False) -> list[str
 class EncounterService:
     def normalize(
         self, data: dict[str, Any], existing: Encounter | None = None
-    ) -> tuple[dict[str, Any], list[dict[str, Any]] | None]:
+    ) -> tuple[dict[str, Any], list[dict[str, Any]] | None, list[dict[str, Any]] | None]:
         fields = {
             key: value
             for key, value in data.items()
@@ -84,19 +90,47 @@ class EncounterService:
                 raise ValueError("Unknown faction.")
             fields["factions"] = [value for value in CARD_FACTIONS if value in fields["factions"]]
         entries = data.get("entries")
-        old_quantities = (
-            {entry.card_id: entry.quantity for entry in existing.entries.all()} if existing else {}
-        )
-        if entries is not None:
-            cards = encounters.get_cards([entry["card_id"] for entry in entries])
+        sideboards = data.get("sideboards")
+        old_boards = {board.id: board for board in existing.sideboards.all()} if existing else {}
+
+        def validate_entries(values: list[dict[str, Any]], old_quantities: dict[str, int]) -> None:
+            cards = encounters.get_cards([entry["card_id"] for entry in values])
             seen: set[str] = set()
-            for entry in entries:
+            for entry in values:
                 card = cards.get(entry["card_id"])
                 if card is None or card.id in seen:
                     raise ValueError("Entries must reference distinct existing cards.")
                 seen.add(card.id)
+                if type(entry["quantity"]) is not int or entry["quantity"] < 1:
+                    raise ValueError("Card quantities must be positive integers.")
                 if card.card_pool != "evil" and entry["quantity"] > old_quantities.get(card.id, 0):
                     raise ValueError("Only Evil cards can be added to an Encounter.")
+
+        if entries is not None:
+            validate_entries(
+                entries,
+                {entry.card_id: entry.quantity for entry in existing.entries.all()}
+                if existing
+                else {},
+            )
+        seen_boards: set[str] = set()
+        if sideboards is not None:
+            for board in sideboards:
+                board["name"] = " ".join(board["name"].split())
+                if not board["name"]:
+                    raise ValueError("Sideboard name is required.")
+                board_id = board.get("id")
+                if board_id and (board_id not in old_boards or board_id in seen_boards):
+                    raise ValueError(
+                        "Sideboards must reference distinct boards belonging to this Encounter."
+                    )
+                if board_id:
+                    seen_boards.add(board_id)
+                old = old_boards.get(board_id)
+                validate_entries(
+                    board["entries"],
+                    {entry.card_id: entry.quantity for entry in old.entries.all()} if old else {},
+                )
         boss_id = fields.get("boss_card_id", existing.boss_card_id if existing else None)
         group_id = fields.get("boss_group_id", existing.boss_group_id if existing else None)
         selection_changed = (
@@ -122,7 +156,7 @@ class EncounterService:
                     for member in group.members.all()
                 ):
                     raise ValueError("The boss group must contain active Evil cards only.")
-        return fields, entries
+        return fields, entries, sideboards
 
     def create(self, creator_id: str, key: UUID, data: dict[str, Any]) -> tuple[Encounter, bool]:
         existing, used = encounters.creation_result(creator_id, key)
@@ -130,15 +164,17 @@ class EncounterService:
             return existing, False
         if used:
             raise encounters.EncounterDeleted("The Encounter created by this key has been deleted.")
-        fields, entries = self.normalize(data)
-        record, created = encounters.create_encounter(creator_id, key, fields, entries or [])
+        fields, entries, sideboards = self.normalize(data)
+        record, created = encounters.create_encounter(
+            creator_id, key, fields, entries or [], sideboards or []
+        )
         result = encounters.get_encounter(str(record.id))
         assert result is not None
         return result, created
 
     def update(self, encounter: Encounter, data: dict[str, Any], revision: int) -> Encounter:
-        fields, entries = self.normalize(data, encounter)
-        encounters.update_encounter(str(encounter.id), revision, fields, entries)
+        fields, entries, sideboards = self.normalize(data, encounter)
+        encounters.update_encounter(str(encounter.id), revision, fields, entries, sideboards)
         result = encounters.get_encounter(str(encounter.id))
         assert result is not None
         return result

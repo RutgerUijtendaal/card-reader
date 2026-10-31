@@ -8,12 +8,7 @@ import {
 import type { PaginatedCardsResponse, GalleryItem } from '@/domain/cards/types';
 
 export const fetchEncounterBosses = async (params: URLSearchParams) =>
-  (
-    await api.get<PaginatedCardsResponse<GalleryItem>>(
-      '/staff/encounters/bosses',
-      { params },
-    )
-  ).data;
+  (await api.get<PaginatedCardsResponse<GalleryItem>>('/staff/encounters/bosses', { params })).data;
 
 export const fetchEncounters = async (
   staff: boolean,
@@ -22,9 +17,22 @@ export const fetchEncounters = async (
   (await api.get<EncounterPage>(staff ? '/staff/encounters' : '/encounters', { params })).data;
 export const fetchEncounter = async (id: string, staff = true): Promise<EncounterRecord> =>
   (await api.get<EncounterRecord>(`${staff ? '/staff' : ''}/encounters/${id}`)).data;
+const writePayload = (payload: EncounterDraft) => ({
+  ...payload,
+  // Existing immutable attempts from before sideboards were supported omit this field.
+  ...(payload.sideboards
+    ? {
+        sideboards: payload.sideboards.map((board) => ({
+          ...(board.source_id ? { id: board.source_id } : {}),
+          name: board.name,
+          entries: board.entries,
+        })),
+      }
+    : {}),
+});
 export const createEncounter = async (payload: EncounterDraft, key: string) => ({
   record: (
-    await api.post<EncounterRecord>('/staff/encounters', payload, {
+    await api.post<EncounterRecord>('/staff/encounters', writePayload(payload), {
       headers: { 'Idempotency-Key': key },
     })
   ).data,
@@ -48,11 +56,22 @@ export const updateEncounter = async (
   payload: EncounterDraft,
   revision: number,
 ): Promise<EncounterRecord> =>
-  (await api.patch<EncounterRecord>(`/staff/encounters/${id}`, { ...payload, revision })).data;
+  (
+    await api.patch<EncounterRecord>(`/staff/encounters/${id}`, {
+      ...writePayload(payload),
+      revision,
+    })
+  ).data;
 export const deleteEncounter = async (id: string, revision: number): Promise<void> => {
   await api.delete(`/staff/encounters/${id}`, { headers: { 'If-Match': String(revision) } });
 };
 export const fetchEncounterRules = async (): Promise<{ minimum_cards: number }> =>
   (await api.get<{ minimum_cards: number }>('/encounters/rules')).data;
-export const exportEncounter = async (id: string) =>
-  mapTtsExportResponse((await api.get<TtsExportApiResponse>(`/encounters/${id}/exports/tts`)).data);
+export const exportEncounter = async (id: string, sideboardId?: string) =>
+  mapTtsExportResponse(
+    (
+      await api.get<TtsExportApiResponse>(`/encounters/${id}/exports/tts`, {
+        params: sideboardId ? { sideboard_id: sideboardId } : undefined,
+      })
+    ).data,
+  );

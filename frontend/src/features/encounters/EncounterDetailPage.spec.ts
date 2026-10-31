@@ -46,7 +46,10 @@ vi.mock('@/domain/cards/components/CardMarkupText.vue', () => ({
 }));
 vi.mock('@/domain/cards/components/CardGalleryItem.vue', () => ({
   default: defineComponent({
-    props: { card: { type: Object, required: true }, navigationTarget: { type: Object, default: undefined } },
+    props: {
+      card: { type: Object, required: true },
+      navigationTarget: { type: Object, default: undefined },
+    },
     setup:
       (props, { slots }) =>
       () =>
@@ -104,6 +107,7 @@ const fixture = (override: Partial<EncounterRecord> = {}): EncounterRecord => ({
   boss_card_id: 'boss',
   boss_group_id: 'group-1',
   boss_card: card('boss', 'boss'),
+  sideboards: [],
   boss_cards: [card('boss', 'boss'), card('linked')],
   entries: [
     { card_id: 'army', card: card('army'), quantity: 19 },
@@ -111,6 +115,7 @@ const fixture = (override: Partial<EncounterRecord> = {}): EncounterRecord => ({
   ],
   factions: ['order'],
   total_cards: 21,
+  sideboard_count: 0,
   visibility: 'public',
   revision: 1,
   creator: { id: 'staff-2', username: 'Another author' },
@@ -223,6 +228,7 @@ test('incomplete staff records show actionable issues without requiring a boss o
       boss_cards: [],
       entries: [],
       total_cards: 0,
+      sideboard_count: 0,
       visibility: 'private',
       status: { is_valid: false, issues: ['Choose a boss.', 'Add at least 20 cards.'] },
     }),
@@ -244,7 +250,7 @@ test('anonymous detail uses the public API, hides staff actions, and exports the
   await click(target, 'Boss');
   (target.querySelector('[aria-label="Copy Encounter TTS"]') as HTMLElement).click();
   await flush();
-  expect(exportRecord).toHaveBeenCalledWith('fight-1');
+  expect(exportRecord).toHaveBeenCalledWith('fight-1', undefined);
   expect(copyExport).toHaveBeenCalled();
   expect(target.querySelector('textarea')?.value).toBe('tts-code');
 });
@@ -275,4 +281,20 @@ test('unavailable encounters show the API failure without cards or export action
   );
   expect(target.querySelectorAll('article')).toHaveLength(0);
   expect(target.querySelector('[aria-label="Copy Encounter TTS"]')).toBeNull();
+});
+
+test('sideboard tabs show saved quantities and export only the selected board', async () => {
+  const base = fixture();
+  fetchRecord.mockResolvedValue(
+    fixture({
+      sideboards: [{ id: 'reserve', name: 'Reinforcements', entries: [base.entries[0]] }],
+    }),
+  );
+  const { target } = await mount();
+  await click(target, 'Reinforcements');
+  (target.querySelector('[aria-label="Copy Sideboard TTS"]') as HTMLElement).click();
+  await flush();
+  expect(exportRecord).toHaveBeenCalledWith('fight-1', 'reserve');
+  await click(target, 'Mainboard');
+  expect(target.querySelector('[aria-label="Copy Encounter TTS"]')).not.toBeNull();
 });

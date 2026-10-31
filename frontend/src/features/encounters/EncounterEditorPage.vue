@@ -85,9 +85,7 @@
         </button>
       </div>
     </div>
-    <BuilderDetailsLayout
-      v-if="mode === 'details'"
-    >
+    <BuilderDetailsLayout v-if="mode === 'details'">
       <template #aside>
         <EncounterSelectionPanel
           :editor="editor"
@@ -274,7 +272,7 @@ const {
 const browser = useEncounterBrowser({
   mode,
   bossFactions: editor.factions,
-  cardIds: computed(() => form.entries.map((entry) => entry.card_id)),
+  cardIds: computed(() => [...form.entries, ...form.sideboards.flatMap((board) => board.entries)].map((entry) => entry.card_id)),
 });
 const sections = [
   { value: 'boss', label: 'Boss', icon: Crown },
@@ -301,7 +299,8 @@ const subtitle = computed(() =>
       ? 'Edit the information people use to understand and discover this Encounter.'
       : `Build an Evil deck with at least ${editor.minimum.value} cards, excluding the boss.`,
 );
-const quantity = (id: string) => form.entries.find((entry) => entry.card_id === id)?.quantity ?? 0;
+const quantity = (id: string) =>
+  editor.boards.activeBoardEntries.value.find((entry) => entry.card_id === id)?.quantity ?? 0;
 const remove = (id: string) => editor.quantity(id, quantity(id) - 1);
 const activate = (card: GalleryItem) => {
   if (mode.value === 'boss') void editor.selectBoss(card);

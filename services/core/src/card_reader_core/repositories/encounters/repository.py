@@ -4,12 +4,19 @@ from typing import Any
 from uuid import UUID
 
 from django.db import transaction
-from django.db.models import Exists, F, OuterRef, Prefetch, Q, QuerySet, Subquery, Sum
+from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, QuerySet, Subquery, Sum
 from django.db.models.functions import Coalesce, Trim
 
 from card_reader_core.models import Card, CardGroup, CardGroupMember, CardRoleAssignment, CardVersionImage, now_utc
-from card_reader_core.models.encounter import Encounter, EncounterCreation, EncounterEntry
+from card_reader_core.models.encounter import (
+    Encounter,
+    EncounterCreation,
+    EncounterEntry,
+    EncounterSideboard,
+    EncounterSideboardEntry,
+)
 from card_reader_core.repositories.cards import card_version_metadata_prefetches
+
 
 
 class EncounterConflict(ValueError):
@@ -47,6 +54,16 @@ def encounter_queryset(*, detail: bool = True) -> QuerySet[Encounter]:
     bad_entries = EncounterEntry.objects.filter(encounter_id=OuterRef("pk")).exclude(
         card__card_pool="evil", card__lifecycle_status="active"
     )
+    bad_sideboards = EncounterSideboardEntry.objects.filter(
+        sideboard__encounter_id=OuterRef("pk")
+    ).exclude(card__card_pool="evil", card__lifecycle_status="active")
+    board_count = (
+        EncounterSideboard.objects.filter(encounter_id=OuterRef("pk"))
+        .order_by()
+        .values("encounter_id")
+        .annotate(value=Count("pk"))
+        .values("value")
+    )
     bad_members = CardGroupMember.objects.filter(group_id=OuterRef("boss_group_id")).exclude(
         card__card_pool="evil", card__lifecycle_status="active"
     )
@@ -58,6 +75,8 @@ def encounter_queryset(*, detail: bool = True) -> QuerySet[Encounter]:
         Encounter.objects.annotate(
             total_cards=Coalesce(Subquery(total), 0),
             bad_entries=Exists(bad_entries),
+            bad_sideboards=Exists(bad_sideboards),
+            sideboard_count=Coalesce(Subquery(board_count), 0),
             bad_members=Exists(bad_members),
             has_boss_role=Exists(boss_role),
             boss_in_group=Exists(boss_member),
@@ -71,6 +90,17 @@ def encounter_queryset(*, detail: bool = True) -> QuerySet[Encounter]:
     if not detail:
         return records
     return records.prefetch_related(
+        Prefetch(
+            "sideboards",
+            queryset=EncounterSideboard.objects.prefetch_related(
+                Prefetch(
+                    "entries",
+                    queryset=EncounterSideboardEntry.objects.prefetch_related(
+                        Prefetch("card", queryset=card_queryset())
+                    ),
+                )
+            ),
+        ),
         Prefetch(
             "entries",
             queryset=EncounterEntry.objects.prefetch_related(
@@ -93,6 +123,7 @@ def public_queryset(minimum_cards: int, *, detail: bool = True) -> QuerySet[Enco
             visibility="public",
             total_cards__gte=minimum_cards,
             bad_entries=False,
+            bad_sideboards=False,
             bad_members=False,
             has_boss_role=True,
             boss_card__card_pool="evil",
@@ -160,9 +191,41 @@ def replace_entries(encounter: Encounter, entries: list[dict[str, Any]]) -> None
     )
 
 
+def replace_sideboards(encounter: Encounter, sideboards: list[dict[str, Any]]) -> None:
+    retained = []
+    for position, data in enumerate(sideboards):
+        board_id = data.get("id")
+        if board_id:
+            board = encounter.sideboards.get(pk=board_id)
+            board.name, board.position = data["name"], position
+            board.save(update_fields=["name", "position", "updated_at"])
+        else:
+            board = EncounterSideboard.objects.create(
+                encounter=encounter, name=data["name"], position=position
+            )
+        retained.append(board.id)
+        board.entries.all().delete()
+        EncounterSideboardEntry.objects.bulk_create(
+            [
+                EncounterSideboardEntry(
+                    sideboard=board,
+                    card_id=entry["card_id"],
+                    quantity=entry["quantity"],
+                    position=index,
+                )
+                for index, entry in enumerate(data["entries"])
+            ]
+        )
+    encounter.sideboards.exclude(pk__in=retained).delete()
+
+
 @transaction.atomic
 def create_encounter(
-    creator_id: str, key: UUID, fields: dict[str, Any], entries: list[dict[str, Any]]
+    creator_id: str,
+    key: UUID,
+    fields: dict[str, Any],
+    entries: list[dict[str, Any]],
+    sideboards: list[dict[str, Any]],
 ) -> tuple[Encounter, bool]:
     receipt, created = EncounterCreation.objects.get_or_create(
         creator_id=creator_id, client_creation_id=key
@@ -174,6 +237,7 @@ def create_encounter(
         return existing, False
     encounter = Encounter.objects.create(creator_id=creator_id, **fields)
     replace_entries(encounter, entries)
+    replace_sideboards(encounter, sideboards)
     receipt.encounter = encounter
     receipt.save(update_fields=["encounter"])
     return encounter, True
@@ -181,7 +245,11 @@ def create_encounter(
 
 @transaction.atomic
 def update_encounter(
-    encounter_id: str, revision: int, fields: dict[str, Any], entries: list[dict[str, Any]] | None
+    encounter_id: str,
+    revision: int,
+    fields: dict[str, Any],
+    entries: list[dict[str, Any]] | None,
+    sideboards: list[dict[str, Any]] | None,
 ) -> None:
     changed = Encounter.objects.filter(pk=encounter_id, revision=revision).update(
         **fields, revision=F("revision") + 1, updated_at=now_utc()
@@ -192,6 +260,8 @@ def update_encounter(
         )
     if entries is not None:
         replace_entries(Encounter.objects.get(pk=encounter_id), entries)
+    if sideboards is not None:
+        replace_sideboards(Encounter.objects.get(pk=encounter_id), sideboards)
 
 
 def delete_encounter(encounter_id: str, revision: int) -> bool:
@@ -212,6 +282,25 @@ def retarget_encounter_cards(target_id: str, source_ids: list[str]) -> None:
     affected.update(
         Encounter.objects.filter(boss_card_id__in=source_ids).values_list("id", flat=True)
     )
+    affected.update(
+        EncounterSideboardEntry.objects.filter(card_id__in=source_ids).values_list(
+            "sideboard__encounter_id", flat=True
+        )
+    )
+    for sideboard_entry in EncounterSideboardEntry.objects.filter(card_id__in=source_ids).order_by(
+        "position", "id"
+    ):
+        existing_sideboard_entry = EncounterSideboardEntry.objects.filter(
+            sideboard=sideboard_entry.sideboard, card_id=target_id
+        ).first()
+        if existing_sideboard_entry is None:
+            sideboard_entry.card_id = target_id
+            sideboard_entry.save(update_fields=["card"])
+        else:
+            existing_sideboard_entry.quantity += sideboard_entry.quantity
+            existing_sideboard_entry.position = min(existing_sideboard_entry.position, sideboard_entry.position)
+            existing_sideboard_entry.save(update_fields=["quantity", "position"])
+            sideboard_entry.delete()
     Encounter.objects.filter(boss_card_id__in=source_ids).update(boss_card_id=target_id)
     for entry in EncounterEntry.objects.filter(card_id__in=source_ids).order_by("position", "id"):
         existing = EncounterEntry.objects.filter(

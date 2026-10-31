@@ -1,15 +1,19 @@
 import { computed, getCurrentScope, onScopeDispose, ref } from 'vue';
-import type {
-  DeckBoardEntryChange,
-  DeckBoardEntryChangeKind,
-  DeckForm,
-  DeckFormEntry,
-} from '@/features/decks/composables/deckEditorDraftTypes';
+export type BoardEntry = { card_id: string; quantity: number };
+export type FormSideboard = { id: string; source_id?: string; name: string; entries: BoardEntry[] };
+type BoardForm = { entries: BoardEntry[]; sideboards: FormSideboard[] };
+type BoardEntryChangeKind = 'add' | 'remove';
+type BoardEntryChange = {
+  cardId: string;
+  boardId: string;
+  kind: BoardEntryChangeKind;
+  sequence: number;
+};
 
 export const MAINBOARD_ID = 'mainboard';
 const BOARD_ENTRY_POP_DURATION_MS = 320;
 
-type PendingRemovedDeckEntry = DeckFormEntry & {
+type PendingRemovedDeckEntry = BoardEntry & {
   boardId: string;
   index: number;
 };
@@ -21,9 +25,9 @@ const buildLocalSideboardId = (): string => {
   return `sideboard-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 };
 
-export const useDeckEditorBoards = (form: DeckForm) => {
+export const useCardCollectionBoards = (form: BoardForm) => {
   const activeBoardId = ref<string>(MAINBOARD_ID);
-  const lastBoardEntryChange = ref<DeckBoardEntryChange | null>(null);
+  const lastBoardEntryChange = ref<BoardEntryChange | null>(null);
   const pendingRemovedEntries = ref<PendingRemovedDeckEntry[]>([]);
   const pendingRemovalTimers = new Map<string, number>();
   let boardEntryChangeSequence = 0;
@@ -42,12 +46,13 @@ export const useDeckEditorBoards = (form: DeckForm) => {
     );
   };
 
-  const schedulePendingRemovedEntry = (entry: DeckFormEntry, boardId: string, index: number): void => {
+  const schedulePendingRemovedEntry = (entry: BoardEntry, boardId: string, index: number): void => {
     clearPendingRemovedEntry(entry.card_id, boardId);
     pendingRemovedEntries.value = [...pendingRemovedEntries.value, { ...entry, boardId, index }];
     const timer = window.setTimeout(() => {
       pendingRemovedEntries.value = pendingRemovedEntries.value.filter(
-        (pendingEntry) => pendingEntry.card_id !== entry.card_id || pendingEntry.boardId !== boardId,
+        (pendingEntry) =>
+          pendingEntry.card_id !== entry.card_id || pendingEntry.boardId !== boardId,
       );
       pendingRemovalTimers.delete(boardEntryKey(entry.card_id, boardId));
     }, BOARD_ENTRY_POP_DURATION_MS);
@@ -63,7 +68,7 @@ export const useDeckEditorBoards = (form: DeckForm) => {
   const notifyBoardEntryChange = (
     cardId: string,
     boardId: string,
-    kind: DeckBoardEntryChangeKind,
+    kind: BoardEntryChangeKind,
   ): void => {
     boardEntryChangeSequence += 1;
     lastBoardEntryChange.value = { cardId, boardId, kind, sequence: boardEntryChangeSequence };
@@ -75,9 +80,9 @@ export const useDeckEditorBoards = (form: DeckForm) => {
     () => form.sideboards.find((sideboard) => sideboard.id === activeBoardId.value) ?? null,
   );
   const activeBoardEntries = computed(() =>
-    activeBoardId.value === MAINBOARD_ID ? form.entries : activeSideboard.value?.entries ?? [],
+    activeBoardId.value === MAINBOARD_ID ? form.entries : (activeSideboard.value?.entries ?? []),
   );
-  const visibleActiveBoardEntries = computed<DeckFormEntry[]>(() => {
+  const visibleActiveBoardEntries = computed<BoardEntry[]>(() => {
     const entries = [...activeBoardEntries.value];
     const pendingEntries = pendingRemovedEntries.value
       .filter((entry) => entry.boardId === activeBoardId.value)
@@ -120,10 +125,10 @@ export const useDeckEditorBoards = (form: DeckForm) => {
     if (activeBoardId.value === sideboardId) activeBoardId.value = MAINBOARD_ID;
   };
 
-  const getBoardEntries = (boardId: string): DeckFormEntry[] =>
+  const getBoardEntries = (boardId: string): BoardEntry[] =>
     boardId === MAINBOARD_ID
       ? form.entries
-      : form.sideboards.find((sideboard) => sideboard.id === boardId)?.entries ?? [];
+      : (form.sideboards.find((sideboard) => sideboard.id === boardId)?.entries ?? []);
   const getEntryQuantity = (cardId: string, boardId = activeBoardId.value): number =>
     getBoardEntries(boardId).find((entry) => entry.card_id === cardId)?.quantity ?? 0;
   const getBoardLabel = (boardId: string): string =>
@@ -131,7 +136,7 @@ export const useDeckEditorBoards = (form: DeckForm) => {
       ? 'Mainboard'
       : form.sideboards.find((sideboard) => sideboard.id === boardId)?.name.trim() ||
         'Untitled Sideboard';
-  const updateBoardEntries = (boardId: string, entries: DeckFormEntry[]): void => {
+  const updateBoardEntries = (boardId: string, entries: BoardEntry[]): void => {
     if (boardId === MAINBOARD_ID) form.entries = entries;
     else {
       form.sideboards = form.sideboards.map((sideboard) =>
@@ -182,7 +187,10 @@ export const useDeckEditorBoards = (form: DeckForm) => {
     const index = entries.findIndex((entry) => entry.card_id === cardId);
     const currentEntry = index >= 0 ? entries[index] : null;
     if (!currentEntry || currentEntry.quantity <= 0) return;
-    updateBoardEntries(boardId, entries.filter((entry) => entry.card_id !== cardId));
+    updateBoardEntries(
+      boardId,
+      entries.filter((entry) => entry.card_id !== cardId),
+    );
     schedulePendingRemovedEntry(currentEntry, boardId, index);
     notifyBoardEntryChange(cardId, boardId, 'remove');
   };

@@ -5,19 +5,26 @@
     <CardBuilderSummaryHeader
       :name="editor.form.name || 'Untitled Encounter'"
       :card="editor.boss.value"
-      board-label="Mainboard"
-      :count="editor.total.value"
+      :board-label="editor.boards.getBoardLabel(editor.boards.activeBoardId.value)"
+      :count="
+        editor.boards.activeBoardEntries.value.reduce((sum, entry) => sum + entry.quantity, 0)
+      "
       empty-label="Choose boss"
       action-label="Choose or change boss"
       :expanded="false"
       @activate="editor.setMode('boss')"
     />
-    <div class="theme-divider flex items-center justify-between border-b px-5 py-3">
-      <h4 class="theme-section-title text-sm font-semibold">
-        Deck cards
-      </h4>
-      <span class="theme-section-muted text-xs">{{ editor.form.entries.length }} unique</span>
-    </div>
+    <CardBuilderBoards
+      class="mt-3"
+      :active-board-id="editor.boards.activeBoardId.value"
+      :mainboard-count="editor.total.value"
+      :sideboards="editor.boards.sideboardTabs.value"
+      :locked="editor.locked.value"
+      @add="editor.addSideboard"
+      @select="editor.boards.selectBoard"
+      @rename="editor.renameSideboard"
+      @remove="editor.removeSideboard"
+    />
     <div
       ref="scrollRef"
       class="app-scrollbar relative mt-4 min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pr-4"
@@ -27,13 +34,13 @@
         class="space-y-3 pb-1"
       >
         <div
-          v-if="!editor.form.entries.length"
+          v-if="!editor.boards.activeBoardEntries.value.length"
           class="theme-empty-state"
         >
-          No cards added to this Encounter yet.
+          No cards added to this board yet.
         </div>
         <template
-          v-for="entry in editor.form.entries"
+          v-for="entry in editor.boards.activeBoardEntries.value"
           :key="entry.card_id"
         >
           <CardBuilderEntryRow
@@ -41,10 +48,11 @@
             :entry="{ card: editor.cards.value[entry.card_id], quantity: entry.quantity }"
             :sortable-card-id="entry.card_id"
             :hover-mode="hoverMode"
-            :move-destinations="[]"
+            :move-destinations="destinations"
             :mutation-disabled="editor.locked.value"
             :row-action-disabled="editor.locked.value"
             :row-secondary-action-disabled="editor.locked.value"
+            @move-to-board="editor.moveToBoard"
             @increment="editor.quantity(entry.card_id, entry.quantity + 1)"
             @decrement="editor.quantity(entry.card_id, entry.quantity - 1)"
             @remove="editor.quantity(entry.card_id, 0)"
@@ -63,8 +71,9 @@
   </aside>
 </template>
 <script setup lang="ts">
-import { ref, shallowRef, watch } from 'vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 import { useSortable } from '@vueuse/integrations/useSortable';
+import CardBuilderBoards from '@/domain/cards/components/CardBuilderBoards.vue';
 import CardBuilderEntryRow from '@/domain/cards/components/CardBuilderEntryRow.vue';
 import CardBuilderSummaryHeader from '@/domain/cards/components/CardBuilderSummaryHeader.vue';
 import type { HoverMode } from '@/domain/cards/utils/gallery/hoverMode';
@@ -73,9 +82,19 @@ const props = defineProps<{
   editor: ReturnType<typeof useEncounterEditor>;
   hoverMode: HoverMode;
 }>();
+const destinations = computed(() =>
+  [
+    { boardId: 'mainboard', label: 'Mainboard', disabled: false },
+    ...props.editor.boards.sideboardTabs.value.map((board) => ({
+      boardId: board.id,
+      label: board.name,
+      disabled: false,
+    })),
+  ].filter((board) => board.boardId !== props.editor.boards.activeBoardId.value),
+);
 const listRef = ref<HTMLElement | null>(null);
 const scrollRef = ref<HTMLElement | null>(null);
-const entries = shallowRef([...props.editor.form.entries]);
+const entries = shallowRef([...props.editor.boards.activeBoardEntries.value]);
 const sortable = useSortable(listRef, entries, {
   animation: 160,
   handle: '.deck-board-entry-drag-handle',
@@ -87,14 +106,14 @@ const sortable = useSortable(listRef, entries, {
   scrollSpeed: 18,
   onUpdate: (event) => {
     if (props.editor.locked.value || event.newIndex === undefined) return;
-    const from = props.editor.form.entries.findIndex(
+    const from = props.editor.boards.activeBoardEntries.value.findIndex(
       (entry) => entry.card_id === event.item.dataset.cardId,
     );
     if (from >= 0) props.editor.move(from, event.newIndex - from);
   },
 });
 watch(
-  () => props.editor.form.entries,
+  () => props.editor.boards.activeBoardEntries.value,
   (value) => {
     entries.value = [...value];
   },
