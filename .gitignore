@@ -35,6 +35,7 @@ services/*/build/
 .codex/config.toml
 /.agents/
 /.agents-location
+# Local command scratch data and seeded benchmark reports.
 .tmp/
 services/integration/.runtime/
 *.spec

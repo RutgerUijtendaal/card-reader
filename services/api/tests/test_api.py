@@ -2844,6 +2844,28 @@ def test_cards_list_can_return_card_groups() -> None:
     assert extra_card.id not in {row["id"] for row in card_rows}
 
 
+def test_default_grouped_gallery_counts_each_group_once_for_multiple_matching_members() -> None:
+    anchor, _ = _create_editable_card_version(name="Existence Anchor")
+    first, _ = _create_editable_card_version(name="Existence Match A")
+    second, _ = _create_editable_card_version(name="Existence Match B")
+    standalone, _ = _create_editable_card_version(name="Existence Match C")
+    group = _create_card_group(
+        "existence-group", anchor_card=anchor, members=[anchor, first, second]
+    )
+    client = Client(HTTP_HOST="localhost")
+    results = []
+    for page in (1, 2):
+        response = client.get("/cards", {
+            "card_pool": "player", "sort": "default", "show_groups": "true",
+            "q": "Existence Match", "page_size": 1, "page": page,
+        })
+        assert response.status_code == 200
+        assert response.json()["count"] == 2
+        results.extend(response.json()["results"])
+    assert [row["id"] for row in results] == [group.id, standalone.id]
+    assert len(results[0]["preview_cards"]) == 3
+
+
 def test_grouped_gallery_preview_images_do_not_query_per_member() -> None:
     cards = []
     for index in range(7):

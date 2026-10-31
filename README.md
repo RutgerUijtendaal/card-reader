@@ -108,6 +108,25 @@ pnpm --filter @card-reader/integration test
 pnpm --filter @card-reader/core lint
 ```
 
+Benchmark gallery pages and deck loading with disposable seeded SQLite data:
+
+```bash
+uv run --package card-reader-api python scripts/benchmark-loading.py --output .tmp/loading.json
+```
+
+The benchmark migrates a temporary database under `.tmp/codex/`, seeds 3,000 cards
+with three versions each and 120 overlapping decks, and measures rendered API
+views after a warmup. It records median/p95 latency, query counts, SQL plans, and
+response hashes. It excludes HTTP, session middleware, and image transfer; the
+synthetic timings are comparison measurements, not production latency promises.
+Use `--cards`, `--decks`, `--snapshot-bytes`, and `--repeats` to vary the workload.
+Add `--encounters 120` to seed and measure Encounter detail, public/staff lists,
+and the boss picker; use `--scenario-prefix encounter` to measure only those cases.
+Use `--source-root <baseline-checkout>` to measure another checkout with the same
+fixture, then `--compare <baseline-report.json>` to require identical response
+hashes. Keep reports under `.tmp/`; the benchmark never uses the configured app
+database or storage and removes its temporary database when finished.
+
 ## Python Workspace
 
 Python services use one shared workspace environment at the repo root.

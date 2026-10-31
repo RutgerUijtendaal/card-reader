@@ -136,9 +136,7 @@ def card_payload(
         "template_id": version.template.key,
         "version_id": version.id,
         "version_number": version.version_number,
-        "previous_version_id": version.previous_version.id
-        if version.previous_version is not None
-        else None,
+        "previous_version_id": version.previous_version_id,
         "is_latest": version.is_latest,
         "content_version": _content_version_payload(version),
         "type_line": version.type_line,

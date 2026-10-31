@@ -81,6 +81,53 @@ def test_summary_query_count_does_not_grow_per_encounter():
     assert len(multiple) == len(single)
 
 
+def test_encounter_detail_batches_version_metadata_and_preserves_duplicate_boss_entries():
+    from card_reader_core.models import CardVersion, CardVersionSymbol, ContentVersion, Symbol, Template
+    from card_reader_core.models.encounter import Encounter, EncounterEntry
+
+    owner = get_user_model().objects.create_user(username="encounter-query-owner", is_staff=True)
+    template = Template.objects.create(key="encounter-query-template", label="Query template")
+    content = ContentVersion.objects.create(
+        version_number="91.0.0", base_version="91.0.0", major=91, minor=0, patch=0,
+        description="Query regression",
+    )
+    symbol = Symbol.objects.create(key="encounter-query-symbol", label="Query symbol")
+    cards = [card(boss=index == 0) for index in range(25)]
+    for value in cards:
+        version = CardVersion.objects.create(
+            card=value, template=template, image_hash=value.id,
+            name=value.label, content_version=content,
+        )
+        CardVersionSymbol.objects.create(card_version=version, symbol=symbol)
+        value.latest_version = version
+        value.save(update_fields=["latest_version"])
+    group = CardGroup.objects.create(key="encounter-query-group", anchor_card=cards[0])
+    for position, value in enumerate(cards[:3]):
+        CardGroupMember.objects.create(group=group, card=value, position=position)
+    record = Encounter.objects.create(
+        creator=owner, name="Query encounter", visibility="public",
+        boss_card=cards[0], boss_group=group,
+    )
+    counts = []
+    for batch in (cards[:5], cards[5:]):
+        EncounterEntry.objects.bulk_create([
+            EncounterEntry(encounter=record, card=value, quantity=4, position=cards.index(value))
+            for value in batch
+        ])
+        with CaptureQueriesContext(connection) as queries:
+            response = Client().get(f"/encounters/{record.id}")
+        assert response.status_code == 200
+        counts.append(len(queries))
+        payload = response.json()
+        assert [row["id"] for row in payload["boss_cards"]] == [value.id for value in cards[:3]]
+        assert payload["entries"][0]["card_id"] == cards[0].id
+        assert payload["entries"][0]["quantity"] == 4
+        assert payload["boss_card"]["content_version"]["id"] == content.id
+        assert payload["boss_card"]["symbols"][0]["id"] == symbol.id
+    assert counts[0] == counts[1]
+    assert counts[1] <= 40
+
+
 def test_pool_restrictions_and_independent_faction_tags():
     client = staff_client()
     boss, normal, player = card(boss=True), card(), card(pool="player")

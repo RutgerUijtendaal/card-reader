@@ -56,13 +56,15 @@ def encounter_payload(
     cards = [*bosses, *[entry.card for entry in entries]]
     if record.boss_card:
         cards.append(record.boss_card)
+    unique_cards = {card.id: card for card in cards}
     backs = (
-        resolve_effective_card_backs([card.id for card in cards])
+        resolve_effective_card_backs(list(unique_cards))
         if resolved_backs is None
         else resolved_backs
     )
     payloads = {
-        card.id: deck_card_payload(card, resolved_card_back=backs.get(card.id)) for card in cards
+        card.id: deck_card_payload(card, resolved_card_back=backs.get(card.id))
+        for card in unique_cards.values()
     }
     issues = validation_issues(record)
     result: dict[str, object] = {

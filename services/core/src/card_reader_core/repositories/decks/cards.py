@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from card_reader_core.models import PLAYER_CARD_POOL, Card
 
-from .prefetch import latest_version_metadata_prefetches
+from card_reader_core.repositories.cards import card_version_metadata_prefetches
 
 
 def get_cards_by_ids(card_ids: list[str]) -> dict[str, Card]:
@@ -21,7 +21,7 @@ def get_cards_by_ids(card_ids: list[str]) -> dict[str, Card]:
             "role_assignments",
             "faction_assignments",
             "mana_family_assignments",
-            *latest_version_metadata_prefetches("latest_version"),
+            *card_version_metadata_prefetches("latest_version"),
         )
     }
 
@@ -37,7 +37,7 @@ def get_deck_card(card_id: str) -> Card | None:
             "role_assignments",
             "faction_assignments",
             "mana_family_assignments",
-            *latest_version_metadata_prefetches("latest_version"),
+            *card_version_metadata_prefetches("latest_version"),
         )
         .first()
     )

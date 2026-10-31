@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import timedelta
 from itertools import count
 
 from django.contrib.auth import get_user_model
 from django.db import connection
+from django.db.models import Prefetch
 from django.http import HttpResponse
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 
-from card_reader_api.decks.serializers import deck_hero_summary_payload
+from card_reader_api.decks.serializers import deck_card_payload, deck_hero_summary_payload
 from card_reader_core.models import (
     Card,
     CardRoleAssignment,
@@ -19,7 +21,11 @@ from card_reader_core.models import (
     CardVersionSymbol,
     CardVersionTag,
     CardVersionType,
+    ContentVersion,
     Deck,
+    DeckEntry,
+    DeckSideboard,
+    DeckSideboardEntry,
     DeckCreation,
     DeckTag,
     DeckTagAssignment,
@@ -684,6 +690,76 @@ def test_deck_summary_list_query_count_stays_bounded() -> None:
     assert response.status_code == 200
     assert len(response.json()) == 4
     assert len(queries.captured_queries) <= 20
+
+
+def test_deck_detail_batches_images_and_content_versions() -> None:
+    owner = _create_user("deck-detail-query-owner", "password")
+    hero = _create_card(name="Detail Query Hero", hero=True)
+    cards = _build_mainboard_cards(total_unique=30)
+    content_version = ContentVersion.objects.create(
+        version_number="90.0.0", base_version="90.0.0",
+        major=90, minor=0, patch=0, description="Query regression",
+    )
+    image_path = settings.image_store_dir / "deck-query.png"
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    image_path.write_bytes(b"image")
+    for card in [hero, *cards]:
+        version = card.latest_version
+        assert version is not None
+        version.content_version = content_version
+        version.save(update_fields=["content_version"])
+        CardVersionImage.objects.create(
+            card_version=version, stored_path="images/deck-query.png",
+            source_file="images/deck-query.png", checksum="usable",
+            created_at=version.created_at - timedelta(seconds=1),
+        )
+        # Keep the existing fallback to an older usable image when the newest is missing.
+        CardVersionImage.objects.create(
+            card_version=version, stored_path="images/missing.png",
+            source_file="images/missing.png", checksum="missing",
+        )
+
+    deck = Deck.objects.create(owner=owner, hero_card=hero, visibility="unlisted")
+    sideboard = DeckSideboard.objects.create(deck=deck, name="Options")
+    DeckSideboardEntry.objects.create(sideboard=sideboard, card=cards[0])
+    counts = []
+    for batch in (cards[:5], cards[5:]):
+        DeckEntry.objects.bulk_create([
+            DeckEntry(deck=deck, card=card, quantity=4, position=position)
+            for position, card in enumerate(batch)
+        ])
+        with CaptureQueriesContext(connection) as queries:
+            response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}")
+        assert response.status_code == 200
+        counts.append(len(queries))
+        payload = response.json()
+        card_payloads = [payload["hero_card"]]
+        card_payloads.extend(row["card"] for row in payload["mainboard"]["entries"])
+        card_payloads.extend(row["card"] for row in payload["sideboards"][0]["entries"])
+        for card_payload in card_payloads:
+            assert card_payload["image_url"] == "/card-images/images/deck-query.png"
+            assert card_payload["content_version"]["id"] == content_version.id
+    assert counts[0] == counts[1]
+    assert counts[1] <= 40
+
+
+def test_deck_card_payload_preserves_newest_image_with_different_prefetch_order() -> None:
+    card = _create_card(name="Image order", hero=False)
+    version = card.latest_version
+    assert version is not None
+    settings.image_store_dir.mkdir(parents=True, exist_ok=True)
+    for index, filename in enumerate(("old.png", "new.png")):
+        (settings.image_store_dir / filename).write_bytes(b"image")
+        CardVersionImage.objects.create(
+            card_version=version, source_file=f"images/{filename}",
+            stored_path=f"images/{filename}", checksum=filename,
+            created_at=version.created_at + timedelta(seconds=index),
+        )
+    loaded = Card.objects.prefetch_related(
+        Prefetch("latest_version__images", queryset=CardVersionImage.objects.order_by("created_at"))
+    ).get(pk=card.id)
+    payload = deck_card_payload(loaded, resolved_card_back=None)
+    assert payload["image_url"] == "/card-images/images/new.png"
 
 
 def test_public_deck_list_filters_by_hero_name() -> None:
