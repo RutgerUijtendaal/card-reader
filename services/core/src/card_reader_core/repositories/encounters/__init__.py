@@ -1,6 +1,7 @@
 from .repository import (
     EncounterConflict,
     EncounterDeleted,
+    EncounterForbidden,
     create_encounter,
     creation_result,
     delete_encounter,
@@ -17,6 +18,7 @@ from .repository import (
 __all__ = [
     "EncounterConflict",
     "EncounterDeleted",
+    "EncounterForbidden",
     "create_encounter",
     "creation_result",
     "delete_encounter",

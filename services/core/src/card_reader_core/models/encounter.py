@@ -41,10 +41,11 @@ class Encounter(TimestampedModel):
     factions = models.JSONField(default=list)
     visibility: models.CharField[str, str] = models.CharField(
         max_length=16,
-        choices=[("private", "Staff only"), ("public", "Public")],
+        choices=[("private", "Private"), ("unlisted", "Unlisted"), ("public", "Public")],
         default="private",
         db_index=True,
     )
+    is_official: models.BooleanField[bool, bool] = models.BooleanField(default=False, db_index=True)
     revision: models.PositiveIntegerField[int, int] = models.PositiveIntegerField(default=1)
 
     class Meta:

@@ -94,10 +94,17 @@ export const buildCardReturnLocation = (query: LocationQuery): RouteLocationRaw 
   if (queryString(query.return_to) === 'encounter' && queryString(query.encounter_id)) {
     return {
       path: `/encounters/${queryString(query.encounter_id)}`,
-      query:
-        queryString(query.encounter_library) === 'staff'
-          ? { return_to: 'staff_encounters' }
-          : { return_to: 'encounters' },
+      query: {
+        return_to:
+          queryString(query.encounter_library) === 'staff'
+            ? 'staff_encounters'
+            : queryString(query.encounter_library) === 'mine'
+              ? 'my_encounters'
+              : 'encounters',
+        q: query.q,
+        factions: query.factions,
+        is_official: query.is_official,
+      },
     };
   }
   if (isNotificationsReturnQuery(query)) {

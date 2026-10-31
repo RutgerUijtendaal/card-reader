@@ -7,8 +7,8 @@
       :icon="APP_SECTION_ICONS.encounters"
       :title="editor.id ? 'Edit Encounter' : 'Build Encounter'"
       :subtitle="subtitle"
-      :back-to="publication.isCreating.value ? null : '/staff/encounters'"
-      back-label="Staff Encounters"
+      :back-to="publication.isCreating.value ? null : '/my/encounters'"
+      back-label="My Encounters"
       title-tag="h2"
       title-class="text-xl"
     >
@@ -36,6 +36,7 @@
           aria-hidden="true"
         />
         <AppHeaderAction
+          v-if="!editor.readOnly.value"
           :icon="busy ? LoaderCircle : editor.id ? Save : APP_SECTION_ICONS.encounters"
           :label="saveLabel"
           :short-label="saveLabel"
@@ -46,6 +47,22 @@
         />
       </template>
     </AppPageHeader>
+    <div
+      v-if="editor.readOnly.value"
+      class="app-page-content space-y-3"
+      role="status"
+    >
+      <p>
+        This Encounter is read only. Official Encounters can only be changed by staff. Your unsaved
+        changes remain in this editor.
+      </p>
+      <RouterLink
+        class="btn-secondary"
+        :to="`/encounters/${editor.id}`"
+      >
+        View saved Encounter
+      </RouterLink>
+    </div>
     <div
       v-if="error || serverConflict || publication.isCreationUnknown.value"
       class="px-5 space-y-3"
@@ -231,6 +248,7 @@
   </section>
 </template>
 <script setup lang="ts">
+import { RouterLink } from 'vue-router';
 import { computed } from 'vue';
 import { Crown, FileText, LayoutGrid, LoaderCircle, Save, TriangleAlert } from 'lucide-vue-next';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
@@ -272,7 +290,11 @@ const {
 const browser = useEncounterBrowser({
   mode,
   bossFactions: editor.factions,
-  cardIds: computed(() => [...form.entries, ...form.sideboards.flatMap((board) => board.entries)].map((entry) => entry.card_id)),
+  cardIds: computed(() =>
+    [...form.entries, ...form.sideboards.flatMap((board) => board.entries)].map(
+      (entry) => entry.card_id,
+    ),
+  ),
 });
 const sections = [
   { value: 'boss', label: 'Boss', icon: Crown },

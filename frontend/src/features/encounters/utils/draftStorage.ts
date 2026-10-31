@@ -23,12 +23,13 @@ const isEntry = (entry: unknown): boolean =>
 export const isEncounterDraft = (value: unknown): value is EncounterDraft => {
   if (!isObject(value)) return false;
   return (
+    (value.is_official === undefined || typeof value.is_official === 'boolean') &&
     typeof value.name === 'string' &&
     typeof value.description_markup === 'string' &&
     typeof value.long_description_markup === 'string' &&
     (value.boss_card_id === null || typeof value.boss_card_id === 'string') &&
     (value.boss_group_id === null || typeof value.boss_group_id === 'string') &&
-    ['private', 'public'].includes(String(value.visibility)) &&
+    ['private', 'unlisted', 'public'].includes(String(value.visibility)) &&
     Array.isArray(value.factions) &&
     value.factions.every(isCardFaction) &&
     (value.sideboards === undefined ||

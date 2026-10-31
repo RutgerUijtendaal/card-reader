@@ -63,7 +63,7 @@ def test_free_flow_drafts_shared_staff_and_public_validity():
     normal.lifecycle_status = "deprecated"
     normal.save()
     assert anonymous.get("/encounters").json()["count"] == 0
-    assert anonymous.get(f"/encounters/{draft['id']}/exports/tts").status_code == 404
+    assert anonymous.get(f"/encounters/{draft['id']}/exports/tts").status_code == 409
     assert other.get(f"/staff/encounters/{draft['id']}").json()["entries"][0]["quantity"] == 20
 
 
@@ -82,21 +82,34 @@ def test_summary_query_count_does_not_grow_per_encounter():
 
 
 def test_encounter_detail_batches_version_metadata_and_preserves_duplicate_boss_entries():
-    from card_reader_core.models import CardVersion, CardVersionSymbol, ContentVersion, Symbol, Template
+    from card_reader_core.models import (
+        CardVersion,
+        CardVersionSymbol,
+        ContentVersion,
+        Symbol,
+        Template,
+    )
     from card_reader_core.models.encounter import Encounter, EncounterEntry
 
     owner = get_user_model().objects.create_user(username="encounter-query-owner", is_staff=True)
     template = Template.objects.create(key="encounter-query-template", label="Query template")
     content = ContentVersion.objects.create(
-        version_number="91.0.0", base_version="91.0.0", major=91, minor=0, patch=0,
+        version_number="91.0.0",
+        base_version="91.0.0",
+        major=91,
+        minor=0,
+        patch=0,
         description="Query regression",
     )
     symbol = Symbol.objects.create(key="encounter-query-symbol", label="Query symbol")
     cards = [card(boss=index == 0) for index in range(25)]
     for value in cards:
         version = CardVersion.objects.create(
-            card=value, template=template, image_hash=value.id,
-            name=value.label, content_version=content,
+            card=value,
+            template=template,
+            image_hash=value.id,
+            name=value.label,
+            content_version=content,
         )
         CardVersionSymbol.objects.create(card_version=version, symbol=symbol)
         value.latest_version = version
@@ -105,15 +118,22 @@ def test_encounter_detail_batches_version_metadata_and_preserves_duplicate_boss_
     for position, value in enumerate(cards[:3]):
         CardGroupMember.objects.create(group=group, card=value, position=position)
     record = Encounter.objects.create(
-        creator=owner, name="Query encounter", visibility="public",
-        boss_card=cards[0], boss_group=group,
+        creator=owner,
+        name="Query encounter",
+        visibility="public",
+        boss_card=cards[0],
+        boss_group=group,
     )
     counts = []
     for batch in (cards[:5], cards[5:]):
-        EncounterEntry.objects.bulk_create([
-            EncounterEntry(encounter=record, card=value, quantity=4, position=cards.index(value))
-            for value in batch
-        ])
+        EncounterEntry.objects.bulk_create(
+            [
+                EncounterEntry(
+                    encounter=record, card=value, quantity=4, position=cards.index(value)
+                )
+                for value in batch
+            ]
+        )
         with CaptureQueriesContext(connection) as queries:
             response = Client().get(f"/encounters/{record.id}")
         assert response.status_code == 200
@@ -459,7 +479,7 @@ def test_sideboards_save_order_identity_revisions_and_public_validity():
         Client()
         .get(f"/encounters/{saved['id']}/exports/tts?sideboard_id={board['id']}")
         .status_code
-        == 404
+        == 409
     )
     retained = update(client, unchanged, sideboards=unchanged["sideboards"]).json()
     assert retained["sideboards"][0]["entries"][0]["quantity"] == 4

@@ -3,23 +3,27 @@ import type { CardFaction } from '@/domain/cards/cardFactions';
 import type { CardListItem } from '@/domain/cards/types';
 
 export type EncounterDraft = {
+  is_official?: boolean;
   name: string;
   description_markup: string;
   long_description_markup: string;
   boss_card_id: string | null;
   boss_group_id: string | null;
   factions: CardFaction[];
-  visibility: 'private' | 'public';
+  visibility: 'private' | 'unlisted' | 'public';
   entries: Array<{ card_id: string; quantity: number }>;
   sideboards: FormSideboard[];
 };
 
 export type EncounterSummary = {
+  is_official: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
   id: string;
   name: string;
   description: string;
   factions: CardFaction[];
-  visibility: 'private' | 'public';
+  visibility: 'private' | 'unlisted' | 'public';
   revision: number;
   creator: { id: string; username: string };
   boss_card_id: string | null;
@@ -58,7 +62,11 @@ export const emptyEncounter = (): EncounterDraft => ({
   entries: [],
   sideboards: [],
 });
-export const encounterDraftFromRecord = (record: EncounterRecord): EncounterDraft => ({
+export const encounterDraftFromRecord = (
+  record: EncounterRecord,
+  includeOfficial = false,
+): EncounterDraft => ({
+  ...(includeOfficial ? { is_official: record.is_official } : {}),
   name: record.name,
   description_markup: record.description_markup,
   long_description_markup: record.long_description_markup,

@@ -8,6 +8,8 @@ from card_reader_core.models import CARD_FACTIONS, Card, card_has_role
 from card_reader_core.models.encounter import Encounter
 from card_reader_core.repositories import encounters
 
+from .access import EncounterActor
+
 MINIMUM_ENCOUNTER_CARDS = 20
 
 
@@ -36,7 +38,7 @@ def validation_issues(encounter: Encounter, *, export: bool = False) -> list[str
         bad_contents = (
             getattr(encounter, "bad_entries")
             or getattr(encounter, "bad_members")
-            or getattr(encounter, "bad_sideboards")
+            or (not export and getattr(encounter, "bad_sideboards"))
         )
     else:
         cards = boss_cards(encounter)
@@ -44,8 +46,9 @@ def validation_issues(encounter: Encounter, *, export: bool = False) -> list[str
         total = sum(entry.quantity for entry in entries)
         missing_boss_member = boss is not None and not any(card.id == boss.id for card in cards)
         cards.extend(entry.card for entry in entries)
-        for board in encounter.sideboards.all():
-            cards.extend(entry.card for entry in board.entries.all())
+        if not export:
+            for board in encounter.sideboards.all():
+                cards.extend(entry.card for entry in board.entries.all())
         bad_contents = any(
             card.card_pool != "evil" or card.lifecycle_status != "active" for card in cards
         )
@@ -59,6 +62,22 @@ def validation_issues(encounter: Encounter, *, export: bool = False) -> list[str
 
 
 class EncounterService:
+    def get_for_viewer(
+        self,
+        encounter_id: str,
+        *,
+        actor: EncounterActor,
+        export: bool = False,
+        management: bool = False,
+    ) -> Encounter | None:
+        record = encounters.get_encounter(encounter_id)
+        if record is None or actor.can_inspect(record):
+            return record
+        if not management and record.visibility in {"public", "unlisted"}:
+            if export or not validation_issues(record):
+                return record
+        return None
+
     def normalize(
         self, data: dict[str, Any], existing: Encounter | None = None
     ) -> tuple[dict[str, Any], list[dict[str, Any]] | None, list[dict[str, Any]] | None]:
@@ -67,6 +86,7 @@ class EncounterService:
             for key, value in data.items()
             if key
             in {
+                "is_official",
                 "name",
                 "description_markup",
                 "long_description_markup",
@@ -158,7 +178,12 @@ class EncounterService:
                     raise ValueError("The boss group must contain active Evil cards only.")
         return fields, entries, sideboards
 
-    def create(self, creator_id: str, key: UUID, data: dict[str, Any]) -> tuple[Encounter, bool]:
+    def create(
+        self, creator_id: str, key: UUID, data: dict[str, Any], *, actor: EncounterActor
+    ) -> tuple[Encounter, bool]:
+        if actor.user_id != creator_id:
+            raise encounters.EncounterForbidden("Creation requires the authenticated owner.")
+        self.check_official_field(data, actor)
         existing, used = encounters.creation_result(creator_id, key)
         if existing:
             return existing, False
@@ -172,9 +197,34 @@ class EncounterService:
         assert result is not None
         return result, created
 
-    def update(self, encounter: Encounter, data: dict[str, Any], revision: int) -> Encounter:
+    @staticmethod
+    def check_official_field(data: dict[str, Any], actor: EncounterActor) -> None:
+        if "is_official" in data and not actor.is_staff:
+            raise encounters.EncounterForbidden("Only staff may change Official status.")
+
+    def update(
+        self, encounter: Encounter, data: dict[str, Any], revision: int, *, actor: EncounterActor
+    ) -> Encounter:
+        self.check_official_field(data, actor)
+        if not actor.can_manage(encounter):
+            raise encounters.EncounterForbidden(
+                "You do not have permission to edit this Encounter."
+            )
         fields, entries, sideboards = self.normalize(data, encounter)
-        encounters.update_encounter(str(encounter.id), revision, fields, entries, sideboards)
+        encounters.update_encounter(
+            str(encounter.id),
+            revision,
+            fields,
+            entries,
+            sideboards,
+            actor_id=actor.user_id,
+            is_staff=actor.is_staff,
+        )
         result = encounters.get_encounter(str(encounter.id))
         assert result is not None
         return result
+
+    def delete(self, encounter_id: str, revision: int, *, actor: EncounterActor) -> bool:
+        return encounters.delete_encounter(
+            encounter_id, revision, actor_id=actor.user_id, is_staff=actor.is_staff
+        )

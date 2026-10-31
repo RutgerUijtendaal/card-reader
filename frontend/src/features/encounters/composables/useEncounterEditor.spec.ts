@@ -8,13 +8,14 @@ import { buildEncounterDraft, encounterDraftKey } from '../utils/draftStorage';
 import { useEncounterEditor } from './useEncounterEditor';
 
 const mocks = vi.hoisted(() => ({
+  auth: { user: { id: 'staff' }, canAccessStaffRoutes: false },
   create: vi.fn(),
   lookup: vi.fn(),
   fetch: vi.fn(),
   update: vi.fn(),
   card: vi.fn(),
 }));
-vi.mock('@/domain/session/store', () => ({ useAuthStore: () => ({ user: { id: 'staff' } }) }));
+vi.mock('@/domain/session/store', () => ({ useAuthStore: () => mocks.auth }));
 vi.mock('@/domain/cards/api', () => ({ fetchCard: mocks.card }));
 vi.mock('@/domain/encounters/api', () => ({
   createEncounter: mocks.create,
@@ -57,6 +58,9 @@ const card = (id: string, factions: CardListItem['card_factions'] = []): CardLis
 const saved = (): EncounterRecord => ({
   ...emptyEncounter(),
   id: 'saved',
+  is_official: false,
+  can_edit: true,
+  can_delete: true,
   revision: 1,
   description: '',
   long_description: '',
@@ -77,7 +81,7 @@ const flush = async () => {
   await vi.advanceTimersByTimeAsync(0);
   await nextTick();
 };
-const mount = async (path = '/staff/encounters/new') => {
+const mount = async (path = '/my/encounters/new') => {
   let editor!: ReturnType<typeof useEncounterEditor>;
   const view = defineComponent({
     setup() {
@@ -88,9 +92,10 @@ const mount = async (path = '/staff/encounters/new') => {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/staff/encounters/new', component: view },
-      { path: '/staff/encounters/:id/edit', component: { template: '<div />' } },
-      { path: '/staff/encounters', component: { template: '<div />' } },
+      { path: '/my/encounters/new', component: view },
+      { path: '/my/encounters/:id/edit', component: { template: '<div />' } },
+      { path: '/my/encounters', component: { template: '<div />' } },
+      { path: '/encounters/:id', component: { template: '<div />' } },
       { path: '/existing/:id', component: view },
     ],
   });
@@ -108,6 +113,7 @@ const mount = async (path = '/staff/encounters/new') => {
   return { editor, router };
 };
 beforeEach(() => {
+  mocks.auth.canAccessStaffRoutes = false;
   vi.useFakeTimers();
   vi.clearAllMocks();
   localStorage.clear();
@@ -159,7 +165,7 @@ describe('Encounter authoring with shared draft machinery', () => {
       else await editor.selectBoss(card('boss'));
       await editor.save();
       expect(mocks.create).toHaveBeenCalledTimes(1);
-      expect(router.currentRoute.value.path).toBe('/staff/encounters/saved/edit');
+      expect(router.currentRoute.value.path).toBe('/my/encounters/saved/edit');
     },
   );
   test('boss presets include all factions while boss changes preserve cards and assigned tags', async () => {
@@ -216,7 +222,7 @@ describe('Encounter authoring with shared draft machinery', () => {
     const { editor, router } = await mount();
     mocks.card.mockRejectedValue(new Error('offline'));
     await editor.recover(editor.draft.pendingRecovery.value!);
-    expect(router.currentRoute.value.path).toBe('/staff/encounters/saved/edit');
+    expect(router.currentRoute.value.path).toBe('/my/encounters/saved/edit');
     expect(mocks.create).not.toHaveBeenCalled();
   });
   test('a deleted create receipt navigates away without recreating the deleted Encounter', async () => {
@@ -233,7 +239,7 @@ describe('Encounter authoring with shared draft machinery', () => {
     mocks.lookup.mockResolvedValue({ status: 'deleted' });
     const { editor, router } = await mount();
     await editor.recover(editor.draft.pendingRecovery.value!);
-    expect(router.currentRoute.value.path).toBe('/staff/encounters');
+    expect(router.currentRoute.value.path).toBe('/my/encounters');
     expect(mocks.create).not.toHaveBeenCalled();
   });
   test('another tab creates a recoverable conflict instead of overwriting local work', async () => {
@@ -336,7 +342,7 @@ describe('Encounter authoring with shared draft machinery', () => {
     expect(mocks.create).toHaveBeenCalledTimes(2);
     expect(mocks.create.mock.calls[1]).toEqual(mocks.create.mock.calls[0]);
     expect(localStorage.getItem(encounterDraftKey('staff'))).toBe(raw);
-    expect(router.currentRoute.value.path).toBe('/staff/encounters/saved/edit');
+    expect(router.currentRoute.value.path).toBe('/my/encounters/saved/edit');
   });
   test.each(['replaced', 'removed'] as const)(
     'leaving a %s cross-tab draft requires confirmation without modifying the remote slot',
@@ -368,13 +374,13 @@ describe('Encounter authoring with shared draft machinery', () => {
         }),
       );
       const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-      await router.push('/staff/encounters');
+      await router.push('/my/encounters');
       expect(confirm).toHaveBeenCalledWith('Leave with unsaved changes?');
-      expect(router.currentRoute.value.path).toBe('/staff/encounters/new');
+      expect(router.currentRoute.value.path).toBe('/my/encounters/new');
       expect(editor.form.name).toBe('Unsaved local work');
       confirm.mockReturnValue(true);
-      await router.push('/staff/encounters');
-      expect(router.currentRoute.value.path).toBe('/staff/encounters');
+      await router.push('/my/encounters');
+      expect(router.currentRoute.value.path).toBe('/my/encounters');
       expect(localStorage.getItem(encounterDraftKey('staff'))).toBe(raw);
     },
   );
@@ -382,9 +388,9 @@ describe('Encounter authoring with shared draft machinery', () => {
     const { editor, router } = await mount();
     editor.form.name = 'Recoverable work';
     const confirm = vi.spyOn(window, 'confirm');
-    await router.push('/staff/encounters');
+    await router.push('/my/encounters');
     expect(confirm).not.toHaveBeenCalled();
-    expect(router.currentRoute.value.path).toBe('/staff/encounters');
+    expect(router.currentRoute.value.path).toBe('/my/encounters');
     expect(JSON.parse(localStorage.getItem(encounterDraftKey('staff'))!).form.name).toBe(
       'Recoverable work',
     );
@@ -400,7 +406,7 @@ describe('Encounter authoring with shared draft machinery', () => {
     await editor.save();
     await editor.save();
     expect(mocks.create).toHaveBeenCalledTimes(1);
-    expect(router.currentRoute.value.path).toBe('/staff/encounters/saved/edit');
+    expect(router.currentRoute.value.path).toBe('/my/encounters/saved/edit');
   });
   test('storage failure keeps editing and creation available in memory', async () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
@@ -411,7 +417,7 @@ describe('Encounter authoring with shared draft machinery', () => {
     await editor.draft.persist();
     expect(editor.draft.storageUnavailable.value).toBe(true);
     await editor.save();
-    expect(router.currentRoute.value.path).toBe('/staff/encounters/saved/edit');
+    expect(router.currentRoute.value.path).toBe('/my/encounters/saved/edit');
   });
   test('navigation failure after a committed create retries navigation without creating again', async () => {
     const { editor, router } = await mount();
@@ -420,11 +426,11 @@ describe('Encounter authoring with shared draft machinery', () => {
     await editor.save();
     expect(mocks.create).toHaveBeenCalledTimes(1);
     expect(editor.publication.hasTerminalNavigationRetry.value).toBe(true);
-    expect(router.currentRoute.value.path).toBe('/staff/encounters/new');
+    expect(router.currentRoute.value.path).toBe('/my/encounters/new');
     removeGuard();
     await editor.save();
     expect(mocks.create).toHaveBeenCalledTimes(1);
-    expect(router.currentRoute.value.path).toBe('/staff/encounters/saved/edit');
+    expect(router.currentRoute.value.path).toBe('/my/encounters/saved/edit');
   });
   test('enabling autosync saves existing edits and remembers the preference on reload', async () => {
     const { editor } = await mount('/existing/saved');
@@ -555,4 +561,105 @@ test('loading another local draft clears a deleted sideboard selection', async (
   expect(editor.boards.activeBoardId.value).toBe('mainboard');
   editor.add(card('new-card'));
   expect(editor.form.entries).toEqual([{ card_id: 'new-card', quantity: 1 }]);
+});
+
+test('endorsement during autosave stops further saves and retains every local board', async () => {
+  const { editor } = await mount('/existing/saved');
+  editor.setDetails({ name: 'Local changes', visibility: 'unlisted' });
+  editor.addSideboard();
+  editor.add(card('reserve'));
+  mocks.update.mockRejectedValue({
+    isAxiosError: true,
+    response: { status: 403, data: { detail: 'Only staff may edit this Official Encounter.' } },
+  });
+  editor.autosync.value = true;
+  await vi.advanceTimersByTimeAsync(500);
+  expect(editor.readOnly.value).toBe(true);
+  expect(editor.locked.value).toBe(true);
+  expect(editor.autosync.value).toBe(false);
+  expect(editor.form.name).toBe('Local changes');
+  expect(editor.form.sideboards[0].entries).toEqual([{ card_id: 'reserve', quantity: 1 }]);
+  expect(editor.dirty.value).toBe(true);
+  editor.autosync.value = true;
+  await vi.advanceTimersByTimeAsync(1500);
+  await editor.save();
+  expect(mocks.update).toHaveBeenCalledTimes(1);
+});
+
+test('ordinary owner payload omits Official status while staff can change it', async () => {
+  const { editor } = await mount('/existing/saved');
+  expect(editor.form).not.toHaveProperty('is_official');
+  editor.setDetails({ is_official: true });
+  expect(editor.form).not.toHaveProperty('is_official');
+  editor.setDetails({ name: 'Owner edit' });
+  mocks.update.mockResolvedValue({ ...saved(), name: 'Owner edit', revision: 2 });
+  await editor.save();
+  expect(mocks.update.mock.calls[0][1]).not.toHaveProperty('is_official');
+  mocks.auth.canAccessStaffRoutes = true;
+  await editor.reload();
+  expect(editor.form.is_official).toBe(false);
+  editor.setDetails({ is_official: true });
+  expect(editor.form.is_official).toBe(true);
+});
+
+test('reconciliation opens an endorsed creation read only without another create', async () => {
+  const legacy = emptyEncounter();
+  const stored = buildEncounterDraft('staff', 'pending-key', legacy, {}, null);
+  stored.pendingCreateAttempt = {
+    payload: legacy,
+    signature: JSON.stringify(legacy),
+    startedAt: new Date().toISOString(),
+  };
+  localStorage.setItem(encounterDraftKey('staff'), JSON.stringify(stored));
+  mocks.lookup.mockResolvedValue({
+    status: 'found',
+    record: { ...saved(), is_official: true, can_edit: false, can_delete: false },
+  });
+  const { editor, router } = await mount();
+  await editor.recover(editor.draft.pendingRecovery.value!);
+  await flush();
+  expect(router.currentRoute.value.path).toBe('/encounters/saved');
+  expect(mocks.create).not.toHaveBeenCalled();
+});
+
+test('opening an official record locks owner mutations and unmarking restores editing', async () => {
+  mocks.fetch.mockResolvedValue({
+    ...saved(),
+    is_official: true,
+    can_edit: false,
+    can_delete: false,
+  });
+  const { editor } = await mount('/existing/saved');
+  expect(editor.readOnly.value).toBe(true);
+  editor.add(card('blocked'));
+  editor.addSideboard();
+  editor.setDetails({ name: 'Blocked' });
+  expect(editor.form.entries).toEqual([]);
+  expect(editor.form.sideboards).toEqual([]);
+  expect(editor.form.name).toBe('');
+  mocks.fetch.mockResolvedValue({ ...saved(), revision: 3 });
+  await editor.reload();
+  expect(editor.readOnly.value).toBe(false);
+  editor.setDetails({ name: 'Restored' });
+  expect(editor.form.name).toBe('Restored');
+});
+
+test('recovering older drafts clears any prior Official selection without adding it to owner payloads', async () => {
+  mocks.auth.canAccessStaffRoutes = true;
+  const { editor } = await mount();
+  editor.setDetails({ is_official: true });
+  const stored = buildEncounterDraft(
+    'staff',
+    editor.draft.draftId.value,
+    emptyEncounter(),
+    {},
+    null,
+  );
+  await editor.recover(stored);
+  expect(editor.form).not.toHaveProperty('is_official');
+  mocks.auth.canAccessStaffRoutes = false;
+  stored.form.is_official = false;
+  await editor.recover(stored);
+  expect(editor.form).not.toHaveProperty('is_official');
+  expect(stored.form.is_official).toBe(false);
 });

@@ -10,6 +10,8 @@ export const useEncounterList = () => {
   const route = useRoute();
   const router = useRouter();
   const staff = computed(() => route.path === '/staff/encounters');
+  const mine = computed(() => route.path === '/my/encounters');
+  const official = ref('');
   const query = ref('');
   const factions = ref<string[]>([]);
   const records = ref<EncounterSummary[]>([]);
@@ -25,6 +27,9 @@ export const useEncounterList = () => {
     const raw = route.query.factions;
     const selected = Array.isArray(raw) ? raw : raw ? [raw] : [];
     return {
+      official: ['true', 'false'].includes(String(route.query.is_official))
+        ? String(route.query.is_official)
+        : '',
       q: typeof route.query.q === 'string' ? route.query.q : '',
       factions: CARD_FACTION_OPTIONS.filter((option) => selected.includes(option.value)).map(
         (option) => option.value,
@@ -32,6 +37,7 @@ export const useEncounterList = () => {
     };
   });
   const filterQuery = computed(() => ({
+    ...(routeQuery.value.official ? { is_official: routeQuery.value.official } : {}),
     ...(routeQuery.value.q ? { q: routeQuery.value.q } : {}),
     ...(routeQuery.value.factions.length ? { factions: routeQuery.value.factions } : {}),
   }));
@@ -53,9 +59,13 @@ export const useEncounterList = () => {
       page: String(page),
       page_size: '10',
     });
+    if (routeQuery.value.official) params.set('is_official', routeQuery.value.official);
     routeQuery.value.factions.forEach((faction) => params.append('factions', faction));
     try {
-      const result = await fetchEncounters(staff.value, params);
+      const result = await fetchEncounters(
+        staff.value ? 'staff' : mine.value ? 'mine' : 'public',
+        params,
+      );
       if (current !== generation) return;
       const existing = new Set(records.value.map((record) => record.id));
       records.value = append
@@ -82,6 +92,7 @@ export const useEncounterList = () => {
       factions.value.includes(option.value),
     ).map((option) => option.value);
     if (
+      official.value === routeQuery.value.official &&
       query.value === routeQuery.value.q &&
       JSON.stringify(selected) === JSON.stringify(routeQuery.value.factions)
     )
@@ -89,13 +100,14 @@ export const useEncounterList = () => {
     void router.replace({
       path: route.path,
       query: {
+        ...(official.value ? { is_official: official.value } : {}),
         ...(query.value ? { q: query.value } : {}),
         ...(selected.length ? { factions: selected } : {}),
       },
     });
   }, 250);
   watch(
-    [query, factions],
+    [query, factions, official],
     () => {
       void updateRoute();
     },
@@ -104,6 +116,7 @@ export const useEncounterList = () => {
   watch(
     [() => route.path, routeQuery],
     () => {
+      official.value = routeQuery.value.official;
       query.value = routeQuery.value.q;
       factions.value = [...routeQuery.value.factions];
       records.value = [];
@@ -118,6 +131,7 @@ export const useEncounterList = () => {
     generation++;
   });
   const reset = () => {
+    official.value = '';
     query.value = '';
     factions.value = [];
   };
@@ -128,6 +142,8 @@ export const useEncounterList = () => {
   };
   return {
     staff,
+    mine,
+    official,
     query,
     factions,
     records,

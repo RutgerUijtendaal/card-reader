@@ -29,6 +29,10 @@
       >
         <div class="flex flex-wrap gap-1.5">
           <span
+            v-if="record.is_official"
+            class="theme-pill theme-pill-accent text-xs"
+          >Official</span>
+          <span
             v-for="faction in record.factions"
             :key="faction"
             class="theme-pill theme-pill-neutral text-xs"
@@ -49,14 +53,14 @@
           @click="copyExport"
         />
         <AppHeaderAction
-          v-if="auth.canAccessStaffRoutes"
+          v-if="record.can_edit"
           :icon="Pencil"
           label="Edit Encounter"
           short-label="Edit"
-          :to="`/staff/encounters/${record.id}/edit`"
+          :to="`/my/encounters/${record.id}/edit`"
         />
         <ExtraActionsMenu
-          v-if="auth.canAccessStaffRoutes"
+          v-if="record.can_delete"
           button-label="More Encounter actions"
         >
           <template #default="{ close }">
@@ -81,6 +85,12 @@
     >
       {{ error }}
     </div>
+    <p
+      v-if="record?.is_official && !record.can_edit && String(auth.user?.id) === record.creator.id"
+      class="app-page-content theme-section-muted text-sm"
+    >
+      This is an Official Encounter. Only staff can edit or delete it. It remains in My Encounters.
+    </p>
     <CollectionDetailLayout
       v-if="record"
       :expanded="detailsExpanded"
@@ -154,12 +164,12 @@
             <div class="flex flex-wrap gap-2">
               <span class="theme-pill theme-pill-neutral text-xs">{{ record.total_cards }} deck cards</span>
               <span
-                v-if="auth.canAccessStaffRoutes"
+                v-if="auth.canAccessStaffRoutes || String(auth.user?.id) === record.creator.id"
                 class="theme-pill text-xs"
                 :class="
                   record.visibility === 'public' ? 'theme-pill-success' : 'theme-pill-neutral'
                 "
-              >{{ record.visibility === 'public' ? 'Public' : 'Staff only' }}</span>
+              >{{ record.visibility.charAt(0).toUpperCase() + record.visibility.slice(1) }}</span>
               <span
                 v-if="!record.status.is_valid"
                 class="theme-pill theme-pill-warning text-xs"
@@ -327,17 +337,31 @@ const activeBoard = ref('mainboard');
 const activeSideboard = computed(() =>
   record.value?.sideboards.find((board) => board.id === activeBoard.value),
 );
-const backLink = computed(() =>
-  auth.canAccessStaffRoutes && route.query.return_to !== 'encounters'
-    ? '/staff/encounters'
-    : '/encounters',
+const library = computed(() =>
+  route.query.return_to === 'staff_encounters' && auth.canAccessStaffRoutes
+    ? 'staff'
+    : route.query.return_to === 'my_encounters' && auth.authenticated
+      ? 'mine'
+      : 'public',
 );
+const backLink = computed(() => ({
+  path:
+    library.value === 'staff'
+      ? '/staff/encounters'
+      : library.value === 'mine'
+        ? '/my/encounters'
+        : '/encounters',
+  query: { q: route.query.q, factions: route.query.factions, is_official: route.query.is_official },
+}));
 const cardLocation = (cardId: string) => ({
   path: `/cards/${cardId}`,
   query: {
     return_to: 'encounter',
     encounter_id: String(route.params.id),
-    encounter_library: backLink.value === '/staff/encounters' ? 'staff' : 'public',
+    encounter_library: library.value,
+    q: route.query.q,
+    factions: route.query.factions,
+    is_official: route.query.is_official,
   },
 });
 const types = ref<CardFiltersResponse['types']>([]);
@@ -366,7 +390,7 @@ const load = async () => {
   detailsExpanded.value = false;
   try {
     const [value, filters] = await Promise.all([
-      fetchEncounter(String(route.params.id), auth.canAccessStaffRoutes),
+      fetchEncounter(String(route.params.id), false),
       fetchCardFilters('evil').catch(() => null),
     ]);
     if (current !== generation) return;
@@ -413,7 +437,7 @@ const remove = async () => {
   if (!selected || !window.confirm(`Delete ${selected.name || 'this Encounter'}?`)) return;
   try {
     await deleteEncounter(selected.id, selected.revision);
-    await router.push('/staff/encounters');
+    await router.push(backLink.value);
   } catch (cause) {
     error.value = getApiErrorMessage(
       cause,
@@ -423,7 +447,7 @@ const remove = async () => {
 };
 
 watch(
-  () => [route.params.id, auth.canAccessStaffRoutes],
+  () => [route.params.id, auth.user?.id, auth.canAccessStaffRoutes],
   () => {
     void load();
   },

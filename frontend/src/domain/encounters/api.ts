@@ -8,15 +8,20 @@ import {
 import type { PaginatedCardsResponse, GalleryItem } from '@/domain/cards/types';
 
 export const fetchEncounterBosses = async (params: URLSearchParams) =>
-  (await api.get<PaginatedCardsResponse<GalleryItem>>('/staff/encounters/bosses', { params })).data;
+  (await api.get<PaginatedCardsResponse<GalleryItem>>('/encounters/bosses', { params })).data;
 
 export const fetchEncounters = async (
-  staff: boolean,
+  scope: 'public' | 'mine' | 'staff',
   params: URLSearchParams,
 ): Promise<EncounterPage> =>
-  (await api.get<EncounterPage>(staff ? '/staff/encounters' : '/encounters', { params })).data;
-export const fetchEncounter = async (id: string, staff = true): Promise<EncounterRecord> =>
-  (await api.get<EncounterRecord>(`${staff ? '/staff' : ''}/encounters/${id}`)).data;
+  (
+    await api.get<EncounterPage>(
+      scope === 'public' ? '/encounters' : `/${scope === 'mine' ? 'my' : 'staff'}/encounters`,
+      { params },
+    )
+  ).data;
+export const fetchEncounter = async (id: string, management = true): Promise<EncounterRecord> =>
+  (await api.get<EncounterRecord>(`${management ? '/my' : ''}/encounters/${id}`)).data;
 const writePayload = (payload: EncounterDraft) => ({
   ...payload,
   // Existing immutable attempts from before sideboards were supported omit this field.
@@ -32,7 +37,7 @@ const writePayload = (payload: EncounterDraft) => ({
 });
 export const createEncounter = async (payload: EncounterDraft, key: string) => ({
   record: (
-    await api.post<EncounterRecord>('/staff/encounters', writePayload(payload), {
+    await api.post<EncounterRecord>('/my/encounters', writePayload(payload), {
       headers: { 'Idempotency-Key': key },
     })
   ).data,
@@ -43,7 +48,7 @@ export const lookupEncounterCreation = async (
   try {
     return {
       status: 'found',
-      record: (await api.get<EncounterRecord>(`/staff/encounters/by-creation-key/${key}`)).data,
+      record: (await api.get<EncounterRecord>(`/my/encounters/by-creation-key/${key}`)).data,
     };
   } catch (error) {
     if (isAxiosError(error) && error.response?.status === 404) return { status: 'missing' };
@@ -57,13 +62,13 @@ export const updateEncounter = async (
   revision: number,
 ): Promise<EncounterRecord> =>
   (
-    await api.patch<EncounterRecord>(`/staff/encounters/${id}`, {
+    await api.patch<EncounterRecord>(`/my/encounters/${id}`, {
       ...writePayload(payload),
       revision,
     })
   ).data;
 export const deleteEncounter = async (id: string, revision: number): Promise<void> => {
-  await api.delete(`/staff/encounters/${id}`, { headers: { 'If-Match': String(revision) } });
+  await api.delete(`/my/encounters/${id}`, { headers: { 'If-Match': String(revision) } });
 };
 export const fetchEncounterRules = async (): Promise<{ minimum_cards: number }> =>
   (await api.get<{ minimum_cards: number }>('/encounters/rules')).data;

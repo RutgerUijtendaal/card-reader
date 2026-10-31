@@ -18,6 +18,7 @@ import {
 import {
   emptyEncounter,
   encounterDraftFromRecord,
+  type EncounterDraft,
   type EncounterRecord,
 } from '@/domain/encounters/types';
 import { getApiErrorMessage } from '@/shared/api/errors';
@@ -47,6 +48,10 @@ export const useEncounterEditor = () => {
   const loading = ref(true);
   const saving = ref(false);
   const serverConflict = ref(false);
+  const permissionLost = ref(false);
+  const readOnly = computed(() => permissionLost.value || record.value?.can_edit === false);
+  const createdLocation = (value: EncounterRecord) =>
+    value.can_edit ? `/my/encounters/${value.id}/edit` : `/encounters/${value.id}`;
   const recoveryBusy = ref(false);
   const openingConfirmedRecord = ref(false);
   let bossSelection = 0;
@@ -54,6 +59,13 @@ export const useEncounterEditor = () => {
   const savedSignature = ref('');
   const autosync = useLocalStorage('card-reader.encounter-editor.autosync', false);
   const signature = computed(() => JSON.stringify(form));
+  const applyForm = (value: EncounterDraft) => {
+    // Missing fields in old drafts must not inherit a previous draft's endorsement.
+    const { is_official, ...content } = value;
+    delete form.is_official;
+    Object.assign(form, content, { sideboards: value.sideboards ?? [] });
+    if (auth.canAccessStaffRoutes && is_official !== undefined) form.is_official = is_official;
+  };
   const draft = useLocalDraft({
     resourceLabel: 'Encounter',
     ownerId: String(auth.user?.id ?? ''),
@@ -77,7 +89,7 @@ export const useEncounterEditor = () => {
   };
   const applyRecord = (value: EncounterRecord) => {
     record.value = value;
-    Object.assign(form, encounterDraftFromRecord(value));
+    applyForm(encounterDraftFromRecord(value, auth.canAccessStaffRoutes));
     resetMissingBoardSelection();
     cards.value = Object.fromEntries(
       [
@@ -90,6 +102,8 @@ export const useEncounterEditor = () => {
     factions.value = [...(value.boss_card?.card_factions ?? [])];
     savedSignature.value = signature.value;
     serverConflict.value = false;
+    permissionLost.value = false;
+    if (!value.can_edit) autosync.value = false;
   };
   const publication = useDraftCreation({
     resourceLabel: 'encounter',
@@ -104,19 +118,20 @@ export const useEncounterEditor = () => {
     retireAfterCreation: draft.retireAfterCreation,
     discardAfterDeletedCreation: draft.discardAfterDeletedCreation,
     onSuccess: async (value) => {
-      const result = await router.replace(`/staff/encounters/${value.id}/edit`);
+      const result = await router.replace(createdLocation(value));
       if (isNavigationFailure(result))
         throw new Error('Encounter created; navigation was interrupted.');
     },
     onDeleted: async () => {
       toast.info('The Encounter created from this draft was deleted.');
-      const result = await router.replace('/staff/encounters');
+      const result = await router.replace('/my/encounters');
       if (isNavigationFailure(result))
         throw new Error('Deleted creation confirmed; navigation was interrupted.');
     },
   });
   const locked = computed(
     () =>
+      readOnly.value ||
       loading.value ||
       saving.value ||
       recoveryBusy.value ||
@@ -176,7 +191,7 @@ export const useEncounterEditor = () => {
   const recover = async (stored: EncounterStoredDraft) => {
     recoveryBusy.value = true;
     draft.beginRecoveredDraft(stored);
-    Object.assign(form, stored.form, { sideboards: stored.form.sideboards ?? [] });
+    applyForm(stored.form);
     resetMissingBoardSelection();
     cards.value = { ...stored.cards };
     try {
@@ -196,7 +211,7 @@ export const useEncounterEditor = () => {
       if (!stored) return;
       // The recovery dialog has not applied this candidate yet. Keep it as the
       // local side of the conflict without replacing the observed remote slot.
-      Object.assign(form, stored.form, { sideboards: stored.form.sideboards ?? [] });
+      applyForm(stored.form);
       resetMissingBoardSelection();
       cards.value = { ...stored.cards };
       recoveryBusy.value = true;
@@ -225,7 +240,7 @@ export const useEncounterEditor = () => {
       const result = await lookupEncounterCreation(conflict.slot.marker.draftId);
       if (result.status === 'found') {
         openingConfirmedRecord.value = true;
-        await router.push(`/staff/encounters/${result.record.id}/edit`);
+        await router.push(createdLocation(result.record));
       } else if (result.status === 'deleted') await draft.overwriteConflict(true);
       else error.value = 'Creation is not confirmed yet. Try again.';
     } catch (cause) {
@@ -271,10 +286,11 @@ export const useEncounterEditor = () => {
         (board) => board.id === boards.activeBoardId.value,
       );
       record.value = value;
-      Object.assign(form, encounterDraftFromRecord(value));
+      applyForm(encounterDraftFromRecord(value, auth.canAccessStaffRoutes));
       if (activeIndex >= 0) boards.selectBoard(form.sideboards[activeIndex]?.id ?? 'mainboard');
       savedSignature.value = signature.value;
     } catch (cause) {
+      permissionLost.value = isAxiosError(cause) && cause.response?.status === 403;
       serverConflict.value = isAxiosError(cause) && cause.response?.status === 409;
       error.value = getApiErrorMessage(
         cause,
@@ -300,6 +316,7 @@ export const useEncounterEditor = () => {
   const changeStatus = computed(() => {
     if (saving.value) return autosync.value ? 'Autosyncing' : 'Saving';
     if (publication.isCreating.value) return 'Creating';
+    if (readOnly.value) return 'Read only';
     if (serverConflict.value) return 'Save conflict';
     if (id) return dirty.value ? (autosync.value ? 'Queued' : 'Unsaved') : 'Saved';
     if (draft.storageUnavailable.value) return 'Draft not saved';
@@ -379,11 +396,17 @@ export const useEncounterEditor = () => {
     values: Partial<
       Pick<
         typeof form,
-        'name' | 'description_markup' | 'long_description_markup' | 'factions' | 'visibility'
+        | 'name'
+        | 'description_markup'
+        | 'long_description_markup'
+        | 'factions'
+        | 'visibility'
+        | 'is_official'
       >
     >,
   ) => {
-    if (!locked.value) Object.assign(form, values);
+    if (!locked.value && (!('is_official' in values) || auth.canAccessStaffRoutes))
+      Object.assign(form, values);
   };
   const setMode = (value: typeof mode.value) => {
     if (!locked.value) mode.value = value;
@@ -464,6 +487,7 @@ export const useEncounterEditor = () => {
     setDetails,
     setMode,
     serverConflict,
+    readOnly,
     autosync,
     changeStatus,
     recoveryBusy,

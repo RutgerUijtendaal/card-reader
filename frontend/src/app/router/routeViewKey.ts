@@ -4,7 +4,7 @@ export const resolveRouteViewKey = (
   path: string,
   workspaceGeneration: number,
 ): string | undefined => {
-  if (/^\/staff\/encounters\/(?:new|[^/]+\/edit)$/.test(path)) return `encounter-editor:${path}`;
+  if (/^\/my\/encounters\/(?:new|[^/]+\/edit)$/.test(path)) return `encounter-editor:${path}`;
   if (DECK_EDITOR_PATH.test(path)) {
     return `deck-editor:${path}`;
   }

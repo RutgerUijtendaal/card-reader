@@ -7,7 +7,14 @@ from django.db import transaction
 from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, QuerySet, Subquery, Sum
 from django.db.models.functions import Coalesce, Trim
 
-from card_reader_core.models import Card, CardGroup, CardGroupMember, CardRoleAssignment, CardVersionImage, now_utc
+from card_reader_core.models import (
+    Card,
+    CardGroup,
+    CardGroupMember,
+    CardRoleAssignment,
+    CardVersionImage,
+    now_utc,
+)
 from card_reader_core.models.encounter import (
     Encounter,
     EncounterCreation,
@@ -18,8 +25,11 @@ from card_reader_core.models.encounter import (
 from card_reader_core.repositories.cards import card_version_metadata_prefetches
 
 
-
 class EncounterConflict(ValueError):
+    pass
+
+
+class EncounterForbidden(PermissionError):
     pass
 
 
@@ -28,18 +38,24 @@ class EncounterDeleted(ValueError):
 
 
 def card_queryset() -> QuerySet[Card]:
-    return Card.objects.select_related(
-        "latest_version", "latest_version__template", "latest_version__content_version"
-    ).defer(
-        "latest_version__parsed_snapshot_json",
-        "latest_version__field_sources_json",
-        "latest_version__template__definition_json",
-    ).prefetch_related(
-        "role_assignments",
-        "faction_assignments",
-        "mana_family_assignments",
-        Prefetch("latest_version__images", queryset=CardVersionImage.objects.order_by("-created_at")),
-        *card_version_metadata_prefetches("latest_version"),
+    return (
+        Card.objects.select_related(
+            "latest_version", "latest_version__template", "latest_version__content_version"
+        )
+        .defer(
+            "latest_version__parsed_snapshot_json",
+            "latest_version__field_sources_json",
+            "latest_version__template__definition_json",
+        )
+        .prefetch_related(
+            "role_assignments",
+            "faction_assignments",
+            "mana_family_assignments",
+            Prefetch(
+                "latest_version__images", queryset=CardVersionImage.objects.order_by("-created_at")
+            ),
+            *card_version_metadata_prefetches("latest_version"),
+        )
     )
 
 
@@ -142,11 +158,25 @@ def get_encounter(encounter_id: str) -> Encounter | None:
 
 
 def list_encounters(
-    *, staff: bool, minimum_cards: int, query: str, factions: list[str], page: int, page_size: int
+    *,
+    staff: bool,
+    minimum_cards: int,
+    query: str,
+    factions: list[str],
+    page: int,
+    page_size: int,
+    owner_id: str | None = None,
+    is_official: bool | None = None,
 ) -> tuple[int, list[Encounter]]:
     records = (
-        encounter_queryset(detail=False) if staff else public_queryset(minimum_cards, detail=False)
+        encounter_queryset(detail=False)
+        if staff or owner_id
+        else public_queryset(minimum_cards, detail=False)
     )
+    if owner_id is not None:
+        records = records.filter(creator_id=owner_id)
+    if is_official is not None:
+        records = records.filter(is_official=is_official)
     records = records.filter(name__icontains=query)
     if factions:
         match = Q()
@@ -250,26 +280,43 @@ def update_encounter(
     fields: dict[str, Any],
     entries: list[dict[str, Any]] | None,
     sideboards: list[dict[str, Any]] | None,
+    *,
+    actor_id: str | None,
+    is_staff: bool,
 ) -> None:
-    changed = Encounter.objects.filter(pk=encounter_id, revision=revision).update(
+    if "is_official" in fields and not is_staff:
+        raise EncounterForbidden("Only staff may change Official status.")
+    allowed = mutable_encounters(actor_id=actor_id, is_staff=is_staff)
+    changed = allowed.filter(pk=encounter_id, revision=revision).update(
         **fields, revision=F("revision") + 1, updated_at=now_utc()
     )
     if not changed:
-        raise EncounterConflict(
-            "Another staff member changed this Encounter. Reload it before saving."
-        )
+        if not allowed.filter(pk=encounter_id).exists():
+            raise EncounterForbidden("You no longer have permission to edit this Encounter.")
+        raise EncounterConflict("Another person changed this Encounter. Reload it before saving.")
     if entries is not None:
         replace_entries(Encounter.objects.get(pk=encounter_id), entries)
     if sideboards is not None:
         replace_sideboards(Encounter.objects.get(pk=encounter_id), sideboards)
 
 
-def delete_encounter(encounter_id: str, revision: int) -> bool:
+def mutable_encounters(*, actor_id: str | None, is_staff: bool) -> QuerySet[Encounter]:
+    # Apply the permission predicate to the conditional revision write, not just a prior read.
+    records = Encounter.objects.all()
+    return records if is_staff else records.filter(creator_id=actor_id, is_official=False)
+
+
+def delete_encounter(
+    encounter_id: str, revision: int, *, actor_id: str | None, is_staff: bool
+) -> bool:
     with transaction.atomic():
         # The conditional write also serializes deletion with concurrent edits on SQLite.
-        if not Encounter.objects.filter(pk=encounter_id, revision=revision).update(
+        allowed = mutable_encounters(actor_id=actor_id, is_staff=is_staff)
+        if not allowed.filter(pk=encounter_id, revision=revision).update(
             revision=F("revision") + 1
         ):
+            if not allowed.filter(pk=encounter_id).exists():
+                raise EncounterForbidden("You no longer have permission to delete this Encounter.")
             raise EncounterConflict("The Encounter changed. Reload it before deleting.")
         count, _ = Encounter.objects.filter(pk=encounter_id).delete()
         return count > 0
@@ -298,7 +345,9 @@ def retarget_encounter_cards(target_id: str, source_ids: list[str]) -> None:
             sideboard_entry.save(update_fields=["card"])
         else:
             existing_sideboard_entry.quantity += sideboard_entry.quantity
-            existing_sideboard_entry.position = min(existing_sideboard_entry.position, sideboard_entry.position)
+            existing_sideboard_entry.position = min(
+                existing_sideboard_entry.position, sideboard_entry.position
+            )
             existing_sideboard_entry.save(update_fields=["quantity", "position"])
             sideboard_entry.delete()
     Encounter.objects.filter(boss_card_id__in=source_ids).update(boss_card_id=target_id)

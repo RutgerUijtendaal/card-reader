@@ -8,33 +8,36 @@
     :image-alt="encounter.boss_card?.name || ''"
     :to="{
       path: `/encounters/${encounter.id}`,
-      query: { return_to: staff ? 'staff_encounters' : 'encounters' },
+      query: {
+        ...filterQuery,
+        return_to: staff ? 'staff_encounters' : mine ? 'my_encounters' : 'encounters',
+      },
     }"
-    :variant="staff ? 'owned' : 'browse'"
+    :variant="staff || mine ? 'owned' : 'browse'"
   >
     <template #badge>
       <span
         class="theme-pill shrink-0 text-xs"
         :class="
-          staff && encounter.visibility === 'public' ? 'theme-pill-success' : 'theme-pill-neutral'
+          (staff || mine) && encounter.visibility === 'public'
+            ? 'theme-pill-success'
+            : 'theme-pill-neutral'
         "
       >
         {{
-          staff
-            ? encounter.visibility === 'public'
-              ? 'Public'
-              : 'Staff only'
+          staff || mine
+            ? encounter.visibility.charAt(0).toUpperCase() + encounter.visibility.slice(1)
             : encounter.creator.username
         }}
       </span>
     </template>
     <template
-      v-if="canEdit"
+      v-if="encounter.can_edit"
       #actions
     >
       <RouterLink
         class="btn-secondary"
-        :to="`/staff/encounters/${encounter.id}/edit`"
+        :to="`/my/encounters/${encounter.id}/edit`"
         aria-label="Edit Encounter"
       >
         <Pencil class="h-4 w-4" /> Edit
@@ -43,12 +46,16 @@
     <template #tags>
       <div class="flex flex-wrap items-center gap-1.5">
         <span
+          v-if="encounter.is_official"
+          class="theme-pill theme-pill-accent text-xs"
+        >Official</span>
+        <span
           v-for="faction in encounter.factions"
           :key="faction"
           class="theme-pill theme-pill-neutral text-xs"
         >{{ cardFactionLabel(faction) }}</span>
         <span
-          v-if="staff && !encounter.status.is_valid"
+          v-if="(staff || mine) && !encounter.status.is_valid"
           class="theme-pill theme-pill-warning text-xs"
         >Under construction</span>
       </div>
@@ -69,13 +76,18 @@
 </template>
 <script setup lang="ts">
 import { computed } from 'vue';
-import { RouterLink } from 'vue-router';
+import { RouterLink, type LocationQueryRaw } from 'vue-router';
 import { CalendarDays, Crown, LibraryBig, PanelRight, Pencil, UserRound } from 'lucide-vue-next';
 import type { EncounterSummary } from '@/domain/encounters/types';
 import { cardFactionLabel } from '@/domain/cards/cardFactions';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
 import CollectionListCard from '@/shared/components/CollectionListCard.vue';
-const props = defineProps<{ encounter: EncounterSummary; staff: boolean; canEdit: boolean }>();
+const props = defineProps<{
+  encounter: EncounterSummary;
+  staff: boolean;
+  mine: boolean;
+  filterQuery: LocationQueryRaw;
+}>();
 const updatedDate = computed(() => {
   const date = new Date(props.encounter.updated_at);
   return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
