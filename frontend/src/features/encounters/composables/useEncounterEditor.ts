@@ -67,15 +67,18 @@ export const useEncounterEditor = () => {
     parse: parseEncounterDraft,
     build: buildEncounterDraft,
   });
-  const applyRecord = (value: EncounterRecord) => {
-    record.value = value;
-    Object.assign(form, encounterDraftFromRecord(value));
+  const resetMissingBoardSelection = () => {
     if (
       boards.activeBoardId.value !== 'mainboard' &&
       !form.sideboards.some((board) => board.id === boards.activeBoardId.value)
     ) {
       boards.selectBoard('mainboard');
     }
+  };
+  const applyRecord = (value: EncounterRecord) => {
+    record.value = value;
+    Object.assign(form, encounterDraftFromRecord(value));
+    resetMissingBoardSelection();
     cards.value = Object.fromEntries(
       [
         ...(value.boss_card ? [value.boss_card] : []),
@@ -174,6 +177,7 @@ export const useEncounterEditor = () => {
     recoveryBusy.value = true;
     draft.beginRecoveredDraft(stored);
     Object.assign(form, stored.form, { sideboards: stored.form.sideboards ?? [] });
+    resetMissingBoardSelection();
     cards.value = { ...stored.cards };
     try {
       // Reconcile the authoritative create independently of optional card hydration.
@@ -193,6 +197,7 @@ export const useEncounterEditor = () => {
       // The recovery dialog has not applied this candidate yet. Keep it as the
       // local side of the conflict without replacing the observed remote slot.
       Object.assign(form, stored.form, { sideboards: stored.form.sideboards ?? [] });
+      resetMissingBoardSelection();
       cards.value = { ...stored.cards };
       recoveryBusy.value = true;
       void (async () => {

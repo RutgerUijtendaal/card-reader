@@ -540,3 +540,19 @@ test('reloading a sideboard deleted by another staff member returns to the mainb
   editor.add(card('new-card'));
   expect(editor.form.entries).toEqual([{ card_id: 'new-card', quantity: 1 }]);
 });
+
+test('loading another local draft clears a deleted sideboard selection', async () => {
+  const { editor } = await mount();
+  editor.addSideboard();
+  const remote = buildEncounterDraft(
+    'staff',
+    editor.draft.draftId.value,
+    emptyEncounter(),
+    {},
+    null,
+  );
+  await editor.recover(remote);
+  expect(editor.boards.activeBoardId.value).toBe('mainboard');
+  editor.add(card('new-card'));
+  expect(editor.form.entries).toEqual([{ card_id: 'new-card', quantity: 1 }]);
+});
