@@ -228,11 +228,11 @@ describe('card pool workspace routes', () => {
     },
   );
 
-  test('blocks nonstaff authoring but allows staff to open the shared builder', async () => {
+  test('allows authenticated authoring and redirects legacy staff builder URLs', async () => {
     setSession();
     const router = createAppRouter(createMemoryHistory());
     await router.push('/staff/encounters/new');
-    expect(router.currentRoute.value.path).toBe('/');
+    expect(router.currentRoute.value.path).toBe('/my/encounters/new');
     useAuthStore().$patch({
       user: {
         authenticated: true,
@@ -243,7 +243,7 @@ describe('card pool workspace routes', () => {
       },
     });
     await router.push('/staff/encounters/new');
-    expect(router.currentRoute.value.path).toBe('/staff/encounters/new');
+    expect(router.currentRoute.value.path).toBe('/my/encounters/new');
     expect(useCardPoolWorkspaceStore().activePool).toBe('evil');
   });
 

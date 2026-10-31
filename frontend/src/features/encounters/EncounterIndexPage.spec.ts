@@ -6,7 +6,7 @@ import type { EncounterPage, EncounterSummary } from '@/domain/encounters/types'
 
 const { fetchList, auth } = vi.hoisted(() => ({
   fetchList: vi.fn(),
-  auth: { canAccessStaffRoutes: true },
+  auth: { canAccessStaffRoutes: true, authenticated: true },
 }));
 vi.mock('@/domain/encounters/api', () => ({ fetchEncounters: fetchList }));
 vi.mock('@/domain/session/store', () => ({ useAuthStore: () => auth }));
@@ -21,6 +21,9 @@ vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
 }));
 const record = (overrides: Partial<EncounterSummary> = {}): EncounterSummary => ({
   id: 'fight-1',
+  is_official: false,
+  can_edit: true,
+  can_delete: true,
   name: 'Gate siege',
   description: 'Hold the gate against the invading army.',
   boss_card: null,
@@ -53,8 +56,9 @@ const mount = async (path = '/encounters') => {
     routes: [
       { path: '/encounters', component: EncounterIndexPage },
       { path: '/staff/encounters', component: EncounterIndexPage },
-      { path: '/staff/encounters/:id/edit', component: { template: '<div />' } },
-      { path: '/staff/encounters/new', component: { template: '<div />' } },
+      { path: '/my/encounters', component: EncounterIndexPage },
+      { path: '/my/encounters/:id/edit', component: { template: '<div />' } },
+      { path: '/my/encounters/new', component: { template: '<div />' } },
       { path: '/encounters/:id', component: { template: '<div />' } },
     ],
   });
@@ -74,6 +78,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   fetchList.mockReset();
   auth.canAccessStaffRoutes = true;
+  auth.authenticated = true;
 });
 afterEach(() => {
   cleanups.splice(0).forEach((cleanup) => cleanup());
@@ -82,9 +87,10 @@ afterEach(() => {
 
 test('public browsing uses summary cards and a left sidebar without staff controls for anonymous visitors', async () => {
   auth.canAccessStaffRoutes = false;
-  fetchList.mockResolvedValue(page([record()]));
+  auth.authenticated = false;
+  fetchList.mockResolvedValue(page([record({ can_edit: false, can_delete: false })]));
   const { target } = await mount();
-  expect(fetchList.mock.calls[0][0]).toBe(false);
+  expect(fetchList.mock.calls[0][0]).toBe('public');
   expect(target.querySelector('.app-page-layout')?.firstElementChild?.tagName).toBe('ASIDE');
   expect(target.querySelector('.collection-list-card-surface')?.textContent).toContain(
     'Hold the gate',
@@ -107,16 +113,16 @@ test('staff mode displays other authors, private and unfinished records with edi
     ]),
   );
   const { target, router } = await mount('/staff/encounters');
-  expect(fetchList.mock.calls[0][0]).toBe(true);
+  expect(fetchList.mock.calls[0][0]).toBe('staff');
   expect(target.textContent).toContain('Untitled Encounter');
-  expect(target.textContent).toContain('Staff only');
+  expect(target.textContent).toContain('Private');
   expect(target.textContent).toContain('Under construction');
   expect(target.textContent).toContain('Another author');
   (target.querySelector('[aria-label="Edit Encounter"]') as HTMLElement).dispatchEvent(
     new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
   );
   await flush();
-  expect(router.currentRoute.value.path).toBe('/staff/encounters/fight-1/edit');
+  expect(router.currentRoute.value.path).toBe('/my/encounters/fight-1/edit');
 });
 
 test('search and multiple faction filters survive the public/staff library switch and reset', async () => {
@@ -131,12 +137,12 @@ test('search and multiple faction filters survive the public/staff library switc
   const params = fetchList.mock.calls.at(-1)?.[1] as URLSearchParams;
   expect(params.get('q')).toBe('gate');
   expect(params.getAll('factions')).toEqual(['order', 'fire']);
-  (
-    target.querySelector('.theme-tablist a[href^="/staff/encounters"]') as HTMLElement
-  ).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+  (target.querySelector('a[href^="/staff/encounters"]') as HTMLElement).dispatchEvent(
+    new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
+  );
   await flush();
   expect(router.currentRoute.value.query.q).toBe('gate');
-  expect(fetchList.mock.calls.at(-1)?.[0]).toBe(true);
+  expect(fetchList.mock.calls.at(-1)?.[0]).toBe('staff');
   (target.querySelector('[aria-label="Reset filters"]') as HTMLElement).dispatchEvent(
     new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
   );
@@ -147,8 +153,8 @@ test('search and multiple faction filters survive the public/staff library switc
 
 test('switching to public discards a late staff response', async () => {
   let resolveStaff!: (value: EncounterPage) => void;
-  fetchList.mockImplementation((staff: boolean) =>
-    staff
+  fetchList.mockImplementation((scope: string) =>
+    scope === 'staff'
       ? new Promise<EncounterPage>((resolve) => {
           resolveStaff = resolve;
         })
@@ -192,4 +198,51 @@ test('initial errors offer retry and a successful empty response shows the empty
     ?.click();
   await flush();
   expect(target.textContent).toContain('No public Encounters yet.');
+});
+
+test('personal library preserves Official filters and shows read-only endorsed owner records', async () => {
+  auth.canAccessStaffRoutes = false;
+  fetchList.mockResolvedValue(
+    page([
+      record({ is_official: true, can_edit: false, can_delete: false, visibility: 'private' }),
+    ]),
+  );
+  const { target, router } = await mount('/my/encounters?q=gate&factions=order&is_official=true');
+  expect(fetchList.mock.calls[0][0]).toBe('mine');
+  expect((fetchList.mock.calls[0][1] as URLSearchParams).get('is_official')).toBe('true');
+  expect(target.textContent).toContain('My Encounters');
+  expect(target.querySelector('.collection-list-card-surface')?.textContent).toContain('Official');
+  expect(target.querySelector('[aria-label="Edit Encounter"]')).toBeNull();
+  const detail = target.querySelector('.collection-list-card-surface[role="link"]') as HTMLElement;
+  detail.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+  await flush();
+  expect(router.currentRoute.value.query).toMatchObject({
+    return_to: 'my_encounters',
+    is_official: 'true',
+    q: 'gate',
+    factions: ['order'],
+  });
+});
+
+test('Official and Community filters compose with search and factions and clear back to All', async () => {
+  fetchList.mockResolvedValue(page([]));
+  const { target, router } = await mount('/encounters?q=gate&factions=fire');
+  const select = (label: string) =>
+    Array.from(target.querySelectorAll('button'))
+      .find((button) => button.textContent?.trim() === label)
+      ?.click();
+  select('Community');
+  await vi.advanceTimersByTimeAsync(300);
+  await flush();
+  expect(router.currentRoute.value.query).toMatchObject({
+    is_official: 'false',
+    q: 'gate',
+    factions: ['fire'],
+  });
+  expect((fetchList.mock.calls.at(-1)?.[1] as URLSearchParams).get('is_official')).toBe('false');
+  select('All');
+  await vi.advanceTimersByTimeAsync(300);
+  await flush();
+  expect(router.currentRoute.value.query).not.toHaveProperty('is_official');
+  expect(router.currentRoute.value.query.q).toBe('gate');
 });

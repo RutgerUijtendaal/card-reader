@@ -2,23 +2,32 @@
   <section class="flex flex-col gap-5">
     <AppPageHeader
       :icon="APP_SECTION_ICONS.encounters"
-      :title="staff ? 'Staff Encounters' : 'Encounters'"
+      :title="staff ? 'Manage Encounters' : mine ? 'My Encounters' : 'Encounters'"
       :subtitle="
         staff
-          ? 'Manage all saved Encounters, including staff-only and unfinished work.'
-          : 'Browse public Encounters and discover your next fight.'
+          ? 'Manage all saved Encounters, including private and unfinished work.'
+          : mine
+            ? 'Your Encounters, including private and unfinished work.'
+            : 'Browse public Encounters and discover your next fight.'
       "
       title-tag="h2"
       title-class="text-xl"
     >
       <template #actions>
         <AppHeaderAction
-          v-if="auth.canAccessStaffRoutes"
+          v-if="auth.canAccessStaffRoutes && !staff"
+          :icon="APP_SECTION_ICONS.encounters"
+          label="Manage Encounters"
+          short-label="Manage"
+          :to="{ path: '/staff/encounters', query: filterQuery }"
+        />
+        <AppHeaderAction
+          v-if="auth.authenticated"
           :icon="APP_SECTION_ICONS.encounters"
           label="Build Encounter"
           short-label="Build Encounter"
           variant="primary"
-          to="/staff/encounters/new"
+          to="/my/encounters/new"
         />
       </template>
     </AppPageHeader>
@@ -34,7 +43,7 @@
           :on-reset="reset"
         >
           <div
-            v-if="auth.canAccessStaffRoutes"
+            v-if="auth.authenticated"
             class="theme-divider space-y-3 border-b pb-4"
           >
             <p class="theme-kicker text-xs font-semibold uppercase tracking-[0.16em]">
@@ -43,18 +52,33 @@
             <div class="theme-tablist w-full">
               <RouterLink
                 class="theme-tab flex-1"
-                :class="!staff ? 'theme-tab-active' : ''"
+                :class="!staff && !mine ? 'theme-tab-active' : ''"
                 :to="{ path: '/encounters', query: filterQuery }"
               >
                 Public
               </RouterLink>
               <RouterLink
                 class="theme-tab flex-1"
-                :class="staff ? 'theme-tab-active' : ''"
-                :to="{ path: '/staff/encounters', query: filterQuery }"
+                :class="mine ? 'theme-tab-active' : ''"
+                :to="{ path: '/my/encounters', query: filterQuery }"
               >
-                Staff Encounters
+                My Encounters
               </RouterLink>
+            </div>
+          </div>
+          <div class="space-y-3">
+            <h3 class="theme-section-title text-sm font-semibold">
+              Official status
+            </h3>
+            <div class="flex flex-wrap gap-2">
+              <ChoicePill
+                v-for="option in officialOptions"
+                :key="option.value"
+                :selected="official === option.value"
+                @click="official = option.value"
+              >
+                {{ option.label }}
+              </ChoicePill>
             </div>
           </div>
           <div class="space-y-3">
@@ -102,9 +126,9 @@
         class="page-card theme-section-muted text-sm"
       >
         {{
-          query || factions.length
+          query || factions.length || official
             ? 'No Encounters match the current filters.'
-            : staff
+            : staff || mine
               ? 'No saved Encounters yet.'
               : 'No public Encounters yet.'
         }}
@@ -118,7 +142,8 @@
           :key="item.id"
           :encounter="item"
           :staff="staff"
-          :can-edit="auth.canAccessStaffRoutes"
+          :mine="mine"
+          :filter-query="filterQuery"
         />
         <div
           v-if="nextPage"
@@ -163,8 +188,15 @@ import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import EncounterListCard from './components/EncounterListCard.vue';
 import { useEncounterList } from './composables/useEncounterList';
 const auth = useAuthStore();
+const officialOptions = [
+  { value: '', label: 'All' },
+  { value: 'true', label: 'Official' },
+  { value: 'false', label: 'Community' },
+];
 const {
   staff,
+  mine,
+  official,
   query,
   factions,
   records,

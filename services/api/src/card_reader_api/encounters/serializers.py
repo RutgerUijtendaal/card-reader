@@ -7,7 +7,7 @@ from card_reader_api.decks.serializers import deck_card_payload
 from card_reader_core.models import CARD_FACTIONS
 from card_reader_core.models.encounter import Encounter
 from card_reader_core.services.card_backs import ResolvedCardBack, resolve_effective_card_backs
-from card_reader_core.services.encounters import boss_cards, validation_issues
+from card_reader_core.services.encounters import EncounterActor, boss_cards, validation_issues
 
 
 class EntrySerializer(serializers.Serializer[dict[str, Any]]):
@@ -27,12 +27,13 @@ class EncounterWriteSerializer(serializers.Serializer[dict[str, Any]]):
     long_description_markup = serializers.CharField(allow_blank=True, required=False)
     boss_card_id = serializers.CharField(allow_null=True, required=False)
     boss_group_id = serializers.CharField(allow_null=True, required=False)
-    visibility = serializers.ChoiceField(choices=["private", "public"], required=False)
+    visibility = serializers.ChoiceField(choices=["private", "unlisted", "public"], required=False)
     factions = serializers.ListField(
         child=serializers.ChoiceField(choices=CARD_FACTIONS), required=False
     )
     entries = EntrySerializer(many=True, required=False)
     sideboards = SideboardSerializer(many=True, required=False)
+    is_official = serializers.BooleanField(required=False)
     revision = serializers.IntegerField(min_value=1, required=False)
 
 
@@ -41,20 +42,27 @@ class EncounterListSerializer(serializers.Serializer[dict[str, Any]]):
     factions = serializers.ListField(
         child=serializers.ChoiceField(choices=CARD_FACTIONS), default=list
     )
+    is_official = serializers.BooleanField(required=False)
     page = serializers.IntegerField(default=1, min_value=1)
     page_size = serializers.IntegerField(default=24, min_value=1, max_value=100)
 
 
-def encounter_summaries(records: list[Encounter]) -> list[dict[str, object]]:
+def encounter_summaries(
+    records: list[Encounter], *, actor: EncounterActor
+) -> list[dict[str, object]]:
     backs = resolve_effective_card_backs(
         [record.boss_card_id for record in records if record.boss_card_id]
     )
-    return [encounter_payload(record, detail=False, resolved_backs=backs) for record in records]
+    return [
+        encounter_payload(record, detail=False, resolved_backs=backs, actor=actor)
+        for record in records
+    ]
 
 
 def encounter_payload(
     record: Encounter,
     *,
+    actor: EncounterActor,
     detail: bool = True,
     resolved_backs: dict[str, ResolvedCardBack] | None = None,
 ) -> dict[str, object]:
@@ -83,6 +91,9 @@ def encounter_payload(
         "description": record.description,
         "factions": record.factions,
         "visibility": record.visibility,
+        "is_official": record.is_official,
+        "can_edit": actor.can_manage(record),
+        "can_delete": actor.can_manage(record),
         "revision": record.revision,
         "creator": {"id": str(record.creator_id), "username": record.creator.get_username()},
         "boss_card_id": record.boss_card_id,

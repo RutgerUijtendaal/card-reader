@@ -52,21 +52,11 @@
           </button>
         </div>
       </AppFormSection>
-      <AppFormSection
-        title="Visibility"
-        :description="selectedVisibilityDescription"
-      >
-        <div class="flex flex-wrap gap-2">
-          <ChoicePill
-            v-for="option in visibilityOptions"
-            :key="option.value"
-            :selected="visibility === option.value"
-            @click="controller.deck.setDeckVisibility(option.value)"
-          >
-            {{ option.label }}
-          </ChoicePill>
-        </div>
-      </AppFormSection>
+      <CollectionVisibilityField
+        :model-value="visibility"
+        :descriptions="deckVisibilityDescriptions"
+        @update:model-value="controller.deck.setDeckVisibility"
+      />
     </section>
 
     <div class="theme-divider flex justify-end border-t pt-6">
@@ -88,12 +78,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { ArrowRight } from 'lucide-vue-next';
+import CollectionVisibilityField from '@/shared/components/builders/CollectionVisibilityField.vue';
 import CardBuilderDetailsFields from '@/domain/cards/components/CardBuilderDetailsFields.vue';
 import ChoicePill from '@/shared/components/ChoicePill.vue';
 import DeckTagPicker from '@/domain/decks/components/DeckTagPicker.vue';
 import AppFormSection from '@/shared/components/app/AppFormSection.vue';
 import { deckDifficultyOptions } from '@/domain/decks/utils/difficulty';
-import { deckVisibilityDescriptions, deckVisibilityOptions } from '@/domain/decks/utils/visibility';
+import { deckVisibilityDescriptions } from '@/domain/decks/utils/visibility';
 import type { DeckEditorController } from '@/features/decks/composables/useDeckEditor';
 
 const props = defineProps<{
@@ -114,9 +105,5 @@ const deckLongDescription = computed({
 });
 const difficultyOptions = deckDifficultyOptions;
 const difficulty = computed(() => props.controller.deck.form.difficulty);
-const visibilityOptions = deckVisibilityOptions;
 const visibility = computed(() => props.controller.deck.form.visibility);
-const selectedVisibilityDescription = computed(
-  () => deckVisibilityDescriptions[visibility.value] ?? '',
-);
 </script>

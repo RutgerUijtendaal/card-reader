@@ -429,8 +429,8 @@
   <text class="title" x="1050" y="2050">Encounter</text>
   <text class="field" x="1050" y="2090">creator / name / descriptions</text>
   <text class="field" x="1050" y="2125">factions / visibility / revision</text>
-  <text class="small" x="1050" y="2160">Incomplete records are saved for staff</text>
-  <text class="small" x="1050" y="2190">Public access requires current validity</text>
+  <text class="small" x="1050" y="2160">is_official (staff-controlled boolean)</text>
+  <text class="small" x="1050" y="2190">Owner + staff inspect unfinished records</text>
   <text class="small" x="1050" y="2220">boss_card and boss_group are nullable</text>
   <text class="small" x="1050" y="2250">Card / group references are protected</text>
   <rect class="box left" x="1440" y="2010" width="350" height="130"/>

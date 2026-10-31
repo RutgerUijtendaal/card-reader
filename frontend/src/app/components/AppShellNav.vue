@@ -284,11 +284,23 @@ const items = computed<NavItem[]>(() => [
         },
       ]
     : []),
-  ...(workspace.activePool === 'evil' ? [
-    { label: 'Encounters', to: '/encounters', icon: APP_SECTION_ICONS.encounters },
-    { label: 'Staff Encounters', to: '/staff/encounters', icon: APP_SECTION_ICONS.encounters, requiresStaff: true },
-    { label: 'Build Encounter', to: '/staff/encounters/new', icon: APP_SECTION_ICONS.encounters, requiresStaff: true },
-  ] : []),
+  ...(workspace.activePool === 'evil'
+    ? [
+        { label: 'Encounters', to: '/encounters', icon: APP_SECTION_ICONS.encounters },
+        {
+          label: 'My Encounters',
+          to: '/my/encounters',
+          icon: APP_SECTION_ICONS.encounters,
+          requiresAuth: true,
+        },
+        {
+          label: 'Build Encounter',
+          to: '/my/encounters/new',
+          icon: APP_SECTION_ICONS.encounters,
+          requiresAuth: true,
+        },
+      ]
+    : []),
   {
     label: 'Notifications',
     to: '/notifications',

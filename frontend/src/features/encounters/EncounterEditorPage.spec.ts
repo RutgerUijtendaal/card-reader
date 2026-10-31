@@ -73,6 +73,7 @@ const mount = () => {
     saving: ref(false),
     error: ref(''),
     locked: ref(false),
+    readOnly: ref(false),
     dirty: ref(false),
     total: ref(0),
     issues: ref([]),

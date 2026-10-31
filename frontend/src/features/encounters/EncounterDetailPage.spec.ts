@@ -1,13 +1,13 @@
 /* eslint-disable vue/one-component-per-file */
 import { createApp, defineComponent, h, nextTick } from 'vue';
-import { createMemoryHistory, createRouter } from 'vue-router';
+import { createMemoryHistory, createRouter, RouterLink } from 'vue-router';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import EncounterDetailPage from './EncounterDetailPage.vue';
 import type { EncounterRecord } from '@/domain/encounters/types';
 import type { CardListItem } from '@/domain/cards/types';
 
 const { auth, fetchRecord, exportRecord, copyExport, fetchFilters } = vi.hoisted(() => ({
-  auth: { canAccessStaffRoutes: true },
+  auth: { canAccessStaffRoutes: true, authenticated: true, user: { id: 'owner' } },
   fetchRecord: vi.fn(),
   exportRecord: vi.fn(),
   copyExport: vi.fn(),
@@ -26,13 +26,16 @@ vi.mock('@/domain/cards/utils/ttsExportResponse', () => ({
 }));
 vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
   default: defineComponent({
-    props: { title: { type: String, default: '' }, backTo: { type: String, default: '' } },
+    props: {
+      title: { type: String, default: '' },
+      backTo: { type: [String, Object], default: '' },
+    },
     setup:
       (props, { slots }) =>
       () =>
         h('header', [
           h('h1', props.title),
-          h('a', { href: props.backTo, 'data-testid': 'back' }),
+          h(RouterLink, { to: props.backTo, 'data-testid': 'back' }),
           slots.subtitle?.(),
           slots.actions?.(),
         ]),
@@ -99,6 +102,9 @@ const card = (id: string, role = '') =>
   }) as unknown as CardListItem;
 const fixture = (override: Partial<EncounterRecord> = {}): EncounterRecord => ({
   id: 'fight-1',
+  is_official: false,
+  can_edit: true,
+  can_delete: true,
   name: 'Gate siege',
   description: 'Hold the gate.',
   description_markup: 'Hold the gate.',
@@ -134,7 +140,7 @@ const mount = async (path = '/encounters/fight-1') => {
     history: createMemoryHistory(),
     routes: [
       { path: '/encounters/:id', component: EncounterDetailPage },
-      { path: '/staff/encounters/:id/edit', component: { template: '<div />' } },
+      { path: '/my/encounters/:id/edit', component: { template: '<div />' } },
       { path: '/staff/encounters', component: { template: '<div />' } },
       { path: '/encounters', component: { template: '<div />' } },
     ],
@@ -174,7 +180,7 @@ afterEach(() => {
 
 test('uses the shared detail layout with boss information left and quantity galleries right', async () => {
   const { target } = await mount('/encounters/fight-1?return_to=encounters');
-  expect(fetchRecord).toHaveBeenCalledWith('fight-1', true);
+  expect(fetchRecord).toHaveBeenCalledWith('fight-1', false);
   expect(fetchFilters).toHaveBeenCalledWith('evil');
   expect(target.querySelector('.collection-detail-primary-aside')?.textContent).toContain(
     'Another author',
@@ -235,7 +241,7 @@ test('incomplete staff records show actionable issues without requiring a boss o
   );
   const { target } = await mount();
   expect(target.textContent).toContain('No boss selected');
-  expect(target.textContent).toContain('Staff only');
+  expect(target.textContent).toContain('Private');
   expect(target.textContent).toContain('Choose a boss.');
   expect(target.textContent).toContain('No cards added to this Encounter yet.');
   expect(target.querySelector('a[aria-label="Edit Encounter"]')).not.toBeNull();
@@ -243,6 +249,7 @@ test('incomplete staff records show actionable issues without requiring a boss o
 
 test('anonymous detail uses the public API, hides staff actions, and exports the full Encounter from either view', async () => {
   auth.canAccessStaffRoutes = false;
+  fetchRecord.mockResolvedValue(fixture({ can_edit: false, can_delete: false }));
   const { target } = await mount();
   expect(fetchRecord).toHaveBeenCalledWith('fight-1', false);
   expect(target.querySelector('a[aria-label="Edit Encounter"]')).toBeNull();
@@ -253,6 +260,27 @@ test('anonymous detail uses the public API, hides staff actions, and exports the
   expect(exportRecord).toHaveBeenCalledWith('fight-1', undefined);
   expect(copyExport).toHaveBeenCalled();
   expect(target.querySelector('textarea')?.value).toBe('tts-code');
+});
+
+test('official owners see a read-only explanation and return to their filtered personal library', async () => {
+  auth.canAccessStaffRoutes = false;
+  fetchRecord.mockResolvedValue(
+    fixture({
+      is_official: true,
+      can_edit: false,
+      can_delete: false,
+      creator: { id: 'owner', username: 'Owner' },
+    }),
+  );
+  const { target } = await mount(
+    '/encounters/fight-1?return_to=my_encounters&is_official=true&q=gate',
+  );
+  expect(target.textContent).toContain('Only staff can edit or delete it.');
+  expect(target.querySelector('a[aria-label="Edit Encounter"]')).toBeNull();
+  expect(target.querySelector('[aria-label="More Encounter actions"]')).toBeNull();
+  expect(target.querySelector('[data-testid="back"]')?.getAttribute('href')).toContain(
+    '/my/encounters?q=gate&is_official=true',
+  );
 });
 
 test('loading uses the shared page skeleton and late responses cannot replace the current Encounter', async () => {

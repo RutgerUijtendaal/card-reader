@@ -39,27 +39,26 @@
           </ChoicePill>
         </div>
       </AppFormSection>
+      <CollectionVisibilityField
+        :model-value="editor.form.visibility"
+        :descriptions="visibilityDescriptions"
+        @update:model-value="editor.setDetails({ visibility: $event })"
+      />
       <AppFormSection
-        title="Visibility"
-        :description="
-          editor.form.visibility === 'public'
-            ? 'Visible to everyone when this Encounter is valid.'
-            : 'Visible to all staff, including unfinished work.'
-        "
+        v-if="auth.canAccessStaffRoutes"
+        title="Official status"
+        description="Official Encounters can only be edited or deleted by staff, including when their owner is an ordinary user."
       >
-        <div class="flex flex-wrap gap-2">
-          <ChoicePill
-            :selected="editor.form.visibility === 'private'"
-            @click="editor.setDetails({ visibility: 'private' })"
+        <label class="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            :checked="editor.form.is_official ?? false"
+            @change="
+              editor.setDetails({ is_official: ($event.target as HTMLInputElement).checked })
+            "
           >
-            Staff only
-          </ChoicePill><ChoicePill
-            :selected="editor.form.visibility === 'public'"
-            @click="editor.setDetails({ visibility: 'public' })"
-          >
-            Public
-          </ChoicePill>
-        </div>
+          Official Encounter
+        </label>
       </AppFormSection>
     </section>
     <div class="theme-divider flex justify-end border-t pt-6">
@@ -74,12 +73,20 @@
   </fieldset>
 </template>
 <script setup lang="ts">
+import CollectionVisibilityField from '@/shared/components/builders/CollectionVisibilityField.vue';
+import { useAuthStore } from '@/domain/session/store';
 import { ArrowRight } from 'lucide-vue-next';
 import CardBuilderDetailsFields from '@/domain/cards/components/CardBuilderDetailsFields.vue';
 import { CARD_FACTION_OPTIONS, type CardFaction } from '@/domain/cards/cardFactions';
 import AppFormSection from '@/shared/components/app/AppFormSection.vue';
 import ChoicePill from '@/shared/components/ChoicePill.vue';
 import type { useEncounterEditor } from '../composables/useEncounterEditor';
+const auth = useAuthStore();
+const visibilityDescriptions = {
+  private: 'Only you and staff can view this Encounter, including unfinished work.',
+  unlisted: 'Anyone with the link can view this Encounter when it is valid.',
+  public: 'Listed for everyone to discover when this Encounter is valid.',
+};
 const props = defineProps<{ editor: ReturnType<typeof useEncounterEditor> }>();
 const toggleFaction = (value: CardFaction) => {
   const form = props.editor.form;
