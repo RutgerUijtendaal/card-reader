@@ -8,7 +8,7 @@ A deck can contain a hero, a mainboard, and supported sideboard sections. Entrie
 
 All referenced cards must belong to the Player pool. The selected hero must also have the Hero role, and Hero-role cards remain excluded from ordinary mainboard entries under the existing rules. Deck-builder searches send the Player pool explicitly and use role filters rather than a card boolean.
 
-The current deck model and builder are therefore the **Player deck** workflow. Decks do not yet persist their own Player/Evil/Neutral classification. Decks, My Decks, Build a deck, and Playtester appear only in the Player workspace; reaching their routes directly also switches the global workspace to Player. A later deck-design project is expected to classify stable deck identities explicitly, but it must define non-Player deck structure and validation on its own terms instead of assuming the current hero/mainboard/sideboard shape applies.
+The current deck model and builder are the **Player deck** workflow. Decks, My Decks, Build a deck, and Playtester appear only in the Player workspace; direct routes also switch to Player. [Encounters](encounters.md) author the Evil side separately, reusing Player draft/recovery machinery, card rows and previews, markup, and TTS reporting without inheriting Player construction rules or changing Deck into a mixed-purpose container.
 
 Deck payloads expose every referenced card's real identity, pool, image, and metadata to any viewer who can access the deck. `has_non_player_cards` reports when a saved reference no longer belongs to Player; it is an eligibility signal, not an authorization flag. An unchanged reclassified reference may round-trip while the owner edits unrelated cards or quantities, and omitting it removes it. Adding, replacing, moving, or increasing a non-Player entry remains rejected. Sideboard writes carry the source sideboard id so a rename can preserve unchanged references.
 
@@ -27,6 +27,10 @@ One versioned draft is stored per authenticated user. It includes the complete f
 Each unpublished draft has a stable UUID. Create sends that UUID as an owner-scoped idempotency key, so a retry returns the same deck instead of creating a duplicate. A durable creation record retains used keys after deck deletion, allowing retries and lookups to report the deleted outcome without recreating the deck. If the initial response is ambiguous, the editor reconciles the UUID with delayed retries; a found deck completes navigation, a deleted result retires the stale local attempt, and repeated misses or unavailable lookups keep the exact attempted payload locked for a safe Retry. A miss unlocks the draft only when the failed Create returned a definitive HTTP response.
 
 Conditional storage revisions and an owner-scoped browser lock make each compare-and-write mutation atomic across tabs. Browsers without that lock support retain the draft in memory instead of risking an overwrite. When another tab changes, removes, or creates the same draft, persistence and Create pause until the user explicitly loads the stored draft, keeps the current tab, discards it, opens the created deck, or keeps the contents under a new draft UUID.
+
+## Collection views
+
+Player and Encounter lists share `CollectionListCard` and `CollectionLoadingSkeleton` under `frontend/src/shared/components/`. Detail pages share `CollectionDetailLayout` for the expandable information panels, plus the cards-domain `CardCollectionGrid`, `CardCollectionViewOptions`, `CardCollectionDetailLoadingSkeleton`, and `useCardCollectionGrid`. Each feature retains its own metadata, actions, construction rules, and card pool; sorting receives that pool explicitly.
 
 ## Constraint model
 

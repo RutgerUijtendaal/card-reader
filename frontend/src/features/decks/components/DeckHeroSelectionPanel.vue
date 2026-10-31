@@ -17,41 +17,10 @@
         </p>
       </div>
 
-      <section class="space-y-3">
-        <p class="theme-section-title text-sm font-semibold">
-          Selected Hero
-        </p>
-        <div
-          v-if="controller.deck.selectedHero.value"
-          class="space-y-3"
-        >
-          <div
-            v-if="controller.deck.selectedHero.value.image_url"
-            class="mx-auto aspect-[63/88] max-h-[34rem] w-full rounded-xl"
-          >
-            <img
-              :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
-              :alt="controller.deck.selectedHero.value.name"
-              class="h-full w-full object-contain"
-            >
-          </div>
-          <div
-            v-else
-            class="theme-empty-state flex h-[34rem] items-center justify-center rounded-xl text-sm"
-          >
-            No hero image
-          </div>
-          <p class="theme-section-title text-center text-sm font-semibold">
-            {{ controller.deck.selectedHero.value.name }}
-          </p>
-        </div>
-        <div
-          v-else
-          class="theme-card-frame mx-auto aspect-[63/88] max-h-[34rem] w-full overflow-hidden rounded-xl"
-        >
-          <CardLoadingSkeleton :animated="false" />
-        </div>
-      </section>
+      <CardBuilderSelection
+        :card="controller.deck.selectedHero.value"
+        label="Selected Hero"
+      />
 
       <div
         v-if="!controller.isChangingHero.value && setupBlockingMessages.length > 0"
@@ -111,9 +80,8 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { toAbsoluteApiUrl } from '@/shared/api/client';
 import AppStickyAside from '@/shared/components/app/AppStickyAside.vue';
-import CardLoadingSkeleton from '@/domain/cards/components/CardLoadingSkeleton.vue';
+import CardBuilderSelection from '@/domain/cards/components/CardBuilderSelection.vue';
 import type { DeckEditorController } from '@/features/decks/composables/useDeckEditor';
 
 const props = defineProps<{

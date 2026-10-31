@@ -25,6 +25,7 @@ from card_reader_core.repositories.classification_reviews import (
 from card_reader_core.services.tts_card_sheets import TtsCardSheetService
 
 from .aliases import build_alias_previews
+from card_reader_core.repositories.encounters import retarget_encounter_cards
 from .relations import merge_card_group_references, merge_deck_references, preview_relation_changes
 from .types import CardMergeCardSummary, CardMergeError, CardMergePreview
 from .versions import merge_card_versions
@@ -85,6 +86,7 @@ def merge_cards(*, target_card_id: str, source_card_ids: list[str]) -> CardMerge
         raise CardMergeError("Merge has blocking alias conflicts.")
 
     source_ids = [source.id for source in sources]
+    retarget_encounter_cards(target.id, source_ids)
     merge_deck_references(target.id, source_ids)
     merge_card_group_references(target.id, source_ids)
     merge_card_versions(target.id, source_ids)

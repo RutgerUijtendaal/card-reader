@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 class CardGroup(TimestampedModel):
     if TYPE_CHECKING:
         members: Manager[CardGroupMember]
+        anchor_card_id: str
 
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)

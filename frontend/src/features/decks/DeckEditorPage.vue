@@ -119,43 +119,44 @@
       </div>
     </AppPageLayout>
 
-    <AppPageLayout
+    <BuilderWorkspaceLayout
       v-if="!controller.loading.value && controller.editorMode.value === 'hero'"
       :inert="controller.isMutationLocked.value"
-      columns="three"
-      root-class="deck-builder-layout"
-      main-class="deck-builder-main-column"
     >
       <template #aside>
         <DeckBuilderFiltersPanel :controller="controller" />
       </template>
-      <div class="deck-builder-gallery-column flex min-w-0 flex-col">
-        <div class="deck-builder-gallery-scroll app-scrollbar min-h-0 flex-1">
-          <DeckBuilderGallery :controller="controller" />
-        </div>
-      </div>
+      <DeckBuilderGallery :controller="controller" />
       <template #endAside>
         <DeckHeroSelectionPanel :controller="controller" />
       </template>
-    </AppPageLayout>
+    </BuilderWorkspaceLayout>
 
-    <AppPageLayout
+    <BuilderDetailsLayout
       v-if="!controller.loading.value && controller.editorMode.value === 'details'"
       :inert="controller.isMutationLocked.value"
-      columns="sidebar"
     >
       <template #aside>
         <DeckDetailsHeroPanel :controller="controller" />
       </template>
+      <template #status>
+        <BuilderStatusBar aria-label="Deck save status">
+          <BuilderSaveStatus
+            v-model:autosync="controller.autosyncEnabled.value"
+            :busy="controller.saving.value || controller.creationState.value.status === 'creating'"
+            :dirty="controller.hasUnsavedChanges.value"
+            :label="controller.changeStatusLabel.value"
+            :saved="controller.isPublished.value"
+            :can-autosync="controller.canAutosync.value"
+          />
+        </BuilderStatusBar>
+      </template>
       <DeckDetailsForm :controller="controller" />
-    </AppPageLayout>
+    </BuilderDetailsLayout>
 
-    <AppPageLayout
+    <BuilderWorkspaceLayout
       v-if="controller.editorMode.value === 'cards'"
       :inert="controller.isMutationLocked.value"
-      columns="three"
-      root-class="deck-builder-layout"
-      main-class="deck-builder-main-column"
     >
       <template #aside>
         <aside
@@ -183,7 +184,7 @@
           :controller="controller"
         />
       </template>
-      <div class="deck-builder-gallery-column flex min-w-0 flex-col gap-4">
+      <template #status>
         <section
           v-if="controller.loading.value"
           class="deck-builder-status-bar mx-px flex shrink-0 items-center justify-between gap-4 px-4 py-3"
@@ -201,38 +202,18 @@
             />
           </div>
         </section>
-        <section
+        <BuilderStatusBar
           v-else
-          class="deck-builder-status-bar mx-px flex shrink-0 flex-col gap-4 px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
           aria-label="Deck builder status"
         >
-          <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <div class="flex items-center gap-2">
-              <component
-                :is="deckChangeStatusIcon"
-                class="h-4 w-4 shrink-0"
-                :class="{
-                  'animate-spin': controller.saving.value
-                    || controller.creationState.value.status === 'creating',
-                }"
-              />
-              <span class="theme-section-title text-sm font-semibold">{{
-                controller.changeStatusLabel.value
-              }}</span>
-            </div>
-            <label
-              class="theme-section-muted flex items-center gap-2 text-sm font-semibold"
-              :class="{ 'opacity-60': !controller.canAutosync.value }"
-            >
-              <input
-                v-model="controller.autosyncEnabled.value"
-                class="h-4 w-4 rounded accent-emerald-400"
-                type="checkbox"
-                :disabled="!controller.canAutosync.value"
-              >
-              <span>{{ controller.isPublished.value ? 'Autosync' : 'Autosync after creation' }}</span>
-            </label>
-          </div>
+          <BuilderSaveStatus
+            v-model:autosync="controller.autosyncEnabled.value"
+            :busy="controller.saving.value || controller.creationState.value.status === 'creating'"
+            :dirty="controller.hasUnsavedChanges.value"
+            :label="controller.changeStatusLabel.value"
+            :saved="controller.isPublished.value"
+            :can-autosync="controller.canAutosync.value"
+          />
 
           <div class="flex flex-wrap items-center justify-start gap-x-5 gap-y-2 lg:justify-end">
             <div class="flex items-center gap-2">
@@ -411,15 +392,12 @@
               </span>
             </div>
           </div>
-        </section>
-
-        <div class="deck-builder-gallery-scroll app-scrollbar min-h-0 flex-1">
-          <DeckBuilderGallery
-            :controller="controller"
-            :loading="controller.loading.value"
-          />
-        </div>
-      </div>
+        </BuilderStatusBar>
+      </template>
+      <DeckBuilderGallery
+        :controller="controller"
+        :loading="controller.loading.value"
+      />
       <template #endAside>
         <aside
           v-if="controller.loading.value"
@@ -449,7 +427,7 @@
           :controller="controller"
         />
       </template>
-    </AppPageLayout>
+    </BuilderWorkspaceLayout>
 
     <ConfirmModal
       :open="controller.discardChangesModalOpen.value"
@@ -491,8 +469,6 @@ import { computed } from 'vue';
 import {
   CircleCheckBig,
   CircleX,
-  Cloud,
-  CloudUpload,
   Crown,
   FileText,
   LayoutGrid,
@@ -501,6 +477,10 @@ import {
   Trash2,
   TriangleAlert,
 } from 'lucide-vue-next';
+import BuilderWorkspaceLayout from '@/shared/components/builders/BuilderWorkspaceLayout.vue';
+import BuilderDetailsLayout from '@/shared/components/builders/BuilderDetailsLayout.vue';
+import BuilderStatusBar from '@/shared/components/builders/BuilderStatusBar.vue';
+import BuilderSaveStatus from '@/shared/components/builders/BuilderSaveStatus.vue';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
@@ -512,8 +492,8 @@ import DeckBuilderGallery from '@/features/decks/components/DeckBuilderGallery.v
 import DeckBuilderSummaryPanel from '@/features/decks/components/DeckBuilderSummaryPanel.vue';
 import DeckDetailsForm from '@/features/decks/components/DeckDetailsForm.vue';
 import DeckDetailsHeroPanel from '@/features/decks/components/DeckDetailsHeroPanel.vue';
-import DeckDraftRecoveryModal from '@/features/decks/components/DeckDraftRecoveryModal.vue';
-import DeckDraftConflictModal from '@/features/decks/components/DeckDraftConflictModal.vue';
+import DeckDraftRecoveryModal from '@/shared/components/builders/BuilderDraftRecoveryModal.vue';
+import DeckDraftConflictModal from '@/shared/components/builders/BuilderDraftConflictModal.vue';
 import DeckHeroSelectionPanel from '@/features/decks/components/DeckHeroSelectionPanel.vue';
 import { useDeckEditor } from '@/features/decks/composables/useDeckEditor';
 import { useFloatingPopover } from '@/shared/composables/useFloatingPopover';
@@ -599,15 +579,6 @@ const deckLeaveConfirmationLabel = computed(() => {
   if (controller.localDraftConflict.value) return 'Discard This Tab';
   return controller.localDraftPersistenceFailed.value ? 'Discard & Leave' : 'Leave Draft';
 });
-const deckChangeStatusIcon = computed(() => {
-  if (controller.saving.value || controller.creationState.value.status === 'creating') {
-    return LoaderCircle;
-  }
-  if (controller.hasUnsavedChanges.value) {
-    return CloudUpload;
-  }
-  return Cloud;
-});
 const handleUseStoredConflict = (): void => {
   const conflict = controller.localDraftConflict.value;
   if (conflict?.kind === 'active-draft') {
@@ -639,43 +610,6 @@ const deckEditorSubtitle = computed(() => {
 </script>
 
 <style scoped>
-:deep(.deck-builder-layout) {
-  padding-top: 0;
-  padding-right: 0;
-  padding-left: 0;
-}
-
-:deep(.deck-builder-main-column) {
-  padding-top: 0;
-  padding-right: 0;
-  padding-left: 0;
-}
-
-@media (min-width: 1280px) {
-  :deep(.deck-builder-layout) {
-    height: calc(100dvh - var(--app-page-header-height, 0px));
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  :deep(.deck-builder-main-column) {
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  .deck-builder-gallery-column {
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  .deck-builder-gallery-scroll {
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-}
-
 .deck-builder-status-bar {
   position: sticky;
   top: 0;

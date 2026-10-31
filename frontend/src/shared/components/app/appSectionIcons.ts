@@ -1,5 +1,6 @@
 import {
   Activity,
+  Swords,
   Bell,
   BookOpen,
   ClipboardCheck,
@@ -14,6 +15,7 @@ import {
 
 export const APP_SECTION_ICONS = {
   home: House,
+  encounters: Swords,
   decks: BookOpen,
   playtester: Gamepad2,
   myDecks: Folders,

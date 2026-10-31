@@ -62,7 +62,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { isManaTypeKey } from '@/domain/cards/utils/gallery/cardSort';
-import { groupDeckEntriesByType } from '@/domain/decks/utils/deckTypeGroups';
+import { groupCardEntriesByType } from '@/domain/cards/utils/cardTypeGroups';
 import {
   buildManaDistributionFromEntryGroups,
   filterManaDistributionEntriesByTypeGroup,
@@ -85,7 +85,7 @@ const props = defineProps<{
 const { groups, saveGroups } = useManaTypeGroups();
 const groupManagerOpen = ref(false);
 const summary = computed(() => {
-  const baseTypeGroups = groupDeckEntriesByType(props.entries, props.types)
+  const baseTypeGroups = groupCardEntriesByType(props.entries, props.types)
     .filter((group) => group.key !== 'untyped' && !isManaTypeKey(group.key))
     .map((group) => ({
       group: {

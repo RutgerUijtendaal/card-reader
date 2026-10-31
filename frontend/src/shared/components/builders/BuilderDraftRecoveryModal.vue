@@ -12,7 +12,7 @@
         :id="titleId"
         class="theme-section-title text-lg font-semibold"
       >
-        Resume local deck draft?
+        Resume local {{ resourceLabel }} draft?
       </h3>
       <p
         :id="descriptionId"
@@ -22,8 +22,8 @@
           Checking whether this draft was already created. Keep this page open for a moment.
         </template>
         <template v-else>
-          This browser has an unpublished deck draft. Resume where you left off or discard it and
-          start a new deck.
+          This browser has an unpublished {{ resourceLabel }} draft. Resume where you left off or
+          discard it and start a new {{ resourceLabel }}.
         </template>
       </p>
       <p
@@ -38,7 +38,7 @@
       <button
         class="btn-danger-secondary"
         type="button"
-        :disabled="busy"
+        :disabled="busy || discardDisabled"
         @click="emit('discard')"
       >
         Discard Draft
@@ -59,11 +59,16 @@
 import { computed, useId } from 'vue';
 import AppModal from '@/shared/components/modals/AppModal.vue';
 
-const props = defineProps<{
-  open: boolean;
-  savedAt?: string;
-  busy?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    open: boolean;
+    resourceLabel?: string;
+    savedAt?: string;
+    busy?: boolean;
+    discardDisabled?: boolean;
+  }>(),
+  { resourceLabel: 'deck', savedAt: undefined },
+);
 
 const emit = defineEmits<{
   discard: [];

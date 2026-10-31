@@ -12,7 +12,11 @@
       {{ copy.title }}
     </h3>
     <p class="theme-section-muted mt-2 text-sm">
-      {{ busy ? 'Finish confirming the current Create request before resolving this conflict.' : copy.message }}
+      {{
+        busy
+          ? 'Finish confirming the current Create request before resolving this conflict.'
+          : copy.message
+      }}
     </p>
     <div class="mt-5 flex flex-wrap justify-end gap-2">
       <button
@@ -38,13 +42,16 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue';
 import AppModal from '@/shared/components/modals/AppModal.vue';
-import type { DeckEditorDraftConflict } from '@/features/decks/composables/useDeckEditorLocalDraft';
 
-const props = defineProps<{
-  open: boolean;
-  kind?: DeckEditorDraftConflict['kind'];
-  busy?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    open: boolean;
+    resourceLabel?: string;
+    kind?: 'created-elsewhere' | 'remote-deletion' | 'active-draft';
+    busy?: boolean;
+  }>(),
+  { resourceLabel: 'deck', kind: undefined },
+);
 
 const emit = defineEmits<{
   (event: 'useStored'): void;
@@ -56,15 +63,16 @@ const copy = computed(() => {
   if (props.kind === 'created-elsewhere') {
     return {
       title: 'This draft was created in another tab',
-      message: 'Open the created deck, or keep this tab as a separate unpublished draft.',
-      storedLabel: 'Open Created Deck',
+      message: `Open the created ${props.resourceLabel}, or keep this tab as a separate unpublished draft.`,
+      storedLabel: `Open Created ${props.resourceLabel.charAt(0).toUpperCase()}${props.resourceLabel.slice(1)}`,
       localLabel: 'Keep as New Draft',
     };
   }
   if (props.kind === 'remote-deletion') {
     return {
       title: 'This draft changed in another tab',
-      message: 'The stored draft was removed. Discard this tab, or save its current contents as the draft.',
+      message:
+        'The stored draft was removed. Discard this tab, or save its current contents as the draft.',
       storedLabel: 'Discard This Tab',
       localLabel: 'Keep This Draft',
     };

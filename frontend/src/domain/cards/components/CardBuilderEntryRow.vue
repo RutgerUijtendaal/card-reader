@@ -15,6 +15,7 @@
     @keydown.space.prevent="handleRowKeydown"
   >
     <button
+      v-if="reorderable !== false"
       class="deck-board-entry-drag-handle theme-card-frame-muted theme-section-muted theme-divider relative z-20 flex h-full w-8 shrink-0 cursor-grab items-center justify-center border-r opacity-75 transition hover:opacity-100 active:cursor-grabbing"
       type="button"
       aria-label="Drag to reorder card"
@@ -53,7 +54,9 @@
           <button
             class="theme-divider inline-flex h-8 w-8 items-center justify-center border-l text-sm font-semibold transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
             type="button"
-            :disabled="mutationDisabled || (quantityMax !== undefined && entry.quantity >= quantityMax)"
+            :disabled="
+              mutationDisabled || (quantityMax !== undefined && entry.quantity >= quantityMax)
+            "
             aria-label="Add one copy"
             @click.stop="handleIncrementClick"
             @contextmenu.stop
@@ -190,20 +193,29 @@ import type { HoverMode } from '@/domain/cards/utils/gallery/hoverMode';
 import { getHoverPreviewCardWidthRem } from '@/domain/cards/utils/gallery/hoverPreviewScale';
 import { useSharedElementHover } from '@/domain/cards/composables/useSharedElementHover';
 import { useHoverModePreferences } from '@/domain/cards/composables/useHoverModePreferences';
-import type { DeckEntrySummary } from '@/domain/decks/types';
-import type { DeckBoardMoveDestination } from '@/features/decks/composables/deckEditorDraftTypes';
-import { blurAfterFinePointerActivation, blurFocusedDescendantAfterFinePointerLeave } from '@/shared/utils/pointerFocus';
+import type {
+  CardBuilderEntry,
+  CardBuilderMoveDestination,
+} from '@/domain/cards/types/cardBuilder';
+import {
+  blurAfterFinePointerActivation,
+  blurFocusedDescendantAfterFinePointerLeave,
+} from '@/shared/utils/pointerFocus';
 
-const props = defineProps<{
-  entry: DeckEntrySummary;
-  sortableCardId: string;
-  hoverMode: HoverMode;
-  quantityMax?: number;
-  moveDestinations: DeckBoardMoveDestination[];
-  mutationDisabled?: boolean;
-  rowActionDisabled?: boolean;
-  rowSecondaryActionDisabled?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    entry: CardBuilderEntry;
+    sortableCardId: string;
+    reorderable?: boolean;
+    hoverMode: HoverMode;
+    quantityMax?: number;
+    moveDestinations: CardBuilderMoveDestination[];
+    mutationDisabled?: boolean;
+    rowActionDisabled?: boolean;
+    rowSecondaryActionDisabled?: boolean;
+  }>(),
+  { reorderable: true, quantityMax: undefined },
+);
 
 const emit = defineEmits<{
   (e: 'decrement', cardId: string): void;
@@ -230,14 +242,20 @@ const {
 } = useFloatingPopover({
   placement: 'bottom-end',
 });
-const showEnlargedPreview = computed(() => props.hoverMode === 'enlarged' || props.hoverMode === 'enlarged-details');
-const showDetailsPreview = computed(() => props.hoverMode === 'details' || props.hoverMode === 'enlarged-details');
+const showEnlargedPreview = computed(
+  () => props.hoverMode === 'enlarged' || props.hoverMode === 'enlarged-details',
+);
+const showDetailsPreview = computed(
+  () => props.hoverMode === 'details' || props.hoverMode === 'enlarged-details',
+);
 const showHoverOverlay = computed(() => {
   if (!hovered.value || props.hoverMode === 'none') {
     return false;
   }
 
-  return (showEnlargedPreview.value && props.entry.card.image_url !== null) || showDetailsPreview.value;
+  return (
+    (showEnlargedPreview.value && props.entry.card.image_url !== null) || showDetailsPreview.value
+  );
 });
 const floating = useFloating(triggerRef, hoverPanelRef, {
   open: showHoverOverlay,
@@ -259,8 +277,7 @@ const sharedElementHover = useSharedElementHover({
   y: hoverPanelY,
 });
 const rowClickable = computed(
-  () => !props.mutationDisabled
-    && (!props.rowActionDisabled || !props.rowSecondaryActionDisabled),
+  () => !props.mutationDisabled && (!props.rowActionDisabled || !props.rowSecondaryActionDisabled),
 );
 const controlsVisible = computed(() => hovered.value || focusedWithin.value || moveMenuOpen.value);
 const singleMoveDestination = computed(() =>

@@ -1,3 +1,4 @@
+import { createDraftStorage } from '@/shared/drafts/storage';
 import type { DeckCardSummary, DeckUpsertRequest } from '@/domain/decks/types';
 import { isCardFaction } from '@/domain/cards/cardFactions';
 import { isCardPool } from '@/domain/cards/cardPools';
@@ -127,7 +128,8 @@ const normalizeEntries = (value: unknown): DeckFormEntry[] | null => {
 };
 
 const normalizeSideboard = (value: unknown): DeckFormSideboard | null => {
-  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.name !== 'string') return null;
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.name !== 'string')
+    return null;
   if (value.source_id !== undefined && typeof value.source_id !== 'string') return null;
   const entries = normalizeEntries(value.entries);
   return entries === null
@@ -145,17 +147,19 @@ const normalizeForm = (value: unknown): DeckForm | null => {
   const entries = normalizeEntries(value.entries);
   if (entries === null || !Array.isArray(value.sideboards)) return null;
   const sideboards = value.sideboards.map(normalizeSideboard);
-  if (!sideboards.every((sideboard): sideboard is DeckFormSideboard => sideboard !== null)) return null;
+  if (!sideboards.every((sideboard): sideboard is DeckFormSideboard => sideboard !== null))
+    return null;
   if (
-    typeof value.name !== 'string'
-    || typeof value.description !== 'string'
-    || typeof value.long_description !== 'string'
-    || (value.difficulty !== null && !['easy', 'medium', 'hard'].includes(String(value.difficulty)))
-    || !['private', 'unlisted', 'public'].includes(String(value.visibility))
-    || typeof value.hero_card_id !== 'string'
-    || !isStringArray(value.tag_ids)
-    || !isStringArray(value.suggested_type_labels)
-  ) return null;
+    typeof value.name !== 'string' ||
+    typeof value.description !== 'string' ||
+    typeof value.long_description !== 'string' ||
+    (value.difficulty !== null && !['easy', 'medium', 'hard'].includes(String(value.difficulty))) ||
+    !['private', 'unlisted', 'public'].includes(String(value.visibility)) ||
+    typeof value.hero_card_id !== 'string' ||
+    !isStringArray(value.tag_ids) ||
+    !isStringArray(value.suggested_type_labels)
+  )
+    return null;
   return {
     name: value.name,
     description: value.description,
@@ -171,26 +175,26 @@ const normalizeForm = (value: unknown): DeckForm | null => {
 };
 
 const isMetadataOption = (value: unknown): boolean =>
-  isRecord(value)
-  && typeof value.id === 'string'
-  && typeof value.key === 'string'
-  && typeof value.label === 'string';
+  isRecord(value) &&
+  typeof value.id === 'string' &&
+  typeof value.key === 'string' &&
+  typeof value.label === 'string';
 
 const isSymbolOption = (value: unknown): boolean =>
-  isMetadataOption(value)
-  && isRecord(value)
-  && typeof value.symbol_type === 'string'
-  && typeof value.text_token === 'string'
-  && (value.asset_url === null || typeof value.asset_url === 'string');
+  isMetadataOption(value) &&
+  isRecord(value) &&
+  typeof value.symbol_type === 'string' &&
+  typeof value.text_token === 'string' &&
+  (value.asset_url === null || typeof value.asset_url === 'string');
 
 const normalizeCardSnapshot = (value: unknown): DeckCardSummary | null => {
   if (!isRecord(value)) return null;
   let cardPool: DeckCardSummary['card_pool'];
   let cardRoles: DeckCardSummary['card_roles'];
   if (
-    isCardPool(value.card_pool)
-    && isStringArray(value.card_roles)
-    && value.card_roles.every(isCardRole)
+    isCardPool(value.card_pool) &&
+    isStringArray(value.card_roles) &&
+    value.card_roles.every(isCardRole)
   ) {
     cardPool = value.card_pool;
     cardRoles = [...value.card_roles];
@@ -201,39 +205,46 @@ const normalizeCardSnapshot = (value: unknown): DeckCardSummary | null => {
     return null;
   }
   if (
-    (value.card_factions !== undefined
-      && (!isStringArray(value.card_factions) || !value.card_factions.every(isCardFaction)))
-    || (value.card_mana_families !== undefined
-      && (!isStringArray(value.card_mana_families)
-        || !value.card_mana_families.every(isManaFamily)))
+    (value.card_factions !== undefined &&
+      (!isStringArray(value.card_factions) || !value.card_factions.every(isCardFaction))) ||
+    (value.card_mana_families !== undefined &&
+      (!isStringArray(value.card_mana_families) || !value.card_mana_families.every(isManaFamily)))
   ) {
     return null;
   }
-  if (!(value.result_type === 'card'
-  && typeof value.id === 'string'
-  && typeof value.key === 'string'
-  && typeof value.label === 'string'
-  && typeof value.template_id === 'string'
-  && typeof value.version_id === 'string'
-  && typeof value.version_number === 'number'
-  && (value.previous_version_id === null || typeof value.previous_version_id === 'string')
-  && typeof value.is_latest === 'boolean'
-  && typeof value.name === 'string'
-  && typeof value.type_line === 'string'
-  && typeof value.mana_cost === 'string'
-  && isStringArray(value.mana_symbols)
-  && (value.mana_value === null || typeof value.mana_value === 'number')
-  && (value.attack === null || typeof value.attack === 'number')
-  && (value.health === null || typeof value.health === 'number')
-  && typeof value.rules_text === 'string'
-  && typeof value.confidence === 'number'
-  && typeof value.created_at === 'string'
-  && typeof value.updated_at === 'string'
-  && isStringArray(value.keywords)
-  && Array.isArray(value.tags) && value.tags.every(isMetadataOption)
-  && Array.isArray(value.symbols) && value.symbols.every(isSymbolOption)
-  && Array.isArray(value.types) && value.types.every(isMetadataOption)
-  && (value.image_url === null || typeof value.image_url === 'string'))) return null;
+  if (
+    !(
+      value.result_type === 'card' &&
+      typeof value.id === 'string' &&
+      typeof value.key === 'string' &&
+      typeof value.label === 'string' &&
+      typeof value.template_id === 'string' &&
+      typeof value.version_id === 'string' &&
+      typeof value.version_number === 'number' &&
+      (value.previous_version_id === null || typeof value.previous_version_id === 'string') &&
+      typeof value.is_latest === 'boolean' &&
+      typeof value.name === 'string' &&
+      typeof value.type_line === 'string' &&
+      typeof value.mana_cost === 'string' &&
+      isStringArray(value.mana_symbols) &&
+      (value.mana_value === null || typeof value.mana_value === 'number') &&
+      (value.attack === null || typeof value.attack === 'number') &&
+      (value.health === null || typeof value.health === 'number') &&
+      typeof value.rules_text === 'string' &&
+      typeof value.confidence === 'number' &&
+      typeof value.created_at === 'string' &&
+      typeof value.updated_at === 'string' &&
+      isStringArray(value.keywords) &&
+      Array.isArray(value.tags) &&
+      value.tags.every(isMetadataOption) &&
+      Array.isArray(value.symbols) &&
+      value.symbols.every(isSymbolOption) &&
+      Array.isArray(value.types) &&
+      value.types.every(isMetadataOption) &&
+      (value.image_url === null || typeof value.image_url === 'string')
+    )
+  )
+    return null;
 
   const normalized: Record<string, unknown> = {
     ...value,
@@ -267,16 +278,19 @@ const normalizePayload = (value: unknown): DeckUpsertRequest | null => {
     return sideboardEntries === null ? null : { name: sideboard.name, entries: sideboardEntries };
   });
   if (
-    !sideboards.every((sideboard): sideboard is DeckUpsertRequest['sideboards'][number] => sideboard !== null)
-    || typeof value.name !== 'string'
-    || (descriptionMarkup !== null && typeof descriptionMarkup !== 'string')
-    || (longDescriptionMarkup !== null && typeof longDescriptionMarkup !== 'string')
-    || (value.difficulty !== null && !['easy', 'medium', 'hard'].includes(String(value.difficulty)))
-    || !['private', 'unlisted', 'public'].includes(String(value.visibility))
-    || typeof value.hero_card_id !== 'string'
-    || !isStringArray(value.tag_ids)
-    || !isStringArray(value.suggested_type_labels)
-  ) return null;
+    !sideboards.every(
+      (sideboard): sideboard is DeckUpsertRequest['sideboards'][number] => sideboard !== null,
+    ) ||
+    typeof value.name !== 'string' ||
+    (descriptionMarkup !== null && typeof descriptionMarkup !== 'string') ||
+    (longDescriptionMarkup !== null && typeof longDescriptionMarkup !== 'string') ||
+    (value.difficulty !== null && !['easy', 'medium', 'hard'].includes(String(value.difficulty))) ||
+    !['private', 'unlisted', 'public'].includes(String(value.visibility)) ||
+    typeof value.hero_card_id !== 'string' ||
+    !isStringArray(value.tag_ids) ||
+    !isStringArray(value.suggested_type_labels)
+  )
+    return null;
   return {
     name: value.name,
     description_markup: descriptionMarkup,
@@ -293,7 +307,12 @@ const normalizePayload = (value: unknown): DeckUpsertRequest | null => {
 
 const normalizeAttempt = (value: unknown): StoredCreateAttempt | null => {
   if (value === null) return null;
-  if (!isRecord(value) || typeof value.signature !== 'string' || typeof value.startedAt !== 'string') return null;
+  if (
+    !isRecord(value) ||
+    typeof value.signature !== 'string' ||
+    typeof value.startedAt !== 'string'
+  )
+    return null;
   if (normalizePayload(value.payload) === null) return null;
   return {
     payload: value.payload as DeckUpsertRequest,
@@ -324,11 +343,12 @@ const clonePayload = (payload: DeckUpsertRequest): DeckUpsertRequest => ({
   suggested_type_labels: [...payload.suggested_type_labels],
 });
 
-const referencedCardIds = (form: DeckForm): Set<string> => new Set([
-  ...(form.hero_card_id ? [form.hero_card_id] : []),
-  ...form.entries.map((entry) => entry.card_id),
-  ...form.sideboards.flatMap((sideboard) => sideboard.entries.map((entry) => entry.card_id)),
-]);
+const referencedCardIds = (form: DeckForm): Set<string> =>
+  new Set([
+    ...(form.hero_card_id ? [form.hero_card_id] : []),
+    ...form.entries.map((entry) => entry.card_id),
+    ...form.sideboards.flatMap((sideboard) => sideboard.entries.map((entry) => entry.card_id)),
+  ]);
 
 export const buildStoredDeckEditorDraft = (
   ownerId: string,
@@ -359,18 +379,20 @@ export const buildStoredDeckEditorDraft = (
 
 const parseV2Draft = (value: unknown, ownerId: string): StoredDeckEditorDraft | null => {
   if (
-    !isRecord(value)
-    || value.version !== DECK_EDITOR_LOCAL_DRAFT_VERSION
-    || value.kind !== 'draft'
-    || value.ownerId !== ownerId
-    || typeof value.draftId !== 'string'
-    || typeof value.revision !== 'string'
-    || typeof value.savedAt !== 'string'
-  ) return null;
+    !isRecord(value) ||
+    value.version !== DECK_EDITOR_LOCAL_DRAFT_VERSION ||
+    value.kind !== 'draft' ||
+    value.ownerId !== ownerId ||
+    typeof value.draftId !== 'string' ||
+    typeof value.revision !== 'string' ||
+    typeof value.savedAt !== 'string'
+  )
+    return null;
   const form = normalizeForm(value.form);
   const cards = normalizeCards(value.cards);
   const attempt = normalizeAttempt(value.pendingCreateAttempt);
-  if (form === null || cards === null || (value.pendingCreateAttempt !== null && attempt === null)) return null;
+  if (form === null || cards === null || (value.pendingCreateAttempt !== null && attempt === null))
+    return null;
   return {
     version: 2,
     kind: 'draft',
@@ -386,25 +408,27 @@ const parseV2Draft = (value: unknown, ownerId: string): StoredDeckEditorDraft | 
 
 const parseRetired = (value: unknown, ownerId: string): RetiredDeckEditorDraft | null => {
   if (
-    !isRecord(value)
-    || value.version !== DECK_EDITOR_LOCAL_DRAFT_VERSION
-    || value.kind !== 'retired'
-    || value.ownerId !== ownerId
-    || typeof value.draftId !== 'string'
-    || typeof value.revision !== 'string'
-    || typeof value.retiredAt !== 'string'
-    || typeof value.createdDeckId !== 'string'
-  ) return null;
+    !isRecord(value) ||
+    value.version !== DECK_EDITOR_LOCAL_DRAFT_VERSION ||
+    value.kind !== 'retired' ||
+    value.ownerId !== ownerId ||
+    typeof value.draftId !== 'string' ||
+    typeof value.revision !== 'string' ||
+    typeof value.retiredAt !== 'string' ||
+    typeof value.createdDeckId !== 'string'
+  )
+    return null;
   return value as RetiredDeckEditorDraft;
 };
 
 const migrateV1Draft = (value: unknown, ownerId: string): StoredDeckEditorDraft | null => {
   if (
-    !isRecord(value)
-    || value.version !== LEGACY_DECK_EDITOR_LOCAL_DRAFT_VERSION
-    || value.ownerId !== ownerId
-    || typeof value.savedAt !== 'string'
-  ) return null;
+    !isRecord(value) ||
+    value.version !== LEGACY_DECK_EDITOR_LOCAL_DRAFT_VERSION ||
+    value.ownerId !== ownerId ||
+    typeof value.savedAt !== 'string'
+  )
+    return null;
   const form = normalizeForm(value.form);
   const cards = normalizeCards(value.cards);
   if (form === null || cards === null) return null;
@@ -440,150 +464,16 @@ export const deckEditorDraftSlotToken = (slot: DeckEditorDraftSlot): DeckEditorD
 export const deckEditorDraftSlotTokensEqual = (
   left: DeckEditorDraftSlotToken,
   right: DeckEditorDraftSlotToken,
-): boolean => left.kind === right.kind
-  && (left.kind === 'empty' || (right.kind !== 'empty' && left.revision === right.revision));
-
-const resolveBrowserStorage = (): Storage | null => {
-  try {
-    return typeof globalThis.localStorage === 'undefined' ? null : globalThis.localStorage;
-  } catch {
-    return null;
-  }
-};
-
-const resolveBrowserLockManager = (): DeckEditorDraftLockManager | null => {
-  try {
-    if (typeof globalThis.navigator === 'undefined' || !globalThis.navigator.locks) return null;
-    return globalThis.navigator.locks;
-  } catch {
-    return null;
-  }
-};
-
-const deckEditorDraftLockName = (ownerId: string): string =>
-  `${deckEditorDraftStorageKey(ownerId)}.mutation`;
+): boolean =>
+  left.kind === right.kind &&
+  (left.kind === 'empty' || (right.kind !== 'empty' && left.revision === right.revision));
 
 export const createDeckEditorLocalDraftStorage = (
   storage?: Storage | null,
   lockManager?: DeckEditorDraftLockManager | null,
-): DeckEditorLocalDraftStorage => {
-  const resolvedStorage = storage === undefined ? resolveBrowserStorage() : storage;
-  const resolvedLockManager = lockManager === undefined ? resolveBrowserLockManager() : lockManager;
-
-  const clearInvalidValue = (ownerId: string, key: string, invalidRaw: string): void => {
-    if (!resolvedStorage || !resolvedLockManager) return;
-    void resolvedLockManager.request(
-      deckEditorDraftLockName(ownerId),
-      { mode: 'exclusive' },
-      () => {
-        try {
-          if (resolvedStorage.getItem(key) === invalidRaw) resolvedStorage.removeItem(key);
-        } catch {
-          // Invalid-data cleanup is best effort; normal mutations report storage health.
-        }
-      },
-    ).catch(() => undefined);
-  };
-
-  const read = (ownerId: string): DeckEditorDraftReadResult => {
-    if (!resolvedStorage || !resolvedLockManager || !ownerId) return { status: 'unavailable' };
-    const key = deckEditorDraftStorageKey(ownerId);
-    let raw: string | null;
-    try {
-      raw = resolvedStorage.getItem(key);
-    } catch {
-      return { status: 'unavailable' };
-    }
-    if (raw === null) return { status: 'loaded', slot: { kind: 'empty' } };
-    let value: unknown;
-    try {
-      value = JSON.parse(raw) as unknown;
-    } catch {
-      clearInvalidValue(ownerId, key, raw);
-      return { status: 'loaded', slot: { kind: 'empty' } };
-    }
-    const slot = parseDeckEditorDraftSlotValue(value, ownerId);
-    if (slot === null) {
-      clearInvalidValue(ownerId, key, raw);
-      return { status: 'loaded', slot: { kind: 'empty' } };
-    }
-    return { status: 'loaded', slot };
-  };
-
-  const currentSlot = (ownerId: string): DeckEditorDraftReadResult => read(ownerId);
-
-  const withOwnerLock = async <Result extends DeckEditorDraftSaveResult | DeckEditorDraftMutationResult>(
-    ownerId: string,
-    operation: () => Result,
-  ): Promise<Result | { status: 'unavailable' }> => {
-    if (!resolvedStorage || !resolvedLockManager || !ownerId) return { status: 'unavailable' };
-    try {
-      return await resolvedLockManager.request(
-        deckEditorDraftLockName(ownerId),
-        { mode: 'exclusive' },
-        operation,
-      );
-    } catch {
-      return { status: 'unavailable' };
-    }
-  };
-
-  return {
-    read,
-    async save(draft, expected) {
-      return await withOwnerLock(draft.ownerId, () => {
-        const current = currentSlot(draft.ownerId);
-        if (current.status === 'unavailable') return current;
-        if (!deckEditorDraftSlotTokensEqual(deckEditorDraftSlotToken(current.slot), expected)) {
-          return { status: 'conflict' as const, slot: current.slot };
-        }
-        try {
-          resolvedStorage?.setItem(deckEditorDraftStorageKey(draft.ownerId), JSON.stringify(draft));
-        } catch {
-          return { status: 'unavailable' as const };
-        }
-        return { status: 'saved' as const, draft };
-      });
-    },
-    async discard(ownerId, expected) {
-      return await withOwnerLock(ownerId, () => {
-        const current = currentSlot(ownerId);
-        if (current.status === 'unavailable') return current;
-        if (!deckEditorDraftSlotTokensEqual(deckEditorDraftSlotToken(current.slot), expected)) {
-          return { status: 'conflict' as const, slot: current.slot };
-        }
-        try {
-          resolvedStorage?.removeItem(deckEditorDraftStorageKey(ownerId));
-        } catch {
-          return { status: 'unavailable' as const };
-        }
-        return { status: 'empty' as const };
-      });
-    },
-    async retire(ownerId, draftId, createdDeckId, expected) {
-      if (!createdDeckId) return { status: 'unavailable' };
-      return await withOwnerLock(ownerId, () => {
-        const current = currentSlot(ownerId);
-        if (current.status === 'unavailable') return current;
-        if (!deckEditorDraftSlotTokensEqual(deckEditorDraftSlotToken(current.slot), expected)) {
-          return { status: 'conflict' as const, slot: current.slot };
-        }
-        const marker: RetiredDeckEditorDraft = {
-          version: 2,
-          kind: 'retired',
-          ownerId,
-          draftId,
-          revision: current.slot.kind === 'draft' ? current.slot.draft.revision : createUuid(),
-          retiredAt: new Date().toISOString(),
-          createdDeckId,
-        };
-        try {
-          resolvedStorage?.setItem(deckEditorDraftStorageKey(ownerId), JSON.stringify(marker));
-        } catch {
-          return { status: 'unavailable' as const };
-        }
-        return { status: 'retired' as const, marker };
-      });
-    },
-  };
-};
+): DeckEditorLocalDraftStorage =>
+  createDraftStorage(
+    { key: deckEditorDraftStorageKey, parse: parseDeckEditorDraftSlotValue },
+    storage,
+    lockManager,
+  );

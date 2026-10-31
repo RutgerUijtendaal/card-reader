@@ -6,11 +6,26 @@ import {
 } from '@/domain/card-navigation/cardReturnState';
 
 describe('cardReturnState', () => {
+  test('returns card inspection to its Encounter and originating library', () => {
+    const query = { return_to: 'encounter', encounter_id: 'fight-1', encounter_library: 'staff' };
+    expect(getCardReturnLabel(query)).toBe('Encounter');
+    expect(buildCardReturnLocation(query)).toEqual({
+      path: '/encounters/fight-1',
+      query: { return_to: 'staff_encounters' },
+    });
+    expect(buildCardReturnLocation({ ...query, encounter_library: 'public' })).toEqual({
+      path: '/encounters/fight-1',
+      query: { return_to: 'encounters' },
+    });
+  });
   test('uses admin return context when present', () => {
     const query = { admin_tab: 'catalog', return_to: 'admin' };
 
     expect(getCardReturnLabel(query)).toBe('Admin');
-    expect(buildCardReturnLocation(query)).toEqual({ path: '/admin', query: { admin_tab: 'catalog' } });
+    expect(buildCardReturnLocation(query)).toEqual({
+      path: '/admin',
+      query: { admin_tab: 'catalog' },
+    });
   });
 
   test('uses deck return context when present', () => {
@@ -31,12 +46,18 @@ describe('cardReturnState', () => {
     const query = { card_id: 'card-1', return_to: 'card', q: 'dragon' };
 
     expect(getCardReturnLabel(query)).toBe('Card');
-    expect(buildCardReturnLocation(query)).toEqual({ path: '/cards/card-1', query: { q: 'dragon' } });
+    expect(buildCardReturnLocation(query)).toEqual({
+      path: '/cards/card-1',
+      query: { q: 'dragon' },
+    });
   });
 
   test('falls back to the gallery when no explicit return context exists', () => {
     expect(getCardReturnLabel({ q: 'dragon' })).toBe('Gallery');
-    expect(buildCardReturnLocation({ q: 'dragon' })).toEqual({ path: '/cards', query: { q: 'dragon' } });
+    expect(buildCardReturnLocation({ q: 'dragon' })).toEqual({
+      path: '/cards',
+      query: { q: 'dragon' },
+    });
   });
 
   test('omits a property focus when opening an overall suggestion in the editor', () => {

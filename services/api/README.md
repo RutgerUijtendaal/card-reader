@@ -10,6 +10,7 @@
 - Staff-protected import, review, settings, catalog, template, CSV export, and gallery/content-version TTS export
   endpoints
 - Public visibility-aware deck and sideboard TTS exports using the shared persistent-sheet payload
+- Staff-owned Encounter authoring and valid-public Encounter lists, details, and TTS exports; see [Encounter API contracts](../../docs/encounters.md#api).
 - Superuser-protected maintenance endpoints
 - Docker API entrypoint and health endpoint
 - Startup orchestration for migrations

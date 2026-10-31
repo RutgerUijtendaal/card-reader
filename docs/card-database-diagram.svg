@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="3100" height="1900" viewBox="0 0 3100 1900" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="3100" height="2380" viewBox="0 0 3100 2380" role="img" aria-labelledby="title desc">
   <title id="title">Card Reader card database relationships</title>
   <desc id="desc">Orthogonal database diagram with import lineage across the top and separate bands for card consumers, stable card identity, version and review lineage, and version metadata. Relationship lines use open routing lanes around entity boxes and separate attachment segments at every destination. Small gaps mark independent lane crossovers.</desc>
   <defs>
@@ -40,7 +40,7 @@
     </style>
   </defs>
 
-  <rect class="bg" width="3100" height="1900"/>
+  <rect class="bg" width="3100" height="2380"/>
   <text x="70" y="75" style="font: 700 42px Inter, Arial, sans-serif; fill: #0f172a;">Card Reader: card model relationships</text>
   <text x="70" y="112" style="font: 18px Inter, Arial, sans-serif; fill: #475569;">Orthogonal routing keeps every relationship outside entity boxes. Shared travel trunks split into dedicated attachment segments before reaching a model.</text>
 
@@ -416,4 +416,43 @@
   <text class="label" x="2795" y="1292">accepted tag</text>
 
   <text class="lane-note" x="60" y="1880">Relationship geometry: orthogonal lanes only • no entity-box crossings • dedicated destination attachments • small gaps mark independent lane crossovers</text>
+
+  <!-- Encounter continuation: Card and CardGroup reference the same models above. -->
+  <rect class="band" x="50" y="1920" width="3000" height="400"/>
+  <text class="band-title" x="80" y="1965">Built from cards: Encounters</text>
+  <rect class="box left" x="90" y="2010" width="450" height="160"/>
+  <text class="title" x="315" y="2050">EncounterCreation</text>
+  <text class="field" x="315" y="2090">creator + client_creation_id unique</text>
+  <text class="small" x="315" y="2125">encounter nullable, one-to-one</text>
+  <text class="small" x="315" y="2150">Retains used keys after deletion</text>
+  <rect class="box left" x="800" y="2010" width="500" height="270"/>
+  <text class="title" x="1050" y="2050">Encounter</text>
+  <text class="field" x="1050" y="2090">creator / name / descriptions</text>
+  <text class="field" x="1050" y="2125">factions / visibility / revision</text>
+  <text class="small" x="1050" y="2160">Incomplete records are saved for staff</text>
+  <text class="small" x="1050" y="2190">Public access requires current validity</text>
+  <text class="small" x="1050" y="2220">boss_card and boss_group are nullable</text>
+  <text class="small" x="1050" y="2250">Card / group references are protected</text>
+  <rect class="box left" x="1440" y="2010" width="350" height="130"/>
+  <text class="title" x="1615" y="2050">EncounterEntry</text>
+  <text class="field" x="1615" y="2090">quantity / position</text>
+  <text class="small" x="1615" y="2120">encounter + card unique</text>
+  <rect class="box card" x="2500" y="2010" width="460" height="130"/>
+  <text class="title" x="2730" y="2050">Card</text>
+  <text class="field" x="2730" y="2090">Same stable identity shown above</text>
+  <text class="small" x="2730" y="2120">Boss and entries use Evil identities</text>
+  <rect class="box group" x="2500" y="2200" width="460" height="100"/>
+  <text class="title" x="2730" y="2240">CardGroup</text>
+  <text class="small" x="2730" y="2275">Same group model shown above</text>
+  <path class="soft" d="M540 2080 L800 2080"/>
+  <text class="label" x="575" y="2070">creation result</text>
+  <path class="line" d="M1440 2060 L1300 2060"/>
+  <text class="label" x="1320" y="2050">owner</text>
+  <path class="line" d="M1790 2060 L2500 2060"/>
+  <text class="label" x="1930" y="2050">card (many entries to one Card)</text>
+  <path class="soft" d="M1300 2210 L2200 2210 L2200 2100 L2500 2100"/>
+  <text class="label" x="1900" y="2200">boss_card</text>
+  <path class="soft" d="M1300 2250 L2500 2250"/>
+  <text class="label" x="1900" y="2240">boss_group</text>
+  <text class="lane-note" x="60" y="2350">Encounter selections resolve current group membership. Added entries retain their own quantities and ordering.</text>
 </svg>

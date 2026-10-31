@@ -36,7 +36,7 @@ import { getDeckTagSuggestionFeedback } from '@/domain/decks/utils/deckTagSugges
 import type { DeckCardSummary, DeckRecord, DeckTagCatalog } from '@/domain/decks/types';
 import { fallbackDeckBuildingRules } from '@/domain/decks/utils/deckRules';
 import { useAuthStore } from '@/domain/session/store';
-import { isDeckMutationLocked } from '@/features/decks/utils/deckEditorLifecycle';
+import { isDeckMutationLocked } from '@/shared/drafts/lifecycle';
 
 export const useDeckEditor = () => {
   const route = useRoute();

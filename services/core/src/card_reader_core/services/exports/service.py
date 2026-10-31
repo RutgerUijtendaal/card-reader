@@ -9,6 +9,8 @@ from card_reader_core.models import (
     PLAYER_CARD_POOL,
     CardVersionImage,
 )
+from card_reader_core.models.encounter import Encounter
+from card_reader_core.services.encounters import boss_cards, validation_issues
 from card_reader_core.repositories.cards import (
     CardFilterParams,
     CardListRow,
@@ -256,6 +258,35 @@ class TtsCardExportService:
                 require_player_cards=True,
             ),
         )
+
+    def build_encounter_export(self, encounter: Encounter) -> TtsCardExportData:
+        issues = validation_issues(encounter, export=True)
+        if issues:
+            raise ValueError(" ".join(issues))
+        requested = [(card, 1, "boss", True) for card in boss_cards(encounter)]
+        requested.extend((entry.card, entry.quantity, "mainboard", False) for entry in encounter.entries.all())
+        rows = get_latest_card_list_rows_by_card_ids(
+            [card.id for card, _, _, _ in requested], lifecycle_status=ALL_CARD_LIFECYCLE_FILTER,
+        )
+        lookup = {row.version.card.id: row for row in rows}
+        entries: list[_ResolvedTtsCardSelectionEntry] = []
+        skipped: list[TtsCardExportSkippedCard] = []
+        for card, quantity, role, required in requested:
+            row = lookup.get(card.id)
+            if row is None:
+                if required:
+                    raise _required_card_unavailable(card.label, "has no latest version")
+                skipped.append(TtsCardExportSkippedCard(card.id, card.label, quantity, "Card has no latest version.", role))
+            else:
+                entries.append(_ResolvedTtsCardSelectionEntry(row, quantity, role, required))
+        return self._build_export(_ResolvedTtsCardSelection(
+            collection_name=encounter.name or "Untitled Encounter",
+            collection_description=encounter.description,
+            source_metadata={"type": "encounter", "encounter_id": encounter.id,
+                "boss_card_id": encounter.boss_card_id, "boss_group_id": encounter.boss_group_id,
+                "factions": encounter.factions},
+            entries=entries, skipped=skipped,
+        ))
 
     def _build_export(
         self,

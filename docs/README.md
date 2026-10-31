@@ -7,6 +7,7 @@ This directory contains feature descriptions, operational guides, and technical 
 - [Imports and parsing](imports-and-parsing.md) explains how uploaded card images move through the asynchronous parser and into reviewable card records.
 - [Card management](card-management.md) describes card identities, versions, metadata, lifecycle state, groups, aliases, and merges.
 - [Deck building](deck-building.md) covers deck structure, visibility, validation, and configurable deck-building constraints.
+- [Encounters](encounters.md) covers staff Evil encounter building, shared drafts, publication, API contracts, and TTS export.
 - [Playtester](playtester.md) explains the local manual playtest sandbox, opening flow, zones, interactions, and draft persistence.
 - [Access control](access-control.md) describes public, authenticated, staff, superuser, and developer access, including managed users and access requests.
 - [Notifications](notifications.md) describes durable in-app notifications and how domain events produce them.

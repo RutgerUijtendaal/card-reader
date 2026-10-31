@@ -6,8 +6,10 @@ from typing import Any, cast
 from django.db.models import (
     Case,
     Count,
+    Exists,
     F,
     IntegerField,
+    OuterRef,
     Prefetch,
     Q,
     QuerySet,
@@ -447,6 +449,8 @@ def list_default_grouped_card_references(
     *,
     page: int,
     page_size: int,
+    anchor_role: str | None = None,
+    require_active_pool_members: bool = False,
 ) -> PaginatedGroupedCardList:
     card_pool = filters["card_pool"]
     if card_pool is None:
@@ -459,6 +463,13 @@ def list_default_grouped_card_references(
         anchor_card__latest_version__isnull=False,
         members__card_id__in=Subquery(matching_card_ids),
     ).distinct()
+    if anchor_role is not None:
+        participating_groups = participating_groups.filter(anchor_card__role_assignments__role=anchor_role)
+    if require_active_pool_members:
+        incompatible_members = CardGroupMember.objects.filter(group_id=OuterRef("pk")).exclude(
+            card__card_pool=card_pool, card__lifecycle_status="active",
+        )
+        participating_groups = participating_groups.filter(~Exists(incompatible_members))
     participating_group_ids = participating_groups.order_by().values("id")
     participant_card_ids = (
         CardGroupMember.objects.filter(

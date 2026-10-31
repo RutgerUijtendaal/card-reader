@@ -187,32 +187,32 @@ describe('DeckListCard', () => {
   test('renders browse mode as a static horizontal card without foldout controls', async () => {
     const mounted = await mountDeckListCard('browse');
     const text = mounted.container.textContent ?? '';
-    const footerText = mounted.container.querySelector('.deck-list-card-footer-meta')?.textContent ?? '';
+    const footerText = mounted.container.querySelector('.collection-list-card-footer-meta')?.textContent ?? '';
 
-    expect(mounted.container.querySelector('.deck-list-card-browse')).not.toBeNull();
-    expect(mounted.container.querySelector('.deck-list-card-description')).not.toBeNull();
-    expect(mounted.container.querySelector('.deck-list-card-footer')).not.toBeNull();
+    expect(mounted.container.querySelector('.collection-list-card-browse')).not.toBeNull();
+    expect(mounted.container.querySelector('.collection-list-card-description')).not.toBeNull();
+    expect(mounted.container.querySelector('.collection-list-card-footer')).not.toBeNull();
     expect(mounted.container.querySelector('img[alt="Azure Hero"]')).not.toBeNull();
     expect(mounted.container.querySelector('button[aria-label="Toggle deck details"]')).toBeNull();
-    expect(mounted.container.querySelector('.deck-list-card-browse-details')).toBeNull();
+    expect(mounted.container.querySelector('.collection-list-card-browse-details')).toBeNull();
     expect(text).toContain('Azure Tempo');
     expect(text).toContain('Maitys');
     expect(text).not.toContain('maitys');
-    expect(mounted.container.querySelector('.deck-list-card-title-row')?.classList).toContain('justify-between');
-    expect(mounted.container.querySelector('.deck-list-card-title-row h3')?.classList).toContain('text-xl');
-    expect(mounted.container.querySelector('.deck-list-card-title-row h3')?.classList).toContain('truncate');
-    expect(mounted.container.querySelector('.deck-list-card-title-pill')?.classList).toContain('theme-pill-neutral');
+    expect(mounted.container.querySelector('.collection-list-card-title-row')?.classList).toContain('justify-between');
+    expect(mounted.container.querySelector('.collection-list-card-title-row h3')?.classList).toContain('text-xl');
+    expect(mounted.container.querySelector('.collection-list-card-title-row h3')?.classList).toContain('truncate');
+    expect(mounted.container.querySelector('.collection-list-card-title-pill')?.classList).toContain('theme-pill-neutral');
     expect(text).toContain('{F}');
     expect(text).toContain('Pressure early, then pivot into efficient trades.');
     expect(text).toContain('Damage');
     expect(text).toContain('Armor');
-    expect(mounted.container.querySelector('.deck-list-card-title-row')?.textContent).not.toContain('Damage');
-    expect(mounted.container.querySelector('.deck-list-card-title-row')?.textContent).not.toContain('Armor');
-    expect(mounted.container.querySelector('.deck-list-card-tags')?.textContent).toContain('Damage');
-    expect(mounted.container.querySelector('.deck-list-card-tags')?.textContent).toContain('Armor');
-    expect(mounted.container.querySelector('.deck-list-card-main .deck-list-card-tags')).toBeNull();
-    expect(mounted.container.querySelector('.deck-list-card-tags-region .deck-list-card-tags')).not.toBeNull();
-    expect(mounted.container.querySelector('.deck-list-card-tags-region')?.nextElementSibling?.classList).toContain('deck-list-card-footer');
+    expect(mounted.container.querySelector('.collection-list-card-title-row')?.textContent).not.toContain('Damage');
+    expect(mounted.container.querySelector('.collection-list-card-title-row')?.textContent).not.toContain('Armor');
+    expect(mounted.container.querySelector('.collection-list-card-tags')?.textContent).toContain('Damage');
+    expect(mounted.container.querySelector('.collection-list-card-tags')?.textContent).toContain('Armor');
+    expect(mounted.container.querySelector('.collection-list-card-main .collection-list-card-tags')).toBeNull();
+    expect(mounted.container.querySelector('.collection-list-card-tags-region .collection-list-card-tags')).not.toBeNull();
+    expect(mounted.container.querySelector('.collection-list-card-tags-region')?.nextElementSibling?.classList).toContain('collection-list-card-footer');
     expect(text).not.toContain('Tempo Burst');
     expect(text).not.toContain('Maindeck 40 · 24 unique · 1 sideboard');
     expect(text).not.toContain('Mainboard 40 · 24 unique · 1 sideboard');
@@ -237,9 +237,9 @@ describe('DeckListCard', () => {
   test('keeps owned deck cards on the management layout', async () => {
     const mounted = await mountDeckListCard('owned');
     const text = mounted.container.textContent ?? '';
-    const footerText = mounted.container.querySelector('.deck-list-card-footer-meta')?.textContent ?? '';
+    const footerText = mounted.container.querySelector('.collection-list-card-footer-meta')?.textContent ?? '';
 
-    expect(mounted.container.querySelector('.deck-list-card-owned')).not.toBeNull();
+    expect(mounted.container.querySelector('.collection-list-card-owned')).not.toBeNull();
     expect(mounted.container.querySelector('img[alt="Azure Hero"]')).not.toBeNull();
     expect(text).toContain('Azure Tempo');
     expect(text).toContain('Public');
@@ -247,10 +247,10 @@ describe('DeckListCard', () => {
     expect(text).toContain('Damage');
     expect(text).toContain('Armor');
     expect(text).toContain('Tempo Burst');
-    expect(mounted.container.querySelector('.deck-list-card-title-row')?.textContent).not.toContain('Damage');
-    expect(mounted.container.querySelector('.deck-list-card-title-row')?.textContent).not.toContain('Tempo Burst');
-    expect(mounted.container.querySelector('.deck-list-card-tags')?.textContent).toContain('Damage');
-    expect(mounted.container.querySelector('.deck-list-card-tags')?.textContent).toContain('Tempo Burst');
+    expect(mounted.container.querySelector('.collection-list-card-title-row')?.textContent).not.toContain('Damage');
+    expect(mounted.container.querySelector('.collection-list-card-title-row')?.textContent).not.toContain('Tempo Burst');
+    expect(mounted.container.querySelector('.collection-list-card-tags')?.textContent).toContain('Damage');
+    expect(mounted.container.querySelector('.collection-list-card-tags')?.textContent).toContain('Tempo Burst');
     expect(text).not.toContain('Maindeck 40 · 24 unique · 1 sideboard');
     expect(footerText).not.toContain('Azure Hero');
     expect(footerText).toContain('Maindeck 40');
@@ -263,7 +263,7 @@ describe('DeckListCard', () => {
 
   test('browse card keeps the expected navigation target', async () => {
     const mounted = await mountDeckListCard('browse');
-    const card = mounted.container.querySelector('.deck-list-card-browse');
+    const card = mounted.container.querySelector('.collection-list-card-browse');
 
     expect(card).not.toBeNull();
     expect(card?.getAttribute('data-navigation-target')).toBe('/decks/deck-1');
@@ -303,8 +303,8 @@ describe('DeckListCard', () => {
   });
 
   test.each([
-    ['browse', '.deck-list-card-browse', '/decks/deck-1'],
-    ['owned', '.deck-list-card-owned', '/my/decks/deck-1'],
+    ['browse', '.collection-list-card-browse', '/decks/deck-1'],
+    ['owned', '.collection-list-card-owned', '/my/decks/deck-1'],
   ] as const)('clickable %s deck cards remain keyboard focusable links', async (mode, selector, target) => {
     const mounted = await mountDeckListCard(mode);
     const card = mounted.container.querySelector<HTMLElement>(selector);

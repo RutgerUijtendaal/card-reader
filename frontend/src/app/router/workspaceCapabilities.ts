@@ -6,7 +6,7 @@ import type {
 import type { CardPool } from '@/domain/cards/cardPools';
 import { buildWorkspaceGallerySelectionLocation } from '@/domain/cards/cardPoolWorkspace';
 
-export type WorkspaceRouteCapability = 'global' | 'gallery' | 'resource' | 'player-only';
+export type WorkspaceRouteCapability = 'global' | 'gallery' | 'resource' | 'player-only' | 'evil-only';
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -80,6 +80,9 @@ export const resolveWorkspaceSelectionDecision = (
         location: buildResourceWorkspaceLocation(route, requestedPool),
         navigation: 'replace',
       };
+    case 'evil-only':
+      if (requestedPool === 'evil') return { kind: 'stay' };
+      return { kind: 'fallback-gallery', location: buildWorkspaceGallerySelectionLocation(requestedPool), navigation: 'push' };
     case 'player-only':
       if (requestedPool === 'player') {
         return { kind: 'stay' };

@@ -6,7 +6,7 @@ import {
   transitionDeckDraftPersistence,
   type DeckCreationState,
   type DeckDraftPersistenceState,
-} from '@/features/decks/utils/deckEditorLifecycle';
+} from '@/shared/drafts/lifecycle';
 
 const creationState = (status: DeckCreationState['status']): DeckCreationState =>
   status === 'unknown'

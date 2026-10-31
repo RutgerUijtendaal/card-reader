@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.db.models import ProtectedError
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -104,7 +105,10 @@ class StaffCardGroupDetailView(APIView):
         return Response(card_group_admin_payload(group))
 
     def delete(self, _request: Request, group_id: str) -> Response:
-        deleted = CardGroupService().delete_group(group_id=group_id)
+        try:
+            deleted = CardGroupService().delete_group(group_id=group_id)
+        except ProtectedError:
+            return Response({"detail": "This group is selected by an Encounter. Change its boss selection before deleting the group."}, status=409)
         if not deleted:
             return not_found("Card group not found")
         return Response(status=status.HTTP_204_NO_CONTENT)

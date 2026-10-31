@@ -165,9 +165,7 @@ describe('card pool workspace routes', () => {
     await router.push('/cards/evil-card/edit?card_pool=evil');
 
     expect(router.currentRoute.value.path).toBe('/login');
-    expect(router.currentRoute.value.query.redirect).toBe(
-      '/cards/evil-card/edit?card_pool=evil',
-    );
+    expect(router.currentRoute.value.query.redirect).toBe('/cards/evil-card/edit?card_pool=evil');
   });
 
   test('normalizes an obsolete Gallery pool to Player instead of a stored preference', async () => {
@@ -217,6 +215,36 @@ describe('card pool workspace routes', () => {
 
     expect(userVisibleRoutes.length).toBeGreaterThan(0);
     expect(userVisibleRoutes.every((route) => route.meta?.workspaceCapability)).toBe(true);
+  });
+
+  test.each(['/encounters', '/encounters/example'])(
+    'opens %s anonymously in the Evil workspace',
+    async (path) => {
+      setAnonymousSession();
+      const router = createAppRouter(createMemoryHistory());
+      await router.push(`${path}?card_pool=player`);
+      expect(router.currentRoute.value.fullPath).toBe(path);
+      expect(useCardPoolWorkspaceStore().activePool).toBe('evil');
+    },
+  );
+
+  test('blocks nonstaff authoring but allows staff to open the shared builder', async () => {
+    setSession();
+    const router = createAppRouter(createMemoryHistory());
+    await router.push('/staff/encounters/new');
+    expect(router.currentRoute.value.path).toBe('/');
+    useAuthStore().$patch({
+      user: {
+        authenticated: true,
+        id: 'staff',
+        username: 'staff',
+        is_staff: true,
+        can_access_admin: true,
+      },
+    });
+    await router.push('/staff/encounters/new');
+    expect(router.currentRoute.value.path).toBe('/staff/encounters/new');
+    expect(useCardPoolWorkspaceStore().activePool).toBe('evil');
   });
 
   test.each(['evil', 'neutral'] as const)(
