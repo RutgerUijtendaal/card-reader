@@ -24,7 +24,7 @@ from card_reader_core.models import (
     card_mana_family_keys,
     card_role_keys,
 )
-from card_reader_core.repositories.cards import get_card_image
+from card_reader_core.repositories.cards import select_usable_card_image
 from card_reader_core.services.cards import CardMetadata
 from card_reader_core.services.card_backs import ResolvedCardBack, resolve_effective_card_backs
 from card_reader_core.services.decks import DeckConstraintEntry, DeckService, effective_deck_building_rules_json, normalize_deck_building_config
@@ -380,7 +380,10 @@ def deck_card_payload(
             "effective_card_back": resolved_card_back_payload(resolved_card_back),
         }
 
-    image = get_card_image(version.id)
+    # Other collection serializers also use this payload and may prefetch images
+    # without ordering. Preserve newest-usable selection without another query.
+    images = sorted(version.images.all(), key=lambda image: image.created_at, reverse=True)
+    image = select_usable_card_image(images)
     metadata = _deck_card_metadata(version)
     return card_payload(
         card,

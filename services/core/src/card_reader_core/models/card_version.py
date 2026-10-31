@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
 class CardVersion(TimestampedModel):
     if TYPE_CHECKING:
+        previous_version_id: str | None
         images: Manager[CardVersionImage]
         parse_results: Manager[ParseResult]
         card_version_keywords: Manager[CardVersionKeyword]

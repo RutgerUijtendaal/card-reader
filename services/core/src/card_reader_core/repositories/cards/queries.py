@@ -458,11 +458,15 @@ def list_default_grouped_card_references(
 
     matching_versions = _build_filtered_versions_from_params(filters)
     matching_card_ids = matching_versions.order_by().values("card_id")
+    matching_members = CardGroupMember.objects.filter(
+        group_id=OuterRef("pk"),
+        card_id__in=Subquery(matching_card_ids),
+    )
     participating_groups = CardGroup.objects.filter(
+        Exists(matching_members),
         anchor_card__card_pool=card_pool,
         anchor_card__latest_version__isnull=False,
-        members__card_id__in=Subquery(matching_card_ids),
-    ).distinct()
+    )
     if anchor_role is not None:
         participating_groups = participating_groups.filter(anchor_card__role_assignments__role=anchor_role)
     if require_active_pool_members:
@@ -498,7 +502,10 @@ def list_default_grouped_card_references(
     ordered_standalone = apply_default_card_sort(
         standalone_versions,
         card_pool=card_pool,
-    ).select_related("card").prefetch_related(
+    ).select_related("card").only(
+        "id", "card_id", "name", "mana_value",
+        "card__id", "card__label", "card__mana_family_sort_key",
+    ).prefetch_related(
         "card__role_assignments",
         "card__faction_assignments",
     )
@@ -508,6 +515,10 @@ def list_default_grouped_card_references(
     ).select_related(
         "anchor_card",
         "anchor_card__latest_version",
+    ).only(
+        "id", "anchor_card_id", "anchor_card__id", "anchor_card__label",
+        "anchor_card__mana_family_sort_key", "anchor_card__latest_version_id",
+        "anchor_card__latest_version__name", "anchor_card__latest_version__mana_value",
     ).prefetch_related(
         "anchor_card__role_assignments",
         "anchor_card__faction_assignments",
@@ -1387,7 +1398,8 @@ def _hydrate_card_versions(card_version_ids: list[str]) -> list[CardVersion]:
     versions_by_id = {
         version.id: version
         for version in CardVersion.objects.filter(id__in=card_version_ids)
-        .select_related("card", "template", "previous_version", "content_version")
+        .select_related("card", "template", "content_version")
+        .defer("parsed_snapshot_json", "field_sources_json", "template__definition_json")
         .prefetch_related(*_card_list_prefetches())
     }
     return [
