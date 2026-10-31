@@ -140,7 +140,7 @@ if TYPE_CHECKING:
         DeckSideboardEntry,
         DeckVisibility,
     )
-    from .encounter import Encounter, EncounterEntry, EncounterCreation
+    from .encounter import Encounter, EncounterEntry, EncounterCreation, EncounterSideboard, EncounterSideboardEntry
     from .deck_tag import (
         DECK_TAG_KINDS,
         DECK_TAG_SUGGESTION_STATUSES,
@@ -222,6 +222,8 @@ if TYPE_CHECKING:
     from .worker_heartbeat import WorkerActivity, WorkerHeartbeat
 
 _EXPORTS = {
+    "EncounterSideboard": ".encounter",
+    "EncounterSideboardEntry": ".encounter",
     "Encounter": ".encounter",
     "EncounterEntry": ".encounter",
     "EncounterCreation": ".encounter",
@@ -398,7 +400,7 @@ _EXPORTS = {
 }
 
 __all__ = [
-    "Encounter", "EncounterEntry", "EncounterCreation",
+    "Encounter", "EncounterEntry", "EncounterCreation", "EncounterSideboard", "EncounterSideboardEntry",
     "now_utc",
     "ImportJobStatus",
     "ImportClassificationMode",

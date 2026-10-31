@@ -259,12 +259,20 @@ class TtsCardExportService:
             ),
         )
 
-    def build_encounter_export(self, encounter: Encounter) -> TtsCardExportData:
-        issues = validation_issues(encounter, export=True)
-        if issues:
-            raise ValueError(" ".join(issues))
-        requested = [(card, 1, "boss", True) for card in boss_cards(encounter)]
-        requested.extend((entry.card, entry.quantity, "mainboard", False) for entry in encounter.entries.all())
+    def build_encounter_export(self, encounter: Encounter, *, sideboard_id: str | None = None) -> TtsCardExportData:
+        sideboard = next((board for board in encounter.sideboards.all() if board.id == sideboard_id), None)
+        if sideboard_id is not None:
+            if sideboard is None:
+                raise ValueError("Sideboard not found.")
+            if any(entry.card.card_pool != "evil" or entry.card.lifecycle_status != "active" for entry in sideboard.entries.all()):
+                raise ValueError("Replace deprecated or non-Evil sideboard cards before exporting.")
+            requested = [(entry.card, entry.quantity, "sideboard", False) for entry in sideboard.entries.all()]
+        else:
+            issues = validation_issues(encounter, export=True)
+            if issues:
+                raise ValueError(" ".join(issues))
+            requested = [(card, 1, "boss", True) for card in boss_cards(encounter)]
+            requested.extend((entry.card, entry.quantity, "mainboard", False) for entry in encounter.entries.all())
         rows = get_latest_card_list_rows_by_card_ids(
             [card.id for card, _, _, _ in requested], lifecycle_status=ALL_CARD_LIFECYCLE_FILTER,
         )
@@ -280,11 +288,12 @@ class TtsCardExportService:
             else:
                 entries.append(_ResolvedTtsCardSelectionEntry(row, quantity, role, required))
         return self._build_export(_ResolvedTtsCardSelection(
-            collection_name=encounter.name or "Untitled Encounter",
+            collection_name=f"{encounter.name or 'Untitled Encounter'} - {sideboard.name}" if sideboard else encounter.name or "Untitled Encounter",
             collection_description=encounter.description,
             source_metadata={"type": "encounter", "encounter_id": encounter.id,
                 "boss_card_id": encounter.boss_card_id, "boss_group_id": encounter.boss_group_id,
-                "factions": encounter.factions},
+                "factions": encounter.factions,
+                **({"sideboard_id": sideboard.id, "sideboard_name": sideboard.name} if sideboard else {})},
             entries=entries, skipped=skipped,
         ))
 

@@ -62,8 +62,10 @@ const saved = (): EncounterRecord => ({
   long_description: '',
   boss_card: null,
   boss_cards: [],
+  sideboards: [],
   entries: [],
   total_cards: 0,
+  sideboard_count: 0,
   status: { is_valid: false, issues: ['Select a boss.'] },
   creator: { id: 'staff', username: 'Staff' },
   created_at: '',
@@ -257,23 +259,39 @@ describe('Encounter authoring with shared draft machinery', () => {
     expect(editor.form.name).toBe('Other tab');
   });
   test('a conflict during recovery keeps the recovered contents as the local candidate', async () => {
-    const original = buildEncounterDraft('staff', crypto.randomUUID(), {
-      ...emptyEncounter(),
-      name: 'Recovered work',
-      factions: ['fire'],
-      entries: [{ card_id: 'a', quantity: 20 }],
-    }, { a: card('a') }, null);
+    const original = buildEncounterDraft(
+      'staff',
+      crypto.randomUUID(),
+      {
+        ...emptyEncounter(),
+        name: 'Recovered work',
+        factions: ['fire'],
+        entries: [{ card_id: 'a', quantity: 20 }],
+      },
+      { a: card('a') },
+      null,
+    );
     localStorage.setItem(encounterDraftKey('staff'), JSON.stringify(original));
     const { editor } = await mount();
     expect(editor.draft.pendingRecovery.value).not.toBeNull();
-    const remote = buildEncounterDraft('staff', crypto.randomUUID(), {
-      ...emptyEncounter(), name: 'Other tab',
-    }, {}, null);
+    const remote = buildEncounterDraft(
+      'staff',
+      crypto.randomUUID(),
+      {
+        ...emptyEncounter(),
+        name: 'Other tab',
+      },
+      {},
+      null,
+    );
     const raw = JSON.stringify(remote);
     localStorage.setItem(encounterDraftKey('staff'), raw);
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: encounterDraftKey('staff'), newValue: raw,
-    }));
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: encounterDraftKey('staff'),
+        newValue: raw,
+      }),
+    );
     await flush();
     expect(editor.draft.pendingRecovery.value).toBeNull();
     expect(editor.locked.value).toBe(true);
@@ -295,14 +313,24 @@ describe('Encounter authoring with shared draft machinery', () => {
     await vi.advanceTimersByTimeAsync(3500);
     await creating;
     expect(editor.publication.isCreationUnknown.value).toBe(true);
-    const remote = buildEncounterDraft('staff', crypto.randomUUID(), {
-      ...emptyEncounter(), name: 'Other tab',
-    }, {}, null);
+    const remote = buildEncounterDraft(
+      'staff',
+      crypto.randomUUID(),
+      {
+        ...emptyEncounter(),
+        name: 'Other tab',
+      },
+      {},
+      null,
+    );
     const raw = JSON.stringify(remote);
     localStorage.setItem(encounterDraftKey('staff'), raw);
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: encounterDraftKey('staff'), newValue: raw,
-    }));
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: encounterDraftKey('staff'),
+        newValue: raw,
+      }),
+    );
     expect(editor.draft.conflict.value?.kind).toBe('active-draft');
     await editor.publication.retry();
     expect(mocks.create).toHaveBeenCalledTimes(2);
@@ -316,16 +344,29 @@ describe('Encounter authoring with shared draft machinery', () => {
       const { editor, router } = await mount();
       editor.form.name = 'Unsaved local work';
       await editor.draft.persist();
-      const raw = change === 'replaced'
-        ? JSON.stringify(buildEncounterDraft('staff', crypto.randomUUID(), {
-          ...emptyEncounter(), name: 'Other tab',
-        }, {}, null))
-        : null;
+      const raw =
+        change === 'replaced'
+          ? JSON.stringify(
+              buildEncounterDraft(
+                'staff',
+                crypto.randomUUID(),
+                {
+                  ...emptyEncounter(),
+                  name: 'Other tab',
+                },
+                {},
+                null,
+              ),
+            )
+          : null;
       if (raw === null) localStorage.removeItem(encounterDraftKey('staff'));
       else localStorage.setItem(encounterDraftKey('staff'), raw);
-      window.dispatchEvent(new StorageEvent('storage', {
-        key: encounterDraftKey('staff'), newValue: raw,
-      }));
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: encounterDraftKey('staff'),
+          newValue: raw,
+        }),
+      );
       const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
       await router.push('/staff/encounters');
       expect(confirm).toHaveBeenCalledWith('Leave with unsaved changes?');
@@ -344,8 +385,9 @@ describe('Encounter authoring with shared draft machinery', () => {
     await router.push('/staff/encounters');
     expect(confirm).not.toHaveBeenCalled();
     expect(router.currentRoute.value.path).toBe('/staff/encounters');
-    expect(JSON.parse(localStorage.getItem(encounterDraftKey('staff'))!).form.name)
-      .toBe('Recoverable work');
+    expect(JSON.parse(localStorage.getItem(encounterDraftKey('staff'))!).form.name).toBe(
+      'Recoverable work',
+    );
   });
   test('cleanup failure after confirmed creation cannot cause a second create', async () => {
     const { editor, router } = await mount();
@@ -409,4 +451,92 @@ describe('Encounter authoring with shared draft machinery', () => {
     await vi.advanceTimersByTimeAsync(500);
     expect(mocks.update).toHaveBeenCalledTimes(2);
   });
+});
+
+test('sideboards share board editing, preserve quantities on moves, and recover locally', async () => {
+  const { editor } = await mount();
+  editor.add(card('main'));
+  editor.quantity('main', 20);
+  editor.addSideboard();
+  const boardId = editor.boards.activeBoardId.value;
+  editor.renameSideboard(boardId, 'Reinforcements');
+  editor.add(card('reserve'));
+  editor.quantity('reserve', 3);
+  editor.add(card('other'));
+  editor.move(1, -1);
+  editor.moveToBoard('reserve', 'mainboard');
+  expect(editor.total.value).toBe(21);
+  expect(editor.form.sideboards[0].entries).toEqual([
+    { card_id: 'other', quantity: 1 },
+    { card_id: 'reserve', quantity: 2 },
+  ]);
+  await vi.advanceTimersByTimeAsync(450);
+  cleanup.splice(0).forEach((fn) => fn());
+  const recovered = (await mount()).editor;
+  await recovered.recover(recovered.draft.pendingRecovery.value!);
+  expect(recovered.form.sideboards[0].name).toBe('Reinforcements');
+  expect(recovered.form.sideboards[0].entries.map((entry) => entry.quantity)).toEqual([1, 2]);
+  expect(recovered.cards.value.other.id).toBe('other');
+  recovered.boards.selectBoard(boardId);
+  recovered.removeSideboard(boardId);
+  expect(recovered.boards.activeBoardId.value).toBe('mainboard');
+  expect(recovered.total.value).toBe(21);
+});
+
+test('autosync adopts saved sideboard identity while keeping the selected board', async () => {
+  const { editor } = await mount('/existing/saved');
+  mocks.update.mockResolvedValue({
+    ...saved(),
+    revision: 2,
+    sideboards: [
+      {
+        id: 'server-board',
+        name: 'Sideboard 1',
+        entries: [{ card_id: 'reserve', quantity: 1, card: card('reserve') }],
+      },
+    ],
+  });
+  editor.addSideboard();
+  editor.add(card('reserve'));
+  editor.autosync.value = true;
+  await vi.advanceTimersByTimeAsync(450);
+  expect(editor.boards.activeBoardId.value).toBe('server-board');
+  expect(editor.form.sideboards[0].source_id).toBe('server-board');
+  expect(editor.dirty.value).toBe(false);
+  await vi.advanceTimersByTimeAsync(500);
+  expect(mocks.update).toHaveBeenCalledTimes(1);
+});
+
+test('legacy draft recovery adds empty sideboards without changing an uncertain payload', async () => {
+  const legacy = { ...emptyEncounter(), name: 'Legacy' };
+  delete (legacy as Partial<typeof legacy>).sideboards;
+  const stored = buildEncounterDraft('staff', 'legacy-key', emptyEncounter(), {}, null);
+  stored.form = legacy;
+  stored.pendingCreateAttempt = {
+    payload: legacy,
+    signature: JSON.stringify(legacy),
+    startedAt: new Date().toISOString(),
+  };
+  localStorage.setItem(encounterDraftKey('staff'), JSON.stringify(stored));
+  mocks.lookup.mockResolvedValue({ status: 'missing' });
+  const { editor } = await mount();
+  const recovery = editor.recover(editor.draft.pendingRecovery.value!);
+  await vi.advanceTimersByTimeAsync(4000);
+  await recovery;
+  expect(editor.form.sideboards).toEqual([]);
+  expect(editor.publication.attempt.value?.payload).not.toHaveProperty('sideboards');
+});
+
+test('reloading a sideboard deleted by another staff member returns to the mainboard', async () => {
+  mocks.fetch.mockResolvedValue({
+    ...saved(),
+    sideboards: [{ id: 'reserve', name: 'Reserve', entries: [] }],
+  });
+  const { editor } = await mount('/existing/saved');
+  editor.boards.selectBoard('reserve');
+  mocks.fetch.mockResolvedValue({ ...saved(), revision: 2 });
+  await editor.reload();
+  expect(editor.boards.activeBoardId.value).toBe('mainboard');
+  editor.add(card('new-card'));
+  expect(editor.form.entries).toEqual([{ card_id: 'new-card', quantity: 1 }]);
 });

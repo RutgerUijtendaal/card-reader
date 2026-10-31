@@ -1,3 +1,4 @@
+import type { FormSideboard } from '@/domain/cards/composables/useCardCollectionBoards';
 import type { CardFaction } from '@/domain/cards/cardFactions';
 import type { CardListItem } from '@/domain/cards/types';
 
@@ -10,6 +11,7 @@ export type EncounterDraft = {
   factions: CardFaction[];
   visibility: 'private' | 'public';
   entries: Array<{ card_id: string; quantity: number }>;
+  sideboards: FormSideboard[];
 };
 
 export type EncounterSummary = {
@@ -24,14 +26,20 @@ export type EncounterSummary = {
   boss_group_id: string | null;
   boss_card: CardListItem | null;
   total_cards: number;
+  sideboard_count: number;
   status: { is_valid: boolean; issues: string[] };
   created_at: string;
   updated_at: string;
 };
 export type EncounterRecord = EncounterSummary &
-  Omit<EncounterDraft, 'entries'> & {
+  Omit<EncounterDraft, 'entries' | 'sideboards'> & {
     long_description: string;
     boss_cards: CardListItem[];
+    sideboards: Array<{
+      id: string;
+      name: string;
+      entries: Array<{ card_id: string; quantity: number; card: CardListItem }>;
+    }>;
     entries: Array<{ card_id: string; quantity: number; card: CardListItem }>;
   };
 export type EncounterPage = {
@@ -48,6 +56,7 @@ export const emptyEncounter = (): EncounterDraft => ({
   factions: [],
   visibility: 'private',
   entries: [],
+  sideboards: [],
 });
 export const encounterDraftFromRecord = (record: EncounterRecord): EncounterDraft => ({
   name: record.name,
@@ -57,5 +66,11 @@ export const encounterDraftFromRecord = (record: EncounterRecord): EncounterDraf
   boss_group_id: record.boss_group_id,
   factions: [...record.factions],
   visibility: record.visibility,
+  sideboards: record.sideboards.map((board) => ({
+    id: board.id,
+    source_id: board.id,
+    name: board.name,
+    entries: board.entries.map(({ card_id, quantity }) => ({ card_id, quantity })),
+  })),
   entries: record.entries.map(({ card_id, quantity }) => ({ card_id, quantity })),
 });

@@ -15,6 +15,12 @@ class EntrySerializer(serializers.Serializer[dict[str, Any]]):
     quantity = serializers.IntegerField(min_value=1)
 
 
+class SideboardSerializer(serializers.Serializer[dict[str, Any]]):
+    id = serializers.CharField(required=False)
+    name = serializers.CharField()
+    entries = EntrySerializer(many=True)
+
+
 class EncounterWriteSerializer(serializers.Serializer[dict[str, Any]]):
     name = serializers.CharField(allow_blank=True, required=False)
     description_markup = serializers.CharField(allow_blank=True, required=False)
@@ -26,6 +32,7 @@ class EncounterWriteSerializer(serializers.Serializer[dict[str, Any]]):
         child=serializers.ChoiceField(choices=CARD_FACTIONS), required=False
     )
     entries = EntrySerializer(many=True, required=False)
+    sideboards = SideboardSerializer(many=True, required=False)
     revision = serializers.IntegerField(min_value=1, required=False)
 
 
@@ -52,8 +59,11 @@ def encounter_payload(
     resolved_backs: dict[str, ResolvedCardBack] | None = None,
 ) -> dict[str, object]:
     entries = list(record.entries.all()) if detail else []
+    sideboards = list(record.sideboards.all()) if detail else []
     bosses = boss_cards(record) if detail else []
     cards = [*bosses, *[entry.card for entry in entries]]
+    for board in sideboards:
+        cards.extend(entry.card for entry in board.entries.all())
     if record.boss_card:
         cards.append(record.boss_card)
     unique_cards = {card.id: card for card in cards}
@@ -79,25 +89,37 @@ def encounter_payload(
         "boss_group_id": record.boss_group_id,
         "boss_card": payloads.get(record.boss_card_id or ""),
         "total_cards": getattr(record, "total_cards", sum(entry.quantity for entry in entries)),
+        "sideboard_count": getattr(record, "sideboard_count", len(sideboards)),
         "status": {"is_valid": not issues, "issues": issues},
         "created_at": record.created_at.isoformat(),
         "updated_at": record.updated_at.isoformat(),
     }
     if detail:
+
+        def entry_payload(entry: Any) -> dict[str, object]:
+            return {
+                "card_id": entry.card_id,
+                "card": payloads[entry.card_id],
+                "quantity": entry.quantity,
+            }
+
+        board_payloads = []
+        for board in sideboards:
+            board_payloads.append(
+                {
+                    "id": board.id,
+                    "name": board.name,
+                    "entries": [entry_payload(entry) for entry in board.entries.all()],
+                }
+            )
         result.update(
             {
                 "description_markup": record.description_markup,
                 "long_description": record.long_description,
                 "long_description_markup": record.long_description_markup,
                 "boss_cards": [payloads[card.id] for card in bosses],
-                "entries": [
-                    {
-                        "card_id": entry.card_id,
-                        "card": payloads[entry.card_id],
-                        "quantity": entry.quantity,
-                    }
-                    for entry in entries
-                ],
+                "sideboards": board_payloads,
+                "entries": [entry_payload(entry) for entry in entries],
             }
         )
     return result

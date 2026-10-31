@@ -15,6 +15,11 @@ export const encounterDraftKey = (owner: string): string =>
   `card-reader.encounter-editor.new-draft.${owner}`;
 const isObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object';
+const isEntry = (entry: unknown): boolean =>
+  isObject(entry) &&
+  typeof entry.card_id === 'string' &&
+  Number.isInteger(entry.quantity) &&
+  Number(entry.quantity) > 0;
 export const isEncounterDraft = (value: unknown): value is EncounterDraft => {
   if (!isObject(value)) return false;
   return (
@@ -26,14 +31,19 @@ export const isEncounterDraft = (value: unknown): value is EncounterDraft => {
     ['private', 'public'].includes(String(value.visibility)) &&
     Array.isArray(value.factions) &&
     value.factions.every(isCardFaction) &&
+    (value.sideboards === undefined ||
+      (Array.isArray(value.sideboards) &&
+        value.sideboards.every(
+          (board: unknown) =>
+            isObject(board) &&
+            typeof board.id === 'string' &&
+            typeof board.name === 'string' &&
+            (board.source_id === undefined || typeof board.source_id === 'string') &&
+            Array.isArray(board.entries) &&
+            board.entries.every(isEntry),
+        ))) &&
     Array.isArray(value.entries) &&
-    value.entries.every(
-      (entry: unknown) =>
-        isObject(entry) &&
-        typeof entry.card_id === 'string' &&
-        Number.isInteger(entry.quantity) &&
-        Number(entry.quantity) > 0,
-    )
+    value.entries.every(isEntry)
   );
 };
 export const parseEncounterDraft = (value: unknown, owner: string): EncounterSlot | null => {
@@ -83,7 +93,11 @@ export const buildEncounterDraft = (
   cards: Record<string, CardListItem>,
   pendingCreateAttempt: Attempt<EncounterDraft> | null,
 ): EncounterStoredDraft => {
-  const ids = new Set([form.boss_card_id, ...form.entries.map((entry) => entry.card_id)]);
+  const ids = new Set([
+    form.boss_card_id,
+    ...form.entries.map((entry) => entry.card_id),
+    ...form.sideboards.flatMap((board) => board.entries.map((entry) => entry.card_id)),
+  ]);
   return JSON.parse(
     JSON.stringify({
       version: 2,

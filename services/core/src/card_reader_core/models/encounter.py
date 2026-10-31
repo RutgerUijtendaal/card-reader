@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 class Encounter(TimestampedModel):
     if TYPE_CHECKING:
         entries: Manager[EncounterEntry]
+        sideboards: Manager[EncounterSideboard]
         boss_card_id: str | None
         boss_group_id: str | None
         creator_id: int
@@ -72,6 +73,49 @@ class EncounterEntry(TimestampedModel):
             models.UniqueConstraint(fields=["encounter", "card"], name="ux_encounter_entry_card"),
             models.CheckConstraint(
                 condition=models.Q(quantity__gte=1), name="ck_encounter_entry_quantity"
+            ),
+        ]
+
+
+class EncounterSideboard(TimestampedModel):
+    if TYPE_CHECKING:
+        entries: Manager[EncounterSideboardEntry]
+
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    encounter: models.ForeignKey[Encounter, Encounter] = models.ForeignKey(
+        Encounter, on_delete=models.CASCADE, related_name="sideboards"
+    )
+    name: models.TextField[str, str] = models.TextField()
+    position: models.PositiveIntegerField[int, int] = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "encounter_sideboard"
+        ordering = ["position", "id"]
+
+
+class EncounterSideboardEntry(TimestampedModel):
+    if TYPE_CHECKING:
+        card_id: str
+
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    sideboard: models.ForeignKey[EncounterSideboard, EncounterSideboard] = models.ForeignKey(
+        EncounterSideboard, on_delete=models.CASCADE, related_name="entries"
+    )
+    card: models.ForeignKey[Card, Card] = models.ForeignKey(
+        "Card", on_delete=models.PROTECT, related_name="encounter_sideboard_entries"
+    )
+    quantity: models.PositiveIntegerField[int, int] = models.PositiveIntegerField(default=1)
+    position: models.PositiveIntegerField[int, int] = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "encounter_sideboard_entry"
+        ordering = ["position", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sideboard", "card"], name="ux_enc_sideboard_entry_card"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(quantity__gte=1), name="ck_enc_sideboard_entry_qty"
             ),
         ]
 

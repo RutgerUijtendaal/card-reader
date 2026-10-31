@@ -65,6 +65,7 @@ const mount = () => {
   publicationState = createPublicationState();
   editor = {
     id: 'saved',
+    boards: { activeBoardEntries: ref([]) },
     form: reactive(emptyEncounter()),
     mode: ref('cards'),
     factions: ref([]),

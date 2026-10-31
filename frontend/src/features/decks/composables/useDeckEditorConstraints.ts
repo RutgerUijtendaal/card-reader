@@ -5,10 +5,7 @@ import {
   resolveDeckBuildingRules,
   type DeckConstraintContext,
 } from '@/domain/decks/utils/deckConstraints';
-import {
-  MAX_DECK_COPIES,
-  MAX_SIDEBOARD_ENTRY_QUANTITY,
-} from '@/domain/decks/utils/constants';
+import { MAX_DECK_COPIES, MAX_SIDEBOARD_ENTRY_QUANTITY } from '@/domain/decks/utils/constants';
 import type { DeckBuildingRules, DeckConstraintScope } from '@/domain/deck-building/types';
 import type { DeckCardSummary } from '@/domain/decks/types';
 import type {
@@ -16,7 +13,7 @@ import type {
   DeckForm,
   DeckFormEntry,
 } from '@/features/decks/composables/deckEditorDraftTypes';
-import { MAINBOARD_ID } from '@/features/decks/composables/useDeckEditorBoards';
+import { MAINBOARD_ID } from '@/domain/cards/composables/useCardCollectionBoards';
 
 type UseDeckEditorConstraintsOptions = {
   form: DeckForm;
@@ -88,10 +85,12 @@ export const useDeckEditorConstraints = ({
       heroCard: selectedHero.value,
       cardLookup: cardLookup.value,
       baseRules: baseDeckBuildingRules.value,
-      mainboardEntries: sourceBoardId === MAINBOARD_ID ? removeMovedCopy(form.entries) : form.entries,
+      mainboardEntries:
+        sourceBoardId === MAINBOARD_ID ? removeMovedCopy(form.entries) : form.entries,
       sideboards: form.sideboards.map((sideboard) => ({
         ...sideboard,
-        entries: sourceBoardId === sideboard.id ? removeMovedCopy(sideboard.entries) : sideboard.entries,
+        entries:
+          sourceBoardId === sideboard.id ? removeMovedCopy(sideboard.entries) : sideboard.entries,
       })),
     };
   };
@@ -103,10 +102,7 @@ export const useDeckEditorConstraints = ({
       ? (deckBuildingRules.value.mainboard_copy_limit.max ?? MAX_DECK_COPIES)
       : (deckBuildingRules.value.sideboard_entry_quantity.max ?? MAX_SIDEBOARD_ENTRY_QUANTITY);
   };
-  const getCardQuantityLimitMessage = (
-    cardId: string,
-    boardId = activeBoardId.value,
-  ): string => {
+  const getCardQuantityLimitMessage = (cardId: string, boardId = activeBoardId.value): string => {
     const card = cardLookup.value[cardId];
     if (card) return getDeckEntryQuantityLimit(card, getConstraintContext(boardId)).message;
     const max = getCardQuantityLimit(cardId, boardId);
@@ -126,7 +122,8 @@ export const useDeckEditorConstraints = ({
       const cardTotal = getActionBlockingMainboardCardTotal(card);
       if (quantity === 0 && cardTotal >= maxCards) return 'Mainboard Full';
       if (quantity === 0) return 'Add To Mainboard';
-      if (quantity >= quantityLimit) return quantityLimit === 1 ? 'At Legendary Limit' : 'At Copy Limit';
+      if (quantity >= quantityLimit)
+        return quantityLimit === 1 ? 'At Legendary Limit' : 'At Copy Limit';
       if (cardTotal >= maxCards) return `At Mainboard Limit (${quantity})`;
       return isFiniteLimit(quantityLimit)
         ? `Add Copy (${quantity}/${quantityLimit})`
@@ -150,10 +147,8 @@ export const useDeckEditorConstraints = ({
         getActionBlockingMainboardCardTotal(card) >= getActionBlockingMainboardMaxCards(card))
     );
   };
-  const galleryRemoveActionDisabled = (
-    cardId: string,
-    boardId = activeBoardId.value,
-  ): boolean => isHeroStep.value || getEntryQuantity(cardId, boardId) <= 0;
+  const galleryRemoveActionDisabled = (cardId: string, boardId = activeBoardId.value): boolean =>
+    isHeroStep.value || getEntryQuantity(cardId, boardId) <= 0;
   const boardRowActionDisabled = (cardId: string, boardId = activeBoardId.value): boolean => {
     if (isHeroStep.value) return true;
     const quantity = getEntryQuantity(cardId, boardId);

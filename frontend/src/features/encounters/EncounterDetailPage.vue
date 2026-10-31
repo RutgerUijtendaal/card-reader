@@ -41,7 +41,9 @@
       >
         <AppHeaderAction
           :icon="TtsCopyIcon"
-          :label="exporting ? 'Exporting Encounter' : 'Copy Encounter TTS'"
+          :label="
+            exporting ? 'Exporting' : activeSideboard ? 'Copy Sideboard TTS' : 'Copy Encounter TTS'
+          "
           short-label="TTS"
           :disabled="exporting"
           @click="copyExport"
@@ -222,6 +224,18 @@
               <span class="ml-1 opacity-80">{{ record.total_cards }} / {{ record.entries.length }}</span>
             </button>
             <button
+              v-for="board in record.sideboards"
+              :key="board.id"
+              class="theme-pill text-xs"
+              :class="activeBoard === board.id ? 'theme-pill-accent' : 'theme-pill-neutral'"
+              type="button"
+              @click="activeBoard = board.id"
+            >
+              {{ board.name }}
+              <span class="ml-1 opacity-80">{{ board.entries.reduce((sum, entry) => sum + entry.quantity, 0) }} /
+                {{ board.entries.length }}</span>
+            </button>
+            <button
               v-if="record.boss_cards.length"
               class="theme-pill text-xs"
               :class="activeBoard === 'boss' ? 'theme-pill-accent' : 'theme-pill-neutral'"
@@ -243,7 +257,7 @@
           v-else
           :entries="sortedEntries"
           :groups="groupedEntries"
-          :group-by-type="groupByType && activeBoard === 'mainboard'"
+          :group-by-type="groupByType && activeBoard !== 'boss'"
           :grid-style="gridStyle"
           :card-style="cardStyle"
           :card-height-rem="cardHeightRem"
@@ -309,7 +323,10 @@ const exportText = ref('');
 const exportMessage = ref('');
 const detailsExpanded = ref(false);
 const canAutoExpand = useMediaQuery('(min-width: 1536px)');
-const activeBoard = ref<'mainboard' | 'boss'>('mainboard');
+const activeBoard = ref('mainboard');
+const activeSideboard = computed(() =>
+  record.value?.sideboards.find((board) => board.id === activeBoard.value),
+);
 const backLink = computed(() =>
   auth.canAccessStaffRoutes && route.query.return_to !== 'encounters'
     ? '/staff/encounters'
@@ -333,7 +350,7 @@ const activeEntries = computed(() =>
     ? []
     : activeBoard.value === 'boss'
       ? record.value.boss_cards.map((card) => ({ card, quantity: 1 }))
-      : record.value.entries,
+      : (activeSideboard.value?.entries ?? record.value.entries),
 );
 const { cardHeightRem, cardStyle, gridStyle, sortedEntries, groupedEntries } =
   useCardCollectionGrid(activeEntries, types, 'evil', sortSurface.effectiveSort, cardScale);
@@ -368,15 +385,19 @@ const load = async () => {
 const copyExport = async () => {
   if (!record.value || exporting.value) return;
   const current = generation;
+  const sideboardId = activeSideboard.value?.id;
   exporting.value = true;
   error.value = '';
   try {
-    const result = await exportEncounter(record.value.id);
+    const result = await exportEncounter(record.value.id, sideboardId);
     if (current !== generation) return;
     exportText.value = result.encodedPayload;
     exportMessage.value = `${result.exportedCount} cards. ${ttsExportSheetDescription(result)}`;
     try {
-      await copyTtsExport(result, 'TTS Encounter copied to clipboard');
+      await copyTtsExport(
+        result,
+        sideboardId ? 'TTS sideboard copied to clipboard' : 'TTS Encounter copied to clipboard',
+      );
       exportMessage.value = `Copied to clipboard. ${exportMessage.value}`;
     } catch {
       /* The import code remains selectable. */

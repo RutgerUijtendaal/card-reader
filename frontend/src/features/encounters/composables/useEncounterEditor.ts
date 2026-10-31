@@ -4,6 +4,7 @@ import { isNavigationFailure, onBeforeRouteLeave, useRoute, useRouter } from 'vu
 import { isAxiosError } from 'axios';
 import { toast } from 'vue-sonner';
 import { useAuthStore } from '@/domain/session/store';
+import { useCardCollectionBoards } from '@/domain/cards/composables/useCardCollectionBoards';
 import { fetchCard } from '@/domain/cards/api';
 import type { CardListItem, GalleryItem } from '@/domain/cards/types';
 import type { CardFaction } from '@/domain/cards/cardFactions';
@@ -37,6 +38,7 @@ export const useEncounterEditor = () => {
   const auth = useAuthStore();
   const id = typeof route.params.id === 'string' ? route.params.id : null;
   const form = reactive(emptyEncounter());
+  const boards = useCardCollectionBoards(form);
   const cards = ref<Record<string, CardListItem>>({});
   const record = ref<EncounterRecord | null>(null);
   const mode = ref<'boss' | 'details' | 'cards'>('cards');
@@ -68,11 +70,18 @@ export const useEncounterEditor = () => {
   const applyRecord = (value: EncounterRecord) => {
     record.value = value;
     Object.assign(form, encounterDraftFromRecord(value));
+    if (
+      boards.activeBoardId.value !== 'mainboard' &&
+      !form.sideboards.some((board) => board.id === boards.activeBoardId.value)
+    ) {
+      boards.selectBoard('mainboard');
+    }
     cards.value = Object.fromEntries(
       [
         ...(value.boss_card ? [value.boss_card] : []),
         ...value.boss_cards,
         ...value.entries.map((entry) => entry.card),
+        ...value.sideboards.flatMap((board) => board.entries.map((entry) => entry.card)),
       ].map((card) => [card.id, card]),
     );
     factions.value = [...(value.boss_card?.card_factions ?? [])];
@@ -127,9 +136,11 @@ export const useEncounterEditor = () => {
   const hydrate = async () => {
     const ids = [
       ...new Set(
-        [form.boss_card_id, ...form.entries.map((entry) => entry.card_id)].filter(
-          (value): value is string => !!value,
-        ),
+        [
+          form.boss_card_id,
+          ...form.entries.map((entry) => entry.card_id),
+          ...form.sideboards.flatMap((board) => board.entries.map((entry) => entry.card_id)),
+        ].filter((value): value is string => !!value),
       ),
     ];
     const results = await Promise.allSettled(ids.map((cardId) => fetchCard<CardListItem>(cardId)));
@@ -143,12 +154,17 @@ export const useEncounterEditor = () => {
     if (!publication.attempt.value) {
       if (form.boss_card_id)
         form.boss_card_id = resolvedIds.get(form.boss_card_id) ?? form.boss_card_id;
-      const entries = new Map<string, number>();
-      form.entries.forEach((entry) => {
-        const cardId = resolvedIds.get(entry.card_id) ?? entry.card_id;
-        entries.set(cardId, (entries.get(cardId) ?? 0) + entry.quantity);
-      });
-      form.entries = [...entries].map(([card_id, quantity]) => ({ card_id, quantity }));
+      for (const boardId of ['mainboard', ...form.sideboards.map((board) => board.id)]) {
+        const entries = new Map<string, number>();
+        boards.getBoardEntries(boardId).forEach((entry) => {
+          const cardId = resolvedIds.get(entry.card_id) ?? entry.card_id;
+          entries.set(cardId, (entries.get(cardId) ?? 0) + entry.quantity);
+        });
+        boards.updateBoardEntries(
+          boardId,
+          [...entries].map(([card_id, quantity]) => ({ card_id, quantity })),
+        );
+      }
     }
     if (results.some((result) => result.status === 'rejected'))
       error.value =
@@ -157,7 +173,7 @@ export const useEncounterEditor = () => {
   const recover = async (stored: EncounterStoredDraft) => {
     recoveryBusy.value = true;
     draft.beginRecoveredDraft(stored);
-    Object.assign(form, stored.form);
+    Object.assign(form, stored.form, { sideboards: stored.form.sideboards ?? [] });
     cards.value = { ...stored.cards };
     try {
       // Reconcile the authoritative create independently of optional card hydration.
@@ -170,24 +186,28 @@ export const useEncounterEditor = () => {
       recoveryBusy.value = false;
     }
   };
-  watch(draft.recoveryConflictCandidate, (stored) => {
-    if (!stored) return;
-    // The recovery dialog has not applied this candidate yet. Keep it as the
-    // local side of the conflict without replacing the observed remote slot.
-    Object.assign(form, stored.form);
-    cards.value = { ...stored.cards };
-    recoveryBusy.value = true;
-    void (async () => {
-      try {
-        if (stored.pendingCreateAttempt)
-          await publication.recoverPendingAttempt(stored.pendingCreateAttempt);
-        await hydrate();
-        factions.value = [...(boss.value?.card_factions ?? [])];
-      } finally {
-        recoveryBusy.value = false;
-      }
-    })();
-  }, { flush: 'sync' });
+  watch(
+    draft.recoveryConflictCandidate,
+    (stored) => {
+      if (!stored) return;
+      // The recovery dialog has not applied this candidate yet. Keep it as the
+      // local side of the conflict without replacing the observed remote slot.
+      Object.assign(form, stored.form, { sideboards: stored.form.sideboards ?? [] });
+      cards.value = { ...stored.cards };
+      recoveryBusy.value = true;
+      void (async () => {
+        try {
+          if (stored.pendingCreateAttempt)
+            await publication.recoverPendingAttempt(stored.pendingCreateAttempt);
+          await hydrate();
+          factions.value = [...(boss.value?.card_factions ?? [])];
+        } finally {
+          recoveryBusy.value = false;
+        }
+      })();
+    },
+    { flush: 'sync' },
+  );
   const loadConflict = async () => {
     const stored = draft.loadConflictDraft();
     if (stored) await recover(stored);
@@ -242,8 +262,13 @@ export const useEncounterEditor = () => {
         JSON.parse(submitted) as typeof form,
         record.value.revision,
       );
+      const activeIndex = form.sideboards.findIndex(
+        (board) => board.id === boards.activeBoardId.value,
+      );
       record.value = value;
-      savedSignature.value = submitted;
+      Object.assign(form, encounterDraftFromRecord(value));
+      if (activeIndex >= 0) boards.selectBoard(form.sideboards[activeIndex]?.id ?? 'mainboard');
+      savedSignature.value = signature.value;
     } catch (cause) {
       serverConflict.value = isAxiosError(cause) && cause.response?.status === 409;
       error.value = getApiErrorMessage(
@@ -300,23 +325,50 @@ export const useEncounterEditor = () => {
   const add = (item: GalleryItem) => {
     if (locked.value || item.result_type !== 'card' || item.card_pool !== 'evil') return;
     cards.value[item.id] = item;
-    const entry = form.entries.find((value) => value.card_id === item.id);
+    const entry = boards.activeBoardEntries.value.find((value) => value.card_id === item.id);
     if (entry) entry.quantity += 1;
-    else form.entries.push({ card_id: item.id, quantity: 1 });
+    else
+      boards.updateBoardEntries(boards.activeBoardId.value, [
+        ...boards.activeBoardEntries.value,
+        { card_id: item.id, quantity: 1 },
+      ]);
   };
   const quantity = (cardId: string, value: number) => {
     if (locked.value || !Number.isInteger(value)) return;
-    if (value <= 0) form.entries = form.entries.filter((entry) => entry.card_id !== cardId);
+    if (value <= 0)
+      boards.updateBoardEntries(
+        boards.activeBoardId.value,
+        boards.activeBoardEntries.value.filter((entry) => entry.card_id !== cardId),
+      );
     else {
-      const entry = form.entries.find((item) => item.card_id === cardId);
+      const entry = boards.activeBoardEntries.value.find((item) => item.card_id === cardId);
       if (entry) entry.quantity = value;
     }
   };
   const move = (index: number, direction: number) => {
-    if (locked.value || index + direction < 0 || index + direction >= form.entries.length) return;
-    const entries = [...form.entries];
-    [entries[index], entries[index + direction]] = [entries[index + direction], entries[index]];
-    form.entries = entries;
+    if (locked.value) return;
+    const entry = boards.activeBoardEntries.value[index];
+    if (entry)
+      boards.moveEntryToIndex(boards.activeBoardId.value, entry.card_id, index + direction);
+  };
+  const addSideboard = () => {
+    if (!locked.value) boards.addSideboard();
+  };
+  const renameSideboard = (boardId: string, name: string) => {
+    if (!locked.value && name.trim()) boards.renameSideboard(boardId, name.trim());
+  };
+  const removeSideboard = (boardId: string) => {
+    if (!locked.value) boards.removeSideboard(boardId);
+  };
+  const moveToBoard = (cardId: string, boardId: string) => {
+    if (
+      locked.value ||
+      cards.value[cardId]?.card_pool !== 'evil' ||
+      boardId === boards.activeBoardId.value
+    )
+      return;
+    if (boardId !== 'mainboard' && !form.sideboards.some((board) => board.id === boardId)) return;
+    boards.moveEntryToBoardUnchecked(cardId, boardId);
   };
   const setDetails = (
     values: Partial<
@@ -350,10 +402,7 @@ export const useEncounterEditor = () => {
     if (!canLeave()) return false;
     if (publication.hasTerminalNavigationRetry.value || openingConfirmedRecord.value) return true;
     if (!id && !publication.isCreationUnknown.value) await draft.persist();
-    if (
-      (id && dirty.value) ||
-      (!id && !draft.isCurrentContentDurable())
-    ) {
+    if ((id && dirty.value) || (!id && !draft.isCurrentContentDurable())) {
       return window.confirm('Leave with unsaved changes?');
     }
     return true;
@@ -378,6 +427,11 @@ export const useEncounterEditor = () => {
   });
   return {
     id,
+    boards,
+    addSideboard,
+    renameSideboard,
+    removeSideboard,
+    moveToBoard,
     form,
     cards,
     record,

@@ -8,7 +8,7 @@ import {
 import type { DeckBuildingRules } from '@/domain/deck-building/types';
 import type { DeckCardSummary, DeckMetadataOption } from '@/domain/decks/types';
 import type { DeckForm, DeckFormEntry } from '@/features/decks/composables/deckEditorDraftTypes';
-import { MAINBOARD_ID } from '@/features/decks/composables/useDeckEditorBoards';
+import { MAINBOARD_ID } from '@/domain/cards/composables/useCardCollectionBoards';
 
 type UseDeckEditorMetricsOptions = {
   form: DeckForm;
@@ -68,7 +68,9 @@ export const useDeckEditorMetrics = ({
       .filter((entry): entry is { card: DeckCardSummary; quantity: number } => Boolean(entry.card));
 
   const detailedMainboardEntries = computed(() => mapDetailedEntries(form.entries));
-  const detailedActiveBoardEntries = computed(() => mapDetailedEntries(visibleActiveBoardEntries.value));
+  const detailedActiveBoardEntries = computed(() =>
+    mapDetailedEntries(visibleActiveBoardEntries.value),
+  );
   const totalMainboardManaTypeCards = computed(() =>
     detailedMainboardEntries.value.reduce(
       (sum, entry) =>

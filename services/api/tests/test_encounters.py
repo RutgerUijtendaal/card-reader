@@ -410,3 +410,162 @@ def test_reclassified_entries_stay_editable_but_cannot_be_increased():
         ).status_code
         == 400
     )
+
+
+def test_sideboards_save_order_identity_revisions_and_public_validity():
+    client, other = staff_client(), staff_client()
+    boss, first, second = card(boss=True), card(), card()
+    saved = create(
+        client,
+        name="Raid",
+        boss_card_id=boss.id,
+        visibility="public",
+        entries=[{"card_id": first.id, "quantity": 19}],
+        sideboards=[
+            {
+                "name": "Reserve",
+                "entries": [
+                    {"card_id": second.id, "quantity": 4},
+                    {"card_id": first.id, "quantity": 2},
+                ],
+            }
+        ],
+    ).json()
+    assert saved["total_cards"] == 19
+    assert not saved["status"]["is_valid"]
+    board = saved["sideboards"][0]
+    changed = update(
+        other,
+        saved,
+        entries=[{"card_id": first.id, "quantity": 20}],
+        sideboards=[{**board, "name": "Alternatives"}, {"name": "Empty", "entries": []}],
+    ).json()
+    assert changed["sideboards"][0]["id"] == board["id"]
+    assert [entry["card_id"] for entry in changed["sideboards"][0]["entries"]] == [
+        second.id,
+        first.id,
+    ]
+    assert changed["status"]["is_valid"]
+    assert (
+        Client().get(f"/encounters/{saved['id']}").json()["sideboards"][0]["name"] == "Alternatives"
+    )
+    assert update(client, saved, sideboards=[]).status_code == 409
+    unchanged = update(client, changed, description_markup="Keep boards").json()
+    assert len(unchanged["sideboards"]) == 2
+    second.card_pool = "neutral"
+    second.save()
+    assert Client().get("/encounters").json()["count"] == 0
+    assert (
+        Client()
+        .get(f"/encounters/{saved['id']}/exports/tts?sideboard_id={board['id']}")
+        .status_code
+        == 404
+    )
+    retained = update(client, unchanged, sideboards=unchanged["sideboards"]).json()
+    assert retained["sideboards"][0]["entries"][0]["quantity"] == 4
+    assert not retained["status"]["is_valid"]
+    repaired = update(client, retained, sideboards=[]).json()
+    assert repaired["status"]["is_valid"]
+
+
+def test_sideboard_references_and_quantities_are_validated_and_creation_is_idempotent():
+    client = staff_client()
+    evil, player = card(), card(pool="player")
+    for entries in (
+        [{"card_id": player.id, "quantity": 1}],
+        [{"card_id": evil.id, "quantity": 0}],
+        [{"card_id": evil.id, "quantity": 1}, {"card_id": evil.id, "quantity": 2}],
+    ):
+        assert (
+            create(client, sideboards=[{"name": "Reserve", "entries": entries}]).status_code == 400
+        )
+    assert create(client, sideboards=[{"name": " ", "entries": []}]).status_code == 400
+    key = str(uuid4())
+    payload = {
+        "sideboards": [{"name": "Reserve", "entries": [{"card_id": evil.id, "quantity": 7}]}]
+    }
+    first = client.post(
+        "/staff/encounters", payload, content_type="application/json", HTTP_IDEMPOTENCY_KEY=key
+    ).json()
+    retry = client.post(
+        "/staff/encounters", {}, content_type="application/json", HTTP_IDEMPOTENCY_KEY=key
+    ).json()
+    assert first["sideboards"] == retry["sideboards"]
+    foreign = create(client).json()
+    assert update(client, foreign, sideboards=first["sideboards"]).status_code == 400
+    assert update(client, first, sideboards=first["sideboards"] * 2).status_code == 400
+    assert Client().get(f"/encounters/{first['id']}").status_code == 404
+
+
+def test_sideboard_export_is_ordered_and_independent_of_boss():
+    from types import SimpleNamespace
+
+    client = staff_client()
+    first, second = card(), card()
+    saved = create(
+        client,
+        sideboards=[
+            {
+                "name": "Reserve",
+                "entries": [
+                    {"card_id": second.id, "quantity": 3},
+                    {"card_id": first.id, "quantity": 2},
+                ],
+            }
+        ],
+    ).json()
+    record = get_encounter(saved["id"])
+    assert record is not None
+    board_id = saved["sideboards"][0]["id"]
+    rows = [SimpleNamespace(version=SimpleNamespace(card=value)) for value in (first, second)]
+    with (
+        patch(
+            "card_reader_core.services.exports.service.get_latest_card_list_rows_by_card_ids",
+            return_value=rows,
+        ),
+        patch.object(TtsCardExportService, "_build_export") as build,
+    ):
+        TtsCardExportService().build_encounter_export(record, sideboard_id=board_id)
+    selection = build.call_args.args[0]
+    assert [
+        (entry.row.version.card.id, entry.quantity, entry.role) for entry in selection.entries
+    ] == [(second.id, 3, "sideboard"), (first.id, 2, "sideboard")]
+    assert selection.source_metadata["sideboard_id"] == board_id
+    assert selection.source_metadata["sideboard_name"] == "Reserve"
+    with pytest.raises(ValueError, match="Sideboard not found"):
+        TtsCardExportService().build_encounter_export(record, sideboard_id=str(uuid4()))
+    assert (
+        Client().get(f"/encounters/{saved['id']}/exports/tts?sideboard_id={board_id}").status_code
+        == 404
+    )
+    second.lifecycle_status = "deprecated"
+    second.save()
+    record = get_encounter(saved["id"])
+    assert record is not None
+    with pytest.raises(ValueError, match="deprecated"):
+        TtsCardExportService().build_encounter_export(record, sideboard_id=board_id)
+
+
+def test_card_merge_combines_sideboard_quantities_and_advances_revision():
+    from card_reader_core.repositories.encounters import retarget_encounter_cards
+
+    client = staff_client()
+    source, target = card(), card()
+    saved = create(
+        client,
+        sideboards=[
+            {
+                "name": "Reserve",
+                "entries": [
+                    {"card_id": source.id, "quantity": 2},
+                    {"card_id": target.id, "quantity": 3},
+                ],
+            }
+        ],
+    ).json()
+    retarget_encounter_cards(target.id, [source.id])
+    result = client.get(f"/staff/encounters/{saved['id']}").json()
+    assert result["revision"] == saved["revision"] + 1
+    assert [
+        (entry["card_id"], entry["quantity"]) for entry in result["sideboards"][0]["entries"]
+    ] == [(target.id, 5)]
