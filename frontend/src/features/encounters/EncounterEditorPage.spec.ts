@@ -7,6 +7,14 @@ import type { useEncounterEditor } from './composables/useEncounterEditor';
 import type { useEncounterBrowser } from './composables/useEncounterBrowser';
 let editor: ReturnType<typeof useEncounterEditor>;
 let browser: ReturnType<typeof useEncounterBrowser>;
+const createPublicationState = () => ({
+  isCreating: ref(false),
+  isReconciling: ref(false),
+  isCreationUnknown: ref(false),
+  hasTerminalNavigationRetry: ref(false),
+  retry: vi.fn(),
+});
+let publicationState = createPublicationState();
 vi.mock('./composables/useEncounterEditor', () => ({ useEncounterEditor: () => editor }));
 vi.mock('./composables/useEncounterBrowser', () => ({ useEncounterBrowser: () => browser }));
 vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
@@ -46,11 +54,15 @@ vi.mock('@/shared/components/builders/BuilderDraftRecoveryModal.vue', () => ({
   default: { template: '<div />' },
 }));
 vi.mock('@/shared/components/builders/BuilderDraftConflictModal.vue', () => ({
-  default: { template: '<div />' },
+  default: {
+    props: { open: Boolean },
+    template: '<div v-if="open" role="dialog" data-testid="draft-conflict" />',
+  },
 }));
 const cleanups: Array<() => void> = [];
 afterEach(() => cleanups.splice(0).forEach((fn) => fn()));
 const mount = () => {
+  publicationState = createPublicationState();
   editor = {
     id: 'saved',
     form: reactive(emptyEncounter()),
@@ -69,12 +81,7 @@ const mount = () => {
     changeStatus: ref('Saved'),
     recoveryBusy: ref(false),
     draft: { pendingRecovery: ref(null), conflict: ref(null) },
-    publication: {
-      isCreating: ref(false),
-      isReconciling: ref(false),
-      isCreationUnknown: ref(false),
-      hasTerminalNavigationRetry: ref(false),
-    },
+    publication: publicationState,
     save: vi.fn(),
   } as unknown as ReturnType<typeof useEncounterEditor>;
   browser = {
@@ -127,4 +134,29 @@ test('Details keeps save state above the padded form in the shared edge-attached
   expect(status?.textContent).toContain('Saved');
   expect(status?.nextElementSibling?.classList.contains('builder-details-content')).toBe(true);
   expect(status?.nextElementSibling?.querySelector('[data-testid="details"]')).not.toBeNull();
+});
+
+test('an unresolved create keeps Retry accessible instead of covering it with a draft conflict', async () => {
+  const target = mount();
+  editor.draft.conflict.value = { kind: 'remote-deletion', slot: { kind: 'empty' } };
+  publicationState.isCreationUnknown.value = true;
+  await nextTick();
+  expect(target.querySelector('[data-testid="draft-conflict"]')).toBeNull();
+  const retry = [...target.querySelectorAll('button')].find(
+    (button) => button.textContent?.trim() === 'Retry creation',
+  )!;
+  expect(retry.disabled).toBe(false);
+  retry.click();
+  expect(editor.publication.retry).toHaveBeenCalledOnce();
+  publicationState.isCreationUnknown.value = false;
+  publicationState.isCreating.value = true;
+  await nextTick();
+  expect(target.querySelector('[data-testid="draft-conflict"]')).toBeNull();
+  publicationState.isCreating.value = false;
+  publicationState.hasTerminalNavigationRetry.value = true;
+  await nextTick();
+  expect(target.querySelector('[data-testid="draft-conflict"]')).toBeNull();
+  publicationState.hasTerminalNavigationRetry.value = false;
+  await nextTick();
+  expect(target.querySelector('[data-testid="draft-conflict"]')).not.toBeNull();
 });

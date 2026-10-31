@@ -286,6 +286,30 @@ describe('Encounter authoring with shared draft machinery', () => {
     expect(kept.draftId).not.toBe(original.draftId);
     expect(editor.locked.value).toBe(false);
   });
+  test('an uncertain create displaced by another tab retries the immutable request without replacing that draft', async () => {
+    const { editor, router } = await mount();
+    editor.form.name = 'Original request';
+    mocks.create.mockRejectedValueOnce(new Error('connection lost'));
+    mocks.lookup.mockResolvedValue({ status: 'missing' });
+    const creating = editor.save();
+    await vi.advanceTimersByTimeAsync(3500);
+    await creating;
+    expect(editor.publication.isCreationUnknown.value).toBe(true);
+    const remote = buildEncounterDraft('staff', crypto.randomUUID(), {
+      ...emptyEncounter(), name: 'Other tab',
+    }, {}, null);
+    const raw = JSON.stringify(remote);
+    localStorage.setItem(encounterDraftKey('staff'), raw);
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: encounterDraftKey('staff'), newValue: raw,
+    }));
+    expect(editor.draft.conflict.value?.kind).toBe('active-draft');
+    await editor.publication.retry();
+    expect(mocks.create).toHaveBeenCalledTimes(2);
+    expect(mocks.create.mock.calls[1]).toEqual(mocks.create.mock.calls[0]);
+    expect(localStorage.getItem(encounterDraftKey('staff'))).toBe(raw);
+    expect(router.currentRoute.value.path).toBe('/staff/encounters/saved/edit');
+  });
   test('cleanup failure after confirmed creation cannot cause a second create', async () => {
     const { editor, router } = await mount();
     editor.form.name = 'Created';

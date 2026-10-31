@@ -217,7 +217,13 @@
       @discard="draft.discardRecovery()"
     />
     <BuilderDraftConflictModal
-      :open="!!draft.conflict.value"
+      :open="
+        !!draft.conflict.value &&
+          !publication.isCreating.value &&
+          !publication.isCreationUnknown.value &&
+          !publication.hasTerminalNavigationRetry.value &&
+          !editor.recoveryBusy.value
+      "
       resource-label="Encounter"
       :kind="draft.conflict.value?.kind"
       :busy="busy || editor.recoveryBusy.value"
