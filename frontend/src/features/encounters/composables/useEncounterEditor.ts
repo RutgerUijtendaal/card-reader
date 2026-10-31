@@ -352,9 +352,7 @@ export const useEncounterEditor = () => {
     if (!id && !publication.isCreationUnknown.value) await draft.persist();
     if (
       (id && dirty.value) ||
-      (!id &&
-        draft.storageUnavailable.value &&
-        signature.value !== JSON.stringify(emptyEncounter()))
+      (!id && !draft.isCurrentContentDurable())
     ) {
       return window.confirm('Leave with unsaved changes?');
     }

@@ -310,6 +310,43 @@ describe('Encounter authoring with shared draft machinery', () => {
     expect(localStorage.getItem(encounterDraftKey('staff'))).toBe(raw);
     expect(router.currentRoute.value.path).toBe('/staff/encounters/saved/edit');
   });
+  test.each(['replaced', 'removed'] as const)(
+    'leaving a %s cross-tab draft requires confirmation without modifying the remote slot',
+    async (change) => {
+      const { editor, router } = await mount();
+      editor.form.name = 'Unsaved local work';
+      await editor.draft.persist();
+      const raw = change === 'replaced'
+        ? JSON.stringify(buildEncounterDraft('staff', crypto.randomUUID(), {
+          ...emptyEncounter(), name: 'Other tab',
+        }, {}, null))
+        : null;
+      if (raw === null) localStorage.removeItem(encounterDraftKey('staff'));
+      else localStorage.setItem(encounterDraftKey('staff'), raw);
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: encounterDraftKey('staff'), newValue: raw,
+      }));
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+      await router.push('/staff/encounters');
+      expect(confirm).toHaveBeenCalledWith('Leave with unsaved changes?');
+      expect(router.currentRoute.value.path).toBe('/staff/encounters/new');
+      expect(editor.form.name).toBe('Unsaved local work');
+      confirm.mockReturnValue(true);
+      await router.push('/staff/encounters');
+      expect(router.currentRoute.value.path).toBe('/staff/encounters');
+      expect(localStorage.getItem(encounterDraftKey('staff'))).toBe(raw);
+    },
+  );
+  test('leaving a durable local draft does not ask to discard it', async () => {
+    const { editor, router } = await mount();
+    editor.form.name = 'Recoverable work';
+    const confirm = vi.spyOn(window, 'confirm');
+    await router.push('/staff/encounters');
+    expect(confirm).not.toHaveBeenCalled();
+    expect(router.currentRoute.value.path).toBe('/staff/encounters');
+    expect(JSON.parse(localStorage.getItem(encounterDraftKey('staff'))!).form.name)
+      .toBe('Recoverable work');
+  });
   test('cleanup failure after confirmed creation cannot cause a second create', async () => {
     const { editor, router } = await mount();
     editor.form.name = 'Created';
