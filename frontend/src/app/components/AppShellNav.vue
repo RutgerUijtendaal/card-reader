@@ -48,7 +48,7 @@
           v-if="!collapsed"
           class="min-w-0"
         >
-          <span class="block truncate text-sm font-semibold text-white">Maity's Card Game</span>
+          <span class="app-sidebar-brand-name block">Maity's Card Game</span>
         </span>
       </RouterLink>
 
@@ -78,7 +78,14 @@
       </button>
     </div>
 
-    <nav class="grid w-full gap-2">
+    <div class="mb-4 w-full">
+      <CardPoolWorkspaceSwitcher
+        :collapsed="collapsed"
+        @selected="handleNavClick"
+      />
+    </div>
+
+    <nav class="grid w-full gap-0.5">
       <template
         v-for="item in publicItems"
         :key="item.label"
@@ -113,8 +120,15 @@
 
       <div
         v-if="staffItems.length > 0"
-        class="app-sidebar-divider my-2"
-      />
+        class="app-sidebar-divider mt-4 pt-2"
+      >
+        <p
+          v-if="!collapsed"
+          class="app-sidebar-group-label"
+        >
+          Workshop
+        </p>
+      </div>
 
       <template
         v-for="item in staffItems"
@@ -149,27 +163,16 @@
       </template>
     </nav>
 
-    <div class="mt-auto w-full space-y-4 pt-6">
-      <div class="app-sidebar-divider pt-4">
-        <CardPoolWorkspaceSwitcher
-          :collapsed="collapsed"
-          @selected="handleNavClick"
-        />
+    <div class="app-sidebar-divider mt-auto w-full space-y-1 pt-4">
+      <div :class="collapsed ? 'flex justify-center' : ''">
+        <AppHotkeysPanel :compact="collapsed" />
       </div>
 
-      <div class="app-sidebar-divider pt-4">
-        <div :class="collapsed ? 'flex justify-center' : ''">
-          <AppHotkeysPanel :compact="collapsed" />
-        </div>
+      <div :class="collapsed ? 'flex justify-center' : ''">
+        <ThemeModeMenu :compact="collapsed" />
       </div>
 
-      <div class="app-sidebar-divider pt-4">
-        <div :class="collapsed ? 'flex justify-center' : ''">
-          <ThemeModeMenu :compact="collapsed" />
-        </div>
-      </div>
-
-      <div class="app-sidebar-divider pt-4">
+      <div>
         <RouterLink
           v-if="!auth.authenticated"
           class="nav-link"

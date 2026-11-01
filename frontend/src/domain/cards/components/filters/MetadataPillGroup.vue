@@ -1,5 +1,5 @@
 <template>
-  <section class="theme-muted-panel flex min-w-[12rem] flex-col gap-3">
+  <section class="theme-filter-section flex min-w-[12rem] flex-col gap-3">
     <button
       type="button"
       class="flex min-h-9 items-center justify-between gap-2 text-left"
@@ -82,7 +82,7 @@
               v-for="option in group.options"
               :key="option.id"
               type="button"
-              class="theme-choice-chip inline-flex min-h-10 items-center gap-1 px-3 py-2"
+              class="theme-choice-chip inline-flex min-h-8 items-center gap-1 px-3 py-1"
               :class="chipClass(option.id, group.selectedClass)"
               :title="chipTitle(option.label, option.id)"
               :aria-pressed="chipState(option.id) !== 'off'"
@@ -109,7 +109,7 @@
           v-for="option in visibleOptions"
           :key="option.id"
           type="button"
-          class="theme-choice-chip inline-flex min-h-10 items-center gap-1 px-3 py-2"
+          class="theme-choice-chip inline-flex min-h-8 items-center gap-1 px-3 py-1"
           :class="chipClass(option.id)"
           :title="chipTitle(option.label, option.id)"
           :aria-pressed="chipState(option.id) !== 'off'"

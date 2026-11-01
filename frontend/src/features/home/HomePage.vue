@@ -4,37 +4,18 @@
     root-class="min-h-full"
     main-class="app-page-single-column"
   >
-    <div class="flex flex-col gap-10 py-3 sm:py-6 lg:py-10">
-      <section
-        class="home-hero relative overflow-hidden rounded-3xl border px-6 py-8 sm:px-9 sm:py-10"
-      >
-        <div class="relative z-10 max-w-3xl">
-          <div class="mb-4 flex items-center gap-3">
-            <span
-              class="theme-selected-surface-strong flex h-11 w-11 items-center justify-center rounded-xl border"
-            >
-              <component
-                :is="APP_SECTION_ICONS.home"
-                class="h-5 w-5"
-                aria-hidden="true"
-              />
-            </span>
-            <p class="theme-kicker text-xs font-semibold uppercase tracking-[0.18em]">
-              Maity's Card Game
-            </p>
-          </div>
-
-          <h1
-            class="theme-section-title max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl"
-          >
+    <div class="flex flex-col gap-14 py-4 sm:py-8 lg:gap-20 lg:py-12">
+      <section class="grid items-center gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div class="max-w-xl">
+          <h1 class="home-headline theme-section-title">
             Explore every side of the game.
           </h1>
-          <p class="theme-section-muted mt-4 max-w-2xl text-base leading-7 sm:text-lg">
+          <p class="theme-section-muted mt-5 text-base leading-7 sm:text-lg sm:leading-8">
             Browse the cards players bring to the table, discover the Evil forces waiting across
             from them, or turn a deck idea into your next game.
           </p>
 
-          <div class="mt-7 flex flex-wrap gap-3">
+          <div class="mt-8 flex flex-wrap gap-3">
             <RouterLink
               :to="auth.authenticated ? newDeckLocation : '/decks'"
               class="btn-primary gap-2"
@@ -64,130 +45,79 @@
 
           <RouterLink
             :to="auth.authenticated ? '/decks' : '/playtester'"
-            class="theme-link mt-4 inline-flex items-center gap-1.5 text-sm font-semibold"
+            class="theme-link mt-5 inline-flex items-center gap-1.5 text-sm font-semibold"
             :data-testid="auth.authenticated ? 'home-decks-action' : 'home-playtester-action'"
           >
             {{ auth.authenticated ? 'Or browse public decks' : 'Or open Playtester' }}
-            <ArrowRight
-              class="h-4 w-4"
-              aria-hidden="true"
-            />
           </RouterLink>
         </div>
 
-        <img
-          :src="cardLogoUrl"
-          alt=""
-          class="pointer-events-none absolute -bottom-10 -right-8 h-52 w-52 rotate-6 object-contain opacity-[0.08] sm:h-64 sm:w-64"
-        >
+        <figure class="min-w-0">
+          <HomeCardFan :card-pool="workspace.activePool" />
+          <figcaption class="theme-kicker mt-2 text-center text-sm">
+            {{ showcaseCaption }}
+          </figcaption>
+        </figure>
       </section>
 
       <section aria-labelledby="home-collections-heading">
-        <div class="mb-4">
+        <div class="mb-6">
           <h2
             id="home-collections-heading"
-            class="theme-section-title text-lg font-semibold"
+            class="theme-section-title theme-display text-2xl"
           >
             Choose a collection
           </h2>
           <p class="theme-section-muted mt-1 text-sm">
-            Player and Evil are the two main sides of the table. Neutral cards live alongside them
-            as their own smaller library.
+            Player and Evil are the two sides of the table. Neutral cards stand apart as their own
+            smaller library.
           </p>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-2">
+        <div class="home-collections grid md:grid-cols-3">
           <RouterLink
-            v-for="collection in primaryCollections"
+            v-for="collection in collections"
             :key="collection.pool"
             :to="buildWorkspaceGallerySelectionLocation(collection.pool)"
-            class="home-collection theme-card-frame group rounded-2xl p-5 transition sm:p-6"
+            class="home-collection group"
             :class="{ 'home-collection-active': workspace.activePool === collection.pool }"
             :data-card-pool-link="collection.pool"
+            :data-pool-tint="collection.pool"
           >
-            <div class="flex items-start justify-between gap-4">
-              <span
-                class="theme-selected-surface flex h-11 w-11 items-center justify-center rounded-xl border"
-              >
-                <component
-                  :is="CARD_POOL_ICONS[collection.pool]"
-                  class="h-5 w-5"
-                  :data-card-pool-icon="collection.pool"
-                  aria-hidden="true"
-                />
-              </span>
+            <span class="flex items-center justify-between gap-3">
+              <component
+                :is="CARD_POOL_ICONS[collection.pool]"
+                class="home-collection-icon h-6 w-6"
+                :data-card-pool-icon="collection.pool"
+                aria-hidden="true"
+              />
               <span
                 v-if="workspace.activePool === collection.pool"
-                class="theme-kicker rounded-full px-2.5 py-1 text-xs font-semibold"
+                class="home-collection-current text-xs font-medium"
                 data-current-workspace
               >
                 Current workspace
               </span>
-            </div>
-            <p class="theme-kicker mt-5 text-xs font-semibold uppercase tracking-[0.16em]">
-              {{ collection.label }} collection
-            </p>
-            <h3 class="theme-section-title mt-2 text-xl font-semibold">
+            </span>
+            <span class="theme-section-title theme-display mt-5 block text-xl">
               {{ collection.title }}
-            </h3>
-            <p class="theme-section-muted mt-2 text-sm leading-6">
+            </span>
+            <span class="theme-section-muted mt-2 block text-sm leading-6">
               {{ collection.description }}
-            </p>
-            <span class="theme-link mt-5 inline-flex items-center gap-1.5 text-sm font-semibold">
+            </span>
+            <span class="home-collection-link mt-5 inline-flex text-sm font-semibold">
               {{ collection.linkLabel }}
-              <component
-                :is="ArrowRight"
-                class="h-4 w-4 transition-transform group-hover:translate-x-0.5"
-                aria-hidden="true"
-              />
             </span>
           </RouterLink>
         </div>
-
-        <RouterLink
-          :to="buildWorkspaceGallerySelectionLocation('neutral')"
-          class="home-collection theme-card-frame-muted group mt-4 flex flex-col gap-4 rounded-2xl p-5 transition sm:flex-row sm:items-center"
-          :class="{ 'home-collection-active': workspace.activePool === 'neutral' }"
-          data-card-pool-link="neutral"
-        >
-          <span
-            class="theme-card-frame theme-section-title flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-          >
-            <component
-              :is="CARD_POOL_ICONS.neutral"
-              class="h-5 w-5"
-              data-card-pool-icon="neutral"
-              aria-hidden="true"
-            />
-          </span>
-          <span class="min-w-0 flex-1">
-            <span class="theme-section-title block font-semibold">Neutral collection</span>
-            <span class="theme-section-muted mt-1 block text-sm">
-              Browse cards that stand apart from the Player and Evil libraries.
-            </span>
-          </span>
-          <span
-            v-if="workspace.activePool === 'neutral'"
-            class="theme-kicker rounded-full px-2.5 py-1 text-xs font-semibold"
-            data-current-workspace
-          >
-            Current workspace
-          </span>
-          <span class="theme-link inline-flex items-center gap-1.5 text-sm font-semibold">
-            Browse Neutral
-            <ArrowRight
-              class="h-4 w-4 transition-transform group-hover:translate-x-0.5"
-              aria-hidden="true"
-            />
-          </span>
-        </RouterLink>
       </section>
     </div>
   </AppPageLayout>
 </template>
 
 <script setup lang="ts">
-import { ArrowRight, LogIn } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { LogIn } from 'lucide-vue-next';
 import type { RouteLocationRaw } from 'vue-router';
 import { RouterLink } from 'vue-router';
 import {
@@ -200,19 +130,18 @@ import { buildNewDeckEditorLocation } from '@/domain/decks/utils/deckRouteState'
 import { useAuthStore } from '@/domain/session/store';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
+import HomeCardFan from '@/features/home/components/HomeCardFan.vue';
 
 type HomeCollection = {
   pool: CardPool;
-  label: string;
   title: string;
   description: string;
   linkLabel: string;
 };
 
-const primaryCollections: HomeCollection[] = [
+const collections: HomeCollection[] = [
   {
     pool: 'player',
-    label: 'Player',
     title: 'Build your side of the table',
     description:
       'Explore Heroes, mana, and the cards that become decks, opening hands, and playtests.',
@@ -220,17 +149,28 @@ const primaryCollections: HomeCollection[] = [
   },
   {
     pool: 'evil',
-    label: 'Evil',
     title: 'Discover what waits across from you',
     description:
       'Explore bosses, locations, and the Order, Blood, Dark, Metal, and Fire factions.',
     linkLabel: 'Browse Evil cards',
   },
+  {
+    pool: 'neutral',
+    title: 'Stand apart from both sides',
+    description: 'Browse the smaller library of cards outside the Player and Evil collections.',
+    linkLabel: 'Browse Neutral cards',
+  },
 ];
+
+const SHOWCASE_CAPTIONS: Record<CardPool, string> = {
+  player: 'Heroes from the Player collection',
+  evil: 'Bosses from the Evil collection',
+  neutral: 'From the Neutral collection',
+};
 
 const auth = useAuthStore();
 const workspace = useCardPoolWorkspaceStore();
-const cardLogoUrl = `${import.meta.env.BASE_URL}card_logo_transparent.webp`;
+const showcaseCaption = computed(() => SHOWCASE_CAPTIONS[workspace.activePool]);
 const newDeckLocation = buildNewDeckEditorLocation();
 const buildDeckSignInLocation: RouteLocationRaw = {
   path: '/login',
@@ -241,40 +181,71 @@ const buildDeckSignInLocation: RouteLocationRaw = {
 </script>
 
 <style scoped>
-.home-hero {
-  border-color: color-mix(in srgb, var(--color-selected-border) 70%, var(--color-border));
-  background:
-    radial-gradient(
-      circle at 88% 12%,
-      color-mix(in srgb, var(--color-selected-bg-strong) 74%, transparent) 0%,
-      transparent 42%
-    ),
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--color-surface-strong) 92%, transparent) 0%,
-      color-mix(in srgb, var(--color-selected-bg) 38%, var(--color-surface)) 100%
-    );
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--color-surface-strong) 76%, transparent),
-    0 18px 42px color-mix(in srgb, var(--color-border) 24%, transparent);
+.home-headline {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(2.5rem, 1.6rem + 3vw, 4.25rem);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+}
+
+.home-collections {
+  border-top: 1px solid var(--color-border);
+}
+
+.home-collection {
+  --pool-tint: var(--accent);
+  display: block;
+  padding: 1.5rem 0;
+  border-bottom: 1px solid var(--color-border);
+  transition: background-color 200ms ease;
+}
+
+.home-collection[data-pool-tint='player'] {
+  --pool-tint: var(--pool-player);
+}
+
+.home-collection[data-pool-tint='evil'] {
+  --pool-tint: var(--pool-evil);
+}
+
+.home-collection[data-pool-tint='neutral'] {
+  --pool-tint: var(--pool-neutral);
+}
+
+.home-collection-icon,
+.home-collection-current,
+.home-collection-link {
+  color: var(--pool-tint);
+}
+
+.home-collection:hover .home-collection-link {
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
 .home-collection-active {
-  border-color: color-mix(in srgb, var(--color-selected-border) 76%, var(--color-border));
+  box-shadow: inset 0 2px 0 var(--pool-tint);
 }
 
-.home-collection:hover {
-  border-color: var(--color-selected-border);
-  transform: translateY(-2px);
+@media (min-width: 768px) {
+  .home-collection {
+    padding: 1.75rem 1.75rem 2rem;
+    border-bottom: 0;
+  }
+
+  .home-collection:first-child {
+    padding-left: 0;
+  }
+
+  .home-collection + .home-collection {
+    border-left: 1px solid var(--color-border);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .home-collection {
     transition: none;
-  }
-
-  .home-collection:hover {
-    transform: none;
   }
 }
 </style>

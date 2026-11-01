@@ -1,9 +1,32 @@
 @layer components {
   .page-card {
-    @apply rounded-xl p-5 shadow-sm backdrop-blur-sm;
+    @apply rounded-lg p-5;
     box-shadow: inset 0 0 0 1px var(--color-border);
     background: var(--color-surface);
     color: var(--color-text);
+  }
+
+  /* Display type: titles and names set in Lora, echoing the serif printed on the cards. */
+  .theme-display {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.005em;
+  }
+
+  .theme-page-header {
+    border-color: var(--color-border);
+    background: color-mix(in srgb, var(--table-canvas) 78%, transparent);
+    backdrop-filter: blur(18px) saturate(1.2);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    color: var(--color-text);
+  }
+
+  .theme-page-header-icon {
+    color: var(--accent);
+  }
+
+  .theme-page-header-bottom {
+    background: transparent;
   }
 
   .field-label {
@@ -59,18 +82,19 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60;
     border: 1px solid transparent;
-    background: linear-gradient(135deg, var(--color-primary-from) 0%, var(--color-primary-to) 100%);
-    background-clip: padding-box;
+    background: var(--color-primary-from);
+    color: var(--accent-ink);
+    box-shadow: 0 6px 18px -8px var(--accent);
   }
 
   .btn-primary:hover {
-    background: linear-gradient(135deg, var(--color-primary-hover-from) 0%, var(--color-primary-hover-to) 100%);
+    background: var(--color-primary-hover-from);
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition;
+    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition;
     border: 1px solid var(--color-secondary-border);
     background: var(--color-secondary-bg);
     color: var(--color-secondary-text);
@@ -82,7 +106,7 @@
   }
 
   .btn-danger-secondary {
-    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
     border: 1px solid var(--color-danger-border);
     background: var(--color-danger-bg);
     color: var(--color-danger-text);
@@ -136,7 +160,7 @@
   }
 
   .nav-link {
-    @apply flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition;
+    @apply flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition;
     color: var(--color-nav-text);
   }
 
@@ -148,13 +172,34 @@
   .nav-link.router-link-active {
     background: var(--color-nav-active-bg);
     color: var(--color-nav-active-text);
+    box-shadow: inset 2px 0 0 var(--sidebar-accent);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  .nav-link.router-link-active > svg {
+    color: var(--sidebar-accent);
   }
 
   .app-sidebar {
-    @apply backdrop-blur-xl;
-    background: var(--color-sidebar);
+    background:
+      radial-gradient(ellipse 120% 40% at 0% 0%, color-mix(in srgb, var(--sidebar-accent) 9%, transparent) 0%, transparent 70%),
+      var(--color-sidebar);
     color: var(--color-sidebar-text);
     border-right: 1px solid var(--color-sidebar-border);
+  }
+
+  .app-sidebar-group-label {
+    @apply px-3 pb-1 pt-3 text-xs font-medium;
+    color: color-mix(in srgb, var(--color-nav-text) 70%, transparent);
+  }
+
+  .app-sidebar-brand-name {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.05rem;
+    line-height: 1.2;
+    color: var(--color-sidebar-text);
   }
 
   .app-sidebar-divider {
@@ -162,20 +207,31 @@
   }
 
   .theme-popover {
-    @apply rounded-2xl border p-4 shadow-xl backdrop-blur-md;
+    @apply rounded-xl border p-4 shadow-xl;
     border-color: var(--color-border-strong);
     background: var(--color-popover);
     color: var(--color-text);
   }
 
   .theme-muted-panel {
-    @apply rounded-xl border px-4 py-2;
+    @apply rounded-lg border px-4 py-2;
     border-color: var(--color-border);
     background: var(--color-surface-muted);
   }
 
+  /* Filter groups float on the aside, separated by hairlines rather than boxed. */
+  .theme-filter-section {
+    @apply py-2;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .theme-filter-section > .theme-divider {
+    border-top-width: 0;
+    padding-top: 0;
+  }
+
   .theme-panel-shell {
-    @apply rounded-xl border;
+    @apply rounded-lg border;
     border-color: var(--color-border);
     background: var(--color-surface-strong);
   }
@@ -237,12 +293,7 @@
     top: var(--app-page-y-inset, 1rem);
     border-color: color-mix(in srgb, var(--color-border) 78%, transparent);
     border-radius: 0;
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--color-surface-strong) 86%, transparent) 0%,
-        color-mix(in srgb, var(--color-surface) 74%, transparent) 100%
-      );
+    background: color-mix(in srgb, var(--table-canvas-deep) 55%, transparent);
     box-shadow: none;
   }
 
@@ -309,13 +360,11 @@
     .app-sticky-aside-left {
       border-right-width: 1px;
       padding-right: 1.25rem;
-      box-shadow: 12px 0 24px -28px rgba(15, 23, 42, 0.5);
     }
 
     .app-sticky-aside-right {
       border-left-width: 1px;
       padding-left: 1.25rem;
-      box-shadow: -12px 0 24px -28px rgba(15, 23, 42, 0.5);
     }
 
     .app-sticky-aside-scroll {
@@ -345,11 +394,9 @@
 
   .theme-card-frame {
     @apply overflow-hidden border;
-    border-color: var(--color-border-strong);
+    border-color: var(--color-border);
     background: var(--color-surface-strong);
-    box-shadow:
-      0 1px 2px rgba(15, 23, 42, 0.08),
-      0 10px 24px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 1px 2px rgba(16, 21, 42, 0.06);
   }
 
   .theme-card-frame-muted {
@@ -367,13 +414,11 @@
   }
 
   html.dark .theme-card-frame {
-    box-shadow:
-      0 1px 2px rgba(2, 6, 23, 0.42),
-      0 14px 32px rgba(2, 6, 23, 0.28);
+    box-shadow: 0 1px 2px rgba(4, 6, 18, 0.4);
   }
 
   html.dark .theme-card-frame-muted {
-    box-shadow: 0 1px 2px rgba(2, 6, 23, 0.28);
+    box-shadow: none;
   }
 
   .shared-element-hover-panel {
@@ -645,23 +690,12 @@
     border-color: var(--color-selected-border);
     background: var(--color-selected-bg);
     color: var(--color-selected-text);
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
   }
 
   .theme-selected-surface-strong {
     border-color: var(--color-selected-border);
     background: var(--color-selected-bg-strong);
     color: var(--color-selected-text);
-    box-shadow:
-      0 1px 2px rgba(15, 23, 42, 0.08),
-      0 10px 24px rgba(15, 23, 42, 0.08);
-  }
-
-  html.dark .theme-selected-surface,
-  html.dark .theme-selected-surface-strong {
-    box-shadow:
-      0 1px 2px rgba(10, 13, 15, 0.32),
-      0 10px 24px rgba(10, 13, 15, 0.18);
   }
 
   .theme-pill {
@@ -717,13 +751,13 @@
   }
 
   .theme-tablist {
-    @apply inline-flex w-full flex-wrap gap-2 rounded-xl border p-1 lg:w-auto lg:flex-nowrap;
+    @apply inline-flex w-full flex-wrap gap-1 rounded-lg border p-1 lg:w-auto lg:flex-nowrap;
     border-color: var(--color-border);
     background: var(--color-surface-soft);
   }
 
   .theme-tab {
-    @apply inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-transparent px-3 py-2 text-sm font-semibold transition;
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-md border border-transparent px-3 py-2 text-sm font-semibold transition;
     color: var(--color-text-muted);
   }
 
@@ -735,7 +769,6 @@
   .theme-tab-active {
     background: var(--color-selected-bg);
     color: var(--color-selected-text);
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
     border: 1px solid var(--color-selected-border);
   }
 
@@ -792,7 +825,7 @@
   .theme-choice-chip {
     @apply inline-flex items-center justify-center rounded-full border text-sm font-medium transition;
     border-color: var(--color-input-border);
-    background: var(--color-surface-strong);
+    background: transparent;
     color: var(--color-text);
   }
 
@@ -800,7 +833,6 @@
     border-color: var(--color-border-strong);
     background: var(--color-surface-soft);
     color: var(--color-text);
-    transform: translateY(-1px);
   }
 
   .theme-choice-chip-active {
@@ -827,40 +859,28 @@
     border-color: var(--color-selected-border);
     background: var(--color-selected-bg-strong);
     color: var(--color-selected-text);
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--color-selected-border) 72%, transparent 28%),
-      0 0 0 2px color-mix(in srgb, var(--color-selected-border) 28%, transparent 72%),
-      0 1px 2px rgba(15, 23, 42, 0.18);
+    box-shadow: inset 0 0 0 1px var(--color-selected-border);
   }
 
   .theme-choice-chip-include:hover {
     border-color: var(--color-selected-border);
     background: var(--color-selected-bg-strong);
     color: var(--color-selected-text);
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--color-selected-border) 78%, transparent 22%),
-      0 0 0 3px color-mix(in srgb, var(--color-selected-border) 36%, transparent 64%),
-      0 3px 8px rgba(15, 23, 42, 0.2);
+    box-shadow: inset 0 0 0 1px var(--color-selected-border);
   }
 
   .theme-choice-chip-exclude {
     border-color: var(--color-filter-exclude-border);
     background: var(--color-filter-exclude-bg);
     color: var(--color-filter-exclude-text);
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--color-filter-exclude-border) 58%, transparent 42%),
-      0 0 0 2px color-mix(in srgb, var(--color-filter-exclude-border) 16%, transparent 84%),
-      0 1px 2px rgba(15, 23, 42, 0.12);
+    box-shadow: inset 0 0 0 1px var(--color-filter-exclude-border);
   }
 
   .theme-choice-chip-exclude:hover {
     border-color: var(--color-filter-exclude-border);
     background: var(--color-filter-exclude-hover);
     color: var(--color-filter-exclude-text);
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--color-filter-exclude-border) 64%, transparent 36%),
-      0 0 0 3px color-mix(in srgb, var(--color-filter-exclude-border) 22%, transparent 78%),
-      0 3px 8px rgba(15, 23, 42, 0.16);
+    box-shadow: inset 0 0 0 1px var(--color-filter-exclude-border);
   }
 
   .theme-choice-chip-dashed {
@@ -933,7 +953,7 @@
   }
 
   .theme-hotkeys-panel {
-    @apply flex w-full flex-col gap-3 rounded-2xl border px-3 py-3 text-left;
+    @apply flex w-full flex-col gap-3 rounded-lg border px-3 py-3 text-left;
     border-color: var(--color-border);
     background: var(--color-surface-soft);
     color: var(--color-text);
@@ -972,13 +992,13 @@
 
   .theme-hotkeys-icon-wrap {
     @apply inline-flex h-10 w-10 items-center justify-center rounded-full shrink-0;
-    background: linear-gradient(135deg, rgba(14, 165, 233, 0.18) 0%, rgba(148, 163, 184, 0.22) 100%);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
     color: var(--color-text);
   }
 
   .theme-hotkeys-icon-wrap-compact {
     @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full;
-    background: linear-gradient(135deg, rgba(14, 165, 233, 0.18) 0%, rgba(148, 163, 184, 0.22) 100%);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
     color: var(--color-text);
   }
 
@@ -996,7 +1016,7 @@
 
   .theme-mode-icon-wrap {
     @apply inline-flex h-10 w-10 items-center justify-center rounded-full;
-    background: linear-gradient(135deg, rgba(250, 204, 21, 0.18) 0%, rgba(148, 163, 184, 0.22) 100%);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
     color: var(--color-text);
   }
 
@@ -1014,7 +1034,7 @@
 
   .theme-mode-icon-wrap-compact {
     @apply inline-flex h-9 w-9 items-center justify-center rounded-full;
-    background: linear-gradient(135deg, rgba(250, 204, 21, 0.18) 0%, rgba(148, 163, 184, 0.22) 100%);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
     color: var(--color-text);
   }
 
@@ -1042,19 +1062,22 @@
   }
 
   .app-sidebar .theme-mode-button {
-    border-color: var(--color-sidebar-border);
-    background: var(--color-sidebar-surface);
+    border-color: transparent;
+    background: transparent;
     color: var(--color-sidebar-text);
+    padding: 0.375rem 0.5rem;
   }
 
   .app-sidebar .theme-mode-button:hover {
-    border-color: var(--color-border-strong);
+    border-color: transparent;
     background: var(--color-sidebar-surface-hover);
   }
 
   .app-sidebar .theme-mode-icon-wrap {
-    background: linear-gradient(135deg, rgba(250, 204, 21, 0.18) 0%, rgba(148, 163, 184, 0.2) 100%);
-    color: var(--color-sidebar-text);
+    height: 2rem;
+    width: 2rem;
+    background: var(--color-sidebar-surface);
+    color: var(--color-nav-text);
   }
 
   .app-sidebar .theme-mode-button-compact {
@@ -1064,24 +1087,25 @@
   }
 
   .app-sidebar .theme-mode-button-compact:hover {
-    border-color: var(--color-border-strong);
+    border-color: var(--color-sidebar-border);
     background: var(--color-sidebar-surface-hover);
   }
 
   .app-sidebar .theme-mode-icon-wrap-compact {
-    background: linear-gradient(135deg, rgba(250, 204, 21, 0.18) 0%, rgba(148, 163, 184, 0.2) 100%);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
     color: var(--color-sidebar-text);
   }
 
   .app-sidebar .theme-hotkeys-panel {
-    border-color: var(--color-sidebar-border);
-    background: var(--color-sidebar-surface);
+    border-color: transparent;
+    background: transparent;
     color: var(--color-sidebar-text);
+    padding: 0.375rem 0.5rem;
   }
 
   .app-sidebar .theme-hotkeys-panel-button:hover,
   .app-sidebar .theme-hotkeys-button-compact:hover {
-    border-color: var(--color-border-strong);
+    border-color: transparent;
     background: var(--color-sidebar-surface-hover);
   }
 
@@ -1097,12 +1121,14 @@
   }
 
   .app-sidebar .theme-hotkeys-icon-wrap {
-    background: linear-gradient(135deg, rgba(14, 165, 233, 0.2) 0%, rgba(148, 163, 184, 0.2) 100%);
-    color: var(--color-sidebar-text);
+    height: 2rem;
+    width: 2rem;
+    background: var(--color-sidebar-surface);
+    color: var(--color-nav-text);
   }
 
   .app-sidebar .theme-hotkeys-icon-wrap-compact {
-    background: linear-gradient(135deg, rgba(14, 165, 233, 0.2) 0%, rgba(148, 163, 184, 0.2) 100%);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
     color: var(--color-sidebar-text);
   }
 }
