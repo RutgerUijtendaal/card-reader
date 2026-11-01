@@ -42,19 +42,28 @@ export const useEncounterBrowser = (options: {
     },
     { flush: 'sync' },
   );
-  watch(
-    options.bossFactions,
-    (factions) => {
-      controller.applyRouteFilterState({
-        ...controller.readFilterState(),
-        cardPool: 'evil',
-        cardFactionKeys: [...factions],
-        cardFactionExcludeKeys: [],
-        cardFactionMatch: 'any',
-      });
-    },
-    { immediate: true },
-  );
+  // The boss's factions preset the Cards filters. Apply the preset outside the boss step and
+  // only when the boss's faction set changes, so picking a boss neither narrows nor reloads
+  // the boss gallery, and a manual faction choice survives switching steps.
+  let appliedBossFactionSignature: string | null = null;
+  const applyBossFactionPreset = () => {
+    if (options.mode.value === 'boss') return;
+    const factions = options.bossFactions.value;
+    const signature = [...factions].sort().join(',');
+    if (signature === appliedBossFactionSignature) return;
+    appliedBossFactionSignature = signature;
+    controller.applyRouteFilterState({
+      ...controller.readFilterState(),
+      cardPool: 'evil',
+      cardFactionKeys: [...factions],
+      cardFactionExcludeKeys: [],
+      cardFactionMatch: 'any',
+    });
+  };
+  watch([options.bossFactions, options.mode], applyBossFactionPreset, {
+    immediate: true,
+    flush: 'sync',
+  });
   const buildSearchParams = () => {
     const params = buildCardFilterApiSearchParams(controller.selectionState.value);
     params.set('card_pool', 'evil');

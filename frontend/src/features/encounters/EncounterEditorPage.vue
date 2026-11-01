@@ -197,7 +197,6 @@
         :loading="loading"
         :hover-mode="browser.filters.hoverMode.value"
         :selection-mode="mode === 'boss'"
-        :is-selected="isSelected"
         :action-label="() => (mode === 'boss' ? 'Select boss' : 'Add card to Encounter')"
         :action-disabled="() => locked"
         :remove-disabled="(id) => locked || quantity(id) === 0"
@@ -328,11 +327,6 @@ const activate = (card: GalleryItem) => {
   if (mode.value === 'boss') void editor.selectBoss(card);
   else editor.add(card);
 };
-const isSelected = (card: GalleryItem) =>
-  mode.value === 'boss' &&
-  (card.result_type === 'card_group'
-    ? form.boss_group_id === card.group_id
-    : !form.boss_group_id && form.boss_card_id === card.id);
 const confirmReload = () => {
   if (window.confirm('Replace your local edits with the saved Encounter?')) void editor.reload();
 };

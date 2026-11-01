@@ -9,10 +9,6 @@
           v-for="card in displayItems"
           :key="card.id"
           class="justify-self-center"
-          :class="{
-            'rounded-2xl ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--color-surface)]':
-              card.result_type !== 'loading_shim' && isSelected(card),
-          }"
           :style="{
             width: `${gallery.galleryTileWidthRem.value}rem`,
             maxWidth: '100%',
@@ -112,7 +108,6 @@ const props = withDefaults(
     gallery: CardBuilderGalleryState;
     hoverMode: HoverMode;
     selectionMode: boolean;
-    isSelected: (card: GalleryItem) => boolean;
     actionLabel: (card: GalleryItem) => string;
     actionDisabled: (card: GalleryItem) => boolean;
     removeDisabled: (id: string) => boolean;

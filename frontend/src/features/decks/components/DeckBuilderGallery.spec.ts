@@ -240,7 +240,7 @@ describe('DeckBuilderGallery', () => {
     mounted.unmount();
   });
 
-  test('highlights the selected hero candidate', async () => {
+  test('labels the selected hero candidate without a gallery ring', async () => {
     const controller = buildController([buildCard()]);
     controller.deck.isHeroStep.value = true;
     controller.deck.isCardsStep.value = false;
@@ -249,7 +249,8 @@ describe('DeckBuilderGallery', () => {
     const mounted = await mountGallery(controller);
     const card = mounted.container.querySelector<HTMLElement>('[data-testid="gallery-card-card-1"]');
 
-    expect(card?.classList.contains('ring-2')).toBe(true);
+    // The hero panel shows the selection; the gallery card stays unframed.
+    expect(card?.classList.contains('ring-2')).toBe(false);
     expect(controller.deck.galleryActionLabel).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'card-1' }),
     );

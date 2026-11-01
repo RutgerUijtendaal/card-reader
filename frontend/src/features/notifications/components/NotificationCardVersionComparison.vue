@@ -289,7 +289,8 @@ onMounted(async () => {
   backdrop-filter: blur(6px);
 }
 
-.comparison-viewer:focus-within {
+/* Keyboard focus only: dragging the full-size slider with a pointer must not frame the card. */
+.comparison-viewer:has(.comparison-range:focus-visible) {
   box-shadow:
     0 16px 32px color-mix(in srgb, var(--color-text) 14%, transparent),
     0 0 0 3px color-mix(in srgb, var(--accent) 68%, transparent);
