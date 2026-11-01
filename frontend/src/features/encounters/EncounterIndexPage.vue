@@ -1,15 +1,9 @@
 <template>
   <section class="flex flex-col gap-5">
     <AppPageHeader
-      :icon="mine ? APP_SECTION_ICONS.myEncounters : APP_SECTION_ICONS.encounters"
-      :title="staff ? 'Manage Encounters' : mine ? 'My Encounters' : 'Encounters'"
-      :subtitle="
-        staff
-          ? 'Manage all saved Encounters, including private and unfinished work.'
-          : mine
-            ? 'Your Encounters, including private and unfinished work.'
-            : 'Browse public Encounters and discover your next fight.'
-      "
+      :icon="APP_SECTION_ICONS.encounters"
+      title="Encounters"
+      subtitle="Browse published Encounters and manage your own."
       title-tag="h2"
       title-class="text-xl"
     >
@@ -21,15 +15,6 @@
           short-label="Build Encounter"
           variant="primary"
           to="/my/encounters/new"
-        />
-      </template>
-      <template
-        v-if="auth.authenticated"
-        #center
-      >
-        <AppScopeTabs
-          label="Encounter library"
-          :tabs="scopeTabs"
         />
       </template>
       <template #bottomLeft>
@@ -44,6 +29,16 @@
             />
           </template>
           <template #filters>
+            <AppScopeToggle
+              v-if="auth.authenticated"
+              label="Encounter library"
+              :options="scopeOptions"
+            />
+            <span
+              v-if="auth.authenticated"
+              class="theme-divider mx-1 h-5 border-l"
+              aria-hidden="true"
+            />
             <div
               class="theme-toggle-shell"
               role="group"
@@ -205,7 +200,7 @@ import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppCollectionSearch from '@/shared/components/app/AppCollectionSearch.vue';
 import AppCollectionToolbar from '@/shared/components/app/AppCollectionToolbar.vue';
 import AppEmptyState from '@/shared/components/app/AppEmptyState.vue';
-import AppScopeTabs, { type AppScopeTab } from '@/shared/components/app/AppScopeTabs.vue';
+import AppScopeToggle, { type AppScopeOption } from '@/shared/components/app/AppScopeToggle.vue';
 import CollectionLoadingSkeleton from '@/shared/components/CollectionLoadingSkeleton.vue';
 import ChoicePill from '@/shared/components/ChoicePill.vue';
 import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
@@ -236,18 +231,16 @@ const {
   toggleFaction,
 } = useEncounterList();
 const hasActiveFilters = computed(() => Boolean(query.value || factions.value.length || official.value));
-const scopeTabs = computed<AppScopeTab[]>(() => [
+const scopeOptions = computed<AppScopeOption[]>(() => [
   {
     label: 'Public',
     to: { path: '/encounters', query: filterQuery.value },
     active: !staff.value && !mine.value,
-    icon: APP_SECTION_ICONS.encounters,
   },
   {
-    label: 'My Encounters',
+    label: 'Mine',
     to: { path: '/my/encounters', query: filterQuery.value },
     active: mine.value,
-    icon: APP_SECTION_ICONS.myEncounters,
   },
   ...(auth.canAccessStaffRoutes
     ? [
@@ -255,7 +248,6 @@ const scopeTabs = computed<AppScopeTab[]>(() => [
           label: 'All',
           to: { path: '/staff/encounters', query: filterQuery.value },
           active: staff.value,
-          icon: APP_SECTION_ICONS.admin,
         },
       ]
     : []),

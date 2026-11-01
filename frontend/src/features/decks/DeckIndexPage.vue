@@ -1,9 +1,9 @@
 <template>
   <section class="flex flex-col gap-5">
     <AppPageHeader
-      :icon="activeHeaderIcon"
-      :title="activeTitle"
-      :subtitle="activeSubtitle"
+      :icon="APP_SECTION_ICONS.decks"
+      title="Decks"
+      subtitle="Browse published decks and manage your own."
       title-tag="h2"
       title-class="text-xl"
     >
@@ -14,15 +14,6 @@
           short-label="Build a deck"
           variant="primary"
           :to="newDeckLocation"
-        />
-      </template>
-      <template
-        v-if="canUseOwnedDecks"
-        #center
-      >
-        <AppScopeTabs
-          label="Deck library"
-          :tabs="scopeTabs"
         />
       </template>
       <template #bottomLeft>
@@ -37,6 +28,16 @@
             />
           </template>
           <template #filters>
+            <AppScopeToggle
+              v-if="canUseOwnedDecks"
+              label="Deck library"
+              :options="scopeOptions"
+            />
+            <span
+              v-if="canUseOwnedDecks"
+              class="theme-divider mx-1 h-5 border-l"
+              aria-hidden="true"
+            />
             <DeckBrowseFilterBar
               :controller="filterController"
               :has-active-filters="hasActiveFilters"
@@ -334,7 +335,7 @@ import ExtraActionsMenu from '@/shared/components/app/ExtraActionsMenu.vue';
 import AppCollectionSearch from '@/shared/components/app/AppCollectionSearch.vue';
 import AppCollectionToolbar from '@/shared/components/app/AppCollectionToolbar.vue';
 import AppEmptyState from '@/shared/components/app/AppEmptyState.vue';
-import AppScopeTabs, { type AppScopeTab } from '@/shared/components/app/AppScopeTabs.vue';
+import AppScopeToggle, { type AppScopeOption } from '@/shared/components/app/AppScopeToggle.vue';
 import TtsCopyIcon from '@/shared/components/icons/TtsCopyIcon.vue';
 import ConfirmModal from '@/shared/components/modals/ConfirmModal.vue';
 import { useAuthStore } from '@/domain/session/store';
@@ -425,12 +426,6 @@ const canUseOwnedDecks = computed(() => auth.authenticated || isOwnedMode.value)
 const activeHeaderIcon = computed(() => (
   isOwnedMode.value ? APP_SECTION_ICONS.myDecks : APP_SECTION_ICONS.decks
 ));
-const activeTitle = computed(() => (isOwnedMode.value ? 'My Decks' : 'Decks'));
-const activeSubtitle = computed(() =>
-  isOwnedMode.value
-    ? 'Manage your private, unlisted, and public decks.'
-    : 'Browse public decks and inspect their hero, mainboard, and sideboards.',
-);
 const searchPlaceholder = computed(() =>
   isOwnedMode.value
     ? 'Search your decks, heroes, or cards...'
@@ -440,18 +435,16 @@ const loadingSkeletonCount = 10;
 const currentRouteFilterState = computed(() => parseDeckBrowseFilterRouteQuery(route.query));
 const effectiveRouteFilterState = computed(() => currentRouteFilterState.value);
 const scopeFilterRouteQuery = computed(() => buildDeckBrowseFilterRouteQuery(currentRouteFilterState.value));
-const scopeTabs = computed<AppScopeTab[]>(() => [
+const scopeOptions = computed<AppScopeOption[]>(() => [
   {
     label: 'Public',
     to: { path: '/decks', query: scopeFilterRouteQuery.value },
     active: !isOwnedMode.value,
-    icon: APP_SECTION_ICONS.decks,
   },
   {
-    label: 'My Decks',
+    label: 'Mine',
     to: { path: '/my/decks', query: scopeFilterRouteQuery.value },
     active: isOwnedMode.value,
-    icon: APP_SECTION_ICONS.myDecks,
   },
 ]);
 const currentRouteSignature = computed(() => getDeckBrowseFilterSignature(effectiveRouteFilterState.value));

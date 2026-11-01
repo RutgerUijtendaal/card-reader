@@ -92,7 +92,7 @@
       >
         <RouterLink
           class="nav-link relative"
-          :class="collapsed ? 'justify-center px-0' : ''"
+          :class="[collapsed ? 'justify-center px-0' : '', { 'router-link-active': isAlsoActive(item) }]"
           :to="item.to"
           :title="collapsed ? item.label : undefined"
           :aria-label="collapsed ? item.label : undefined"
@@ -136,7 +136,7 @@
       >
         <RouterLink
           class="nav-link relative"
-          :class="collapsed ? 'justify-center px-0' : ''"
+          :class="[collapsed ? 'justify-center px-0' : '', { 'router-link-active': isAlsoActive(item) }]"
           :to="item.to"
           :title="collapsed ? item.label : undefined"
           :aria-label="collapsed ? item.label : undefined"
@@ -207,7 +207,7 @@
 import { computed } from 'vue';
 import type { Component } from 'vue';
 import { ChevronRight, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-vue-next';
-import { RouterLink, useRouter } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import type { RouteLocationRaw } from 'vue-router';
 import AppHotkeysPanel from '@/app/components/AppHotkeysPanel.vue';
 import CardPoolWorkspaceSwitcher from '@/app/components/CardPoolWorkspaceSwitcher.vue';
@@ -233,6 +233,8 @@ type NavItem = {
   requiresAuth?: boolean;
   requiresAuthenticatedUser?: boolean;
   badgeCount?: number;
+  /** Other path prefixes that belong to this link, such as the Mine scope of a library. */
+  alsoActiveFor?: string[];
 };
 
 const props = withDefaults(
@@ -256,6 +258,7 @@ const emit = defineEmits<{
 const auth = useAuthStore();
 const workspace = useCardPoolWorkspaceStore();
 const router = useRouter();
+const route = useRoute();
 const cardLogoUrl = `${import.meta.env.BASE_URL}card_logo_transparent.webp`;
 const { openReviewCount } = useReviewSummary();
 const { unreadNotificationCount } = useNotificationSummary();
@@ -276,8 +279,7 @@ const items = computed<NavItem[]>(() => [
   },
   ...(workspace.activePool === 'player'
     ? [
-        { label: 'Decks', to: '/decks', icon: APP_SECTION_ICONS.decks },
-        { label: 'My Decks', to: '/my/decks', icon: APP_SECTION_ICONS.myDecks, requiresAuth: true },
+        { label: 'Decks', to: '/decks', icon: APP_SECTION_ICONS.decks, alsoActiveFor: ['/my/decks'] },
         {
           label: 'Build a deck',
           to: '/my/decks/new?return_to=my_decks',
@@ -289,12 +291,11 @@ const items = computed<NavItem[]>(() => [
     : []),
   ...(workspace.activePool === 'evil'
     ? [
-        { label: 'Encounters', to: '/encounters', icon: APP_SECTION_ICONS.encounters },
         {
-          label: 'My Encounters',
-          to: '/my/encounters',
-          icon: APP_SECTION_ICONS.myEncounters,
-          requiresAuth: true,
+          label: 'Encounters',
+          to: '/encounters',
+          icon: APP_SECTION_ICONS.encounters,
+          alsoActiveFor: ['/my/encounters', '/staff/encounters'],
         },
         {
           label: 'Build Encounter',
@@ -334,6 +335,10 @@ const items = computed<NavItem[]>(() => [
     badgeCount: pendingAccessRequestCount.value,
   },
 ]);
+
+// Builder routes such as /my/decks/new have their own link, so only the library path itself matches.
+const isAlsoActive = (item: NavItem): boolean =>
+  item.alsoActiveFor?.includes(route.path) ?? false;
 
 const canShowItem = (item: NavItem): boolean => {
   if (item.requiresStaff && !auth.canAccessStaffRoutes) {

@@ -211,7 +211,9 @@ test('personal library preserves Official filters and shows read-only endorsed o
   const { target, router } = await mount('/my/encounters?q=gate&factions=order&is_official=true');
   expect(fetchList.mock.calls[0][0]).toBe('mine');
   expect((fetchList.mock.calls[0][1] as URLSearchParams).get('is_official')).toBe('true');
-  expect(target.textContent).toContain('My Encounters');
+  expect(target.querySelector('[aria-label="Encounter library"] [aria-current="page"]')?.textContent?.trim()).toBe(
+    'Mine',
+  );
   expect(target.querySelector('.collection-list-card-surface')?.textContent).toContain('Official');
   expect(target.querySelector('[aria-label="Edit Encounter"]')).toBeNull();
   const detail = target.querySelector('.collection-list-card-surface[role="link"]') as HTMLElement;

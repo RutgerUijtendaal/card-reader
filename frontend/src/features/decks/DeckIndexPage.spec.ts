@@ -605,11 +605,11 @@ describe('DeckIndexPage', () => {
     mounted.unmount();
   });
 
-  test('header scope tabs link to public and owned deck routes with the shared deck search query', async () => {
+  test('the scope toggle links to public and owned deck routes with the shared deck search query', async () => {
     const mounted = await mountPage('/decks?q=Blade');
     const links = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a'));
     const publicLink = links.find((link) => link.textContent?.trim() === 'Public');
-    const ownedLink = links.find((link) => link.textContent?.trim() === 'My Decks');
+    const ownedLink = links.find((link) => link.textContent?.trim() === 'Mine');
 
     expect(publicLink).toBeDefined();
     expect(ownedLink).toBeDefined();
@@ -625,14 +625,14 @@ describe('DeckIndexPage', () => {
     mounted.unmount();
   });
 
-  test('hides the deck library scope tabs for anonymous public browsing', async () => {
+  test('hides the deck library scope toggle for anonymous public browsing', async () => {
     authState.authenticated = false;
     authState.user = null;
     const mounted = await mountPage('/decks');
     const links = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a'));
 
     expect(links.find((link) => link.textContent?.trim() === 'Public')).toBeUndefined();
-    expect(links.find((link) => link.textContent?.trim() === 'My Decks')).toBeUndefined();
+    expect(links.find((link) => link.textContent?.trim() === 'Mine')).toBeUndefined();
     expect(mounted.container.querySelector('header input')?.getAttribute('placeholder')).toContain(
       'Search public decks',
     );
