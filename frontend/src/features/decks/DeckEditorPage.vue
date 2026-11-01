@@ -5,7 +5,7 @@
   >
     <AppPageHeader
       :icon="APP_SECTION_ICONS.deckBuilder"
-      :title="controller.deckId.value ? 'Edit Deck' : 'Build Deck'"
+      :title="deckTitle"
       :subtitle="deckEditorSubtitle"
       :back-to="controller.isCreating.value ? null : controller.backLink.value"
       :back-label="controller.backLabel.value"
@@ -14,14 +14,10 @@
     >
       <template #actions>
         <div
-          v-if="!controller.isChangingHero.value"
           class="deck-editor-header-divider theme-divider hidden h-6 border-l lg:block"
           aria-hidden="true"
         />
-        <div
-          v-if="!controller.isChangingHero.value"
-          class="flex items-center gap-2"
-        >
+        <div class="flex items-center gap-2">
           <AppHeaderAction
             v-if="!controller.isPublished.value && controller.hasLocalDraft.value"
             :icon="Trash2"
@@ -41,126 +37,86 @@
           />
         </div>
       </template>
-      <template #center>
-        <nav
-          v-if="!controller.isChangingHero.value"
-          class="deck-editor-section-tabs theme-tablist max-w-xl flex-nowrap justify-center"
-          aria-label="Deck editor sections"
-        >
-          <AppHeaderAction
-            v-if="!controller.isPublished.value"
-            :icon="Crown"
-            label="Open deck hero"
-            short-label="Hero"
-            variant="tab"
-            :active="controller.editorMode.value === 'hero'"
-            :disabled="controller.isMutationLocked.value"
-            @click="controller.openHero()"
-          />
-          <AppHeaderAction
-            :icon="FileText"
-            label="Open deck details"
-            short-label="Details"
-            variant="tab"
-            :active="controller.editorMode.value === 'details'"
-            :disabled="controller.isMutationLocked.value"
-            @click="controller.openDetails()"
-          />
-          <AppHeaderAction
-            :icon="LayoutGrid"
-            label="Open deck cards"
-            short-label="Cards"
-            variant="tab"
-            :active="controller.editorMode.value === 'cards'"
-            :disabled="controller.isMutationLocked.value"
-            @click="controller.openCards()"
-          />
-        </nav>
-      </template>
       <template
-        v-if="controller.editorMode.value !== 'details' && !controller.loading.value"
+        v-if="!controller.loading.value"
         #bottomLeft
       >
         <DeckBuilderFilterBar :controller="controller" />
       </template>
     </AppPageHeader>
 
-    <AppPageLayout
-      v-if="controller.loading.value && controller.editorMode.value !== 'cards'"
-      :inert="controller.isMutationLocked.value"
-      columns="sidebar"
-      aria-label="Loading deck details"
-    >
-      <template #aside>
-        <aside class="app-sticky-aside app-sticky-aside-left deck-builder-loading-panel">
+    <BuilderWorkspaceLayout :inert="controller.isMutationLocked.value">
+      <DeckBuilderGallery
+        :controller="controller"
+        :loading="controller.loading.value"
+      />
+      <template
+        v-if="isDetailsOpen"
+        #overlay
+      >
+        <section
+          class="mx-auto w-full max-w-4xl px-5 pb-10 pt-4"
+          aria-label="Deck details"
+          @keydown.esc="controller.closeDetails()"
+        >
+          <div class="sticky top-0 z-10 -mx-1 flex justify-end bg-[var(--table-canvas)] py-2">
+            <button
+              class="theme-icon-button inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--color-border-strong)]"
+              type="button"
+              aria-label="Close deck details"
+              title="Close details"
+              @click="controller.closeDetails()"
+            >
+              <X
+                class="h-4 w-4"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+          <div
+            v-if="controller.loading.value"
+            class="space-y-5"
+            aria-hidden="true"
+          >
+            <div class="deck-builder-loading-line h-11 w-full" />
+            <div class="deck-builder-loading-line h-20 w-full" />
+            <div class="deck-builder-loading-line h-64 w-full" />
+          </div>
+          <DeckDetailsForm
+            v-else
+            :controller="controller"
+          />
+        </section>
+      </template>
+      <template #endAside>
+        <aside
+          v-if="controller.loading.value"
+          class="app-sticky-aside app-sticky-aside-right deck-builder-loading-panel"
+        >
           <div class="app-sticky-aside-scroll space-y-5">
             <div class="space-y-3">
-              <div class="deck-builder-loading-line h-5 w-20" />
-              <div class="deck-builder-loading-line h-4 w-full" />
+              <div class="deck-builder-loading-line h-4 w-36" />
+              <div class="deck-builder-loading-line h-8 w-full" />
             </div>
-            <div class="deck-builder-loading-line mx-auto aspect-[63/88] w-full max-w-48 rounded-xl" />
-            <div class="deck-builder-loading-line mx-auto h-5 w-32" />
-            <div class="deck-builder-loading-line h-10 w-full" />
+            <div
+              v-for="sectionIndex in 3"
+              :key="`loading-board-${sectionIndex}`"
+              class="space-y-2"
+            >
+              <div class="deck-builder-loading-line h-4 w-24" />
+              <div
+                v-for="rowIndex in 4"
+                :key="`loading-board-${sectionIndex}-${rowIndex}`"
+                class="deck-builder-loading-line h-11 w-full"
+              />
+            </div>
           </div>
         </aside>
+        <DeckBuilderSummaryPanel
+          v-else
+          :controller="controller"
+        />
       </template>
-
-      <div
-        class="mx-auto w-full max-w-4xl space-y-8"
-        aria-hidden="true"
-      >
-        <div class="space-y-3">
-          <div class="deck-builder-loading-line h-7 w-36" />
-          <div class="deck-builder-loading-line h-4 w-80 max-w-full" />
-        </div>
-        <div class="space-y-5">
-          <div class="deck-builder-loading-line h-11 w-full" />
-          <div class="deck-builder-loading-line h-20 w-full" />
-          <div class="deck-builder-loading-line h-64 w-full" />
-        </div>
-        <div class="space-y-3">
-          <div class="deck-builder-loading-line h-6 w-32" />
-          <div class="deck-builder-loading-line h-24 w-full" />
-        </div>
-      </div>
-    </AppPageLayout>
-
-    <BuilderWorkspaceLayout
-      v-if="!controller.loading.value && controller.editorMode.value === 'hero'"
-      :inert="controller.isMutationLocked.value"
-    >
-      <DeckBuilderGallery :controller="controller" />
-      <template #endAside>
-        <DeckHeroSelectionPanel :controller="controller" />
-      </template>
-    </BuilderWorkspaceLayout>
-
-    <BuilderDetailsLayout
-      v-if="!controller.loading.value && controller.editorMode.value === 'details'"
-      :inert="controller.isMutationLocked.value"
-    >
-      <template #aside>
-        <DeckDetailsHeroPanel :controller="controller" />
-      </template>
-      <template #status>
-        <BuilderStatusBar aria-label="Deck save status">
-          <BuilderSaveStatus
-            v-model:autosync="controller.autosyncEnabled.value"
-            :busy="controller.saving.value || controller.creationState.value.status === 'creating'"
-            :dirty="controller.hasUnsavedChanges.value"
-            :label="controller.changeStatusLabel.value"
-            :saved="controller.isPublished.value"
-            :can-autosync="controller.canAutosync.value"
-          />
-        </BuilderStatusBar>
-      </template>
-      <DeckDetailsForm :controller="controller" />
-    </BuilderDetailsLayout>
-
-    <BuilderWorkspaceLayout
-      v-if="controller.editorMode.value === 'cards'"
-      :inert="controller.isMutationLocked.value"
-    >
       <template #status>
         <section
           v-if="controller.loading.value"
@@ -192,7 +148,7 @@
             :can-autosync="controller.canAutosync.value"
           />
 
-          <div class="flex flex-wrap items-center justify-start gap-x-5 gap-y-2 lg:justify-end">
+          <div class="flex flex-wrap items-center justify-start gap-x-5 gap-y-2 lg:min-w-0 lg:flex-1 lg:justify-end">
             <div class="flex items-center gap-2">
               <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Total</span>
               <span class="theme-section-title theme-display text-lg tabular-nums">{{
@@ -371,39 +327,6 @@
           </div>
         </BuilderStatusBar>
       </template>
-      <DeckBuilderGallery
-        :controller="controller"
-        :loading="controller.loading.value"
-      />
-      <template #endAside>
-        <aside
-          v-if="controller.loading.value"
-          class="app-sticky-aside app-sticky-aside-right deck-builder-loading-panel"
-        >
-          <div class="app-sticky-aside-scroll space-y-5">
-            <div class="space-y-3">
-              <div class="deck-builder-loading-line h-4 w-36" />
-              <div class="deck-builder-loading-line h-8 w-full" />
-            </div>
-            <div
-              v-for="sectionIndex in 3"
-              :key="`loading-board-${sectionIndex}`"
-              class="space-y-2"
-            >
-              <div class="deck-builder-loading-line h-4 w-24" />
-              <div
-                v-for="rowIndex in 4"
-                :key="`loading-board-${sectionIndex}-${rowIndex}`"
-                class="deck-builder-loading-line h-11 w-full"
-              />
-            </div>
-          </div>
-        </aside>
-        <DeckBuilderSummaryPanel
-          v-else
-          :controller="controller"
-        />
-      </template>
     </BuilderWorkspaceLayout>
 
     <ConfirmModal
@@ -446,19 +369,15 @@ import { computed } from 'vue';
 import {
   CircleCheckBig,
   CircleX,
-  Crown,
-  FileText,
-  LayoutGrid,
+  X,
   LoaderCircle,
   Save,
   Trash2,
   TriangleAlert,
 } from 'lucide-vue-next';
 import BuilderWorkspaceLayout from '@/shared/components/builders/BuilderWorkspaceLayout.vue';
-import BuilderDetailsLayout from '@/shared/components/builders/BuilderDetailsLayout.vue';
 import BuilderStatusBar from '@/shared/components/builders/BuilderStatusBar.vue';
 import BuilderSaveStatus from '@/shared/components/builders/BuilderSaveStatus.vue';
-import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
@@ -468,10 +387,8 @@ import DeckBuilderFilterBar from '@/features/decks/components/DeckBuilderFilterB
 import DeckBuilderGallery from '@/features/decks/components/DeckBuilderGallery.vue';
 import DeckBuilderSummaryPanel from '@/features/decks/components/DeckBuilderSummaryPanel.vue';
 import DeckDetailsForm from '@/features/decks/components/DeckDetailsForm.vue';
-import DeckDetailsHeroPanel from '@/features/decks/components/DeckDetailsHeroPanel.vue';
 import DeckDraftRecoveryModal from '@/shared/components/builders/BuilderDraftRecoveryModal.vue';
 import DeckDraftConflictModal from '@/shared/components/builders/BuilderDraftConflictModal.vue';
-import DeckHeroSelectionPanel from '@/features/decks/components/DeckHeroSelectionPanel.vue';
 import { useDeckEditor } from '@/features/decks/composables/useDeckEditor';
 import { useFloatingPopover } from '@/shared/composables/useFloatingPopover';
 
@@ -573,14 +490,17 @@ const handleKeepLocalConflict = (): void => {
     controller.keepThisConflictDraft();
   }
 };
-const deckEditorSubtitle = computed(() => {
-  if (controller.editorMode.value === 'hero') {
-    return controller.isChangingHero.value
-      ? 'Choose a replacement hero, then apply or cancel the change.'
-      : 'Choose the hero that will shape this deck.';
+const isDetailsOpen = computed(() => controller.detailsOpen.value);
+const deckTitle = computed(() => {
+  const name = controller.deck.form.name.trim();
+  if (name) {
+    return name;
   }
-  if (controller.editorMode.value === 'details') {
-    return 'Edit the information people use to understand and discover this deck.';
+  return controller.deckId.value ? 'Untitled deck' : 'New deck';
+});
+const deckEditorSubtitle = computed(() => {
+  if (!controller.deck.selectedHero.value) {
+    return 'Choose a hero and add cards in any order.';
   }
   return `Build a mainboard with at least ${mainboardMinCards.value} cards, including ${manaMinCards.value} Mana cards.`;
 });

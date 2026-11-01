@@ -20,7 +20,7 @@ Decks are owned by users and may be private or publicly listed according to thei
 
 ## Local-first creation
 
-New decks remain unpublished browser drafts until the owner explicitly selects **Create**. Hero, Details, and Cards are peer editor screens during this phase, and autosync remains unavailable because no server deck exists yet.
+The deck builder is one workbench: the card pool fills the page under a filter bar, the deck panel sits on the right, and save state and stats run along a bottom bar. The deck panel switch reads **Hero · Cards · Details**: it switches the pool between Hero and Cards and opens **Details** as an overlay above whichever pool is showing; closing it returns to that pool. Picking a hero is an ordinary draft edit, including on saved decks, and returns the pool to Cards with that hero's mana preset. Cards can be added before a hero is chosen. Both builders open on Cards; `?editor_mode=details` opens the overlay explicitly. New decks remain unpublished browser drafts until the owner explicitly selects **Create**, and autosync remains unavailable because no server deck exists yet; on saved decks autosync pauses while Details is open.
 
 One versioned draft is stored per authenticated user. It includes the complete form, board ordering and quantities, sideboards, and snapshots of referenced cards. On recovery, snapshots are shown immediately while current cards, merged identities, tags, ordering, and quantities are reconciled before editing resumes. Browser storage is best-effort: if it is unavailable, the in-memory draft and leave warning remain active, but a confirmed server creation is never reversed or blocked by browser cleanup.
 

@@ -14,8 +14,27 @@
       :expanded="false"
       @activate="editor.setMode('boss')"
     />
+    <BuilderPanelTabs
+      label="Encounter builder view"
+      :tabs="viewTabs"
+      :disabled="editor.locked.value"
+      @select="selectView"
+    />
+    <div
+      v-if="editor.boss.value"
+      class="flex justify-end px-5 pt-2"
+    >
+      <button
+        class="theme-ghost-button inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium"
+        type="button"
+        :disabled="editor.locked.value"
+        @click="editor.selectBoss(null)"
+      >
+        Clear boss
+      </button>
+    </div>
     <CardBuilderBoards
-      class="mt-3"
+      class="mt-2"
       :active-board-id="editor.boards.activeBoardId.value"
       :mainboard-count="editor.total.value"
       :sideboards="editor.boards.sideboardTabs.value"
@@ -73,6 +92,8 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue';
 import { useSortable } from '@vueuse/integrations/useSortable';
+import { Crown, FileText, LayoutGrid } from 'lucide-vue-next';
+import BuilderPanelTabs from '@/shared/components/builders/BuilderPanelTabs.vue';
 import CardBuilderBoards from '@/domain/cards/components/CardBuilderBoards.vue';
 import CardBuilderEntryRow from '@/domain/cards/components/CardBuilderEntryRow.vue';
 import CardBuilderSummaryHeader from '@/domain/cards/components/CardBuilderSummaryHeader.vue';
@@ -82,6 +103,20 @@ const props = defineProps<{
   editor: ReturnType<typeof useEncounterEditor>;
   hoverMode: HoverMode;
 }>();
+type EncounterBuilderView = 'cards' | 'boss' | 'details';
+const viewTabs = computed(() => {
+  const detailsOpen = props.editor.detailsOpen.value;
+  const mode = props.editor.mode.value;
+  return [
+    { id: 'boss' as const, label: 'Boss', icon: Crown, active: !detailsOpen && mode === 'boss' },
+    { id: 'cards' as const, label: 'Cards', icon: LayoutGrid, active: !detailsOpen && mode === 'cards' },
+    { id: 'details' as const, label: 'Details', icon: FileText, active: detailsOpen },
+  ];
+});
+const selectView = (view: EncounterBuilderView): void => {
+  if (view === 'details') props.editor.openDetails();
+  else props.editor.setMode(view);
+};
 const destinations = computed(() =>
   [
     { boardId: 'mainboard', label: 'Mainboard', disabled: false },

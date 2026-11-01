@@ -5,31 +5,13 @@
   >
     <AppPageHeader
       :icon="APP_SECTION_ICONS.encounterBuilder"
-      :title="editor.id ? 'Edit Encounter' : 'Build Encounter'"
+      :title="encounterTitle"
       :subtitle="subtitle"
       :back-to="publication.isCreating.value ? null : '/my/encounters'"
       back-label="My Encounters"
       title-tag="h2"
       title-class="text-xl"
     >
-      <template #center>
-        <nav
-          class="deck-editor-section-tabs theme-tablist max-w-xl flex-nowrap justify-center"
-          aria-label="Encounter editor sections"
-        >
-          <AppHeaderAction
-            v-for="section in sections"
-            :key="section.value"
-            :icon="section.icon"
-            :label="`Open encounter ${section.value}`"
-            :short-label="section.label"
-            variant="tab"
-            :active="mode === section.value"
-            :disabled="locked"
-            @click="mode = section.value"
-          />
-        </nav>
-      </template>
       <template #actions>
         <div
           class="deck-editor-header-divider theme-divider hidden h-6 border-l lg:block"
@@ -46,10 +28,7 @@
           @click="editor.save()"
         />
       </template>
-      <template
-        v-if="mode !== 'details'"
-        #bottomLeft
-      >
+      <template #bottomLeft>
         <CardBuilderFilterBar
           :filters="browser.filters"
           :total-count="browser.gallery.totalCount.value"
@@ -116,28 +95,7 @@
         </button>
       </div>
     </div>
-    <BuilderDetailsLayout v-if="mode === 'details'">
-      <template #aside>
-        <EncounterSelectionPanel
-          :editor="editor"
-          side="left"
-        />
-      </template>
-      <template #status>
-        <BuilderStatusBar aria-label="Encounter save status">
-          <BuilderSaveStatus
-            v-model:autosync="autosync"
-            :busy="busy"
-            :dirty="dirty"
-            :label="editor.changeStatus.value"
-            :saved="!!editor.id"
-            :can-autosync="!!editor.id && !locked"
-          />
-        </BuilderStatusBar>
-      </template>
-      <EncounterDetailsForm :editor="editor" />
-    </BuilderDetailsLayout>
-    <BuilderWorkspaceLayout v-else>
+    <BuilderWorkspaceLayout>
       <template #status>
         <BuilderStatusBar aria-label="Encounter builder status">
           <BuilderSaveStatus
@@ -148,7 +106,7 @@
             :saved="!!editor.id"
             :can-autosync="!!editor.id && !locked"
           />
-          <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <div class="flex flex-wrap items-center gap-x-5 gap-y-2 lg:min-w-0 lg:flex-1 lg:justify-end">
             <div class="flex items-center gap-2">
               <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Cards</span><span class="theme-section-title text-base font-semibold">{{ total }}</span>
             </div>
@@ -208,13 +166,34 @@
             : 'No cards found for the current filters.'
         "
       />
+      <template
+        v-if="detailsOpen"
+        #overlay
+      >
+        <section
+          class="mx-auto w-full max-w-4xl px-5 pb-10 pt-4"
+          aria-label="Encounter details"
+          @keydown.esc="editor.closeDetails()"
+        >
+          <div class="sticky top-0 z-10 -mx-1 flex justify-end bg-[var(--table-canvas)] py-2">
+            <button
+              class="theme-icon-button inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--color-border-strong)]"
+              type="button"
+              aria-label="Close Encounter details"
+              title="Close details"
+              @click="editor.closeDetails()"
+            >
+              <X
+                class="h-4 w-4"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+          <EncounterDetailsForm :editor="editor" />
+        </section>
+      </template>
       <template #endAside>
-        <EncounterSelectionPanel
-          v-if="mode === 'boss'"
-          :editor="editor"
-        />
         <EncounterSummaryPanel
-          v-else
           :editor="editor"
           :hover-mode="browser.filters.hoverMode.value"
         />
@@ -248,9 +227,8 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router';
 import { computed } from 'vue';
-import { Crown, FileText, LayoutGrid, LoaderCircle, Save, TriangleAlert } from 'lucide-vue-next';
+import { LoaderCircle, Save, TriangleAlert, X } from 'lucide-vue-next';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
-import BuilderDetailsLayout from '@/shared/components/builders/BuilderDetailsLayout.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import BuilderDraftRecoveryModal from '@/shared/components/builders/BuilderDraftRecoveryModal.vue';
 import BuilderDraftConflictModal from '@/shared/components/builders/BuilderDraftConflictModal.vue';
@@ -265,7 +243,6 @@ import { emptyEncounter } from '@/domain/encounters/types';
 import type { GalleryItem } from '@/domain/cards/types';
 import type { CardFilterSectionKey } from '@/domain/cards/utils/filters/cardFilterSectionsState';
 import EncounterDetailsForm from './components/EncounterDetailsForm.vue';
-import EncounterSelectionPanel from './components/EncounterSelectionPanel.vue';
 import EncounterSummaryPanel from './components/EncounterSummaryPanel.vue';
 import { useEncounterEditor } from './composables/useEncounterEditor';
 import { useEncounterBrowser } from './composables/useEncounterBrowser';
@@ -273,6 +250,7 @@ const editor = useEncounterEditor();
 const {
   form,
   mode,
+  detailsOpen,
   loading,
   saving,
   error,
@@ -294,11 +272,6 @@ const browser = useEncounterBrowser({
     ),
   ),
 });
-const sections = [
-  { value: 'boss', label: 'Boss', icon: Crown },
-  { value: 'details', label: 'Details', icon: FileText },
-  { value: 'cards', label: 'Cards', icon: LayoutGrid },
-] as const;
 const visibleFilters: CardFilterSectionKey[] = ['factions', 'types', 'keywords', 'tags', 'generic'];
 const busy = computed(
   () => saving.value || publication.isCreating.value || publication.isReconciling.value,
@@ -313,19 +286,27 @@ const saveLabel = computed(() =>
         : 'Create',
 );
 const subtitle = computed(() =>
-  mode.value === 'boss'
-    ? 'Choose the boss for this Encounter.'
-    : mode.value === 'details'
-      ? 'Edit the information people use to understand and discover this Encounter.'
-      : `Build an Evil deck with at least ${editor.minimum.value} cards, excluding the boss.`,
+  editor.boss.value
+    ? `Build an Evil deck with at least ${editor.minimum.value} cards, excluding the boss.`
+    : 'Choose a boss and add cards in any order.',
 );
 const quantity = (id: string) =>
   editor.boards.activeBoardEntries.value.find((entry) => entry.card_id === id)?.quantity ?? 0;
 const remove = (id: string) => editor.quantity(id, quantity(id) - 1);
-const activate = (card: GalleryItem) => {
-  if (mode.value === 'boss') void editor.selectBoss(card);
-  else editor.add(card);
+// Bosses is another view of the card pool; choosing one returns to Cards.
+const activate = async (card: GalleryItem): Promise<void> => {
+  if (mode.value !== 'boss') {
+    editor.add(card);
+    return;
+  }
+  await editor.selectBoss(card);
+  if (mode.value === 'boss' && editor.boss.value) editor.setMode('cards');
 };
+const encounterTitle = computed(() => {
+  const name = form.name.trim();
+  if (name) return name;
+  return editor.id ? 'Untitled Encounter' : 'New Encounter';
+});
 const confirmReload = () => {
   if (window.confirm('Replace your local edits with the saved Encounter?')) void editor.reload();
 };

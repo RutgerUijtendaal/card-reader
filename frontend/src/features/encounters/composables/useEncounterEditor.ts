@@ -42,7 +42,9 @@ export const useEncounterEditor = () => {
   const boards = useCardCollectionBoards(form);
   const cards = ref<Record<string, CardListItem>>({});
   const record = ref<EncounterRecord | null>(null);
-  const mode = ref<'boss' | 'details' | 'cards'>('cards');
+  // Which part of the card pool is showing; details open as a separate overlay on top of it.
+  const mode = ref<'boss' | 'cards'>('cards');
+  const detailsOpen = ref(false);
   const factions = ref<CardFaction[]>([]);
   const minimum = ref(20);
   const loading = ref(true);
@@ -408,8 +410,17 @@ export const useEncounterEditor = () => {
     if (!locked.value && (!('is_official' in values) || auth.canAccessStaffRoutes))
       Object.assign(form, values);
   };
+  // Choosing a pool means looking at it, so it also closes the details overlay.
   const setMode = (value: typeof mode.value) => {
-    if (!locked.value) mode.value = value;
+    if (locked.value) return;
+    mode.value = value;
+    detailsOpen.value = false;
+  };
+  const openDetails = () => {
+    if (!locked.value) detailsOpen.value = true;
+  };
+  const closeDetails = () => {
+    detailsOpen.value = false;
   };
   const canLeave = () => {
     if (publication.hasTerminalNavigationRetry.value || openingConfirmedRecord.value) return true;
@@ -486,6 +497,9 @@ export const useEncounterEditor = () => {
     move,
     setDetails,
     setMode,
+    detailsOpen,
+    openDetails,
+    closeDetails,
     serverConflict,
     readOnly,
     autosync,

@@ -39,23 +39,11 @@
               class="theme-divider mx-1 h-5 border-l"
               aria-hidden="true"
             />
-            <div
-              class="theme-toggle-shell"
-              role="group"
-              aria-label="Official status"
-            >
-              <button
-                v-for="option in officialOptions"
-                :key="option.value"
-                type="button"
-                class="theme-toggle-option"
-                :class="{ 'theme-toggle-option-active': official === option.value }"
-                :aria-pressed="official === option.value"
-                @click="official = option.value"
-              >
-                {{ option.label }}
-              </button>
-            </div>
+            <AppSegmentedToggle
+              v-model="official"
+              label="Official status"
+              :options="officialOptions"
+            />
             <span
               class="theme-divider mx-1 h-5 border-l"
               aria-hidden="true"
@@ -201,6 +189,7 @@ import AppCollectionSearch from '@/shared/components/app/AppCollectionSearch.vue
 import AppCollectionToolbar from '@/shared/components/app/AppCollectionToolbar.vue';
 import AppEmptyState from '@/shared/components/app/AppEmptyState.vue';
 import AppScopeToggle, { type AppScopeOption } from '@/shared/components/app/AppScopeToggle.vue';
+import AppSegmentedToggle from '@/shared/components/app/AppSegmentedToggle.vue';
 import CollectionLoadingSkeleton from '@/shared/components/CollectionLoadingSkeleton.vue';
 import ChoicePill from '@/shared/components/ChoicePill.vue';
 import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';

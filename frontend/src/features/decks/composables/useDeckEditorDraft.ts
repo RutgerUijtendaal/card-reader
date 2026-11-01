@@ -39,7 +39,6 @@ export const useDeckEditorDraft = ({
   const effectiveBaseDeckBuildingRules = baseDeckBuildingRules ?? ref(fallbackDeckBuildingRules());
   const form = reactive(createEmptyDeckForm());
   const isHeroStep = computed(() => editorMode.value === 'hero');
-  const isDetailsStep = computed(() => editorMode.value === 'details');
   const isCardsStep = computed(() => editorMode.value === 'cards');
   const selectedHero = computed(() =>
     form.hero_card_id ? (cardLookup.value[form.hero_card_id] ?? null) : null,
@@ -227,7 +226,6 @@ export const useDeckEditorDraft = ({
   return {
     form,
     isHeroStep,
-    isDetailsStep,
     isCardsStep,
     activeBoardId: boards.activeBoardId,
     lastBoardEntryChange: boards.lastBoardEntryChange,

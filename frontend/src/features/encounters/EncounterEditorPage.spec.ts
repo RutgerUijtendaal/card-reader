@@ -68,6 +68,11 @@ const mount = () => {
     boards: { activeBoardEntries: ref([]) },
     form: reactive(emptyEncounter()),
     mode: ref('cards'),
+    detailsOpen: ref(false),
+    boss: ref(null),
+    openDetails: vi.fn(),
+    closeDetails: vi.fn(),
+    setMode: vi.fn(),
     factions: ref([]),
     loading: ref(false),
     saving: ref(false),
@@ -101,42 +106,42 @@ const mount = () => {
   });
   return target;
 };
-test('Cards uses the shared workbench with header filters, status/gallery first and deck right', () => {
+test('Cards uses the shared workbench: header filters, the pool, the Encounter panel, and a bottom status bar', () => {
   const target = mount();
   expect(target.querySelector('header [data-testid="shared-filters"]')).not.toBeNull();
+  expect(target.querySelector('header nav[aria-label="Encounter editor sections"]')).toBeNull();
   const layout = target.querySelector('.builder-workspace-layout')!;
-  expect(layout.children).toHaveLength(2);
+  expect(layout.children).toHaveLength(3);
   expect(layout.children[0].querySelector('[data-testid="shared-gallery"]')).not.toBeNull();
-  expect(
-    layout.children[0].querySelector('[aria-label="Encounter builder status"]'),
-  ).not.toBeNull();
   expect(layout.children[1].getAttribute('data-testid')).toBe('encounter-deck');
+  expect(layout.children[2].classList.contains('builder-workspace-footer')).toBe(true);
+  expect(layout.children[2].querySelector('[aria-label="Encounter builder status"]')).not.toBeNull();
   const autosync = layout.querySelector('input[type="checkbox"]') as HTMLInputElement;
   autosync.checked = true;
   autosync.dispatchEvent(new Event('change', { bubbles: true }));
   expect(editor.autosync.value).toBe(true);
 });
-test('Boss keeps the same filters and gallery and replaces the right-hand deck with selection', async () => {
+test('Boss keeps the same filters, gallery, and Encounter panel', async () => {
   const target = mount();
   editor.mode.value = 'boss';
   await nextTick();
   expect(target.querySelector('header [data-testid="shared-filters"]')).not.toBeNull();
   const layout = target.querySelector('.builder-workspace-layout')!;
   expect(layout.children[0].querySelector('[data-testid="shared-gallery"]')).not.toBeNull();
-  expect(layout.children[1].getAttribute('data-testid')).toBe('boss-selection');
-  expect(target.querySelector('[data-testid="encounter-deck"]')).toBeNull();
+  expect(layout.children[1].getAttribute('data-testid')).toBe('encounter-deck');
 });
 
-test('Details keeps save state above the padded form in the shared edge-attached layout', async () => {
+test('Details opens as an overlay above the still-mounted pool and closes back to it', async () => {
   const target = mount();
-  editor.mode.value = 'details';
+  editor.detailsOpen.value = true;
   await nextTick();
-  const main = target.querySelector('.builder-details-main')!;
-  const status = main.querySelector('[aria-label="Encounter save status"]');
-  expect(main.firstElementChild).toBe(status);
-  expect(status?.textContent).toContain('Saved');
-  expect(status?.nextElementSibling?.classList.contains('builder-details-content')).toBe(true);
-  expect(status?.nextElementSibling?.querySelector('[data-testid="details"]')).not.toBeNull();
+  const overlay = target.querySelector('.builder-workspace-overlay');
+  expect(overlay?.querySelector('[data-testid="details"]')).not.toBeNull();
+  expect(target.querySelector('[data-testid="shared-gallery"]')).not.toBeNull();
+  expect(target.querySelector('header [data-testid="shared-filters"]')).not.toBeNull();
+  expect(target.querySelector('[aria-label="Encounter builder status"]')?.textContent).toContain('Saved');
+  overlay?.querySelector<HTMLButtonElement>('button[aria-label="Close Encounter details"]')?.click();
+  expect(editor.closeDetails).toHaveBeenCalledOnce();
 });
 
 test('an unresolved create keeps Retry accessible instead of covering it with a draft conflict', async () => {

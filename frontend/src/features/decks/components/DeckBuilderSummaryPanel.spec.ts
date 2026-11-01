@@ -112,6 +112,10 @@ const buildController = () => {
 
   const controller = {
     openHero: vi.fn(),
+    openCards: vi.fn(),
+    openDetails: vi.fn(),
+    editorMode: ref<'hero' | 'cards'>('cards'),
+    detailsOpen: ref(false),
     filters: {
       hoverMode: ref('details'),
     },
@@ -256,6 +260,28 @@ describe('DeckBuilderSummaryPanel', () => {
     expect(listSection).not.toBeNull();
     expect(mounted.container.querySelector('[data-testid="mana-curve"]')).toBeNull();
     expect(mounted.container.querySelector('[data-testid="deck-summary-hero-details"]')).toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('switches between Cards, Hero, and the details overlay from the panel', async () => {
+    const mounted = await mountPanel();
+    const tabs = () =>
+      Array.from(mounted.container.querySelectorAll<HTMLButtonElement>('[aria-label="Deck builder view"] button'));
+
+    expect(tabs().map((tab) => tab.textContent?.trim())).toEqual(['Hero', 'Cards', 'Details']);
+    expect(tabs().find((tab) => tab.getAttribute('aria-pressed') === 'true')?.textContent?.trim()).toBe('Cards');
+
+    tabs()[0].click();
+    tabs()[2].click();
+    tabs()[1].click();
+    expect(mounted.controller.openHero).toHaveBeenCalledTimes(1);
+    expect(mounted.controller.openDetails).toHaveBeenCalledTimes(1);
+    expect(mounted.controller.openCards).toHaveBeenCalledTimes(1);
+
+    mounted.controller.detailsOpen.value = true;
+    await nextTick();
+    expect(tabs().find((tab) => tab.getAttribute('aria-pressed') === 'true')?.textContent?.trim()).toBe('Details');
 
     mounted.unmount();
   });

@@ -2,8 +2,6 @@
 import { createApp, defineComponent, h, nextTick, reactive, ref, type Component } from 'vue';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import DeckDetailsForm from '@/features/decks/components/DeckDetailsForm.vue';
-import DeckDetailsHeroPanel from '@/features/decks/components/DeckDetailsHeroPanel.vue';
-import DeckHeroSelectionPanel from '@/features/decks/components/DeckHeroSelectionPanel.vue';
 
 vi.mock('@/shared/api/client', () => ({
   toAbsoluteApiUrl: (url: string) => url,
@@ -47,14 +45,9 @@ const buildController = () => {
     suggested_type_labels: [],
   });
   return {
-    isChangingHero: ref(false),
-    canApplyHeroChange: ref(false),
     focusDeckNameRequest: ref(0),
     openHero: vi.fn(),
     openCards: vi.fn(),
-    beginHeroChange: vi.fn(),
-    applyHeroChange: vi.fn(),
-    cancelHeroChange: vi.fn(),
     deckTagCatalog: ref({ roles: [], types: [] }),
     deck: {
       form,
@@ -107,36 +100,6 @@ describe('deck editor mode panels', () => {
   afterEach(() => {
     document.body.innerHTML = '';
     vi.clearAllMocks();
-  });
-
-  test('keeps initial hero setup focused on hero and required deck name', async () => {
-    const mounted = await mountComponent(DeckHeroSelectionPanel);
-    const text = mounted.container.textContent ?? '';
-
-    expect(text).toContain('Selected Hero');
-    expect(text).toContain('Name *');
-    expect(text).not.toContain('Continue');
-    expect(text).not.toContain('Summary');
-    expect(text).not.toContain('Long description');
-    expect(text).not.toContain('Visibility');
-    expect(mounted.container.querySelector('input[required]')).not.toBeNull();
-
-    mounted.unmount();
-  });
-
-  test('shows explicit Apply and Cancel controls when replacing a hero', async () => {
-    const controller = buildController();
-    controller.isChangingHero.value = true;
-    controller.canApplyHeroChange.value = false;
-    const mounted = await mountComponent(DeckHeroSelectionPanel, controller);
-    const buttons = Array.from(mounted.container.querySelectorAll<HTMLButtonElement>('button'));
-
-    expect(mounted.container.querySelector('input[placeholder="Deck name"]')).toBeNull();
-    expect(buttons.find((button) => button.textContent?.trim() === 'Apply')?.disabled).toBe(true);
-    buttons.find((button) => button.textContent?.trim() === 'Cancel')?.click();
-    expect(controller.cancelHeroChange).toHaveBeenCalledTimes(1);
-
-    mounted.unmount();
   });
 
   test('renders all metadata fields in the wide Details form', async () => {
@@ -208,20 +171,6 @@ describe('deck editor mode panels', () => {
     expect(button?.parentElement?.classList.contains('border-t')).toBe(true);
     expect(button?.parentElement?.classList.contains('theme-divider')).toBe(true);
     expect(mounted.controller.openCards).toHaveBeenCalledTimes(1);
-
-    mounted.unmount();
-  });
-
-  test('uses a compact hero sidebar with an explicit Change hero action', async () => {
-    const mounted = await mountComponent(DeckDetailsHeroPanel);
-    const button = Array.from(mounted.container.querySelectorAll<HTMLButtonElement>('button')).find(
-      (candidate) => candidate.textContent?.trim() === 'Change hero',
-    );
-
-    expect(mounted.container.textContent).toContain('Aurora Hero');
-    expect(mounted.container.querySelector('img')?.parentElement?.className).toContain('max-w-48');
-    button?.click();
-    expect(mounted.controller.openHero).toHaveBeenCalledTimes(1);
 
     mounted.unmount();
   });

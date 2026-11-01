@@ -334,12 +334,12 @@ describe('useDeckEditor', () => {
     document.body.innerHTML = '';
   });
 
-  test('opens existing decks in Details without querying the hidden gallery', async () => {
+  test('opens existing decks on Cards with the details overlay closed', async () => {
     const mounted = await mountController();
 
-    expect(mounted.controller.editorMode.value).toBe('details');
-    expect(mounted.controller.canAutosync.value).toBe(false);
-    expect(searchCardsMock).not.toHaveBeenCalled();
+    expect(mounted.controller.editorMode.value).toBe('cards');
+    expect(mounted.controller.detailsOpen.value).toBe(false);
+    expect(mounted.controller.canAutosync.value).toBe(true);
 
     mounted.unmount();
   });
@@ -358,11 +358,14 @@ describe('useDeckEditor', () => {
       return_to: 'my_decks',
     });
 
+    expect(mounted.controller.detailsOpen.value).toBe(false);
+
     await mounted.router.replace(
       '/my/decks/deck-1/edit?editor_mode=details&return_to=my_decks',
     );
     await nextTick();
-    expect(mounted.controller.editorMode.value).toBe('details');
+    expect(mounted.controller.detailsOpen.value).toBe(true);
+    expect(mounted.controller.editorMode.value).toBe('cards');
 
     mounted.unmount();
   });
@@ -428,7 +431,8 @@ describe('useDeckEditor', () => {
     await mounted.controller.saveDeck();
 
     expect(createDeckMock).not.toHaveBeenCalled();
-    expect(mounted.controller.editorMode.value).toBe('details');
+    expect(mounted.controller.editorMode.value).toBe('cards');
+    expect(mounted.controller.detailsOpen.value).toBe(true);
     expect(mounted.controller.focusDeckNameRequest.value).toBe(1);
     expect(toastErrorMock).toHaveBeenLastCalledWith('Name your deck before creating it.');
 
@@ -1730,48 +1734,52 @@ describe('useDeckEditor', () => {
     mounted.unmount();
   });
 
-  test('switches Details and Cards without saving or losing draft metadata', async () => {
+  test('opens and closes the details overlay without saving or losing draft metadata', async () => {
     const mounted = await mountController();
     mounted.controller.deck.setDeckLongDescription('Keep this strategy note.');
 
-    mounted.controller.openCards();
     expect(mounted.controller.editorMode.value).toBe('cards');
+    expect(mounted.controller.detailsOpen.value).toBe(false);
     expect(mounted.controller.canAutosync.value).toBe(true);
     expect(applyHeroManaFamilyPresetMock).toHaveBeenCalledTimes(1);
-    await vi.waitFor(() => {
-      expect(mounted.router.currentRoute.value.query.editor_mode).toBe('cards');
-    });
 
     mounted.controller.openDetails();
-    expect(mounted.controller.editorMode.value).toBe('details');
+    expect(mounted.controller.detailsOpen.value).toBe(true);
+    expect(mounted.controller.editorMode.value).toBe('cards');
+    expect(mounted.controller.canAutosync.value).toBe(false);
     expect(mounted.controller.deck.form.long_description).toBe('Keep this strategy note.');
     expect(updateDeckMock).not.toHaveBeenCalled();
     await vi.waitFor(() => {
       expect(mounted.router.currentRoute.value.query.editor_mode).toBe('details');
     });
 
+    mounted.controller.closeDetails();
+    expect(mounted.controller.detailsOpen.value).toBe(false);
+    expect(mounted.controller.editorMode.value).toBe('cards');
+    await vi.waitFor(() => {
+      expect(mounted.router.currentRoute.value.query.editor_mode).toBe('cards');
+    });
+
     mounted.unmount();
   });
 
-  test('applies a replacement hero without saving and refreshes its card preset on Cards', async () => {
+  test('treats a replacement hero as an ordinary draft edit that returns to Cards', async () => {
     const mounted = await mountController();
     mounted.controller.deck.setDeckDescription('Preserved summary');
+    mounted.controller.closeDetails();
 
-    mounted.controller.beginHeroChange();
+    mounted.controller.openHero();
     expect(mounted.controller.editorMode.value).toBe('hero');
-    expect(mounted.controller.isChangingHero.value).toBe(true);
     expect(resetFiltersMock).toHaveBeenCalledTimes(1);
 
     mounted.controller.deck.handleGalleryAction(buildHero('hero-2', 'Replacement Hero'));
-    expect(mounted.controller.canApplyHeroChange.value).toBe(true);
-    mounted.controller.applyHeroChange();
+    await nextTick();
 
-    expect(mounted.controller.editorMode.value).toBe('details');
+    expect(mounted.controller.editorMode.value).toBe('cards');
     expect(mounted.controller.deck.form.hero_card_id).toBe('hero-2');
     expect(mounted.controller.deck.form.description).toBe('Preserved summary');
+    expect(mounted.controller.hasUnsavedChanges.value).toBe(true);
     expect(updateDeckMock).not.toHaveBeenCalled();
-
-    mounted.controller.openCards();
     expect(applyHeroManaFamilyPresetMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ id: 'hero-2' }),
     );
@@ -1779,31 +1787,16 @@ describe('useDeckEditor', () => {
     mounted.unmount();
   });
 
-  test('cancels hero replacement while preserving all other draft edits', async () => {
+  test('keeps autosync paused while Details is open and resumes it on close', async () => {
     const mounted = await mountController();
-    mounted.controller.deck.setDeckLongDescription('Preserved notes');
-
-    mounted.controller.beginHeroChange();
-    mounted.controller.deck.handleGalleryAction(buildHero('hero-2', 'Replacement Hero'));
-    mounted.controller.cancelHeroChange();
-
-    expect(mounted.controller.editorMode.value).toBe('details');
-    expect(mounted.controller.deck.form.hero_card_id).toBe('hero-1');
-    expect(mounted.controller.deck.form.long_description).toBe('Preserved notes');
-    expect(updateDeckMock).not.toHaveBeenCalled();
-
-    mounted.unmount();
-  });
-
-  test('keeps autosync paused in Details and resumes it in Cards', async () => {
-    const mounted = await mountController();
+    mounted.controller.openDetails();
     mounted.controller.deck.setDeckName('Dirty details');
     await nextTick();
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(updateDeckMock).not.toHaveBeenCalled();
 
-    mounted.controller.openCards();
+    mounted.controller.closeDetails();
     await nextTick();
     await vi.advanceTimersByTimeAsync(900);
 

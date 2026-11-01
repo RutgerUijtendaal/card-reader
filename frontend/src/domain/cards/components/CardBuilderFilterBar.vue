@@ -10,6 +10,7 @@
       />
     </template>
     <template #filters>
+      <slot name="leading" />
       <button
         v-if="showCurrentOnly"
         type="button"
