@@ -122,6 +122,13 @@ watch(
   aspect-ratio: 63 / 88;
   transform-origin: 50% 120%;
   transform: translateX(calc(-50% + var(--fan-shift))) translateY(var(--fan-drop)) rotate(var(--fan-rotate));
+  /*
+   * Card scans are several times larger than a fan slot. Drawn straight through a rotated
+   * transform, Chromium resamples them with cheap filtering and the printed text aliases.
+   * A compositing layer rasterizes the card upright with high-quality downscaling first,
+   * then rotates that small bitmap.
+   */
+  will-change: transform;
 }
 
 .home-card-fan-card {
