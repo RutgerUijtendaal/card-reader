@@ -99,7 +99,9 @@ describe('CardFilterSections', () => {
     expect(panel?.textContent).toContain('Cost');
     expect(panel?.querySelector('[aria-label="Reset group"]')).not.toBeNull();
 
-    mounted.controller.filterSectionsState.value.onUpdateManaCostMin('2');
+    const input = panel!.querySelector<HTMLInputElement>('input[type="number"]')!;
+    input.value = '2';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
     await nextTick();
     expect(chips[0].textContent).toContain('1');
     const clear = Array.from(mounted.container.querySelectorAll('button')).find(
@@ -107,6 +109,37 @@ describe('CardFilterSections', () => {
     );
     clear?.click();
     expect(onReset).toHaveBeenCalledOnce();
+
+    mounted.unmount();
+  });
+
+  test.each([
+    ['Mana', 0, 'manaCostMin'],
+    ['Mana', 1, 'manaCostMax'],
+    ['Generic', 0, 'attackMin'],
+    ['Generic', 1, 'attackMax'],
+    ['Generic', 2, 'healthMin'],
+    ['Generic', 3, 'healthMax'],
+  ] as const)('normalizes %s input %s and clears its active range', async (label, index, field) => {
+    const mounted = await mountSections(GALLERY_VISIBLE_FILTER_SECTIONS.player, {
+      onReset: vi.fn(),
+    });
+    const chip = Array.from(
+      mounted.container.querySelectorAll<HTMLButtonElement>('button[aria-expanded]'),
+    ).find((button) => button.textContent?.trim() === label)!;
+    chip.click();
+    await nextTick();
+    const panel = document.body.querySelector(`[role="dialog"][aria-label="${label} filter"]`)!;
+    const input = panel.querySelectorAll<HTMLInputElement>('input[type="number"]')[index];
+
+    for (const value of ['0', '2', '']) {
+      input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await nextTick();
+      expect(mounted.controller.filterSectionsState.value[field]).toBe(value);
+      expect(chip.textContent?.trim()).toBe(value ? `${label}1` : label);
+      expect(mounted.container.textContent?.includes('Clear filters')).toBe(Boolean(value));
+    }
 
     mounted.unmount();
   });

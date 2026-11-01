@@ -4,19 +4,24 @@
     being built sits on the right, and save state and stats run along the bottom.
   -->
   <section class="builder-workspace-layout app-page-layout">
+    <slot name="endAside" />
     <section class="builder-workspace-main app-page-layout-main">
-      <div class="builder-gallery-scroll app-scrollbar min-h-0">
+      <div
+        class="builder-gallery-scroll app-scrollbar min-h-0"
+        :inert="$slots.overlay ? true : undefined"
+      >
         <slot />
       </div>
       <!-- Overlays (such as details) cover the pool without unmounting it, so closing returns to it unchanged. -->
       <div
         v-if="$slots.overlay"
+        ref="overlayRef"
         class="builder-workspace-overlay app-scrollbar"
+        tabindex="-1"
       >
         <slot name="overlay" />
       </div>
     </section>
-    <slot name="endAside" />
     <div
       v-if="$slots.status"
       class="builder-workspace-footer"
@@ -25,6 +30,32 @@
     </div>
   </section>
 </template>
+<script setup lang="ts">
+import { ref, watch } from 'vue';
+
+const overlayRef = ref<HTMLElement | null>(null);
+let previousFocus: HTMLElement | null = null;
+
+watch(
+  overlayRef,
+  (overlay) => {
+    if (overlay) {
+      previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      const control = overlay.querySelector<HTMLElement>(
+        'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)',
+      );
+      (control ?? overlay).focus();
+    } else {
+      // A panel tab may have closed Details; keep focus there instead of stealing it back.
+      if (document.activeElement === document.body && previousFocus?.isConnected) {
+        previousFocus.focus();
+      }
+      previousFocus = null;
+    }
+  },
+  { flush: 'post' },
+);
+</script>
 <style scoped>
 .builder-workspace-layout {
   grid-template-columns: minmax(0, 1fr);
@@ -69,6 +100,8 @@
   }
 
   .builder-workspace-main {
+    grid-column: 1;
+    grid-row: 1;
     height: 100%;
     min-height: 0;
     overflow: hidden;
@@ -82,6 +115,8 @@
 
   /* The right column fills its grid row so the bottom bar never covers its list. */
   .builder-workspace-layout > :deep(.app-sticky-aside) {
+    grid-column: 2;
+    grid-row: 1;
     position: static;
     height: 100%;
     max-height: none;

@@ -284,7 +284,7 @@ describe('DeckEditorPage', () => {
     vi.clearAllMocks();
   });
 
-  test('renders the filter bar in the header, then the pool, the deck panel, and a bottom status bar', async () => {
+  test('keeps the deck panel before the pool in reading order, below header filters and above status', async () => {
     const mounted = await mountPage();
     const statusBar = mounted.container.querySelector<HTMLElement>('[aria-label="Deck builder status"]');
     const filterBar = mounted.container.querySelector<HTMLElement>('header [data-testid="deck-filter-bar"]');
@@ -297,7 +297,7 @@ describe('DeckEditorPage', () => {
     }
     expect(mounted.container.querySelectorAll('aside')).toHaveLength(1);
     expect(filterBar.compareDocumentPosition(gallery) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(gallery.compareDocumentPosition(rightAside) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(rightAside.compareDocumentPosition(gallery) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(rightAside.compareDocumentPosition(statusBar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(statusBar.closest('.builder-workspace-footer')).not.toBeNull();
     expect(statusBar?.textContent).toContain('Unsaved');

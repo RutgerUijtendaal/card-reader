@@ -106,14 +106,14 @@ const mount = () => {
   });
   return target;
 };
-test('Cards uses the shared workbench: header filters, the pool, the Encounter panel, and a bottom status bar', () => {
+test('Cards keeps the Encounter panel before the pool in reading order, below header filters and above status', () => {
   const target = mount();
   expect(target.querySelector('header [data-testid="shared-filters"]')).not.toBeNull();
   expect(target.querySelector('header nav[aria-label="Encounter editor sections"]')).toBeNull();
   const layout = target.querySelector('.builder-workspace-layout')!;
   expect(layout.children).toHaveLength(3);
-  expect(layout.children[0].querySelector('[data-testid="shared-gallery"]')).not.toBeNull();
-  expect(layout.children[1].getAttribute('data-testid')).toBe('encounter-deck');
+  expect(layout.children[0].getAttribute('data-testid')).toBe('encounter-deck');
+  expect(layout.children[1].querySelector('[data-testid="shared-gallery"]')).not.toBeNull();
   expect(layout.children[2].classList.contains('builder-workspace-footer')).toBe(true);
   expect(layout.children[2].querySelector('[aria-label="Encounter builder status"]')).not.toBeNull();
   const autosync = layout.querySelector('input[type="checkbox"]') as HTMLInputElement;
@@ -127,8 +127,8 @@ test('Boss keeps the same filters, gallery, and Encounter panel', async () => {
   await nextTick();
   expect(target.querySelector('header [data-testid="shared-filters"]')).not.toBeNull();
   const layout = target.querySelector('.builder-workspace-layout')!;
-  expect(layout.children[0].querySelector('[data-testid="shared-gallery"]')).not.toBeNull();
-  expect(layout.children[1].getAttribute('data-testid')).toBe('encounter-deck');
+  expect(layout.children[0].getAttribute('data-testid')).toBe('encounter-deck');
+  expect(layout.children[1].querySelector('[data-testid="shared-gallery"]')).not.toBeNull();
 });
 
 test('Details opens as an overlay above the still-mounted pool and closes back to it', async () => {
