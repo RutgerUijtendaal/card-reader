@@ -85,7 +85,7 @@ card references one deduplicated `card_backs` resource. Native custom-deck defin
 `(sheet_id, card_back_id)`, so cards on one face sheet may use different backs. Deck
 exports store an export-time source snapshot with the deck ID, scope, hero ID, difficulty, tags, and optional
 sideboard identity. The imported deck receives the collection name and description plus structured collection GM
-Notes. Each card receives Card Reader identity GM Notes and its optional `hero`, `mainboard`, or `sideboard` role.
+Notes. Each card receives Card Reader identity GM Notes and its optional `hero`, `boss`, `mainboard`, or `sideboard` role.
 
 Card Reader resolves each exported card back as an explicit Card override, then the first configured role default
 in canonical role order, then the first configured Evil faction default in canonical faction order, then its pool
@@ -126,7 +126,7 @@ export-time snapshots.
 ## Sheet operations
 
 Production and local development run `run_tts_sheet_renderer` as a separate process using the API image. Useful
-maintenance commands are:
+maintenance commands, run from `services/api` in the configured Python environment (also the API container working directory), are:
 
 ```text
 python manage.py reconcile_tts_card_sheets

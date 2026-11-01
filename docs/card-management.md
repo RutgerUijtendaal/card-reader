@@ -46,9 +46,9 @@ rerendering TTS face sheets; subsequent exports use the current effective back.
 
 ## Cards and versions
 
-A `Card` is the durable identity referenced by decks, groups, aliases, and application URLs. A `CardVersion` contains versioned content such as parsed text, images, template selection, symbols, and metadata relations.
+A `Card` is the durable identity referenced by decks, Encounters, groups, aliases, and application URLs. A `CardVersion` contains versioned content such as parsed text, images, template selection, symbols, and metadata relations.
 
-Each card points to its current version, while older versions remain available for history and comparison. Imports, reparses, and edits use this version model so a correction does not destroy the record of what existed previously.
+Each card points to its current version, while older versions remain available for history and comparison. A new printing can create a new version, but manual corrections and targeted reparses update the selected latest version in place. Reparse field provenance preserves manual overrides unless a template change resets them; not every edit creates a historical version.
 
 Content versions provide an additional history boundary for related changes made during import and editing workflows. The UI exposes this history through card detail and generation views.
 
@@ -56,7 +56,7 @@ Content versions provide an additional history boundary for related changes made
 
 Every stable card identity belongs to exactly one of the **Player**, **Evil**, or **Neutral** pools. Neutral is currently a separate pool rather than an implicit overlay in Player or Evil views. A card can also hold any combination of the code-owned Hero, Boss, Location, Boon, Event, Shop Item, Directive, Reminder, and Mana roles, any combination of the Order, Blood, Dark, Metal, and Fire factions, and any combination of the Arcane, Dark, Divine, Martial, Occult, and Primal mana families. Directive, Reminder, and Mana identify those card kinds without assigning a mana family or Evil faction. **Normal**, **No faction**, and **Colorless** are displayed names for empty assignment sets; none is persisted as an assignment.
 
-Role, faction, and mana-family assignment keys allow up to 64 characters. Their definitions, labels, and ordering are code-owned. Hero remains the only role with existing deck-builder or Playtester behavior; every other role and all factions are descriptive until their gameplay rules are designed.
+Role, faction, and mana-family assignment keys allow up to 64 characters. Their definitions, labels, and ordering are code-owned. Hero controls Player deck and Playtester hero selection; Boss controls Encounter boss selection. Roles also participate in sorting and card-back defaults, while Evil factions drive sorting, filters, Encounter faction presets, and faction-default backs. These classifications do not implement a gameplay rules engine.
 
 Staff edit all four dimensions in the Card tab alongside lifecycle state and deck-building configuration. They are intentionally independent of template selection, which remains version-level parsing configuration. Role, faction, and mana-family definitions remain code-owned, while Admin Catalog exposes their current usage and staff-editable pool-specific Tag, Type, or Symbol inference rules. Normal, No faction, and Colorless appear there as read-only derived empty states. Mana-family definitions link to their existing mana Symbol for display instead of duplicating icon assets.
 
@@ -72,7 +72,7 @@ Within the shared Keyword, Tag, and Type facets, the Gallery loads only values l
 
 Staff can export the current Player, Evil, or Neutral Gallery selection to TTS. Persistent sheets are partitioned by pool so exports normally reuse atlases containing cards from the same pool. Every pool uses the same stable public sheet URL contract: an existing TTS object sees later rendered card-art updates without being re-exported. Deck TTS exports remain Player-only alongside the current deck workflow.
 
-Switching workspaces keeps global staff and settings routes mounted, resets Gallery to the selected pool's canonical defaults, and keeps card or group resources open while updating their Gallery return context. Player-only deck and Playtester routes fall back to the selected non-Player Gallery only when they cannot remain active. Every new import starts without a template or pool selection and requires both choices explicitly; role, faction, and mana-family inference default independently to Automatic using an immutable snapshot of matching Tag, Type, and Symbol rules.
+Switching workspaces keeps global staff and settings routes mounted, resets Gallery to the selected pool's canonical defaults, and keeps card or group resources open while updating their Gallery return context. Player deck and Playtester routes, and Evil Encounter routes, fall back to the newly selected Gallery when their required pool is incompatible. Every new import starts without a template or pool selection and requires both choices explicitly; role, faction, and mana-family inference default independently to Automatic using an immutable snapshot of matching Tag, Type, and Symbol rules.
 
 After the one-time pre-classification migration adoption described in the import guide, inference rules affect future jobs only. Editing, disabling, or repointing a rule does not reclassify existing cards or reinterpret queued jobs. Tag, Type, and Symbol detail views show reverse rule references, and referenced sources are protected from deletion until their rules are removed or repointed.
 
@@ -107,7 +107,7 @@ Cards have an explicit lifecycle state:
 - Active cards appear by default in gallery, public group views, catalog previews, exports, deck building, and Playtester selection.
 - Deprecated cards remain directly retrievable and available in explicit management queries, but are hidden from ordinary browsing and selection.
 
-Deprecating or reclassifying a card does not silently remove it from existing decks or groups. Those relationships remain visible so owners can resolve them deliberately. Deck validation and management views surface the resulting warnings or invalid state, and embedded deck payloads always expose the referenced card's real identity, pool, and content.
+Deprecating or reclassifying a card does not silently remove it from existing decks, Encounters, or groups. Invalid Encounters leave public discovery and shared detail access while remaining available for owner/staff inspection and repair. Authorized TTS exports validate only the requested board; see [Encounters](encounters.md). Those relationships remain visible so owners can resolve them deliberately. Deck validation and management views surface the resulting warnings or invalid state, and embedded deck payloads always expose the referenced card's real identity, pool, and content.
 
 ## Card groups
 
@@ -125,6 +125,6 @@ Merges are domain operations, not raw row deletion. Conflict checks and a previe
 
 ## Ownership boundaries
 
-API views handle endpoint authorization, request validation, and response formatting. Card-derived repositories, services, and payload builders do not receive viewer-dependent pool entitlements: global reads cover all pools, pool-specific reads use an exact requested pool, and genuine Player-only workflows use an explicit Player predicate. Core code does not inspect users or staff state.
+API views handle endpoint authorization, request validation, and response formatting. Card-derived repositories, services, and payload builders do not receive viewer-dependent pool entitlements: global reads cover all pools, pool-specific reads use an exact requested pool, and genuine Player-only workflows use an explicit Player predicate. Card classification, identity, and public card payloads do not depend on viewer staff state. Account-owned workflows such as deck ownership, Encounter ownership, notifications, and user management still use user identities in core.
 
 This separation keeps imports, staff tools, deck building, and future clients aligned on the same card behavior.

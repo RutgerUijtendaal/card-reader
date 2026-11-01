@@ -19,7 +19,7 @@ This directory contains feature descriptions, operational guides, and technical 
 
 ## Reference
 
-- [Card database diagram](card-database-diagram.svg) shows the main card, version, metadata, import, group, and deck relationships.
+- [Card database diagram](card-database-diagram.svg) shows the main card, version, metadata, import, group, deck, Encounter, card-back, and TTS-sheet relationships.
 - [Tabletop Simulator imports](../tts/README.md) documents the shared persistent-sheet payload, native custom-deck creation, and stable artwork cache refresh.
 
 ## Planning

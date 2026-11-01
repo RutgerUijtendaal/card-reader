@@ -35,7 +35,7 @@ the removed Hero boolean or internal faction identity key. Card-group anchors an
 structured card reference containing the pool, canonical faction set, mana-family context, and normalized card key, so
 same-key cards in different faction namespaces remain distinct throughout validation and import.
 
-The importer writes current Version 7 archives and explicitly adopts retained Versions 1 through 6.
+The exporter writes current Version 7 archives; the importer also explicitly adopts retained Versions 1 through 6.
 Version 7 identifies card-back assets by checksum, imports assets first, applies pool, role, and Evil faction
 defaults second, and then imports Player Cards with optional override references. Retained Version 6
 archives adopt empty role defaults, and retained Version 5 archives adopt empty role and Evil faction
@@ -77,7 +77,7 @@ missing Card mana families after import. After the compatible application is dep
 Version 7 bundle through the normal staff workflow and commit its generated lock; never hand-edit the
 lock as a substitute for that publish.
 
-They exclude accounts, decks, notifications, access and activity records, import jobs, uploads, raw
+They exclude accounts, decks, Encounters (including sideboards and creation receipts), notifications, access and activity records, import jobs, uploads, raw
 OCR, parse flags, suggestions, logs, debug crops, credentials, and source or server paths.
 
 ## Access

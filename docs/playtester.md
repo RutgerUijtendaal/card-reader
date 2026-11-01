@@ -8,7 +8,7 @@ The deck selector lives at `/playtester`; an active session lives at `/playteste
 
 Starting a playtest expands mainboard quantities into distinct `PlaytestCardInstance` copies. Sideboards remain reference-only, and the hero begins in its dedicated stack outside the library.
 
-Playtester consumes Player-pool decks only. Until decks persist their own classification, every deck supported by the current builder is treated as a Player deck. Once explicit deck pools exist, the selector and direct play route must omit or reject Evil and Neutral decks rather than inferring eligibility from their current card contents.
+Playtester consumes Player decks only; Deck records do not have their own pool field. Eligibility requires every referenced card to remain active and in Player, including sideboard references. General deck validity is not required, so an under-construction deck can still be tested. Evil Encounters have a separate model and are not Playtester inputs.
 
 The pool workspace does not show Playtester in Evil or Neutral navigation. A direct Playtester route switches the global workspace to Player, while deck and card eligibility independently reject non-Player references. A future non-Player testing workflow would be a separate design; the current hero, opening-hand, and mainboard assumptions must not be generalized into one automatically.
 
@@ -24,7 +24,7 @@ This setup is intentionally manual. It supports testing real deck behavior witho
 
 The play surface supports the physical operations needed for manual testing:
 
-- moving cards between the library, hand, board, discard, exile, and relevant stacks;
+- moving cards between the library, hand, board, discard, banish, other, and hero stacks;
 - pointer dragging and drag-box group selection;
 - stacks and visual piles, including card-level inspection;
 - right-click context actions;

@@ -16,6 +16,7 @@ Follow `AGENTS.md` first. Use this skill for shared backend behavior; combine it
 - Expose stable feature APIs from package `__init__.py` files and prefer those public imports across package boundaries.
 - Extend an existing feature package or shared helper when it owns the responsibility; do not recreate root-level one-off modules or legacy `*_repository.py` files.
 - Preserve SQLite compatibility unless a different database is explicitly approved.
+- Keep Player Deck and Evil Encounter aggregates separate. Encounter rules live in `card_reader_core.services.encounters`, persistence in `card_reader_core.repositories.encounters`, and the contract in `docs/encounters.md`; do not apply Player construction rules to Encounter boards.
 
 ## Stateful Changes
 
@@ -34,7 +35,7 @@ Follow `AGENTS.md` first. Use this skill for shared backend behavior; combine it
 5. Update `docs/card-database-diagram.svg` when card-related models or relationships change, using `card-reader-db-diagrams`.
 6. Update relevant docs when behavior, permissions, contracts, onboarding, or operations change.
 7. Test the public seam and important failure or replay behavior, not only internal helpers.
-8. Run core lint and typecheck plus the narrowest relevant service and integration tests.
+8. Run core lint and typecheck. Inspect focused backend tests for coverage, but do not run service/integration tests under the current `AGENTS.md` policy.
 
 ## Checks
 
@@ -43,10 +44,9 @@ From the repository root, prefer targeted commands while iterating:
 ```text
 pnpm --filter @card-reader/core lint
 pnpm --filter @card-reader/core typecheck
-pnpm --filter @card-reader/core test
 ```
 
-Also run API, parser, or integration checks when their contracts or workflows consume the changed core behavior.
+Also run affected API/parser lint and typecheck when they consume the changed core behavior. Read their tests without executing service/integration suites unless the user explicitly overrides the repository restriction.
 
 ## Review Focus
 

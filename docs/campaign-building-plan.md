@@ -2,7 +2,13 @@
 
 Status: proposed direction, retained for future design and implementation work.
 
-This document preserves the initial campaign-building product idea and the architectural conclusions reached after reviewing the card-classification branch against `master`. It is not a final schema or implementation specification. Decisions marked as open must be resolved before migrations or public API contracts are created.
+This document describes proposed Campaign composition above the implemented Card, Player Deck, and Encounter domains. It is not a final schema or implementation specification. Decisions marked as open must be resolved before migrations or public API contracts are created.
+
+## Implemented foundation
+
+[Encounters](encounters.md) already provide owner-authored community Evil boss fights with staff-controlled Official status, a selected Boss and optional CardGroup, ordered mainboard entries, named sideboards, faction assignments, validity-gated public browsing, and single-pile TTS export. Their integer `revision` is an optimistic-concurrency counter on a mutable record, not an immutable published revision. Player and Encounter builders already share draft persistence, creation reconciliation, collection views, and board controls.
+
+Campaigns, reusable Pile Definitions, immutable Encounter/Campaign revisions, Game Setups, resolved manifests, and multi-pile TTS export remain proposed. Future work should extend these existing boundaries rather than recreate Encounter authoring.
 
 ## Product goal
 
@@ -90,7 +96,7 @@ Fixed entries should be relational records. Selector and constraint payloads may
 
 ### Encounter Revision
 
-An immutable, published boss-fight definition. An Encounter may reference or own typed slots for:
+A proposed immutable, published boss-fight definition above the current mutable Encounter. It may reference or own typed slots for:
 
 - one or more Boss Cards;
 - the fight deck or fight-specific Evil piles;
@@ -113,7 +119,7 @@ An immutable, published Campaign definition containing:
 - Campaign metadata and instructions;
 - a versioned rules/schema contract.
 
-The existing documentation uses `Scenario` as a placeholder for a future mixed-content aggregate. Before implementation, standardize the vocabulary. The proposed distinction is that a Campaign is the complete sequence while an Encounter is one boss fight. Retain `Scenario` only if it receives a separate, precise product meaning.
+Campaign denotes the proposed complete sequence; Encounter already denotes one boss fight. Use `Scenario` only if future design gives it a separate, precise product meaning.
 
 ### Game Setup
 
@@ -203,7 +209,7 @@ The current persistent TTS sheet system already provides useful groundwork:
 - one export may reference sheets from multiple pools;
 - CardVersion IDs and image checksums are included at export time.
 
-The current payload still describes one flat collection and the importer creates one native deck. Its optional `cards[].role` field represents export placement such as Hero, mainboard, or sideboard; it must not be overloaded with intrinsic Card Roles or Campaign pile identity.
+The current `card-reader.tts-cards.v3` payload still describes one flat collection and the importer creates one native deck. Its optional `cards[].role` field represents export placement such as Hero, Boss, mainboard, or sideboard; it must not be overloaded with intrinsic Card Roles or Campaign pile identity.
 
 A Campaign-capable payload will likely need a new schema version with:
 
@@ -267,7 +273,7 @@ Resolve these before creating migrations:
 
 4. **Staff builders**
    - Build shared entry-selection components where the abstraction fits.
-   - Add domain-specific Pile, Encounter, and Campaign authoring workflows.
+   - Add Pile and Campaign authoring workflows and extend the existing Encounter builder for immutable publication if required.
    - Support previews across light and dark themes.
 
 5. **GM game setup flow**

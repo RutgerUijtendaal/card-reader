@@ -15,11 +15,13 @@ Follow `AGENTS.md` first. Use this skill both when implementing API changes and 
 - Preserve the current session-auth and CSRF model unless the task explicitly requires a contract change.
 - Keep API compatibility stable unless the requested work requires a deliberate change.
 - Keep deck-building constraint defaults, validation, and metadata in core deck services; expose them through API views without duplicating rule definitions in serializers or frontend code.
-- For idempotent creates, scope keys to the authenticated owner, return an existing result before revalidating a replayed body, and enforce race-safe uniqueness in the database as well as the service lookup path. Keep a durable used-key outcome when the created resource can be deleted, so an old retry cannot recreate an intentionally deleted resource.
+- For receipt-backed deck, Encounter, and card-back creates, scope keys to the authenticated owner, return an existing result before revalidating a replayed body, and enforce race-safe uniqueness in the database as well as the service lookup path. Keep a durable used-key outcome when the created resource can be deleted. Import admission has a separate fingerprint contract: the same creation key with a different payload is rejected; preserve its staging and cleanup boundary in `docs/imports-and-parsing.md`.
 - Keep Player, Evil, and Neutral card data equally public. Exact-pool reads use an explicit `card_pool`; global reads cover every pool.
 - Treat workspace selection as browsing context, not authorization. Keep Admin, Review, maintenance, and other global staff operations independent of the selected workspace.
 - Require every new import to provide both template and card pool explicitly; never inherit either from shell state.
 - Keep direct persistent TTS sheet images public. Preserve staff-only export creation where required and deck-visibility rules for deck exports.
+- Keep Encounter creator ownership immutable. Active authenticated users create community records; owners manage community records, staff manage all records, and only staff control Official status. Official records lock ordinary owner mutations. Public discovery requires public visibility and validity; shared public/unlisted detail requires validity. Preserve creator-scoped creation keys and atomic ownership/Official/revision checks for PATCH and `If-Match` DELETE. Follow `docs/encounters.md` for board-specific export authorization and validation.
+- Keep `/internal/monitoring` independent of sessions behind its dedicated bearer token. Preserve read-only bounded diagnostics, disabled access without a token, and the explicit unavailable-database payload.
 - Re-check active-user and Developer/staff access during developer-data credential exchange and downloads; keep bundle creation and build history staff-only.
 
 ## Implementation Workflow
@@ -33,7 +35,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing API changes and 
 7. If the change affects auth or public/staff/superuser access, trace the current rules before changing endpoint behavior.
 8. If the change affects deck-building constraints, keep `GET /decks/rules` aligned with supported rule ids, defaults, allowed values, and example config.
 9. If an endpoint returns cards, card-derived counts, or embedded cards, decide lifecycle and pool scope explicitly and keep list/detail/count behavior aligned.
-10. Run lint, typecheck, and relevant tests before finishing.
+10. Run lint and typecheck. Inspect focused backend tests for coverage, but do not run service/integration tests under the current `AGENTS.md` policy.
 
 ## Review Focus
 

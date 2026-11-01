@@ -12,8 +12,8 @@ Follow `AGENTS.md`, `card-reader-core`, and `docs/developer-data.md`. Treat bund
 - Keep `dev-data/selection.json` as the reviewed source of selection keys, inclusion policy, and coverage requirements.
 - Keep the published catalog explicitly Player-only unless the product contract changes. Do not infer publication scope from the staff builder or from public card visibility.
 - Resolve Card identity using pool plus canonical faction set. Preserve exact selected identities through groups and reject cross-pool or non-Player archive records under the current contract.
-- Include only reviewed public/domain data needed by a clean checkout. Exclude accounts, decks, notifications, activity/access records, imports, uploads, OCR, parse flags, suggestions, logs, debug data, credentials, and server paths.
-- Exclude TTS sheet rows, slots, coordinates, and rendered atlases. Reconcile and render fresh local sheets after import.
+- Include only reviewed public/domain data needed by a clean checkout. Exclude accounts, decks, Encounters and their boards/creation receipts, card-back import receipts, notifications, activity/access records, imports, uploads, OCR, parse flags, suggestions, logs, debug data, credentials, and server paths.
+- Exclude TTS sheet rows, slots, coordinates, and rendered atlases. Reconcile fresh local sheets after import; bootstrap rendering is optional through its prompt or `--generate-tts-sheets` / `--skip-tts-sheets` flags.
 - Never write absolute source or server paths into a bundle.
 
 ## Schema And Compatibility
@@ -40,7 +40,7 @@ Follow `AGENTS.md`, `card-reader-core`, and `docs/developer-data.md`. Treat bund
 2. State whether the change affects current output, retained input, publication selection, authorization, build orchestration, or bootstrap consumption.
 3. Define the compatibility matrix before changing a bundle field or format.
 4. Update validation before or with exporters so invalid archives cannot be published.
-5. Exercise export, isolated import, idempotent re-import, retained-version adoption, and rejection paths relevant to the change.
+5. Check export, isolated import, idempotent re-import, retained-version adoption, and rejection coverage relevant to the change. Respect the repository restriction on running service/integration tests.
 6. Update the documentation and bootstrap messaging with any contract or operator-flow change.
 
 ## Hotspots And Checks
@@ -55,4 +55,4 @@ Follow `AGENTS.md`, `card-reader-core`, and `docs/developer-data.md`. Treat bund
 - `frontend/src/domain/developer-data`
 - `frontend/src/features/settings/components/DeveloperDataSettingsSection.vue`
 
-Run core and API lint/typecheck plus focused developer-data and bootstrap tests. Use a temporary output under `.tmp/dev-data/`; do not publish a production version unless the user explicitly requests it.
+Run core and API lint/typecheck and permitted script/frontend checks; inspect backend coverage without running service/integration tests. Use a temporary output under `.tmp/dev-data/`; do not publish a production version unless the user explicitly requests it.

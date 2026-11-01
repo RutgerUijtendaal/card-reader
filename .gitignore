@@ -33,6 +33,8 @@ services/*/build/
 .vscode/
 .idea/
 .codex/config.toml
+/.claude/settings.local.json
+/CLAUDE.local.md
 /.agents/
 /.agents-location
 # Local command scratch data and seeded benchmark reports.

@@ -10,8 +10,9 @@ A backup contains:
 
 - a consistent SQLite snapshot with an integrity check;
 - uploaded files and maintenance data;
+- persistent TTS card-sheet files alongside their database slot assignments;
 - public card images and symbol assets;
-- logs only when `--include-logs` is requested;
+- stored log files only when `--include-logs` is requested; container stdout/journald logs remain the host collector's responsibility;
 - a manifest containing file sizes and SHA-256 checksums.
 
 Developer-data bundles are intentionally excluded. They are reproducible, immutable artifacts and

@@ -18,6 +18,7 @@ Follow `AGENTS.md` and `card-reader-frontend` first. Use this skill when changin
 - Fetch full deck detail only when the selector needs an opening-hand preview or active play needs complete deck entries.
 - Authenticated deck detail fetches should try owned deck detail first, then public deck detail. Anonymous playtests should use public deck detail only.
 - Sideboards are reference-only and must not enter the shuffled library.
+- Playtester accepts Player Deck records, not Encounters. Eligibility checks active Player references across all boards, including reference-only sideboards, without requiring general deck validity; do not invent a Deck pool field.
 - Drafts are local-storage only, keyed per deck plus `deck.updated_at`. Preserve existing draft migration support, but do not add extra branch-era migration code unless explicitly requested.
 - Import Playtester state from its direct owner: `playtestStateCore.ts` for initialization/normalization, `playtestBoardState.ts` for board and zone mutations, `playtestOpeningState.ts` for opening setup, and `playtestDraftPersistence.ts` for draft serialization/migration. Do not recreate an aggregate state façade.
 

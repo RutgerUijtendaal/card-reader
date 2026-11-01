@@ -1,6 +1,6 @@
 ---
 name: card-reader-frontend
-description: Work on the Card Reader Vue frontend for gallery, review, imports, settings, auth, and shared UI behavior. Use when changing frontend pages, composables, routing, API client usage, filter behavior, theming, or visible UI in this repository.
+description: Work on the Card Reader Vue frontend for cards, decks, Encounters, review, imports, settings, auth, and shared UI behavior. Use when changing frontend pages, composables, routing, API clients, filters, theming, or visible UI in this repository.
 ---
 
 # Card Reader Frontend
@@ -15,6 +15,9 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Use direct file imports. Do not add barrel files or transitional re-exports to mask ownership.
 - Keep reusable card queries, filters, gallery behavior, sorting, symbols, preferences, and card UI in `frontend/src/domain/cards`.
 - Keep reusable deck contracts, clients, constraints, calculations, exports, route helpers, tags, and deck UI in `frontend/src/domain/decks`; use `frontend/src/domain/deck-building` for contracts shared with cards.
+- Keep Encounter contracts and clients in `frontend/src/domain/encounters` and authoring/list/detail workflows in `frontend/src/features/encounters`. Follow `docs/encounters.md` for owner/staff permissions, Official protection, Evil selection, revisions, and sideboards; consume server `can_edit` and `can_delete`, and do not reuse Player construction rules.
+- Reuse `frontend/src/shared/drafts` for generic local persistence and idempotent creation, and `frontend/src/shared/components/builders` for workspace, save status, and recovery/conflict UI. Feature adapters own payloads, codecs, and storage keys; preserve existing Player draft compatibility.
+- Reuse cards-domain builder controls and collection views: `CardBuilderBoards`, `useCardCollectionBoards`, `CardCollectionGrid`, `CardCollectionViewOptions`, and `useCardCollectionGrid`. Generic list cards/skeletons and expandable detail layout live in shared components. Pass the collection's card pool explicitly to sorting.
 - Keep app bootstrap, routing, shell navigation/hotkeys, theme orchestration, and global styles in `frontend/src/app`.
 - Keep icons consistent across matching sidebar links and page headers. Source stable section icons from `frontend/src/shared/components/app/appSectionIcons.ts`, and pool-aware Gallery icons from the cards-domain pool icon mapping; never import separate icons for the two surfaces.
 - Keep generic API infrastructure, form/modal/layout controls, floating UI, keyboard/pointer helpers, and generic composables in `frontend/src/shared`.
@@ -22,6 +25,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Co-locate unit and component specs with their source. Use a feature `tests/` directory only for scenarios spanning several source files.
 - Use shared deck list components and `DeckListRecord`-compatible props for deck listing surfaces that can consume either full or summary deck records.
 - Prefer deck summary endpoints and `DeckSummaryRecord` for list/selector views that do not need full card entries; fetch full `DeckRecord` only for detail/editor/export/playtest flows that need complete deck contents.
+- Use Encounter summary endpoints for public/personal/staff lists; load full records only for detail/editor/export behavior. Keep list filters, including All/Official/Community, and library return context URL-backed.
 - Keep feature roots limited to pages/views and true feature entry files such as private `api.ts`, `types.ts`, or stores. Put implementation details under `components`, `composables`, or `utils`.
 - Deck-building rule defaults and example config are backend-owned through `GET /decks/rules`; use the shared deck rules client/fallback instead of duplicating rule constants in feature UI.
 - In the card detail editor, keep card-level controls on the `Card` tab and version-level controls on the `Card Version` tab.
@@ -111,6 +115,10 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - `frontend/src/features`
 - `frontend/src/domain/cards`
 - `frontend/src/domain/decks`
+- `frontend/src/domain/encounters`
+- `frontend/src/features/encounters`
+- `frontend/src/shared/drafts`
+- `frontend/src/shared/components/builders`
 - `frontend/src/domain/session`
 - `frontend/src/domain/notifications`
 - `frontend/src/shared`

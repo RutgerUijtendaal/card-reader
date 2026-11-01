@@ -1,6 +1,6 @@
 ---
 name: card-reader-tts
-description: Work on Card Reader's persistent Tabletop Simulator card-sheet and export system. Use when changing TTS sheet models, slot assignment, renderer claims and publication, sheet image caching, deck/sideboard/gallery/content-version exports, the card-reader.tts-cards.v2 payload, or tts/importer.lua.
+description: Work on Card Reader's persistent Tabletop Simulator card-sheet and export system. Use when changing TTS sheets, renderer claims and publication, caching, card-back resolution, deck/Encounter/gallery/content-version exports, the card-reader.tts-cards.v3 payload, or tts/importer.lua.
 ---
 
 # Card Reader TTS
@@ -19,17 +19,21 @@ Follow `AGENTS.md`, `card-reader-core`, and `tts/README.md`. Treat the website's
 
 ## Export Contract
 
-- Emit the shared Base64 `card-reader.tts-cards.v2` payload for decks, sideboards, Gallery selections, and content versions.
+- Emit the shared Base64 `card-reader.tts-cards.v3` payload for decks, Encounters, their sideboards, Gallery selections, and content versions.
+- Deduplicate `card_backs` resources and reference one `card_back_id` per card. Resolve backs through `resolve_effective_card_backs`: Card override, canonical role default, canonical Evil faction default, then pool default. An unusable explicit choice must fail rather than silently inherit.
+- Back assignment changes affect subsequent exports without dirtying or moving face sheets.
 - Reference existing persistent sheets and slots. Do not create export-specific sheet assignments.
 - Preserve saved deck quantities and order, export-time source metadata, and optional `hero`, `mainboard`, or `sideboard` roles.
 - Include deprecated Cards still referenced by decks. Report unavailable cards in `skipped` with quantity and role.
 - Require usable hero artwork for main-deck exports; keep targeted sideboard exports independent.
+- Encounter exports authorize by owner, staff, or public/unlisted visibility, then validate the requested board without requiring whole-record validity, name, or the 20-card minimum. Main exports require usable boss/group artwork and compatible active Evil mainboard references; sideboard exports validate only that board, independently of boss/mainboard/other sideboards. Official status grants no additional access. Preserve `boss`, `mainboard`, and `sideboard` placement roles and selected group identity; see `docs/encounters.md`.
 - Keep direct sheet images public. Preserve endpoint-specific authorization for export creation and deck visibility.
 
 ## Importer Contract
 
 - Keep `tts/importer.lua` attached to an object and spawn native custom decks directly from payload sheets.
 - Reject legacy v1 schemas with a re-export instruction.
+- Accept retained v2 exports by normalizing their collection-wide back to the v3 resource shape. Deduplicate native deck definitions by `(sheet_id, card_back_id)`.
 - Preserve Card Reader identity and collection metadata in GM Notes.
 - Keep `{verifycache}` face URLs and document that artwork refresh becomes visible after a fresh TTS verification session.
 
@@ -46,13 +50,16 @@ Follow `AGENTS.md`, `card-reader-core`, and `tts/README.md`. Treat the website's
 2. Define slot identity, claim ownership, authoritative publication success, cache behavior, and cleanup semantics before changing renderer state.
 3. Keep payload schema changes synchronized across Python serialization, TypeScript handling, Lua validation/spawning, tests, and `tts/README.md`.
 4. Cover pool partitioning, merge behavior, stale claims, failed renders, atomic publication, previous-revision serving, quantities/roles, deprecated cards, and authorization as applicable.
-5. Run core/API/frontend checks plus focused TTS tests. Validate Lua syntax or exercise the importer path when `tts/importer.lua` changes.
+5. Run affected lint/typecheck and permitted frontend checks. Read focused backend tests for coverage; respect `AGENTS.md`'s restriction on running service/integration tests. Validate Lua syntax or exercise the importer path when `tts/importer.lua` changes.
 
 ## Hotspots
 
 - `services/core/src/card_reader_core/models/tts_card_sheet.py`
 - `services/core/src/card_reader_core/repositories/tts_card_sheets`
 - `services/core/src/card_reader_core/services/tts_card_sheets`
+- `services/core/src/card_reader_core/services/card_backs/resolution.py`
+- `services/core/src/card_reader_core/services/exports`
+- `services/api/src/card_reader_api/encounters`
 - `services/api/src/card_reader_api/cards/tts_card_sheets.py`
 - `services/api/src/card_reader_api/exports/tts_cards.py`
 - `services/api/src/card_reader_api/management/commands/*tts*.py`

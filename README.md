@@ -1,7 +1,7 @@
 # Card Reader
 
 Card Reader is a monorepo for importing, parsing, reviewing, and browsing card data.
-It combines a Django API, a shared Python domain layer, an OCR/parser worker, a Vue web app, and a
+It combines a Django API, a shared Python domain layer, an OCR/parser worker, a Vue web app, and
 supporting project automation.
 
 # Feature tracker
@@ -10,7 +10,7 @@ https://trello.com/b/sCM4JM5V/cards
 
 ## What is in this repo
 
-- `frontend`: Vue 3 + Vite frontend for gallery, imports, review, settings, and auth flows
+- `frontend`: Vue 3 + Vite frontend for cards, Player decks, Evil Encounters, Playtester, imports, review, settings, and auth
 - `services/core`: shared Django models, migrations, repositories, services, settings, and storage
 - `services/api`: Django + DRF API service
 - `services/parser`: background OCR/parser worker
@@ -137,7 +137,7 @@ Python services use one shared workspace environment at the repo root.
 When you need to run a specific Python package directly:
 
 ```bash
-uv run --project . --package card-reader-api python manage.py check
+uv run --project . --package card-reader-api python services/api/manage.py check
 uv run --project . --package card-reader-parser python -m card_reader_parser.main
 ```
 
@@ -145,6 +145,12 @@ uv run --project . --package card-reader-parser python -m card_reader_parser.mai
 
 Feature guides, operational documentation, and technical references are indexed in
 [docs/README.md](docs/README.md).
+
+Claude Code loads [CLAUDE.md](CLAUDE.md), which imports the shared project instructions
+and documentation index. All repository skills have discovery wrappers under
+`.claude/skills/`; their full instructions remain in `.codex/skills/`. For example,
+use `/card-reader-frontend` in Claude Code for frontend work. When maintaining a
+skill, keep its Claude wrapper's name, description, and link aligned with the canonical skill.
 
 ## Configuration
 
@@ -174,6 +180,10 @@ Auth is always enabled.
 - Player, Evil, and Neutral card data, groups, generations, embedded payloads, and direct assets
   are public. Pool-partitioned TTS sheet images are public derived artifacts.
 - Public deck detail and deck TTS export are available to any viewer who can access the deck
+- Authenticated users own community Encounters; staff manage all records and control Official
+  status. Valid public/unlisted records support shared detail access; public records also appear
+  in the library. TTS exports authorize by owner, staff, or public/unlisted visibility and validate
+  only the requested board; see [Encounters](docs/encounters.md)
 - Deck building, Playtester, deck TTS eligibility, and developer-data publication remain
   Player-only product contracts rather than card-visibility permissions
 - Import jobs, review, administrative settings APIs, catalog, templates, CSV exports, and gallery/content-version

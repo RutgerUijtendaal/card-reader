@@ -46,6 +46,9 @@ Keep `Card` visually central. Decks and groups should point to `Card`, not to `C
 - `CardVersionParseFlag.submitted_by` is required and points to the Django auth user.
 - `CardVersionParseFlagItem.reviewed_by` is nullable. Show it as optional/dashed or label it clearly as nullable when the distinction matters.
 - `MetadataSuggestion.accepted_tag` and `MetadataSuggestion.accepted_type` are optional accepted metadata links.
+- The Encounter continuation band uses `Encounter`, `EncounterEntry`, `EncounterSideboard`, `EncounterSideboardEntry`, and `EncounterCreation` from `models/encounter.py`. Its Card/CardGroup boxes refer to the same models as the main diagram. `revision` is an optimistic-concurrency counter, not a published revision entity.
+- `DeckCreation` and `EncounterCreation` retain used keys with nullable result links after resource deletion. Do not draw those links as required or cascading deletes.
+- `CardBackImportReceipt` stores a historical hero ID rather than a hero FK; its asset link is nullable. Card-back defaults and Card overrides reference reusable immutable `CardBack` assets.
 
 ## SVG Style Rules
 

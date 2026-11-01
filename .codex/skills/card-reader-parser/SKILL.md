@@ -14,11 +14,13 @@ Follow `AGENTS.md` first. Use this skill both when implementing parser changes a
 - Keep parser provider-agnostic; PaddleOCR remains an adapter behind parser-owned boundaries.
 - Persist results through core repositories and services instead of parser-local data shortcuts.
 - Preserve the async import flow: API creates work, parser claims queued work, parser writes results back through core.
-- Treat the import item's explicit card pool and frozen parser inputs as authoritative for a queued parse. Do not derive them from mutable shell, template, catalog, or current-version state later in processing.
+- Treat the job's explicit pool, classification modes, overrides, and classification-rule snapshot as authoritative. Templates and general catalogs are loaded at processing time; snapshot detector sources are merged into live resources to preserve frozen classification evidence. Do not describe all parser inputs as queue-time snapshots.
 - Preserve raw OCR evidence and field provenance when normalization or pool-specific parsing changes the interpreted value.
 - Keep pool-aware extraction explicit. Player and Evil mana layouts may differ; do not apply one pool's badge/row heuristics to another implicitly.
 - Keep parsed version evidence separate from stable Card classification. Persist classification and identity decisions through core import/card services, including ambiguous Evil fallback and review-item creation.
-- Symbol persistence must respect the frozen parse snapshot; catalog entries deleted after queueing must not be recreated accidentally.
+- Symbol persistence must respect classification evidence and current catalog existence; catalog entries deleted after queueing must not be recreated accidentally.
+- Preserve the three-attempt budget in `ImportJobItem.attempt_count`: claiming increments it atomically before OCR; startup recovery requeues only interrupted work below the cap. Caught parsing errors fail immediately, and terminal retries require a new import or reparse.
+- Processing and recovery share the nonblocking per-job OS lock under `uploads/.parser-locks`. Heartbeats are telemetry, not ownership leases; all workers need the same storage filesystem.
 
 ## Implementation Workflow
 
@@ -30,7 +32,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing parser changes a
 6. Trace claim-time and process-time inputs separately when a task can outlive configuration, template, or catalog changes.
 7. Treat data writes as domain operations; route them through existing repositories/services unless the task explicitly requires a new shared abstraction.
 8. Add fixtures for raw OCR ambiguity and the affected card pool instead of covering only normalized happy paths.
-9. Run lint, typecheck, and relevant tests before finishing.
+9. Run lint and typecheck. Inspect focused backend tests and fixtures for coverage, but do not run service/integration tests under the current `AGENTS.md` policy.
 
 ## Review Focus
 
@@ -40,7 +42,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing parser changes a
 - Persistence shortcuts that bypass shared repositories/services
 - Coupling parser behavior to one OCR implementation in places that should remain adapter-based
 - Pool-specific OCR heuristics applied without an explicit pool branch or regression fixture
-- Mutable catalog/template state replacing the frozen evidence captured for queued work
+- Live catalog sources overriding frozen classification evidence, or code incorrectly treating templates/general catalogs as frozen at admission
 - Parser-side writes that silently mutate stable Card classification or bypass classification review
 - Normalization that discards ambiguous title, mana, or provenance evidence needed for review
 - Missing tests around parsing flow, extraction behavior, or persistence boundaries
@@ -49,6 +51,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing parser changes a
 
 - `services/parser/src`
 - `services/core/src/card_reader_core/repositories/import_jobs`
+- `services/core/src/card_reader_core/imports/locking.py`
 - `services/core/src/card_reader_core/repositories/cards`
 - `services/core/src/card_reader_core/repositories/metadata`
 - `services/core/src/card_reader_core/services/parser_jobs`

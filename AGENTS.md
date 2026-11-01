@@ -23,7 +23,7 @@ Core stack:
 - OCR/CV target: PaddleOCR + OpenCV
 
 ## Repo Structure
-- `frontend`: Vue app for card gallery, imports, review, settings, and login.
+- `frontend`: Vue app for cards, Player decks, Evil Encounters, Playtester, imports, review, settings, and login.
 - `services/core`: shared runtime and domain package.
   - Django models and migrations
   - database connection/adoption helpers
@@ -63,11 +63,11 @@ Core stack:
   - `rules`: rule-text placeholder/rendering helpers.
   - `operations`: operational workflows such as backup/restore.
 - Place feature-specific core services under `services/<feature>/`.
-  - Current service packages include `cards`, `card_groups`, `card_merges`, `catalog`, `decks`, `imports`, `parser_jobs`, and `templates`.
+  - Current service packages include `cards`, `card_groups`, `card_merges`, `catalog`, `decks`, `encounters`, `imports`, `parser_jobs`, and `templates`.
   - `notifications` owns durable user notification creation, event builders, coalescing policy, and future channel fanout seams.
   - Service package `__init__.py` files expose the stable public API for that feature.
 - Place feature-specific core repositories under `repositories/<feature>/`.
-  - Current repository packages include `cards`, `card_groups`, `decks`, `exports`, `import_jobs`, `metadata`, and `templates`.
+  - Current repository packages include `cards`, `card_groups`, `decks`, `encounters`, `exports`, `import_jobs`, `metadata`, and `templates`.
   - `notifications` owns user notification persistence, unread counts, list queries, read-state updates, and coalescing writes.
   - Shared repository helpers belong in `repositories/helpers.py`; avoid recreating legacy `*_repository.py` modules.
 - Prefer importing from package public APIs, such as `card_reader_core.repositories.cards` or `card_reader_core.services.decks`, rather than deep module paths unless the caller is inside the same package.
@@ -87,6 +87,8 @@ Core stack:
 - Co-locate frontend unit and component specs with their source. Reserve `tests/` directories for scenarios spanning several source files.
 - Shared card queries, filters, gallery behavior, sorting, symbols, preferences, and reusable card UI belong in `frontend/src/domain/cards`.
 - Shared deck contracts, clients, constraints, calculations, exports, route helpers, tags, and reusable deck UI belong in `frontend/src/domain/decks`; deck-building contracts live in `frontend/src/domain/deck-building` to keep card/deck ownership acyclic.
+- Shared Player/Encounter builder persistence and creation state machines belong in `frontend/src/shared/drafts`; generic workspace, save status, and recovery/conflict UI belong in `frontend/src/shared/components/builders`. Feature adapters own payloads, codecs, and storage keys. Shared card collection boards, grids, filters, and builder controls belong in `frontend/src/domain/cards`; generic list cards, skeletons, and detail layout belong in shared components.
+- Encounter contracts and clients belong in `frontend/src/domain/encounters`; authoring, list, and detail workflows belong in `frontend/src/features/encounters`. Keep Player rules and Encounter rules separate.
 - Reusable auth/session, notification, template, card-back, review, and access-request contracts and state belong in their matching `frontend/src/domain` slices.
 - Playtester is a frontend-only manual deck sandbox.
   - Deck selection lives at `/playtester` and should reuse existing deck list UI patterns, compact deck cards, summary deck records, and the shared playtest table/lower-bar surface; active play lives at `/playtester/:deckId`.
@@ -173,6 +175,14 @@ Core stack:
   - Rules have `scope` values of `mainboard` or `whole_deck`; scope defaults to `mainboard` unless a rule override changes it.
   - Hard rules can set `blocks_action`; action-blocking hard rules should prevent direct builder actions and API submissions that would exceed the rule.
   - Frontend code should consume `/decks/rules` for defaults and examples, keeping local fallback defaults only for load/error resilience.
+- Encounters are owner-authored Evil boss-fight records, separate from Player Decks.
+  - Active authenticated users can create community Encounters, including incomplete records. The creator is the immutable owner. Owners can inspect all their records and edit/delete community records; staff can inspect and manage every record.
+  - Only staff may set or clear `is_official`. Official status locks ordinary owner mutations and deletion without changing ownership, visibility, or validity. Removing Official restores owner editing. Mutation authorization checks current ownership, Official status, and revision atomically; frontend actions consume `can_edit` and `can_delete`.
+  - Visibility is private, unlisted, or public. Public discovery requires public visibility and current validity; shared public/unlisted detail requires current validity. Owners and staff can inspect unfinished work. Official status grants no additional viewing or export access.
+  - Core owns the 20-card mainboard minimum, active Evil references, Boss/group compatibility, and sideboard validation. Boss selection and sideboards do not count toward the minimum; Player construction rules do not apply.
+  - Creation is creator-keyed and idempotent, with durable receipts surviving deletion. Updates require `revision`; deletes require `If-Match`. Mainboard, sideboards, and metadata save atomically.
+  - Reuse shared builder drafts, board controls, and collection UI. Public, personal, and staff lists use summaries with All/Official/Community filters. Direct Encounter routes select Evil; Playtester remains Player-only.
+  - Authorize exports by owner, staff, or public/unlisted visibility, then validate the requested board. Full validity, name, and the 20-card minimum are not export prerequisites. Main exports require a usable active Evil boss/group and mainboard; sideboard exports require only the selected usable board, independently of boss, mainboard, or other sideboards. Follow `docs/encounters.md` for API and export contracts. Campaigns and immutable published revisions remain proposals.
 - Deck list surfaces that only need listing metadata should use summary deck records/endpoints and `DeckListRecord`-compatible shared components; fetch full `DeckRecord` only for detail, editor, export, or playtest flows that need full board entries.
 - The card detail editor separates card-level and version-level edits:
   - The `Card` tab owns Card Pool, multi-valued Card Roles, Factions, and Mana Families, Card Status, and Deck-Building Config; Normal, No faction, and Colorless are derived when their assignment sets are empty.
@@ -191,7 +201,7 @@ Core stack:
   - Classification mismatches belong in Review rather than import warnings. Do not reintroduce a parallel `card_classification_mismatch` warning path.
 
 ## Auth Rules
-- Auth is enabled by default.
+- Auth is always enabled.
 - Player, Evil, and Neutral card galleries, details, groups, generations, embedded payloads, and
   direct assets are public. Pool-partitioned TTS card-sheet images are public at stable URLs for all three pools.
   Deck TTS exports follow deck visibility; gallery and content-version TTS export creation requires
@@ -199,6 +209,8 @@ Core stack:
 - Player remains the default workspace. Player-only deck building, Playtester, deck TTS eligibility, and developer-data publication are product contracts rather than card-visibility permissions.
 - Import jobs, review, admin, catalog, templates, and user-selected exports require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
+- Encounter creation requires an active authenticated user. Owners manage community records; staff manage all records and exclusively control Official status. Shared public/unlisted detail requires current validity; public discovery additionally requires public visibility. Export access and board validation follow the Encounter rules above.
+- `/internal/monitoring` uses a dedicated bearer token, not sessions. An unset monitoring token disables access; diagnostics are bounded and read-only, and database unavailability returns an explicit unavailable payload.
 - Developer-data metadata, browser downloads, and bootstrap-code creation require an active
   authenticated user who is either staff or has the Developer role. Code exchange is
   unauthenticated, but exchange and download-token authorization must re-check that the issuing
@@ -219,12 +231,14 @@ Core stack:
 ## Developer Data
 - `dev-data/selection.json` owns the reviewed public selection keys and coverage requirements;
   `dev-data.lock.json` pins the immutable bundle version, format, SHA-256, and website API URL.
-- Developer-data bundles may contain catalogs, templates, deck tags, symbol assets, the current card
-  back, and curated cards with their versions, images, aliases, groups, metadata, content versions,
+- Developer-data bundles may contain catalogs, templates, classification rules, deck tags, symbol assets,
+  immutable card-back assets with pool/role/Evil-faction defaults and Card overrides, and selected Player
+  cards with their versions, images, aliases, groups, metadata, content versions,
   lifecycle state, and deck-building overrides.
 - Developer-data bundles do not contain TTS card-sheet rows, coordinates, or rendered atlases. After
-  import, reconcile and render fresh local sheets from the imported Card images.
-- Bundles must exclude users, decks, notifications, activity/access records, import jobs, uploads,
+  import, reconcile fresh local sheets from the imported Card images; bootstrap rendering is optional.
+- Bundles must exclude users, decks, Encounters and their boards/creation receipts, card-back import
+  receipts, notifications, activity/access records, import jobs, uploads,
   raw OCR, parse flags, suggestions, logs, debug crops, credentials, and source/server paths.
 - Production bundles live outside `maintenance/`, under `/var/lib/card-reader/dev-data` by default.
   Published versions are immutable and retained for older pinned branches.
@@ -253,8 +267,8 @@ Core stack:
   serializers, exports, or UI.
   Broken explicit overrides remain explicit and never silently inherit. Card override writes stay in
   the atomic Card edit workflow; card-back repositories own only assets plus pool- and
-  role- and faction-default assignments.
-- Website TTS exports for decks, sideboards, gallery selections, and content versions all use the
+  role- and faction-default assignments plus import receipts.
+- Website TTS exports for decks, Encounters, their sideboards, gallery selections, and content versions all use the
   `card-reader.tts-cards.v3` persistent-sheet payload. The object importer spawns those sheets directly and must not
   depend on scripting regions, preloaded card libraries, name matching, or automatic library synchronization.
 - TTS deck exports preserve saved quantities and order, mark hero/mainboard/sideboard roles, include deprecated
@@ -271,6 +285,8 @@ Core stack:
   `alpine:3.21` probe as `linux/amd64`; keep this aligned with the parser service platform.
 - API container startup runs migrations, then Gunicorn.
 - Parser container waits for the API health check and assumes the schema is ready.
+- Import item claims atomically increment a durable three-attempt budget before OCR. Startup recovery requeues only interrupted items below that limit; caught errors fail immediately. Processing and recovery share per-job OS locks under `uploads/.parser-locks`, and all workers must share the same storage filesystem. Heartbeats remain telemetry rather than ownership.
+- Classification rules and their detector source definitions are snapshotted at admission; templates and general catalogs are loaded at processing time with frozen classification sources merged into the live resources.
 - Parser container uses `DJANGO_SETTINGS_MODULE=card_reader_core.django_settings`.
 - Runtime settings are provided through `CARD_READER_*` environment variables.
 - Runtime storage is the repo-root `storage/` directory in development. The Python source package `card_reader_core/storage` is tracked; keep `.gitignore` scoped to `/storage/` for runtime data.
@@ -372,7 +388,18 @@ Python-specific tricks.
 - `POST /developer-data/grants`
 - `POST /developer-data/grants/exchange`
 - `GET /developer-data/bundles/{version}/download`
-- `GET/POST/PATCH/DELETE /settings/*`
+- Administrative APIs use `/admin/*`, including catalog, templates, classification rules, and card backs; `/settings` is a frontend route.
+- `POST /admin/card-backs/import-items` and `GET /admin/card-backs/import-items/{client_request_id}`
+- `GET /encounters`, `/encounters/rules`, `/encounters/{id}`, and `/encounters/{id}/exports/tts`
+- `GET /encounters/bosses` (authenticated)
+- `GET/POST /my/encounters`
+- `GET/PATCH/DELETE /my/encounters/{id}`
+- `GET /my/encounters/by-creation-key/{key}`
+- `GET/POST /staff/encounters`
+- `GET/PATCH/DELETE /staff/encounters/{id}`
+- `GET /staff/encounters/bosses` and `/staff/encounters/by-creation-key/{key}`
+- `GET /operations` and `/operations/queues/{queue_key}`
+- `GET /internal/monitoring`
 - `POST /auth/login`
 - `POST /auth/logout`
 - `GET /auth/me`

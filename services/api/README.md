@@ -19,28 +19,30 @@ Domain models, migrations, repositories, and shared business services live in `s
 
 ## Commands
 
+Run these commands from the repository root:
+
 Run migrations:
 
 ```bash
-uv run --project . python manage.py migrate_card_reader
+uv run --project . --package card-reader-api python services/api/manage.py migrate_card_reader
 ```
 
 Adopt and verify an existing database:
 
 ```bash
-uv run --project . python manage.py adopt_schema
+uv run --project . --package card-reader-api python services/api/manage.py adopt_schema
 ```
 
 Create the first administrator for a fresh installation:
 
 ```bash
-uv run --project . python manage.py createsuperuser
+uv run --project . --package card-reader-api python services/api/manage.py createsuperuser
 ```
 
 Run the API locally:
 
 ```bash
-uv run --project . python manage.py runserver 127.0.0.1:8000
+uv run --project . --package card-reader-api python services/api/manage.py runserver 127.0.0.1:8000
 ```
 
 Run the package scripts:
@@ -63,6 +65,12 @@ Auth is always enabled.
 - The temporary `/tts/cache-test/card-image` diagnostic, symbol assets, `/health`, and `/auth/*`
   are public.
 - Public deck detail and deck TTS export are available to any viewer who can access the deck.
+- Authenticated Encounter authors use `/my/encounters`; owners manage community records, and
+  staff manage all records and exclusively control Official status. Shared public/unlisted detail
+  requires validity; public discovery also requires public visibility. TTS exports authorize by
+  owner, staff, or public/unlisted visibility and validate only the requested board.
+- `/internal/monitoring` uses a dedicated bearer token, independently of session authentication.
+  An unset `CARD_READER_MONITORING_TOKEN` disables access; keep the endpoint private at the proxy.
 - Import jobs, review, administrative settings APIs, catalog, templates, CSV exports, and
   `POST /exports/tts/cards` require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
@@ -70,7 +78,7 @@ Auth is always enabled.
   active user assigned the Developer role through the managed-users API.
 - Developer-data build creation, history, and lock-file downloads require `is_staff=true`.
 - Bootstrap-code exchange is public by design; codes are single-use, expire after 10 minutes, and
-  yield a hashed bearer token that can retry the pinned download for 30 minutes.
+  yield a bearer token that can retry the pinned download for 30 minutes. Only its hash is stored server-side.
 
 The Vue app uses Django session auth with CSRF protection. `/auth/me` and `/auth/login` return the
 current user payload and a CSRF token used by the browser client for unsafe requests. Session
@@ -107,12 +115,12 @@ HTTP surface:
 
 ## Docker
 
-The API container runs:
+From its `services/api` working directory, the API container runs:
 
 ```bash
 python manage.py migrate_card_reader
 gunicorn card_reader_api.project.wsgi:application --pythonpath src --bind 0.0.0.0:8000
 ```
 
-The parser and developer-data builder containers wait for the API health check and share the same
-data volume. The builder processes queued staff requests; it does not import bundles into production.
+The parser, developer-data builder, and TTS sheet renderer containers wait for the API health check
+and share the same runtime storage. The builder processes queued staff requests; it does not import bundles into production.

@@ -30,7 +30,12 @@ Follow `AGENTS.md` first. Use this skill when reviewing pull requests, local dif
 - Viewer-dependent pool redaction or workspace-scoped Admin/Review behavior despite equal public card-pool access
 - Import pipeline regressions in async job creation, claiming, and persistence
 - Developer-data changes that weaken current validation, break retained immutable formats, include private/operational rows, or hand-edit the lock
-- TTS changes that reuse/move slots, mix pools on a sheet, publish without the live claim, or drift from the shared v2 payload
+- TTS changes that reuse/move slots, mix pools on a sheet, publish without the live claim, or drift from the shared v3 payload and retained-v2 importer compatibility
+- Per-card backs that bypass bulk resolution, silently inherit past a broken override, or deduplicate native TTS definitions by sheet alone rather than sheet plus back
+- Encounter regressions that apply Player rules, break immutable ownership or staff overrides, allow ordinary owners to mutate Official records, expose invalid records through public discovery/shared detail, omit sideboards from validity, or bypass atomic permission/revision and creation-receipt checks
+- Encounter exports that bypass owner/staff/public-or-unlisted authorization, require whole-record validity instead of requested-board validation, or make a usable sideboard depend on boss/mainboard/other sideboards
+- Duplicate builder draft/recovery machinery outside `frontend/src/shared/drafts`, or shared collection UI imported feature-to-feature instead of through cards/shared owners
+- Parser interruption recovery that resets the three-attempt budget, replays completed items, or replaces per-job OS locks with heartbeat-based ownership
 - Missing lint, typing, or test coverage for touched behavior
 - Stateful workflows encoded as interacting flags without an explicit transition model
 - Cleanup failures that block or undo an already confirmed authoritative success
@@ -58,7 +63,7 @@ Follow `AGENTS.md` first. Use this skill when reviewing pull requests, local dif
 4. Check that backend changes preserve the controller -> service -> repository boundary.
 5. Prefer concrete findings with file references and impact.
 6. Call out missing tests when a regression risk is not otherwise covered.
-7. Treat lint and typecheck as baseline, not as substitutes for code review.
+7. Treat lint and typecheck as baseline for code changes, not substitutes for review. For docs/skills-only changes, validate the artifacts directly. Respect `AGENTS.md`'s restriction on running service/integration tests.
 8. Keep summaries brief and secondary.
 
 ## Implementation Follow-Through

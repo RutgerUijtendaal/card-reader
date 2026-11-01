@@ -15,7 +15,7 @@ Claiming is coordinated through the shared core layer. This prevents the API, pa
 
 ## Service responsibilities
 
-- The API owns HTTP upload streaming, request authorization, fingerprint-isolated staging, admission responses, cancellation requests, and retry actions. Its upload view delegates claimed/discarded/uncertain lifecycle decisions to the import admission boundary.
+- The API owns HTTP upload streaming, request authorization, fingerprint-isolated staging, admission responses, cancellation requests, and idempotent admission retries. Its upload view delegates claimed/discarded/uncertain lifecycle decisions to the import admission boundary.
 - The parser owns polling, OCR adapters, region parsing, symbol detection, and extraction logic. It does not depend on API views or serializers.
 - Core owns creation prevalidation, the atomic content-version/job/item transaction, grouped reparse planning, job claiming, persistence, state transitions, storage paths, and the domain services used by both processes. Template and maintenance reparses use the same grouped operation and transaction.
 
@@ -73,8 +73,7 @@ under `/operations`; its latest page refreshes automatically while older pages r
 inspection. Active jobs, recent history, and an open detail are refreshed through one activity
 coordinator. Each read keeps independent error state, stale responses cannot replace newer manual
 selection, and a non-terminal open detail receives its terminal refresh even after the active list
-becomes empty. Failed or cancelled items can be retried through supported API and UI flows rather than
-by manually editing database state. Worker claims and state transitions are designed to avoid two
+becomes empty. To retry terminal failed or cancelled work, submit a new import or an applicable card/template reparse. There is no endpoint that resets terminal items in the original job; do not manually reset database state. Worker claims and state transitions are designed to avoid two
 workers completing the same queued item.
 
 ## Review and card history
@@ -85,4 +84,4 @@ New cards receive the import pool plus resolved roles, factions, and mana famili
 
 Import activity shows the job snapshot's rule count and digest. Item details show resolved roles, factions, and mana families plus matching Tag, Type, and Symbol sources after the parser has persisted that evidence. Queued or active items are marked as classification pending, while terminal items that never produced evidence are marked unavailable rather than being presented as an empty derived state. Automatic classification with no matching rules is a completed Normal/No faction/Colorless result, except that an empty Evil faction result is explicitly flagged for review rather than presented as reviewed stable classification. Mismatch evidence includes stored/live values, the queued snapshot when applicable, inferred values, and matching rules, with a direct Card-tab review link.
 
-Reparsing creates new content through the card-version workflow instead of erasing historical state. See [Card management](card-management.md) for the distinction between a stable card identity and its versions.
+Targeted reparses update the existing latest CardVersion in place, preserving manual field overrides unless a template change resets them. An untargeted import can reuse the latest version for the same image or create a new version, including a content-version snapshot when required. Reparsing is therefore not an automatic historical-version boundary. See [Card management](card-management.md) for the distinction between a stable card identity and its versions.

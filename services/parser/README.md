@@ -17,10 +17,10 @@ serializers, URLs, DRF settings, or API-only services.
 
 ## Commands
 
-Run the parser locally:
+Run the parser locally from the repository root:
 
 ```bash
-uv run --project . python -m card_reader_parser.main
+uv run --project . --package card-reader-parser python -m card_reader_parser.main
 ```
 
 Run package scripts:
@@ -35,7 +35,8 @@ pnpm --filter @card-reader/parser typecheck
 ## Docker
 
 The parser container shares the API data volume and starts after the API health check passes. The API
-container owns migration and seed startup. The parser assumes the database schema is ready.
+container owns migration startup. Catalogs and templates come from developer-data bootstrap or
+staff management, not automatic production seeding. The parser assumes the database schema is ready.
 
 The locked PaddlePaddle build supports native parser development on Windows x86_64, Linux x86_64,
 and macOS ARM64 with Python 3.12 or 3.13. The container defaults to `linux/amd64`, including on
