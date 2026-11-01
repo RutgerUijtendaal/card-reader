@@ -247,7 +247,7 @@ describe('CardGalleryPage pool-aware filters', () => {
     staleResponse.resolve({ data: { ...emptyCardsPage, count: 37 } });
     await flushPromises();
 
-    expect(mounted.container.textContent).not.toContain('37 results');
+    expect(mounted.container.textContent).not.toContain('37 cards');
 
     releaseCanonicalReplace.resolve();
     await vi.waitFor(() => {
@@ -379,6 +379,14 @@ describe('CardGalleryPage pool-aware filters', () => {
     mounted.unmount();
   });
 
+  const openExportMenu = async (container: HTMLElement): Promise<HTMLButtonElement[]> => {
+    container.querySelector<HTMLButtonElement>('[aria-label="Export cards"]')?.click();
+    await flushPromises();
+    return Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).filter(
+      (button) => button.textContent?.includes('Export'),
+    );
+  };
+
   test('keeps exports ready for catalog-independent fallback results', async () => {
     authState.canAccessStaffRoutes = true;
     const mounted = await mountGallery(
@@ -388,9 +396,7 @@ describe('CardGalleryPage pool-aware filters', () => {
       () => Promise.reject(new Error('facet failure')),
     );
 
-    const exportButtons = Array.from(mounted.container.querySelectorAll('button')).filter(
-      (button) => button.textContent?.includes('Export'),
-    );
+    const exportButtons = await openExportMenu(mounted.container);
     expect(exportButtons).toHaveLength(2);
     expect(exportButtons.every((button) => !button.disabled)).toBe(true);
 
@@ -407,9 +413,7 @@ describe('CardGalleryPage pool-aware filters', () => {
       false,
     );
 
-    const exportButtons = Array.from(mounted.container.querySelectorAll('button')).filter(
-      (button) => button.textContent?.includes('Export'),
-    );
+    const exportButtons = await openExportMenu(mounted.container);
     expect(exportButtons).toHaveLength(2);
     expect(exportButtons.every((button) => button.disabled)).toBe(true);
 
@@ -662,13 +666,13 @@ describe('CardGalleryPage pool-aware filters', () => {
       () => Promise.resolve({ data: { ...emptyCardsPage, count: 7 } }),
       () => Promise.reject(new Error('facet failure')),
     );
-    expect(mounted.container.textContent).toContain('7 results');
+    expect(mounted.container.textContent).toContain('7 cards');
 
     await mounted.router.push('/cards?tag_keys=dragon');
     await flushPromises();
 
     expect(mounted.requestRoutes).toEqual(['/cards']);
-    expect(mounted.container.textContent).not.toContain('7 results');
+    expect(mounted.container.textContent).not.toContain('7 cards');
     expect(mounted.container.textContent).toContain('Filter options could not be loaded');
 
     mounted.unmount();
@@ -696,7 +700,7 @@ describe('CardGalleryPage pool-aware filters', () => {
 
     expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?tag_keys=dragon');
     expect(mounted.requestRoutes).toEqual(['/cards']);
-    expect(mounted.container.textContent).not.toContain('7 results');
+    expect(mounted.container.textContent).not.toContain('7 cards');
 
     mounted.unmount();
   });

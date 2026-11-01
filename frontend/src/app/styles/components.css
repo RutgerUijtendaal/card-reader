@@ -241,6 +241,22 @@
     padding-top: 0.25rem;
   }
 
+  /* In-page section menus read like the app sidebar: flat rows, the current one marked by an accent bar. */
+  .theme-side-nav-item {
+    border: 1px solid transparent;
+  }
+
+  .theme-side-nav-item:hover:not(.theme-side-nav-item-active) {
+    background: var(--color-surface-soft);
+  }
+
+  .theme-side-nav-item.theme-side-nav-item-active {
+    border-color: transparent;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+
   .theme-panel-shell {
     @apply rounded-lg border;
     border-color: var(--color-border);

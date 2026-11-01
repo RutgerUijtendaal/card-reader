@@ -16,7 +16,7 @@ vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
     setup:
       (props, { slots }) =>
       () =>
-        h('header', [props.title, slots.actions?.()]),
+        h('header', [props.title, slots.actions?.(), slots.center?.(), slots.bottomLeft?.()]),
   }),
 }));
 const record = (overrides: Partial<EncounterSummary> = {}): EncounterSummary => ({

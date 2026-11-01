@@ -6,7 +6,36 @@
       subtitle="Review updates tied to your decks, submitted flags, and account activity."
       title-tag="h2"
       title-class="text-xl"
-    />
+    >
+      <template #actions>
+        <AppHeaderAction
+          :icon="CheckCheck"
+          label="Mark all read"
+          short-label="Mark all read"
+          :disabled="unreadNotificationCount === 0 || markingAllRead"
+          @click="handleMarkAllRead"
+        />
+      </template>
+      <template #bottomLeft>
+        <p class="theme-section-muted text-sm tabular-nums">
+          <span class="theme-section-title font-medium">{{ activeTypeOption.label }}</span>
+          · {{ notifications.length }} of {{ page.count }} shown · {{ unreadNotificationCount }} unread
+        </p>
+      </template>
+      <template #bottomRight>
+        <GalleryOptionsMenu
+          :hover-mode="effectiveHoverMode"
+          :default-hover-mode="defaultHoverMode"
+          :hover-mode-override-active="notificationHoverModeOverride !== null"
+          allow-hover-mode-default-option
+          :card-scale="cardScale"
+          :show-card-groups-control="false"
+          @update:hover-mode="setNotificationHoverModeOverride"
+          @reset:hover-mode="clearNotificationHoverModeOverride"
+          @update:card-scale="cardScale = $event"
+        />
+      </template>
+    </AppPageHeader>
 
     <AppPageLayout
       columns="one"
@@ -15,8 +44,7 @@
       <template #aside>
         <AppStickyAside scroll-class="space-y-4">
           <AppSideNav
-            title="Notification filters"
-            :description="`Show the updates that matter right now. ${unreadNotificationCount} new.`"
+            title="Show"
             navigation-label="Notification type filters"
           >
             <AppSideNavItem
@@ -29,55 +57,10 @@
               @click="selectType(option.value)"
             />
           </AppSideNav>
-
-          <template #footer>
-            <GalleryOptionsMenu
-              :hover-mode="effectiveHoverMode"
-              :default-hover-mode="defaultHoverMode"
-              :hover-mode-override-active="notificationHoverModeOverride !== null"
-              allow-hover-mode-default-option
-              :card-scale="cardScale"
-              :show-card-groups-control="false"
-              @update:hover-mode="setNotificationHoverModeOverride"
-              @reset:hover-mode="clearNotificationHoverModeOverride"
-              @update:card-scale="cardScale = $event"
-            />
-          </template>
         </AppStickyAside>
       </template>
 
       <section class="pt-0">
-        <div class="theme-divider mb-4 flex flex-wrap items-start justify-between gap-3 border-b pb-4">
-          <div class="flex min-w-0 items-start gap-3">
-            <div
-              class="theme-card-frame-muted theme-section-title flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-              aria-hidden="true"
-            >
-              <component
-                :is="activeTypeOption.icon"
-                class="h-5 w-5"
-              />
-            </div>
-            <div class="min-w-0">
-              <h3 class="theme-section-title text-base font-semibold">
-                {{ activeTypeOption.label }}
-              </h3>
-              <p class="theme-section-muted mt-1 text-sm">
-                {{ notifications.length }} loaded · {{ page.count }} total
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            class="btn-secondary inline-flex shrink-0 items-center gap-2"
-            :disabled="unreadNotificationCount === 0 || markingAllRead"
-            @click="handleMarkAllRead"
-          >
-            <CheckCheck class="h-4 w-4" />
-            <span>Mark all read</span>
-          </button>
-        </div>
-
         <div
           v-if="loadingInitial"
           class="theme-divider"
@@ -164,6 +147,7 @@ import type { Component } from 'vue';
 import { toast } from 'vue-sonner';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
+import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import AppSideNav from '@/shared/components/app/AppSideNav.vue';
 import AppSideNavItem from '@/shared/components/app/AppSideNavItem.vue';

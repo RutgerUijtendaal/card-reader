@@ -31,6 +31,9 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - In the card detail editor, keep card-level controls on the `Card` tab and version-level controls on the `Card Version` tab.
 - Use `JsonEditorField` for deck-building config JSON so formatting, validation affordances, and examples stay consistent with other admin JSON inputs.
 - For routed app pages with filters, local navigation, summaries, or page controls, prefer the shared `AppPageLayout` and `AppStickyAside` structure.
+- Browse pages (Gallery, Decks, Encounters) put search and the result count in the page header's toolbar row with `AppCollectionSearch`, Public/Mine scope in the header center with `AppScopeTabs`, and result-level controls such as sort, view options, and exports on the right of that row. Their filter aside holds facets only (`GalleryFilterSidebar` with `showSearch` off). Builders keep search at the top of their filter column.
+- Collection detail pages put board switching (`AppBoardTabs`) and view options in the same header toolbar row; in-page section menus use the flat `AppSideNavItem` rows.
+- Empty results use `AppEmptyState` with a next step, such as clearing filters or starting a build.
 - Routed pages that fetch initial page data should expose a full, layout-shaped skeleton loading state instead of falling through to empty states or text-only loading labels.
 - Primary page lists and content should use the shell page scroll; avoid max-height primary list containers that trap content.
 - Desktop asides should behave as edge-attached side panels below the lifted shell header, use the shared aside width, keep bounded inner scrolling only inside the aside, and place persistent footer controls in the shared footer slot so they anchor at the bottom.

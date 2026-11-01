@@ -1,41 +1,9 @@
 <template>
   <GalleryFilterSidebar
-    title="Deck Filters"
-    :description="description"
-    :query="controller.query.value"
-    :on-update-query="controller.updateQuery"
-    search-placeholder="Search decks, heroes, owners, or cards..."
-    :total-count="totalCount"
+    title="Filters"
+    :show-search="false"
     :on-reset="controller.resetFilters"
   >
-    <div
-      v-if="canUseOwnedDecks"
-      class="theme-divider space-y-3 border-b pb-4"
-    >
-      <div class="space-y-1">
-        <p class="theme-kicker text-xs font-semibold uppercase tracking-[0.16em]">
-          Deck Library
-        </p>
-      </div>
-
-      <div class="theme-tablist w-full">
-        <RouterLink
-          class="theme-tab flex-1"
-          :class="mode === 'public' ? 'theme-tab-active' : ''"
-          :to="publicTo"
-        >
-          Public
-        </RouterLink>
-        <RouterLink
-          class="theme-tab flex-1"
-          :class="mode === 'owned' ? 'theme-tab-active' : ''"
-          :to="ownedTo"
-        >
-          My Decks
-        </RouterLink>
-      </div>
-    </div>
-
     <SymbolToggleGroup
       v-model:included-value="selectedAffinitySymbolIds"
       v-model:excluded-value="excludedAffinitySymbolIds"
@@ -61,8 +29,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { RouterLink } from 'vue-router';
-import type { RouteLocationRaw } from 'vue-router';
 import SymbolToggleGroup from '@/domain/cards/components/filters/SymbolToggleGroup.vue';
 import MetadataPillGroup, {
   type MetadataPillOptionGroup,
@@ -72,19 +38,7 @@ import type { DeckBrowseFiltersController } from '@/features/decks/composables/u
 
 const props = defineProps<{
   controller: DeckBrowseFiltersController;
-  totalCount: number;
-  description?: string;
-  mode: 'public' | 'owned';
-  canUseOwnedDecks: boolean;
-  publicTo: RouteLocationRaw;
-  ownedTo: RouteLocationRaw;
 }>();
-
-const description = computed(
-  () =>
-    props.description ??
-    'Filter public decks by deck, hero, owner, included cards, affinity, and tags.',
-);
 
 const selectedAffinitySymbolIds = computed({
   get: () => props.controller.affinitySymbolIds.value,

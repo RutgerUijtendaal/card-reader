@@ -15,13 +15,6 @@
     >
       <template #actions>
         <AppHeaderAction
-          v-if="auth.canAccessStaffRoutes && !staff"
-          :icon="APP_SECTION_ICONS.encounters"
-          label="Manage Encounters"
-          short-label="Manage"
-          :to="{ path: '/staff/encounters', query: filterQuery }"
-        />
-        <AppHeaderAction
           v-if="auth.authenticated"
           :icon="APP_SECTION_ICONS.encounterBuilder"
           label="Build Encounter"
@@ -30,43 +23,33 @@
           to="/my/encounters/new"
         />
       </template>
+      <template
+        v-if="auth.authenticated"
+        #center
+      >
+        <AppScopeTabs
+          label="Encounter library"
+          :tabs="scopeTabs"
+        />
+      </template>
+      <template #bottomLeft>
+        <AppCollectionSearch
+          :query="query"
+          placeholder="Search Encounters by name..."
+          :total-count="count"
+          :result-noun="['Encounter', 'Encounters']"
+          @update:query="(value) => (query = value)"
+        />
+      </template>
     </AppPageHeader>
     <AppPageLayout>
       <template #aside>
         <GalleryFilterSidebar
-          title="Encounter Filters"
-          description="Search by name and assigned factions."
-          :query="query"
-          :on-update-query="(value) => (query = value)"
-          search-placeholder="Search Encounters..."
-          :total-count="count"
+          title="Filters"
+          :show-search="false"
           :on-reset="reset"
         >
-          <div
-            v-if="auth.authenticated"
-            class="theme-divider space-y-3 border-b pb-4"
-          >
-            <p class="theme-kicker text-xs font-semibold uppercase tracking-[0.16em]">
-              Encounter Library
-            </p>
-            <div class="theme-tablist w-full">
-              <RouterLink
-                class="theme-tab flex-1"
-                :class="!staff && !mine ? 'theme-tab-active' : ''"
-                :to="{ path: '/encounters', query: filterQuery }"
-              >
-                Public
-              </RouterLink>
-              <RouterLink
-                class="theme-tab flex-1"
-                :class="mine ? 'theme-tab-active' : ''"
-                :to="{ path: '/my/encounters', query: filterQuery }"
-              >
-                My Encounters
-              </RouterLink>
-            </div>
-          </div>
-          <div class="space-y-3">
+          <section class="theme-filter-section space-y-3">
             <h3 class="theme-section-title text-sm font-semibold">
               Official status
             </h3>
@@ -80,8 +63,8 @@
                 {{ option.label }}
               </ChoicePill>
             </div>
-          </div>
-          <div class="space-y-3">
+          </section>
+          <section class="theme-filter-section space-y-3">
             <h3 class="theme-section-title text-sm font-semibold">
               Factions
             </h3>
@@ -95,7 +78,7 @@
                 {{ option.label }}
               </ChoicePill>
             </div>
-          </div>
+          </section>
         </GalleryFilterSidebar>
       </template>
       <div
@@ -121,18 +104,40 @@
           Retry
         </button>
       </div>
-      <div
+      <AppEmptyState
         v-else-if="!records.length"
-        class="page-card theme-section-muted text-sm"
-      >
-        {{
-          query || factions.length || official
+        :icon="mine ? APP_SECTION_ICONS.myEncounters : APP_SECTION_ICONS.encounters"
+        :title="
+          hasActiveFilters
             ? 'No Encounters match the current filters.'
             : staff || mine
               ? 'No saved Encounters yet.'
               : 'No public Encounters yet.'
-        }}
-      </div>
+        "
+        :message="
+          hasActiveFilters
+            ? 'Try removing a filter or searching for something else.'
+            : mine
+              ? 'Pick a boss and build an Evil deck to challenge players.'
+              : 'Encounters that players publish appear here.'
+        "
+      >
+        <button
+          v-if="hasActiveFilters"
+          class="btn-secondary"
+          type="button"
+          @click="reset"
+        >
+          Clear filters
+        </button>
+        <RouterLink
+          v-else-if="auth.authenticated"
+          class="btn-primary"
+          to="/my/encounters/new"
+        >
+          Build Encounter
+        </RouterLink>
+      </AppEmptyState>
       <div
         v-else
         class="app-page-single-column grid gap-4"
@@ -173,7 +178,7 @@
   </section>
 </template>
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { useIntersectionObserver } from '@vueuse/core';
 import { CARD_FACTION_OPTIONS } from '@/domain/cards/cardFactions';
@@ -182,6 +187,9 @@ import GalleryFilterSidebar from '@/domain/cards/components/filters/GalleryFilte
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
+import AppCollectionSearch from '@/shared/components/app/AppCollectionSearch.vue';
+import AppEmptyState from '@/shared/components/app/AppEmptyState.vue';
+import AppScopeTabs, { type AppScopeTab } from '@/shared/components/app/AppScopeTabs.vue';
 import CollectionLoadingSkeleton from '@/shared/components/CollectionLoadingSkeleton.vue';
 import ChoicePill from '@/shared/components/ChoicePill.vue';
 import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
@@ -211,6 +219,31 @@ const {
   reset,
   toggleFaction,
 } = useEncounterList();
+const hasActiveFilters = computed(() => Boolean(query.value || factions.value.length || official.value));
+const scopeTabs = computed<AppScopeTab[]>(() => [
+  {
+    label: 'Public',
+    to: { path: '/encounters', query: filterQuery.value },
+    active: !staff.value && !mine.value,
+    icon: APP_SECTION_ICONS.encounters,
+  },
+  {
+    label: 'My Encounters',
+    to: { path: '/my/encounters', query: filterQuery.value },
+    active: mine.value,
+    icon: APP_SECTION_ICONS.myEncounters,
+  },
+  ...(auth.canAccessStaffRoutes
+    ? [
+        {
+          label: 'All',
+          to: { path: '/staff/encounters', query: filterQuery.value },
+          active: staff.value,
+          icon: APP_SECTION_ICONS.admin,
+        },
+      ]
+    : []),
+]);
 const sentinel = ref<HTMLElement | null>(null);
 const visible = ref(false);
 useIntersectionObserver(

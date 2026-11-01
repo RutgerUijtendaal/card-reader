@@ -86,7 +86,7 @@
       >
         <div
           v-if="hasBottomLeft"
-          class="flex flex-wrap items-center gap-2"
+          class="flex min-w-[16rem] flex-1 flex-wrap items-center gap-2"
         >
           <slot name="bottomLeft" />
         </div>

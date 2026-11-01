@@ -65,6 +65,8 @@ vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
               ? h('p', { 'data-testid': 'header-subtitle' }, props.subtitle)
               : null,
           slots.actions?.(),
+          slots.bottomLeft?.(),
+          slots.bottomRight?.(),
         ]);
     },
   }),
@@ -381,7 +383,7 @@ describe('DeckDetailPage type grouping', () => {
     unspecifiedMounted.unmount();
   });
 
-  test('places the deck description below the hero and anchors mana controls above the footer', async () => {
+  test('places the deck description below the hero, anchors mana controls, and keeps view options in the header toolbar', async () => {
     const mounted = await mountPage();
     const header = mounted.container.querySelector('header');
     const description = mounted.container.querySelector<HTMLElement>('[data-testid="deck-description"]');
@@ -394,8 +396,7 @@ describe('DeckDetailPage type grouping', () => {
     expect(manaSection?.classList.contains('!mt-auto')).toBe(true);
     expect(description?.compareDocumentPosition(manaSection as Node) ?? 0)
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(manaSection?.compareDocumentPosition(viewOptions as Node) ?? 0)
-      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(header?.contains(viewOptions)).toBe(true);
 
     mounted.unmount();
   });

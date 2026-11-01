@@ -13,7 +13,7 @@
     class="flex flex-col gap-5"
   >
     <AppPageHeader
-      :icon="BookOpenText"
+      :icon="APP_SECTION_ICONS.decks"
       :title="deck.name"
       :back-to="backLink"
       :back-label="backLabel"
@@ -55,6 +55,25 @@
           short-label="Playtest"
           variant="primary"
           :to="`/playtester/${deck.id}`"
+        />
+      </template>
+
+      <template #bottomLeft>
+        <AppBoardTabs
+          v-model="activeBoardId"
+          label="Deck boards"
+          :tabs="boardTabs"
+        />
+      </template>
+      <template #bottomRight>
+        <span class="theme-section-muted text-sm tabular-nums">
+          {{ deck.totals.overall_total_cards }} cards across all boards
+        </span>
+        <CardCollectionViewOptions
+          v-model:card-scale="cardScale"
+          v-model:group-by-type="groupByType"
+          :sort-surface="sortSurface"
+          :hover-surface="hoverSurface"
         />
       </template>
     </AppPageHeader>
@@ -192,14 +211,6 @@
           </div>
         </div>
       </template>
-      <template #aside-footer>
-        <CardCollectionViewOptions
-          v-model:card-scale="cardScale"
-          v-model:group-by-type="groupByType"
-          :sort-surface="sortSurface"
-          :hover-surface="hoverSurface"
-        />
-      </template>
       <template #details>
         <section
           v-if="activeDetailPanel === 'summary' && deck.long_description"
@@ -237,39 +248,6 @@
         </button>
       </template>
       <section class="space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex flex-wrap items-center gap-2">
-            <button
-              class="theme-pill text-xs"
-              :class="activeBoardId === 'mainboard' ? 'theme-pill-accent' : 'theme-pill-neutral'"
-              type="button"
-              @click="activeBoardId = 'mainboard'"
-            >
-              Mainboard
-              <span class="ml-1 opacity-80">
-                {{ deck.mainboard.total_cards }} / {{ deck.mainboard.unique_cards }}
-              </span>
-            </button>
-            <button
-              v-for="sideboard in deck.sideboards"
-              :key="sideboard.id"
-              class="theme-pill text-xs"
-              :class="activeBoardId === sideboard.id ? 'theme-pill-accent' : 'theme-pill-neutral'"
-              type="button"
-              @click="activeBoardId = sideboard.id"
-            >
-              {{ sideboard.name }}
-              <span class="ml-1 opacity-80">
-                {{ sideboard.total_cards }} / {{ sideboard.unique_cards }}
-              </span>
-            </button>
-          </div>
-
-          <span class="theme-pill theme-pill-neutral shrink-0 text-xs">
-            {{ deck.totals.overall_total_cards }} total across all boards
-          </span>
-        </div>
-
         <div class="sr-only">
           <h3>
             {{ activeBoardTitle }}
@@ -301,11 +279,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useLocalStorage, useMediaQuery } from '@vueuse/core';
-import { BookOpenText, ChevronRight, Gamepad2, Gauge, Pencil, Share2, X } from 'lucide-vue-next';
+import { ChevronRight, Gamepad2, Gauge, Pencil, Share2, X } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
 import CollectionDetailLayout from '@/shared/components/CollectionDetailLayout.vue';
+import AppBoardTabs, { type AppBoardTab } from '@/shared/components/app/AppBoardTabs.vue';
+import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import CardCollectionGrid from '@/domain/cards/components/CardCollectionGrid.vue';
@@ -364,6 +344,25 @@ const hoverSurface = useHoverModeSurface('deckDetail');
 const { effectiveHoverMode } = hoverSurface;
 const { exportTtsDeck } = useDeckExport();
 const activeBoardId = ref('mainboard');
+const boardTabs = computed<AppBoardTab[]>(() => {
+  if (!deck.value) {
+    return [];
+  }
+  return [
+    {
+      id: 'mainboard',
+      label: 'Mainboard',
+      count: deck.value.mainboard.total_cards,
+      detail: `${deck.value.mainboard.total_cards} cards, ${deck.value.mainboard.unique_cards} unique`,
+    },
+    ...deck.value.sideboards.map((sideboard) => ({
+      id: sideboard.id,
+      label: sideboard.name,
+      count: sideboard.total_cards,
+      detail: `${sideboard.total_cards} cards, ${sideboard.unique_cards} unique`,
+    })),
+  ];
+});
 type DeckDetailPanel = 'summary' | 'mana';
 const activeDetailPanel = ref<DeckDetailPanel | null>(null);
 const detailsExpanded = computed(() => activeDetailPanel.value !== null);

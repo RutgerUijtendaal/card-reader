@@ -38,6 +38,8 @@ vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
           h(RouterLink, { to: props.backTo, 'data-testid': 'back' }),
           slots.subtitle?.(),
           slots.actions?.(),
+          slots.bottomLeft?.(),
+          slots.bottomRight?.(),
         ]),
   }),
 }));
