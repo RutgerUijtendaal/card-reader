@@ -2,7 +2,6 @@
   <AppModal
     :open="open"
     aria-labelledby="parse-flag-title"
-    overlay-class="bg-black/55"
     panel-class="theme-popover app-scrollbar max-h-[90vh] w-full max-w-5xl overflow-y-auto p-5"
     :close-disabled="submitting"
     @close="requestClose"
@@ -178,7 +177,7 @@
     <div class="theme-divider mt-5 flex flex-wrap items-center justify-end gap-3 border-t pt-4">
       <p
         v-if="errorMessage"
-        class="mr-auto text-sm text-rose-500"
+        class="theme-error-text mr-auto text-sm"
       >
         {{ errorMessage }}
       </p>

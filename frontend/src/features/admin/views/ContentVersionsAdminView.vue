@@ -2,7 +2,7 @@
   <section class="grid h-[calc(100vh-12rem)] min-h-[34rem] gap-6 overflow-hidden xl:grid-cols-[22rem_minmax(0,1fr)]">
     <aside class="page-card flex min-h-0 flex-col overflow-hidden">
       <div class="theme-divider border-b pb-4">
-        <h3 class="theme-section-title text-base font-semibold">
+        <h3 class="theme-section-title theme-display text-xl">
           Versions
         </h3>
         <p class="theme-section-muted mt-1 text-sm">
@@ -34,7 +34,7 @@
             type="button"
             :class="version.id === selectedVersionId
               ? 'theme-selected-surface-strong'
-              : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
+              : 'theme-card-frame theme-section-title hover:border-[var(--color-border-strong)]'"
             @click="selectVersion(version.id)"
           >
             <div class="flex items-start justify-between gap-3">
@@ -75,7 +75,7 @@
           >
           <span
             v-if="versionNumberError"
-            class="text-xs text-rose-400"
+            class="theme-error-text text-xs"
           >
             {{ versionNumberError }}
           </span>
@@ -89,7 +89,7 @@
           />
           <span
             v-if="descriptionError"
-            class="text-xs text-rose-400"
+            class="theme-error-text text-xs"
           >
             {{ descriptionError }}
           </span>
@@ -129,7 +129,7 @@
     <section class="page-card flex min-h-0 flex-col overflow-hidden">
       <div class="theme-divider flex flex-wrap items-start justify-between gap-3 border-b pb-4">
         <div>
-          <h3 class="theme-section-title text-base font-semibold">
+          <h3 class="theme-section-title theme-display text-xl">
             Cards
           </h3>
           <p class="theme-section-muted mt-1 text-sm">
@@ -184,7 +184,7 @@
               <RouterLink
                 v-if="isCard && cardItem"
                 :to="buildAdminCardDetailLocation(cardItem.id, route.query)"
-                class="btn-secondary pointer-events-auto gap-1.5 rounded-full px-3 py-1.5 text-xs shadow-xl"
+                class="btn-secondary pointer-events-auto gap-1.5 rounded-full px-3 py-1.5 text-xs"
               >
                 <Pencil class="h-3.5 w-3.5" />
                 <span>Edit</span>

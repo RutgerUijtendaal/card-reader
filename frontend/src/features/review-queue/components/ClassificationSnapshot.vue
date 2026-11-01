@@ -1,32 +1,32 @@
 <template>
   <div
-    class="rounded-lg border p-3"
-    :class="emphasized ? 'theme-selected-surface' : 'theme-card-frame'"
+    class="classification-snapshot py-1 pl-3"
+    :class="{ 'classification-snapshot-emphasized': emphasized }"
   >
     <p class="theme-kicker text-[11px] font-medium uppercase tracking-wide">
       {{ label }}
     </p>
     <dl class="mt-2 grid gap-1 text-sm">
       <div class="flex gap-2">
-        <dt class="font-semibold">
+        <dt class="theme-section-muted w-16 shrink-0 font-medium">
           Pool
         </dt>
         <dd>{{ cardPoolLabel(classification.card_pool) }}</dd>
       </div>
       <div class="flex gap-2">
-        <dt class="font-semibold">
+        <dt class="theme-section-muted w-16 shrink-0 font-medium">
           Roles
         </dt>
         <dd>{{ roleLabels }}</dd>
       </div>
       <div class="flex gap-2">
-        <dt class="font-semibold">
+        <dt class="theme-section-muted w-16 shrink-0 font-medium">
           Factions
         </dt>
         <dd>{{ factionLabels }}</dd>
       </div>
       <div class="flex gap-2">
-        <dt class="font-semibold">
+        <dt class="theme-section-muted w-16 shrink-0 font-medium">
           Mana
         </dt>
         <dd>{{ manaLabels }}</dd>
@@ -62,3 +62,19 @@ const manaLabels = computed(() =>
   displayManaFamilyLabels(props.classification.card_mana_families).join(', '),
 );
 </script>
+
+<style scoped>
+.classification-snapshot {
+  border-left: 2px solid var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.classification-snapshot-emphasized {
+  border-left-color: var(--accent);
+}
+
+.classification-snapshot-emphasized dd {
+  color: var(--color-selected-text);
+  font-weight: 600;
+}
+</style>

@@ -3,7 +3,7 @@
     <div class="flex items-start justify-between gap-3">
       <div class="flex min-w-0 items-start gap-3">
         <div class="min-w-0">
-          <h3 class="theme-section-title text-lg font-semibold">
+          <h3 class="theme-section-title theme-display text-xl">
             {{ editorTitle }}
           </h3>
           <p class="theme-section-muted text-sm">
@@ -41,9 +41,8 @@
     <div class="app-scrollbar my-5 min-h-0 flex-1 overflow-y-auto">
       <div
         v-if="activeEditorTab === 'card'"
-        class="space-y-4"
       >
-        <div class="theme-muted-panel p-4">
+        <div class="theme-form-section">
           <div>
             <div class="min-w-0">
               <p class="theme-section-title text-sm font-semibold">
@@ -79,8 +78,8 @@
                     v-for="option in cardRoleOptions"
                     :key="option.value"
                     type="button"
-                    class="theme-section-title min-h-9 rounded-lg border px-3 py-1.5 text-xs font-semibold transition"
-                    :class="form.card_roles.includes(option.value) ? 'theme-selected-surface' : 'theme-card-frame-muted'"
+                    class="theme-choice-chip min-h-8 px-3 py-1 text-xs font-semibold"
+                    :class="{ 'theme-choice-chip-active': form.card_roles.includes(option.value) }"
                     :aria-pressed="form.card_roles.includes(option.value)"
                     :disabled="!version.editable || isBusy"
                     :data-testid="`card-role-option-${option.value}`"
@@ -109,8 +108,8 @@
                     v-for="option in manaFamilyOptions"
                     :key="option.value"
                     type="button"
-                    class="theme-section-title min-h-9 rounded-lg border px-3 py-1.5 text-xs font-semibold transition"
-                    :class="form.card_mana_families.includes(option.value) ? 'theme-selected-surface' : 'theme-card-frame-muted'"
+                    class="theme-choice-chip min-h-8 px-3 py-1 text-xs font-semibold"
+                    :class="{ 'theme-choice-chip-active': form.card_mana_families.includes(option.value) }"
                     :aria-pressed="form.card_mana_families.includes(option.value)"
                     :disabled="!version.editable || isBusy"
                     :data-testid="`card-mana-family-option-${option.value}`"
@@ -139,8 +138,8 @@
                     v-for="option in cardFactionOptions"
                     :key="option.value"
                     type="button"
-                    class="theme-section-title min-h-9 rounded-lg border px-3 py-1.5 text-xs font-semibold transition"
-                    :class="form.card_factions.includes(option.value) ? 'theme-selected-surface' : 'theme-card-frame-muted'"
+                    class="theme-choice-chip min-h-8 px-3 py-1 text-xs font-semibold"
+                    :class="{ 'theme-choice-chip-active': form.card_factions.includes(option.value) }"
                     :aria-pressed="form.card_factions.includes(option.value)"
                     :disabled="!version.editable || isBusy"
                     :data-testid="`card-faction-option-${option.value}`"
@@ -160,7 +159,7 @@
           </div>
         </div>
 
-        <div class="theme-muted-panel p-4">
+        <div class="theme-form-section">
           <div class="mb-3">
             <p class="theme-section-title text-sm font-semibold">
               Card Back
@@ -180,7 +179,7 @@
           />
         </div>
 
-        <div class="theme-muted-panel p-3">
+        <div class="theme-form-section">
           <JsonEditorField
             :model-value="form.deck_building_config"
             label="Deck-Building Config JSON"
@@ -193,7 +192,7 @@
           />
         </div>
 
-        <div class="theme-muted-panel p-3">
+        <div class="theme-form-section">
           <div class="flex flex-wrap items-start justify-between gap-4">
             <div class="min-w-0">
               <p class="theme-section-title text-sm font-semibold">
@@ -231,12 +230,11 @@
 
       <div
         v-else
-        class="space-y-4"
       >
         <div
           v-for="field in scalarFields"
           :key="field.name"
-          class="theme-muted-panel p-3"
+          class="theme-form-section"
           :class="focusClass(field.name)"
         >
           <div class="mb-2 flex items-center justify-between gap-3">
@@ -314,7 +312,7 @@
 
               <div
                 v-if="ruleTextUnknownSymbolKeys.length > 0"
-                class="theme-card-frame-muted rounded-lg border border-amber-400/40 px-3 py-3"
+                class="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-3 py-3"
               >
                 <p class="theme-section-title text-xs font-semibold uppercase tracking-wide">
                   Unknown Placeholders
@@ -352,7 +350,7 @@
           </p>
         </div>
 
-        <div class="theme-muted-panel p-3">
+        <div class="theme-form-section">
           <div
             class="mb-3 flex items-center justify-between gap-3"
             :class="focusClass('symbols')"
@@ -396,7 +394,7 @@
               <label
                 v-for="option in symbolInsertOptions"
                 :key="`symbol-${option.id}`"
-                class="theme-card-frame-muted theme-section-title flex items-center gap-3 rounded-lg px-3 py-2 text-sm"
+                class="theme-checkbox-row items-center"
               >
                 <input
                   :checked="additionalSymbolIds.includes(option.id) || rulesTextSymbolIds.includes(option.id)"
@@ -442,7 +440,7 @@
         <div
           v-for="group in nonSymbolMetadataGroups"
           :key="group.name"
-          class="theme-muted-panel p-3"
+          class="theme-form-section"
           :class="focusClass(group.name)"
         >
           <div class="mb-3 flex items-center justify-between gap-3">
@@ -489,7 +487,7 @@
             <label
               v-for="option in optionsForGroup(group.name)"
               :key="option.id"
-              class="theme-card-frame-muted theme-section-title flex items-center gap-3 rounded-lg px-3 py-2 text-sm"
+              class="theme-checkbox-row items-center"
             >
               <input
                 :checked="selectedIds(group.name).includes(option.id)"
@@ -738,7 +736,7 @@ const reparseTemplateOptions = computed(() =>
 
 const focusClass = (propertyKey: ParseFlagPropertyKey): string =>
   props.reviewFocusPropertyKey === propertyKey
-    ? 'ring-2 ring-[var(--color-accent)] ring-offset-2 ring-offset-[var(--color-surface)]'
+    ? 'ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--table-canvas)]'
     : '';
 
 const lifecycleOptionDisabled = (value: CardLifecycleStatus): boolean =>

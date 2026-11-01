@@ -42,7 +42,7 @@
     >
       <DeckLoadingSkeleton :animated="false" />
       <RouterLink
-        class="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-surface)]"
+        class="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--table-canvas)]"
         style="border-color: color-mix(in srgb, var(--color-border-strong) 62%, transparent 38%); background: color-mix(in srgb, var(--color-surface-strong) 88%, transparent 12%); color: var(--color-text-muted);"
         aria-label="Create deck"
         title="Create deck"

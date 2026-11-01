@@ -10,7 +10,7 @@
           :key="card.id"
           class="justify-self-center"
           :class="{
-            'rounded-2xl ring-2 ring-[var(--color-accent)] ring-offset-2 ring-offset-[var(--color-surface)]':
+            'rounded-2xl ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--color-surface)]':
               card.result_type !== 'loading_shim' && isSelected(card),
           }"
           :style="{

@@ -1,5 +1,5 @@
 <template>
-  <section class="theme-panel-shell flex min-h-0 flex-col rounded-2xl p-5 shadow-sm">
+  <section class="theme-panel-shell flex min-h-0 flex-col p-5">
     <div class="theme-divider flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">
       <div>
         <p class="theme-kicker text-xs font-medium uppercase tracking-[0.18em]">

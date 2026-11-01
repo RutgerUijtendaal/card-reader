@@ -47,7 +47,7 @@
       <div
         v-if="heroDetailsExpanded"
         ref="heroDetailsPanelRef"
-        class="theme-popover z-30 p-4 shadow-2xl"
+        class="theme-popover z-30 p-4"
         data-testid="deck-summary-hero-details"
         :style="{
           position: 'fixed',
@@ -59,7 +59,7 @@
         <div class="space-y-4">
           <div
             v-if="controller.deck.selectedHero.value?.image_url"
-            class="theme-card-frame-muted mx-auto w-full max-w-[22rem] overflow-hidden rounded-2xl"
+            class="theme-card-frame-muted mx-auto w-full max-w-[22rem] overflow-hidden rounded-xl"
           >
             <img
               :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
@@ -69,7 +69,7 @@
           </div>
           <div
             v-else
-            class="theme-empty-state mx-auto flex h-[31rem] w-full max-w-[22rem] items-center justify-center rounded-2xl text-sm"
+            class="theme-empty-state mx-auto flex h-[31rem] w-full max-w-[22rem] items-center justify-center rounded-xl text-sm"
           >
             No hero
           </div>
@@ -360,7 +360,7 @@ watch(
 }
 
 .deck-board-entry-sortable-chosen {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 42%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 42%, transparent);
 }
 
 .deck-board-entry-sortable-drag {
@@ -375,7 +375,7 @@ watch(
 
   38% {
     transform: scale(1.035);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 42%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 42%, transparent);
   }
 
   100% {

@@ -108,7 +108,7 @@
                 <span>{{ tag.label }}</span>
                 <Check
                   v-if="selectedIds.has(tag.id)"
-                  class="h-4 w-4 text-[var(--theme-accent)]"
+                  class="h-4 w-4 text-[var(--accent)]"
                 />
               </button>
             </div>
@@ -116,7 +116,7 @@
             <button
               v-if="canSuggestSearch"
               type="button"
-              class="theme-divider flex w-full items-center gap-2 border-t px-2 pt-3 text-left text-sm font-semibold text-[var(--theme-accent)]"
+              class="theme-divider flex w-full items-center gap-2 border-t px-2 pt-3 text-left text-sm font-semibold text-[var(--accent)]"
               @click="suggestSearch"
             >
               <Plus class="h-4 w-4" />

@@ -2,7 +2,7 @@
   <section class="grid min-h-[34rem] gap-6 xl:h-[calc(100vh-12rem)] xl:grid-cols-[18rem_minmax(0,1fr)]">
     <aside class="page-card flex min-h-0 flex-col overflow-hidden">
       <div class="theme-divider border-b pb-4">
-        <h3 class="theme-section-title text-base font-semibold">
+        <h3 class="theme-section-title theme-display text-xl">
           Users
         </h3>
         <p class="theme-section-muted mt-1 text-sm">
@@ -18,7 +18,7 @@
           type="button"
           :class="activeSection === section.id
             ? 'theme-selected-surface-strong'
-            : 'theme-card-frame-muted theme-section-title hover:border-[var(--theme-border-strong)]'"
+            : 'theme-card-frame-muted theme-section-title hover:border-[var(--color-border-strong)]'"
           @click="activeSection = section.id"
         >
           <div class="flex items-center justify-between gap-3">
@@ -40,7 +40,7 @@
     <section class="page-card flex min-h-0 flex-col overflow-hidden">
       <div class="theme-divider flex flex-col gap-4 border-b pb-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h3 class="theme-section-title text-base font-semibold">
+          <h3 class="theme-section-title theme-display text-xl">
             {{ activeSectionTitle }}
           </h3>
           <p class="theme-section-muted mt-1 text-sm">
@@ -96,7 +96,7 @@
             </button>
           </div>
 
-          <div class="theme-card-frame rounded-xl p-3">
+          <div class="theme-card-frame rounded-lg p-3">
             <code class="block break-all text-xs">{{ setupResponse.setup_url }}</code>
           </div>
         </section>
@@ -145,7 +145,7 @@
             <article
               v-for="user in users"
               :key="user.id"
-              class="theme-card-frame flex flex-col gap-3 rounded-xl p-4 lg:flex-row lg:items-center lg:justify-between"
+              class="theme-card-frame flex flex-col gap-3 rounded-lg p-4 lg:flex-row lg:items-center lg:justify-between"
             >
               <div>
                 <div class="flex flex-wrap items-center gap-2">
@@ -235,7 +235,7 @@
             <article
               v-for="request in accessRequests"
               :key="request.id"
-              class="theme-card-frame flex flex-col gap-3 rounded-xl p-4 lg:flex-row lg:items-start lg:justify-between"
+              class="theme-card-frame flex flex-col gap-3 rounded-lg p-4 lg:flex-row lg:items-start lg:justify-between"
             >
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
@@ -327,7 +327,7 @@
             <article
               v-for="user in unmanagedUsers"
               :key="user.id"
-              class="theme-card-frame flex flex-col gap-3 rounded-xl p-4 lg:flex-row lg:items-center lg:justify-between"
+              class="theme-card-frame flex flex-col gap-3 rounded-lg p-4 lg:flex-row lg:items-center lg:justify-between"
             >
               <div>
                 <div class="flex flex-wrap items-center gap-2">

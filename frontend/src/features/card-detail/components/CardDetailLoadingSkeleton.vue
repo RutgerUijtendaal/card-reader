@@ -36,31 +36,38 @@
             <span class="card-detail-loading-line h-3 w-48 max-w-[72%]" />
           </div>
 
-          <div class="space-y-5">
-            <div class="card-detail-loading-panel h-20" />
-
-            <div class="grid gap-4 sm:grid-cols-2">
-              <div class="card-detail-loading-panel h-28" />
-              <div class="card-detail-loading-panel h-28" />
+          <div class="theme-divider grid grid-cols-3 border-y">
+            <div
+              v-for="index in 3"
+              :key="`stat-loading-${index}`"
+              class="space-y-2 py-3.5"
+              :class="index === 1 ? 'pr-4' : 'theme-divider border-l px-4'"
+            >
+              <span class="card-detail-loading-line h-3 w-16" />
+              <span class="card-detail-loading-line h-6 w-10" />
             </div>
+          </div>
 
-            <div class="space-y-3">
-              <span class="card-detail-loading-line h-4 w-28" />
-              <div class="card-detail-loading-panel space-y-3 p-4">
-                <span class="card-detail-loading-line h-4 w-full" />
-                <span class="card-detail-loading-line h-4 w-5/6" />
-                <span class="card-detail-loading-line h-4 w-2/3" />
+          <div class="space-y-3">
+            <span class="card-detail-loading-line h-3 w-28" />
+            <div class="card-detail-loading-rules space-y-3">
+              <span class="card-detail-loading-line h-4 w-full" />
+              <span class="card-detail-loading-line h-4 w-5/6" />
+              <span class="card-detail-loading-line h-4 w-2/3" />
+            </div>
+          </div>
+
+          <div class="theme-divider divide-y divide-[var(--color-border)] border-y">
+            <div
+              v-for="index in 4"
+              :key="`meta-loading-${index}`"
+              class="grid grid-cols-[8rem_minmax(0,1fr)] items-center gap-4 py-3"
+            >
+              <span class="card-detail-loading-line h-3 w-16" />
+              <div class="flex gap-1.5">
+                <span class="card-detail-loading-pill h-5 w-16" />
+                <span class="card-detail-loading-pill h-5 w-12" />
               </div>
-            </div>
-
-            <div class="grid gap-4 sm:grid-cols-2">
-              <div class="card-detail-loading-panel h-20" />
-              <div class="card-detail-loading-panel h-20" />
-            </div>
-
-            <div class="grid gap-4 sm:grid-cols-2">
-              <div class="card-detail-loading-panel h-28" />
-              <div class="card-detail-loading-panel h-28" />
             </div>
           </div>
         </div>
@@ -193,12 +200,17 @@ defineProps<{
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--color-text) 22%, var(--color-surface-strong) 78%) 0%,
-    color-mix(in srgb, var(--theme-accent) 34%, var(--color-surface-strong) 66%) 100%
+    color-mix(in srgb, var(--accent) 34%, var(--color-surface-strong) 66%) 100%
   );
 }
 
 .card-detail-loading-card {
   max-width: 30rem;
+}
+
+.card-detail-loading-rules {
+  border-left: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  padding: 0.25rem 0 0.25rem 1rem;
 }
 
 .card-detail-loading-thumb {

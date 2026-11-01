@@ -36,16 +36,13 @@
                 <p class="theme-kicker text-xs font-semibold uppercase tracking-[0.16em]">
                   {{ activeView === 'classification' ? 'Review Status' : 'Report Status' }}
                 </p>
-                <div class="grid gap-2">
+                <div class="flex flex-wrap gap-2">
                   <button
                     v-for="status in reviewStatuses"
                     :key="status.value"
-                    class="rounded-lg border px-3 py-2 text-left text-sm font-semibold transition"
-                    :class="
-                      reviewStatus === status.value
-                        ? 'theme-selected-surface'
-                        : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'
-                    "
+                    class="theme-choice-chip min-h-8 px-3 py-1 text-sm font-semibold"
+                    :class="{ 'theme-choice-chip-active': reviewStatus === status.value }"
+                    :aria-pressed="reviewStatus === status.value"
                     type="button"
                     @click="setReviewStatus(status.value)"
                   >
@@ -64,7 +61,7 @@
           class="space-y-4"
         >
           <div class="theme-divider border-b pb-4">
-            <h3 class="theme-section-title text-base font-semibold">
+            <h3 class="theme-section-title theme-display text-xl">
               Classification
             </h3>
             <p class="theme-section-muted mt-1 text-sm">
@@ -176,14 +173,14 @@
                     <div class="min-w-0">
                       <RouterLink
                         v-if="item.card.id"
-                        class="theme-link text-base font-semibold"
+                        class="theme-link theme-display text-lg"
                         :to="classificationEditorLocation(item)"
                       >
                         {{ item.card.name }}
                       </RouterLink>
                       <span
                         v-else
-                        class="theme-section-title text-base font-semibold"
+                        class="theme-section-title theme-display text-lg"
                       >{{
                         item.card.name
                       }}</span>
@@ -294,7 +291,7 @@
           class="space-y-4"
         >
           <div class="theme-divider border-b pb-4">
-            <h3 class="theme-section-title text-base font-semibold">
+            <h3 class="theme-section-title theme-display text-xl">
               Flagged Parses
             </h3>
             <p class="theme-section-muted mt-1 text-sm">
@@ -363,7 +360,7 @@
                   <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="min-w-0">
                       <RouterLink
-                        class="theme-link text-base font-semibold"
+                        class="theme-link theme-display text-lg"
                         :to="flagEditorLocation(group.primary, group)"
                       >
                         {{ group.card.name }}

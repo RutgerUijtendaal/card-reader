@@ -22,7 +22,7 @@
 
     <div
       v-if="open"
-      class="theme-popover absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-xl shadow-xl"
+      class="theme-popover absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-lg shadow-xl"
     >
       <div
         v-if="loading"
@@ -44,7 +44,7 @@
           v-for="card in cards"
           :key="card.id"
           class="w-full rounded-lg border px-3 py-2 text-left transition"
-          :class="selectedCard?.id === card.id ? 'theme-selected-surface' : 'theme-card-frame hover:-translate-y-0.5'"
+          :class="selectedCard?.id === card.id ? 'theme-selected-surface' : 'theme-card-frame'"
           type="button"
           @mousedown.prevent="selectCard(card)"
         >

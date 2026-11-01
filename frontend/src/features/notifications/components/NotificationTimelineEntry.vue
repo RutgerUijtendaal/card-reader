@@ -229,7 +229,7 @@ const openComparedCard = (versionId: string): void => {
 }
 
 .notification-details-trigger:focus-visible {
-  outline: 2px solid var(--theme-accent);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 

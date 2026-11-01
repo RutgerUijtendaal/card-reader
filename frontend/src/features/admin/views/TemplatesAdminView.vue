@@ -1,6 +1,6 @@
 <template>
-  <div class="page-card flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
-    <h3 class="theme-section-title text-base font-semibold">
+  <div class="flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
+    <h3 class="theme-section-title theme-display text-xl">
       Templates
     </h3>
 
@@ -25,7 +25,7 @@
             :class="
               selectedId === item.id
                 ? 'theme-selected-surface'
-                : 'theme-card-frame theme-section-title hover:-translate-y-0.5'
+                : 'theme-card-frame theme-section-title'
             "
             type="button"
             @click="selectTemplate(item.id)"

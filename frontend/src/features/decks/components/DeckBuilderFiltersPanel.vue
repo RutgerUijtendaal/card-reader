@@ -12,7 +12,7 @@
   >
     <div
       v-if="controller.deck.isHeroStep.value"
-      class="theme-muted-panel space-y-3 p-3"
+      class="theme-divider space-y-1 border-t pt-3"
     >
       <p class="theme-section-title text-sm font-semibold">
         Setup

@@ -1,5 +1,5 @@
 <template>
-  <section class="theme-panel-shell flex min-h-0 flex-col rounded-2xl p-5 shadow-sm">
+  <section class="theme-panel-shell flex min-h-0 flex-col p-5">
     <div
       v-if="!definition"
       class="theme-section-muted py-8 text-sm"
@@ -65,7 +65,7 @@
             <div
               v-for="rule in rulesForPool(pool.value)"
               :key="rule.id"
-              class="theme-card-frame grid gap-3 rounded-xl p-3 md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center"
+              class="theme-card-frame grid gap-3 rounded-lg p-3 md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center"
             >
               <span
                 class="theme-pill"

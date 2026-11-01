@@ -5,7 +5,7 @@
   >
     <div class="space-y-5">
       <div class="space-y-1">
-        <h3 class="theme-section-title text-lg font-semibold">
+        <h3 class="theme-section-title theme-display text-xl">
           Encounter Setup
         </h3>
         <p class="theme-section-muted text-sm">

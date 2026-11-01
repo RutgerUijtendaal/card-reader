@@ -121,14 +121,14 @@
   }
 
   .theme-alert-warning {
-    @apply rounded-xl border px-3 py-2 text-sm;
+    @apply rounded-lg border px-3 py-2 text-sm;
     border-color: var(--color-warning-border);
     background: var(--color-warning-bg);
     color: var(--color-warning-text);
   }
 
   .theme-alert-danger {
-    @apply rounded-xl border px-4 py-3 text-sm font-medium;
+    @apply rounded-lg border px-4 py-3 text-sm font-medium;
     border-color: var(--color-danger-border);
     background: var(--color-danger-bg);
     color: var(--color-danger-text);
@@ -228,6 +228,17 @@
   .theme-filter-section > .theme-divider {
     border-top-width: 0;
     padding-top: 0;
+  }
+
+  /* Form groups on a page or aside: hairline-separated sections instead of nested boxes. */
+  .theme-form-section {
+    @apply py-5;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .theme-form-section:first-child {
+    border-top-width: 0;
+    padding-top: 0.25rem;
   }
 
   .theme-panel-shell {
@@ -386,7 +397,7 @@
   }
 
   .theme-info-box {
-    @apply rounded-xl border px-3 py-2;
+    @apply rounded-lg border px-3 py-2;
     border-color: var(--color-border);
     background: var(--color-surface-soft);
     color: var(--color-text-muted);
@@ -404,6 +415,28 @@
     border-color: var(--color-border);
     background: var(--color-surface-soft);
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  }
+
+  /* Night ink laid over card art so names stay legible on any artwork, in both themes. */
+  .theme-art-scrim {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-sidebar) 92%, transparent) 0%,
+      color-mix(in srgb, var(--color-sidebar) 74%, transparent) 50%,
+      color-mix(in srgb, var(--color-sidebar) 28%, transparent) 100%
+    );
+  }
+
+  .theme-art-scrim-edge {
+    background: linear-gradient(270deg, color-mix(in srgb, var(--color-sidebar) 62%, transparent) 0%, transparent 100%);
+  }
+
+  .theme-art-scrim-text {
+    color: var(--color-sidebar-text);
+  }
+
+  .theme-art-scrim-muted {
+    color: var(--color-nav-text);
   }
 
   .theme-input-disabled-key {
