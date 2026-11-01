@@ -1,26 +1,13 @@
 <template>
   <section class="flex flex-col gap-5">
     <AppPageHeader
-      :icon="mine ? APP_SECTION_ICONS.myEncounters : APP_SECTION_ICONS.encounters"
-      :title="staff ? 'Manage Encounters' : mine ? 'My Encounters' : 'Encounters'"
-      :subtitle="
-        staff
-          ? 'Manage all saved Encounters, including private and unfinished work.'
-          : mine
-            ? 'Your Encounters, including private and unfinished work.'
-            : 'Browse public Encounters and discover your next fight.'
-      "
+      :icon="APP_SECTION_ICONS.encounters"
+      title="Encounters"
+      subtitle="Browse published Encounters and manage your own."
       title-tag="h2"
       title-class="text-xl"
     >
       <template #actions>
-        <AppHeaderAction
-          v-if="auth.canAccessStaffRoutes && !staff"
-          :icon="APP_SECTION_ICONS.encounters"
-          label="Manage Encounters"
-          short-label="Manage"
-          :to="{ path: '/staff/encounters', query: filterQuery }"
-        />
         <AppHeaderAction
           v-if="auth.authenticated"
           :icon="APP_SECTION_ICONS.encounterBuilder"
@@ -30,62 +17,42 @@
           to="/my/encounters/new"
         />
       </template>
-    </AppPageHeader>
-    <AppPageLayout>
-      <template #aside>
-        <GalleryFilterSidebar
-          title="Encounter Filters"
-          description="Search by name and assigned factions."
-          :query="query"
-          :on-update-query="(value) => (query = value)"
-          search-placeholder="Search Encounters..."
-          :total-count="count"
-          :on-reset="reset"
-        >
-          <div
-            v-if="auth.authenticated"
-            class="theme-divider space-y-3 border-b pb-4"
-          >
-            <p class="theme-kicker text-xs font-semibold uppercase tracking-[0.16em]">
-              Encounter Library
-            </p>
-            <div class="theme-tablist w-full">
-              <RouterLink
-                class="theme-tab flex-1"
-                :class="!staff && !mine ? 'theme-tab-active' : ''"
-                :to="{ path: '/encounters', query: filterQuery }"
-              >
-                Public
-              </RouterLink>
-              <RouterLink
-                class="theme-tab flex-1"
-                :class="mine ? 'theme-tab-active' : ''"
-                :to="{ path: '/my/encounters', query: filterQuery }"
-              >
-                My Encounters
-              </RouterLink>
-            </div>
-          </div>
-          <div class="space-y-3">
-            <h3 class="theme-section-title text-sm font-semibold">
-              Official status
-            </h3>
-            <div class="flex flex-wrap gap-2">
-              <ChoicePill
-                v-for="option in officialOptions"
-                :key="option.value"
-                :selected="official === option.value"
-                @click="official = option.value"
-              >
-                {{ option.label }}
-              </ChoicePill>
-            </div>
-          </div>
-          <div class="space-y-3">
-            <h3 class="theme-section-title text-sm font-semibold">
-              Factions
-            </h3>
-            <div class="flex flex-wrap gap-2">
+      <template #bottomLeft>
+        <AppCollectionToolbar>
+          <template #search>
+            <AppCollectionSearch
+              :query="query"
+              placeholder="Search Encounters by name..."
+              :total-count="count"
+              :result-noun="['Encounter', 'Encounters']"
+              @update:query="(value) => (query = value)"
+            />
+          </template>
+          <template #filters>
+            <AppScopeToggle
+              v-if="auth.authenticated"
+              label="Encounter library"
+              :options="scopeOptions"
+            />
+            <span
+              v-if="auth.authenticated"
+              class="theme-divider mx-1 h-5 border-l"
+              aria-hidden="true"
+            />
+            <AppSegmentedToggle
+              v-model="official"
+              label="Official status"
+              :options="officialOptions"
+            />
+            <span
+              class="theme-divider mx-1 h-5 border-l"
+              aria-hidden="true"
+            />
+            <div
+              class="flex flex-wrap items-center gap-2"
+              role="group"
+              aria-label="Factions"
+            >
               <ChoicePill
                 v-for="option in CARD_FACTION_OPTIONS"
                 :key="option.value"
@@ -95,9 +62,23 @@
                 {{ option.label }}
               </ChoicePill>
             </div>
-          </div>
-        </GalleryFilterSidebar>
+            <button
+              v-if="hasActiveFilters"
+              type="button"
+              class="theme-ghost-button inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium"
+              @click="reset"
+            >
+              <X
+                class="h-3.5 w-3.5"
+                aria-hidden="true"
+              />
+              Clear filters
+            </button>
+          </template>
+        </AppCollectionToolbar>
       </template>
+    </AppPageHeader>
+    <AppPageLayout columns="one">
       <div
         v-if="loading"
         class="app-page-single-column grid gap-4"
@@ -121,18 +102,40 @@
           Retry
         </button>
       </div>
-      <div
+      <AppEmptyState
         v-else-if="!records.length"
-        class="page-card theme-section-muted text-sm"
-      >
-        {{
-          query || factions.length || official
+        :icon="mine ? APP_SECTION_ICONS.myEncounters : APP_SECTION_ICONS.encounters"
+        :title="
+          hasActiveFilters
             ? 'No Encounters match the current filters.'
             : staff || mine
               ? 'No saved Encounters yet.'
               : 'No public Encounters yet.'
-        }}
-      </div>
+        "
+        :message="
+          hasActiveFilters
+            ? 'Try removing a filter or searching for something else.'
+            : mine
+              ? 'Pick a boss and build an Evil deck to challenge players.'
+              : 'Encounters that players publish appear here.'
+        "
+      >
+        <button
+          v-if="hasActiveFilters"
+          class="btn-secondary"
+          type="button"
+          @click="reset"
+        >
+          Clear filters
+        </button>
+        <RouterLink
+          v-else-if="auth.authenticated"
+          class="btn-primary"
+          to="/my/encounters/new"
+        >
+          Build Encounter
+        </RouterLink>
+      </AppEmptyState>
       <div
         v-else
         class="app-page-single-column grid gap-4"
@@ -173,15 +176,20 @@
   </section>
 </template>
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
+import { X } from 'lucide-vue-next';
 import { useIntersectionObserver } from '@vueuse/core';
 import { CARD_FACTION_OPTIONS } from '@/domain/cards/cardFactions';
 import { useAuthStore } from '@/domain/session/store';
-import GalleryFilterSidebar from '@/domain/cards/components/filters/GalleryFilterSidebar.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
+import AppCollectionSearch from '@/shared/components/app/AppCollectionSearch.vue';
+import AppCollectionToolbar from '@/shared/components/app/AppCollectionToolbar.vue';
+import AppEmptyState from '@/shared/components/app/AppEmptyState.vue';
+import AppScopeToggle, { type AppScopeOption } from '@/shared/components/app/AppScopeToggle.vue';
+import AppSegmentedToggle from '@/shared/components/app/AppSegmentedToggle.vue';
 import CollectionLoadingSkeleton from '@/shared/components/CollectionLoadingSkeleton.vue';
 import ChoicePill from '@/shared/components/ChoicePill.vue';
 import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
@@ -211,6 +219,28 @@ const {
   reset,
   toggleFaction,
 } = useEncounterList();
+const hasActiveFilters = computed(() => Boolean(query.value || factions.value.length || official.value));
+const scopeOptions = computed<AppScopeOption[]>(() => [
+  {
+    label: 'Public',
+    to: { path: '/encounters', query: filterQuery.value },
+    active: !staff.value && !mine.value,
+  },
+  {
+    label: 'Mine',
+    to: { path: '/my/encounters', query: filterQuery.value },
+    active: mine.value,
+  },
+  ...(auth.canAccessStaffRoutes
+    ? [
+        {
+          label: 'All',
+          to: { path: '/staff/encounters', query: filterQuery.value },
+          active: staff.value,
+        },
+      ]
+    : []),
+]);
 const sentinel = ref<HTMLElement | null>(null);
 const visible = ref(false);
 useIntersectionObserver(

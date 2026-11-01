@@ -77,6 +77,30 @@
           </template>
         </ExtraActionsMenu>
       </template>
+      <template
+        v-if="record"
+        #bottomLeft
+      >
+        <AppBoardTabs
+          v-model="activeBoard"
+          label="Encounter boards"
+          :tabs="boardTabs"
+        />
+      </template>
+      <template
+        v-if="record"
+        #bottomRight
+      >
+        <span class="theme-section-muted text-sm tabular-nums">
+          {{ record.total_cards + record.boss_cards.length }} cards including boss
+        </span>
+        <CardCollectionViewOptions
+          v-model:card-scale="cardScale"
+          v-model:group-by-type="groupByType"
+          :sort-surface="sortSurface"
+          :hover-surface="hoverSurface"
+        />
+      </template>
     </AppPageHeader>
     <div
       v-if="error"
@@ -189,14 +213,6 @@
           </section>
         </div>
       </template>
-      <template #aside-footer>
-        <CardCollectionViewOptions
-          v-model:card-scale="cardScale"
-          v-model:group-by-type="groupByType"
-          :sort-surface="sortSurface"
-          :hover-surface="hoverSurface"
-        />
-      </template>
       <template #details>
         <section
           class="space-y-2"
@@ -222,41 +238,6 @@
         </button>
       </template>
       <section class="space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex flex-wrap items-center gap-2">
-            <button
-              class="theme-pill text-xs"
-              :class="activeBoard === 'mainboard' ? 'theme-pill-accent' : 'theme-pill-neutral'"
-              type="button"
-              @click="activeBoard = 'mainboard'"
-            >
-              Mainboard
-              <span class="ml-1 opacity-80">{{ record.total_cards }} / {{ record.entries.length }}</span>
-            </button>
-            <button
-              v-for="board in record.sideboards"
-              :key="board.id"
-              class="theme-pill text-xs"
-              :class="activeBoard === board.id ? 'theme-pill-accent' : 'theme-pill-neutral'"
-              type="button"
-              @click="activeBoard = board.id"
-            >
-              {{ board.name }}
-              <span class="ml-1 opacity-80">{{ board.entries.reduce((sum, entry) => sum + entry.quantity, 0) }} /
-                {{ board.entries.length }}</span>
-            </button>
-            <button
-              v-if="record.boss_cards.length"
-              class="theme-pill text-xs"
-              :class="activeBoard === 'boss' ? 'theme-pill-accent' : 'theme-pill-neutral'"
-              type="button"
-              @click="activeBoard = 'boss'"
-            >
-              Boss <span class="ml-1 opacity-80">{{ record.boss_cards.length }}</span>
-            </button>
-          </div>
-          <span class="theme-pill theme-pill-neutral text-xs">{{ record.total_cards + record.boss_cards.length }} total including boss</span>
-        </div>
         <p
           v-if="!activeEntries.length"
           class="theme-section-muted text-sm"
@@ -318,6 +299,7 @@ import CollectionDetailLayout from '@/shared/components/CollectionDetailLayout.v
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import ExtraActionsMenu from '@/shared/components/app/ExtraActionsMenu.vue';
+import AppBoardTabs, { type AppBoardTab } from '@/shared/components/app/AppBoardTabs.vue';
 import TtsCopyIcon from '@/shared/components/icons/TtsCopyIcon.vue';
 import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import { getApiErrorMessage } from '@/shared/api/errors';
@@ -334,6 +316,29 @@ const exportMessage = ref('');
 const detailsExpanded = ref(false);
 const canAutoExpand = useMediaQuery('(min-width: 1536px)');
 const activeBoard = ref('mainboard');
+const countBoardCards = (entries: { quantity: number }[]): number =>
+  entries.reduce((sum, entry) => sum + entry.quantity, 0);
+const boardTabs = computed<AppBoardTab[]>(() => {
+  if (!record.value) return [];
+  const tabs: AppBoardTab[] = [
+    {
+      id: 'mainboard',
+      label: 'Mainboard',
+      count: record.value.total_cards,
+      detail: `${record.value.total_cards} cards, ${record.value.entries.length} unique`,
+    },
+    ...record.value.sideboards.map((board) => ({
+      id: board.id,
+      label: board.name,
+      count: countBoardCards(board.entries),
+      detail: `${countBoardCards(board.entries)} cards, ${board.entries.length} unique`,
+    })),
+  ];
+  if (record.value.boss_cards.length) {
+    tabs.push({ id: 'boss', label: 'Boss', count: record.value.boss_cards.length });
+  }
+  return tabs;
+});
 const activeSideboard = computed(() =>
   record.value?.sideboards.find((board) => board.id === activeBoard.value),
 );

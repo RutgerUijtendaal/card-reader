@@ -3,7 +3,7 @@
     :is="to ? RouterLink : 'button'"
     :to="to"
     :type="to ? undefined : 'button'"
-    class="block w-full rounded-lg border px-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-input-focus)]"
+    class="theme-side-nav-item block w-full rounded-md px-3 py-2.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-input-focus)]"
     :class="itemClass"
     :aria-current="active ? 'page' : undefined"
     :aria-disabled="disabled || undefined"
@@ -72,9 +72,7 @@ const emit = defineEmits<{
 }>();
 
 const itemClass = computed(() => [
-  props.active
-    ? 'theme-selected-surface-strong'
-    : 'theme-card-frame theme-section-title hover:border-[var(--color-border-strong)]',
+  props.active ? 'theme-selected-surface-strong theme-side-nav-item-active' : 'theme-section-title',
   props.disabled ? 'theme-disabled cursor-not-allowed' : '',
 ]);
 

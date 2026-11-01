@@ -25,7 +25,8 @@ export type DeckForm = {
   suggested_type_labels: string[];
 };
 
-export type DeckEditorMode = 'hero' | 'details' | 'cards';
+/** Which part of the card pool the builder shows; deck details open as a separate overlay. */
+export type DeckEditorMode = 'hero' | 'cards';
 
 export type DeckBoardMoveDestination = {
   boardId: string;

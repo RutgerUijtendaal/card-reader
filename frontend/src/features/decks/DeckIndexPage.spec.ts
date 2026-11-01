@@ -89,6 +89,8 @@ vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
         h('header', [
           h('h1', props.title),
           slots.actions?.(),
+          slots.center?.(),
+          slots.bottomLeft?.(),
         ]);
     },
   }),
@@ -168,48 +170,14 @@ vi.mock('@/shared/components/app/ExtraActionsMenu.vue', () => ({
   }),
 }));
 
-vi.mock('@/features/decks/components/DeckBrowseFiltersPanel.vue', () => ({
+vi.mock('@/features/decks/components/DeckBrowseFilterBar.vue', () => ({
   default: defineComponent({
     props: {
-      canUseOwnedDecks: { type: Boolean, default: false },
       controller: { type: Object, required: true },
-      description: { type: String, required: true },
-      mode: { type: String, required: true },
-      ownedTo: { type: Object, required: true },
-      publicTo: { type: Object, required: true },
-      totalCount: { type: Number, required: true },
+      hasActiveFilters: { type: Boolean, required: true },
     },
-    setup(props) {
-      const routeHref = (to: { path?: string; query?: Record<string, unknown> }): string => {
-        const params = new URLSearchParams();
-        Object.entries(to.query ?? {}).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
-            params.set(key, String(value));
-          }
-        });
-        const query = params.toString();
-        return `${to.path ?? ''}${query ? `?${query}` : ''}`;
-      };
-      return () =>
-        h('aside', [
-          h('p', props.description),
-          props.canUseOwnedDecks
-            ? [
-                h('a', { href: routeHref(props.publicTo as { path?: string; query?: Record<string, unknown> }) }, 'Public'),
-                h('a', { href: routeHref(props.ownedTo as { path?: string; query?: Record<string, unknown> }) }, 'My Decks'),
-              ]
-            : null,
-          h('span', `Total ${props.totalCount}`),
-          h('input', {
-            'data-testid': 'deck-query',
-            value: (props.controller as { query: { value: string } }).query.value,
-            onInput: (event: Event) => {
-              (props.controller as { updateQuery: (value: string) => void }).updateQuery(
-                (event.target as HTMLInputElement).value,
-              );
-            },
-          }),
-        ]);
+    setup() {
+      return () => h('aside', { 'data-testid': 'deck-filters' });
     },
   }),
 }));
@@ -413,7 +381,9 @@ describe('DeckIndexPage', () => {
     expect(fetchMyDeckSummariesMock).not.toHaveBeenCalled();
     expect(mounted.container.querySelector('[data-mode="browse"]')).not.toBeNull();
     expect(mounted.container.querySelector('[data-title-to="/decks/deck-1"]')).not.toBeNull();
-    expect(mounted.container.textContent).toContain('Search public decks');
+    expect(mounted.container.querySelector('header input')?.getAttribute('placeholder')).toContain(
+      'Search public decks',
+    );
     expect(mounted.container.querySelector('a[aria-label="Build a deck"]')?.textContent).toBe('Build a deck');
 
     mounted.unmount();
@@ -436,7 +406,9 @@ describe('DeckIndexPage', () => {
     expect(fetchPublicDeckSummariesMock).not.toHaveBeenCalled();
     expect(mounted.container.querySelector('[data-mode="owned"]')).not.toBeNull();
     expect(mounted.container.querySelector('[data-title-to="/my/decks/deck-1"]')).not.toBeNull();
-    expect(mounted.container.textContent).toContain('Search your decks');
+    expect(mounted.container.querySelector('header input')?.getAttribute('placeholder')).toContain(
+      'Search your decks',
+    );
 
     mounted.unmount();
   });
@@ -475,7 +447,7 @@ describe('DeckIndexPage', () => {
       null,
       null,
     );
-    expect(mounted.container.textContent).toContain('Total 11');
+    expect(mounted.container.querySelector('header')?.textContent).toContain('11 decks');
     expect(mounted.container.textContent).not.toContain('Previous');
 
     intersectionState.callback?.([{ isIntersecting: true }]);
@@ -633,11 +605,11 @@ describe('DeckIndexPage', () => {
     mounted.unmount();
   });
 
-  test('tabs link to public and owned deck routes with the shared deck search query', async () => {
+  test('the scope toggle links to public and owned deck routes with the shared deck search query', async () => {
     const mounted = await mountPage('/decks?q=Blade');
     const links = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a'));
     const publicLink = links.find((link) => link.textContent?.trim() === 'Public');
-    const ownedLink = links.find((link) => link.textContent?.trim() === 'My Decks');
+    const ownedLink = links.find((link) => link.textContent?.trim() === 'Mine');
 
     expect(publicLink).toBeDefined();
     expect(ownedLink).toBeDefined();
@@ -653,15 +625,17 @@ describe('DeckIndexPage', () => {
     mounted.unmount();
   });
 
-  test('hides the deck library tab selector for anonymous public browsing', async () => {
+  test('hides the deck library scope toggle for anonymous public browsing', async () => {
     authState.authenticated = false;
     authState.user = null;
     const mounted = await mountPage('/decks');
     const links = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a'));
 
     expect(links.find((link) => link.textContent?.trim() === 'Public')).toBeUndefined();
-    expect(links.find((link) => link.textContent?.trim() === 'My Decks')).toBeUndefined();
-    expect(mounted.container.textContent).toContain('Search public decks');
+    expect(links.find((link) => link.textContent?.trim() === 'Mine')).toBeUndefined();
+    expect(mounted.container.querySelector('header input')?.getAttribute('placeholder')).toContain(
+      'Search public decks',
+    );
     expect(fetchPublicDeckSummariesMock).toHaveBeenCalledTimes(1);
     expect(fetchMyDeckSummariesMock).not.toHaveBeenCalled();
     expect(mounted.container.querySelector('[aria-label="Manage deck tags"]')).toBeNull();
@@ -814,7 +788,7 @@ describe('DeckIndexPage', () => {
   test.each(['/decks', '/my/decks'])('filter input updates the %s route query', async (path) => {
     vi.useFakeTimers();
     const mounted = await mountPage(path);
-    const input = mounted.container.querySelector<HTMLInputElement>('[data-testid="deck-query"]');
+    const input = mounted.container.querySelector<HTMLInputElement>('header input');
     if (!input) {
       throw new Error('expected deck filter input');
     }

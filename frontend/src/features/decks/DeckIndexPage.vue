@@ -1,9 +1,9 @@
 <template>
   <section class="flex flex-col gap-5">
     <AppPageHeader
-      :icon="activeHeaderIcon"
-      :title="activeTitle"
-      :subtitle="activeSubtitle"
+      :icon="APP_SECTION_ICONS.decks"
+      title="Decks"
+      subtitle="Browse published decks and manage your own."
       title-tag="h2"
       title-class="text-xl"
     >
@@ -16,21 +16,38 @@
           :to="newDeckLocation"
         />
       </template>
+      <template #bottomLeft>
+        <AppCollectionToolbar>
+          <template #search>
+            <AppCollectionSearch
+              :query="filterController.query.value"
+              :placeholder="searchPlaceholder"
+              :total-count="totalDeckCount"
+              :result-noun="['deck', 'decks']"
+              @update:query="filterController.updateQuery"
+            />
+          </template>
+          <template #filters>
+            <AppScopeToggle
+              v-if="canUseOwnedDecks"
+              label="Deck library"
+              :options="scopeOptions"
+            />
+            <span
+              v-if="canUseOwnedDecks"
+              class="theme-divider mx-1 h-5 border-l"
+              aria-hidden="true"
+            />
+            <DeckBrowseFilterBar
+              :controller="filterController"
+              :has-active-filters="hasActiveFilters"
+            />
+          </template>
+        </AppCollectionToolbar>
+      </template>
     </AppPageHeader>
 
-    <AppPageLayout>
-      <template #aside>
-        <DeckBrowseFiltersPanel
-          :controller="filterController"
-          :total-count="totalDeckCount"
-          :description="filterDescription"
-          :mode="isOwnedMode ? 'owned' : 'public'"
-          :can-use-owned-decks="canUseOwnedDecks"
-          :public-to="{ path: '/decks', query: publicFilterRouteQuery }"
-          :owned-to="{ path: '/my/decks', query: ownedFilterRouteQuery }"
-        />
-      </template>
-
+    <AppPageLayout columns="one">
       <div
         v-if="(loading && decks.length === 0) || !filtersLoaded"
         class="app-page-single-column deck-index-grid grid gap-4"
@@ -55,12 +72,28 @@
         </button>
       </div>
 
-      <div
+      <AppEmptyState
         v-else-if="decks.length === 0"
-        class="page-card theme-section-muted text-sm"
+        :icon="activeHeaderIcon"
+        :title="emptyLabel"
+        :message="emptyMessage"
       >
-        {{ emptyLabel }}
-      </div>
+        <button
+          v-if="hasActiveFilters"
+          class="btn-secondary"
+          type="button"
+          @click="filterController.resetFilters"
+        >
+          Clear filters
+        </button>
+        <RouterLink
+          v-else-if="auth.authenticated"
+          class="btn-primary"
+          :to="newDeckLocation"
+        >
+          Build a deck
+        </RouterLink>
+      </AppEmptyState>
 
       <div
         v-else
@@ -299,6 +332,10 @@ import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import AppSelect from '@/shared/components/app/AppSelect.vue';
 import ExtraActionsMenu from '@/shared/components/app/ExtraActionsMenu.vue';
+import AppCollectionSearch from '@/shared/components/app/AppCollectionSearch.vue';
+import AppCollectionToolbar from '@/shared/components/app/AppCollectionToolbar.vue';
+import AppEmptyState from '@/shared/components/app/AppEmptyState.vue';
+import AppScopeToggle, { type AppScopeOption } from '@/shared/components/app/AppScopeToggle.vue';
 import TtsCopyIcon from '@/shared/components/icons/TtsCopyIcon.vue';
 import ConfirmModal from '@/shared/components/modals/ConfirmModal.vue';
 import { useAuthStore } from '@/domain/session/store';
@@ -310,7 +347,7 @@ import {
   fetchPublicDeckSummaryPage,
   updateDeck,
 } from '@/domain/decks/api';
-import DeckBrowseFiltersPanel from '@/features/decks/components/DeckBrowseFiltersPanel.vue';
+import DeckBrowseFilterBar from '@/features/decks/components/DeckBrowseFilterBar.vue';
 import DeckLoadingSkeleton from '@/shared/components/CollectionLoadingSkeleton.vue';
 import DeckListCard from '@/domain/decks/components/DeckListCard.vue';
 import DeckTagManagementModal from '@/domain/decks/components/DeckTagManagementModal.vue';
@@ -389,22 +426,27 @@ const canUseOwnedDecks = computed(() => auth.authenticated || isOwnedMode.value)
 const activeHeaderIcon = computed(() => (
   isOwnedMode.value ? APP_SECTION_ICONS.myDecks : APP_SECTION_ICONS.decks
 ));
-const activeTitle = computed(() => (isOwnedMode.value ? 'My Decks' : 'Decks'));
-const activeSubtitle = computed(() =>
+const searchPlaceholder = computed(() =>
   isOwnedMode.value
-    ? 'Manage your private, unlisted, and public decks.'
-    : 'Browse public decks and inspect their hero, mainboard, and sideboards.',
-);
-const filterDescription = computed(() =>
-  isOwnedMode.value
-    ? 'Search your decks by deck, hero, included cards, and affinity.'
-    : 'Search public decks by deck, hero, owner, included cards, and affinity.',
+    ? 'Search your decks, heroes, or cards...'
+    : 'Search public decks, heroes, owners, or cards...',
 );
 const loadingSkeletonCount = 10;
 const currentRouteFilterState = computed(() => parseDeckBrowseFilterRouteQuery(route.query));
 const effectiveRouteFilterState = computed(() => currentRouteFilterState.value);
-const publicFilterRouteQuery = computed(() => buildDeckBrowseFilterRouteQuery(currentRouteFilterState.value));
-const ownedFilterRouteQuery = computed(() => buildDeckBrowseFilterRouteQuery(currentRouteFilterState.value));
+const scopeFilterRouteQuery = computed(() => buildDeckBrowseFilterRouteQuery(currentRouteFilterState.value));
+const scopeOptions = computed<AppScopeOption[]>(() => [
+  {
+    label: 'Public',
+    to: { path: '/decks', query: scopeFilterRouteQuery.value },
+    active: !isOwnedMode.value,
+  },
+  {
+    label: 'Mine',
+    to: { path: '/my/decks', query: scopeFilterRouteQuery.value },
+    active: isOwnedMode.value,
+  },
+]);
 const currentRouteSignature = computed(() => getDeckBrowseFilterSignature(effectiveRouteFilterState.value));
 const hasActiveFilters = computed(() => currentRouteSignature.value.length > 0);
 const emptyLabel = computed(() => {
@@ -412,6 +454,14 @@ const emptyLabel = computed(() => {
     return isOwnedMode.value ? 'No owned decks match the current filters.' : 'No public decks match the current filters.';
   }
   return isOwnedMode.value ? 'You do not have any decks yet.' : 'No public decks yet.';
+});
+const emptyMessage = computed(() => {
+  if (hasActiveFilters.value) {
+    return 'Try removing a filter or searching for something else.';
+  }
+  return isOwnedMode.value
+    ? 'Build your first deck from a hero and the cards in the Player gallery.'
+    : 'Decks that players publish appear here.';
 });
 const currentDeckPath = computed(() => (isOwnedMode.value ? '/my/decks' : '/decks'));
 const newDeckLocation = computed(() => buildNewDeckEditorLocation(isOwnedMode.value ? 'my_decks' : 'decks'));

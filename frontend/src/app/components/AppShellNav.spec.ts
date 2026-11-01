@@ -240,19 +240,25 @@ describe('AppShellNav', () => {
     mounted.unmount();
   });
 
-  test('orders Player links as browse, own, build, then playtest', async () => {
+  test('orders Player links as library, build, then playtest', async () => {
     const mounted = await mountNav();
     const labels = Array.from(mounted.container.querySelectorAll('nav a.nav-link')).map((link) =>
       link.textContent?.trim(),
     );
     const decksIndex = labels.indexOf('Decks');
 
-    expect(labels.slice(decksIndex, decksIndex + 4)).toEqual([
-      'Decks',
-      'My Decks',
-      'Build a deck',
-      'Playtester',
-    ]);
+    expect(labels).not.toContain('My Decks');
+    expect(labels.slice(decksIndex, decksIndex + 3)).toEqual(['Decks', 'Build a deck', 'Playtester']);
+    mounted.unmount();
+  });
+
+  test('keeps Decks highlighted on the Mine scope of the deck library', async () => {
+    const mounted = await mountNav({}, false, '/my/decks');
+    const decksLink = Array.from(mounted.container.querySelectorAll('nav a.nav-link')).find(
+      (link) => link.textContent?.trim() === 'Decks',
+    );
+
+    expect(decksLink?.classList.contains('router-link-active')).toBe(true);
     mounted.unmount();
   });
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-3">
+  <div :class="layout === 'bar' ? 'contents' : 'space-y-3'">
     <label
       v-if="showCardPool && state.cardPoolOptions.length > 1"
       class="block space-y-1"
@@ -19,178 +19,246 @@
       </select>
     </label>
 
-    <MetadataPillGroup
+    <FilterSlot
       v-if="isSectionVisible('roles')"
-      v-model:included-value="selectedCardRoles"
-      v-model:excluded-value="excludedCardRoles"
-      v-model:match-mode="cardRoleMatch"
-      :default-open="isSectionOpenByDefault('roles', true)"
       label="Card roles"
-      :options="state.cardRoleOptions"
-      @reset="state.resetCardRoleGroup"
-    />
+      :active-count="activeCounts.roles"
+    >
+      <MetadataPillGroup
+        v-model:included-value="selectedCardRoles"
+        v-model:excluded-value="excludedCardRoles"
+        v-model:match-mode="cardRoleMatch"
+        :default-open="isSectionOpenByDefault('roles', true)"
+        :collapsible="layout !== 'bar'"
+        label="Card roles"
+        :options="state.cardRoleOptions"
+        @reset="state.resetCardRoleGroup"
+      />
+    </FilterSlot>
 
-    <MetadataPillGroup
+    <FilterSlot
       v-if="isSectionVisible('factions')"
-      v-model:included-value="selectedCardFactions"
-      v-model:excluded-value="excludedCardFactions"
-      v-model:match-mode="cardFactionMatch"
-      :default-open="isSectionOpenByDefault('factions', true)"
       label="Factions"
-      :options="state.cardFactionOptions"
-      @reset="state.resetCardFactionGroup"
-    />
+      :active-count="activeCounts.factions"
+    >
+      <MetadataPillGroup
+        v-model:included-value="selectedCardFactions"
+        v-model:excluded-value="excludedCardFactions"
+        v-model:match-mode="cardFactionMatch"
+        :default-open="isSectionOpenByDefault('factions', true)"
+        :collapsible="layout !== 'bar'"
+        label="Factions"
+        :options="state.cardFactionOptions"
+        @reset="state.resetCardFactionGroup"
+      />
+    </FilterSlot>
 
-    <SymbolToggleGroup
+    <FilterSlot
       v-if="isSectionVisible('mana')"
-      v-model:included-value="selectedManaFamilyIds"
-      v-model:excluded-value="excludedManaFamilyIds"
-      v-model:match-mode="manaFamilyMatch"
-      :default-open="isSectionOpenByDefault('mana', true)"
       label="Mana"
-      :options="state.manaFamilyOptions"
-      @reset="state.resetManaGroup"
+      :active-count="activeCounts.mana"
     >
-      <div class="theme-divider border-t pt-3">
-        <div class="flex items-center gap-3">
-          <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
-            Cost
-          </h4>
-          <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
-            <input
-              v-model="manaCostMin"
-              class="input-base min-w-0"
-              type="number"
-              placeholder="Min"
-            >
-            <input
-              v-model="manaCostMax"
-              class="input-base min-w-0"
-              type="number"
-              placeholder="Max"
-            >
+      <SymbolToggleGroup
+        v-model:included-value="selectedManaFamilyIds"
+        v-model:excluded-value="excludedManaFamilyIds"
+        v-model:match-mode="manaFamilyMatch"
+        :default-open="isSectionOpenByDefault('mana', true)"
+        :collapsible="layout !== 'bar'"
+        label="Mana"
+        :options="state.manaFamilyOptions"
+        @reset="state.resetManaGroup"
+      >
+        <div class="theme-divider border-t pt-3">
+          <div class="flex items-center gap-3">
+            <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
+              Cost
+            </h4>
+            <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
+              <input
+                v-model="manaCostMin"
+                class="input-base min-w-0"
+                type="number"
+                placeholder="Min"
+              >
+              <input
+                v-model="manaCostMax"
+                class="input-base min-w-0"
+                type="number"
+                placeholder="Max"
+              >
+            </div>
           </div>
         </div>
-      </div>
-    </SymbolToggleGroup>
+      </SymbolToggleGroup>
+    </FilterSlot>
 
-    <MetadataPillGroup
+    <FilterSlot
       v-if="isSectionVisible('types')"
-      v-model:included-value="selectedTypeIds"
-      v-model:excluded-value="excludedTypeIds"
-      v-model:match-mode="typeMatch"
-      :default-open="isSectionOpenByDefault('types', true)"
-      :initial-visible-count="7"
       label="Types"
-      :options="state.typeOptions"
-      @reset="state.resetTypeGroup"
-    />
-
-    <SymbolToggleGroup
-      v-if="isSectionVisible('affinity')"
-      v-model:included-value="selectedAffinitySymbolIds"
-      v-model:excluded-value="excludedAffinitySymbolIds"
-      v-model:match-mode="affinitySymbolMatch"
-      :default-open="isSectionOpenByDefault('affinity')"
-      label="Affinity"
-      :options="state.affinityTypeOptions"
-      @reset="state.resetAffinityGroup"
-    />
-
-    <SymbolToggleGroup
-      v-if="isSectionVisible('devotion')"
-      v-model:included-value="selectedDevotionSymbolIds"
-      v-model:excluded-value="excludedDevotionSymbolIds"
-      v-model:match-mode="devotionSymbolMatch"
-      :default-open="isSectionOpenByDefault('devotion')"
-      label="Devotion"
-      :options="state.devotionTypeOptions"
-      @reset="state.resetDevotionGroup"
-    />
-
-    <SymbolToggleGroup
-      v-if="isSectionVisible('generic')"
-      v-model:included-value="selectedOtherSymbolIds"
-      v-model:excluded-value="excludedOtherSymbolIds"
-      v-model:match-mode="otherSymbolMatch"
-      :default-open="isSectionOpenByDefault('generic')"
-      label="Generic"
-      :options="state.otherSymbolOptions"
-      @reset="state.resetGenericGroup"
+      :active-count="activeCounts.types"
     >
-      <div class="theme-divider space-y-2 border-t pt-3">
-        <div class="flex items-center gap-3">
-          <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
-            Attack
-          </h4>
-          <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
-            <input
-              v-model="attackMin"
-              class="input-base min-w-0"
-              type="number"
-              placeholder="Min"
-            >
-            <input
-              v-model="attackMax"
-              class="input-base min-w-0"
-              type="number"
-              placeholder="Max"
-            >
+      <MetadataPillGroup
+        v-model:included-value="selectedTypeIds"
+        v-model:excluded-value="excludedTypeIds"
+        v-model:match-mode="typeMatch"
+        :default-open="isSectionOpenByDefault('types', true)"
+        :collapsible="layout !== 'bar'"
+        :initial-visible-count="7"
+        label="Types"
+        :options="state.typeOptions"
+        @reset="state.resetTypeGroup"
+      />
+    </FilterSlot>
+
+    <FilterSlot
+      v-if="isSectionVisible('generic')"
+      label="Generic"
+      :active-count="activeCounts.generic"
+    >
+      <SymbolToggleGroup
+        v-model:included-value="selectedOtherSymbolIds"
+        v-model:excluded-value="excludedOtherSymbolIds"
+        v-model:match-mode="otherSymbolMatch"
+        :default-open="isSectionOpenByDefault('generic')"
+        :collapsible="layout !== 'bar'"
+        label="Generic"
+        :options="state.otherSymbolOptions"
+        @reset="state.resetGenericGroup"
+      >
+        <div class="theme-divider space-y-2 border-t pt-3">
+          <div class="flex items-center gap-3">
+            <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
+              Attack
+            </h4>
+            <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
+              <input
+                v-model="attackMin"
+                class="input-base min-w-0"
+                type="number"
+                placeholder="Min"
+              >
+              <input
+                v-model="attackMax"
+                class="input-base min-w-0"
+                type="number"
+                placeholder="Max"
+              >
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
+              Health
+            </h4>
+            <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
+              <input
+                v-model="healthMin"
+                class="input-base min-w-0"
+                type="number"
+                placeholder="Min"
+              >
+              <input
+                v-model="healthMax"
+                class="input-base min-w-0"
+                type="number"
+                placeholder="Max"
+              >
+            </div>
           </div>
         </div>
+      </SymbolToggleGroup>
+    </FilterSlot>
 
-        <div class="flex items-center gap-3">
-          <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
-            Health
-          </h4>
-          <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
-            <input
-              v-model="healthMin"
-              class="input-base min-w-0"
-              type="number"
-              placeholder="Min"
-            >
-            <input
-              v-model="healthMax"
-              class="input-base min-w-0"
-              type="number"
-              placeholder="Max"
-            >
-          </div>
-        </div>
-      </div>
-    </SymbolToggleGroup>
-
-    <MetadataChecklistGroup
+    <FilterSlot
       v-if="isSectionVisible('keywords')"
-      v-model="selectedKeywordIds"
-      v-model:match-mode="keywordMatch"
-      :default-open="isSectionOpenByDefault('keywords')"
-      :favorite-group="state.keywordFavoriteGroup"
-      :favorite-keys="state.keywordFavoriteKeys"
       label="Keywords"
-      :options="state.keywordOptions"
-      @toggle-favorite="state.toggleKeywordFavorite"
-      @reset="state.resetKeywordGroup"
-    />
+      :active-count="activeCounts.keywords"
+    >
+      <MetadataChecklistGroup
+        v-model="selectedKeywordIds"
+        v-model:match-mode="keywordMatch"
+        :default-open="isSectionOpenByDefault('keywords')"
+        :collapsible="layout !== 'bar'"
+        :favorite-group="state.keywordFavoriteGroup"
+        :favorite-keys="state.keywordFavoriteKeys"
+        label="Keywords"
+        :options="state.keywordOptions"
+        @toggle-favorite="state.toggleKeywordFavorite"
+        @reset="state.resetKeywordGroup"
+      />
+    </FilterSlot>
 
-    <MetadataChecklistGroup
+    <FilterSlot
       v-if="isSectionVisible('tags')"
-      v-model="selectedTagIds"
-      v-model:match-mode="tagMatch"
-      :default-open="isSectionOpenByDefault('tags')"
-      :favorite-group="state.tagFavoriteGroup"
-      :favorite-keys="state.tagFavoriteKeys"
       label="Tags"
-      :options="state.tagOptions"
-      @toggle-favorite="state.toggleTagFavorite"
-      @reset="state.resetTagGroup"
-    />
+      :active-count="activeCounts.tags"
+    >
+      <MetadataChecklistGroup
+        v-model="selectedTagIds"
+        v-model:match-mode="tagMatch"
+        :default-open="isSectionOpenByDefault('tags')"
+        :collapsible="layout !== 'bar'"
+        :favorite-group="state.tagFavoriteGroup"
+        :favorite-keys="state.tagFavoriteKeys"
+        label="Tags"
+        :options="state.tagOptions"
+        @toggle-favorite="state.toggleTagFavorite"
+        @reset="state.resetTagGroup"
+      />
+    </FilterSlot>
+
+    <FilterSlot
+      v-if="isSectionVisible('affinity')"
+      label="Affinity"
+      :active-count="activeCounts.affinity"
+    >
+      <SymbolToggleGroup
+        v-model:included-value="selectedAffinitySymbolIds"
+        v-model:excluded-value="excludedAffinitySymbolIds"
+        v-model:match-mode="affinitySymbolMatch"
+        :default-open="isSectionOpenByDefault('affinity')"
+        :collapsible="layout !== 'bar'"
+        label="Affinity"
+        :options="state.affinityTypeOptions"
+        @reset="state.resetAffinityGroup"
+      />
+    </FilterSlot>
+
+    <FilterSlot
+      v-if="isSectionVisible('devotion')"
+      label="Devotion"
+      :active-count="activeCounts.devotion"
+    >
+      <SymbolToggleGroup
+        v-model:included-value="selectedDevotionSymbolIds"
+        v-model:excluded-value="excludedDevotionSymbolIds"
+        v-model:match-mode="devotionSymbolMatch"
+        :default-open="isSectionOpenByDefault('devotion')"
+        :collapsible="layout !== 'bar'"
+        label="Devotion"
+        :options="state.devotionTypeOptions"
+        @reset="state.resetDevotionGroup"
+      />
+    </FilterSlot>
+    <button
+      v-if="layout === 'bar' && (totalActiveCount > 0 || hasActiveState) && onReset"
+      type="button"
+      class="theme-ghost-button inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium"
+      @click="onReset"
+    >
+      <X
+        class="h-3.5 w-3.5"
+        aria-hidden="true"
+      />
+      Clear filters
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, type FunctionalComponent } from 'vue';
+import { X } from 'lucide-vue-next';
+import AppFilterChip from '@/shared/components/app/AppFilterChip.vue';
 import MetadataChecklistGroup from '@/domain/cards/components/filters/MetadataChecklistGroup.vue';
 import MetadataPillGroup from '@/domain/cards/components/filters/MetadataPillGroup.vue';
 import SymbolToggleGroup from '@/domain/cards/components/filters/SymbolToggleGroup.vue';
@@ -205,7 +273,20 @@ const props = defineProps<{
   showCardPool?: boolean;
   visibleSections?: readonly CardFilterSectionKey[];
   defaultOpenSections?: readonly CardFilterSectionKey[];
+  /** `column` stacks open sections in a filter aside; `bar` turns each section into a chip with a popover. */
+  layout?: 'column' | 'bar';
+  /** Clears every filter; offered from the bar once any filter is active. */
+  onReset?: () => void;
+  /** Filter state the sections cannot count themselves, such as a search query or unresolved route keys. */
+  hasActiveState?: boolean;
 }>();
+
+const layout = computed(() => props.layout ?? 'column');
+
+// Column sections render as-is; bar sections sit behind a chip that reports their active selections.
+const PassThroughSection: FunctionalComponent = (_props, { slots }) => slots.default?.();
+PassThroughSection.inheritAttrs = false;
+const FilterSlot = computed(() => (layout.value === 'bar' ? AppFilterChip : PassThroughSection));
 
 const showCardPool = computed(() => props.showCardPool ?? true);
 
@@ -218,8 +299,12 @@ const defaultOpenSections = computed(() =>
 
 const isSectionVisible = (section: CardFilterSectionKey): boolean =>
   visibleSections.value?.has(section) ?? true;
-const isSectionOpenByDefault = (section: CardFilterSectionKey, fallback = false): boolean =>
-  defaultOpenSections.value?.has(section) ?? fallback;
+const isSectionOpenByDefault = (section: CardFilterSectionKey, fallback = false): boolean => {
+  if (layout.value === 'bar') {
+    return true;
+  }
+  return defaultOpenSections.value?.has(section) ?? fallback;
+};
 
 const cardPool = computed({
   get: () => props.state.cardPool,
@@ -349,5 +434,37 @@ const selectedTagIds = computed({
 const tagMatch = computed({
   get: () => props.state.tagMatch,
   set: props.state.onUpdateTagMatch,
+});
+
+const countRange = (min: string, max: string): number => (min.trim() || max.trim() ? 1 : 0);
+const activeCounts = computed<Record<CardFilterSectionKey, number>>(() => {
+  const state = props.state;
+  return {
+    roles: state.selectedCardRoles.length + state.excludedCardRoles.length,
+    factions: state.selectedCardFactions.length + state.excludedCardFactions.length,
+    mana:
+      state.selectedManaFamilyIds.length +
+      state.excludedManaFamilyIds.length +
+      countRange(state.manaCostMin, state.manaCostMax),
+    types: state.selectedTypeIds.length + state.excludedTypeIds.length,
+    affinity: state.selectedAffinitySymbolIds.length + state.excludedAffinitySymbolIds.length,
+    devotion: state.selectedDevotionSymbolIds.length + state.excludedDevotionSymbolIds.length,
+    generic:
+      state.selectedOtherSymbolIds.length +
+      state.excludedOtherSymbolIds.length +
+      countRange(state.attackMin, state.attackMax) +
+      countRange(state.healthMin, state.healthMax),
+    keywords: state.selectedKeywordIds.length,
+    tags: state.selectedTagIds.length,
+  };
+});
+const totalActiveCount = computed(() => {
+  let total = 0;
+  for (const section of Object.keys(activeCounts.value) as CardFilterSectionKey[]) {
+    if (isSectionVisible(section)) {
+      total += activeCounts.value[section];
+    }
+  }
+  return total;
 });
 </script>

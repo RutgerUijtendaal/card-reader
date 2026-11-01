@@ -15,7 +15,7 @@ import { appendCardSortSearchParam } from '@/domain/cards/utils/gallery/cardSort
 import { getApiErrorMessage } from '@/shared/api/errors';
 
 export const useEncounterBrowser = (options: {
-  mode: Ref<'boss' | 'details' | 'cards'>;
+  mode: Ref<'boss' | 'cards'>;
   bossFactions: Ref<CardFaction[]>;
   cardIds: Ref<string[]>;
 }) => {
@@ -27,7 +27,6 @@ export const useEncounterBrowser = (options: {
   const hover = useHoverModeSurface('deckBuilder');
   const sort = useCardSortSurface('deckBuilder');
   const selectionMode = computed(() => options.mode.value === 'boss');
-  const enabled = computed(() => options.mode.value !== 'details');
   const filteredCardIds = useCardIdFilter(
     options.cardIds,
     computed(() => currentDeckOnly.value && options.mode.value === 'cards'),
@@ -81,7 +80,6 @@ export const useEncounterBrowser = (options: {
   };
   const collection = useCardCollection<GalleryItem>({
     filtersLoaded: controller.filtersLoaded,
-    enabled,
     resultSetKey: selectionMode,
     pageSize: 30,
     buildSearchParams,

@@ -18,8 +18,8 @@ const createArrayUpdater = <T extends string>(target: { value: T[] }) =>
 
 const createStringUpdater =
   (target: { value: string }) =>
-  (value: string): void => {
-    target.value = value;
+  (value: string | number): void => {
+    target.value = String(value);
   };
 
 const createMatchModeUpdater =

@@ -17,93 +17,97 @@
           :to="newDeckLocation"
         />
       </template>
-    </AppPageHeader>
-
-    <AppPageLayout>
-      <template #aside>
-        <GalleryFilterSidebar
-          title="Gallery"
-          description="Search cards by name, type line, rules text, or cost, then refine by symbols, stats, and metadata."
-          :query="query"
-          :on-update-query="updateQuery"
-          search-placeholder="Search by name, type, rules, or cost..."
-          :total-count="totalCount"
-          :on-reset="resetFilters"
-        >
-          <CardFilterSections
-            :state="filterSectionsState"
-            :show-card-pool="false"
-            :visible-sections="visibleFilterSections"
-          />
-          <div
-            v-if="filtersError"
-            class="theme-section-muted space-y-2 text-xs"
-            role="status"
-          >
-            <p>Filter options could not be loaded. Card browsing is still available.</p>
-            <button
-              class="btn-secondary"
-              type="button"
-              @click="retryFilterLoad"
+      <template #bottomLeft>
+        <AppCollectionToolbar>
+          <template #search>
+            <AppCollectionSearch
+              :query="query"
+              placeholder="Search by name, type, rules, or cost..."
+              :total-count="totalCount"
+              :result-noun="['card', 'cards']"
+              @update:query="updateQuery"
+            />
+          </template>
+          <template #filters>
+            <CardFilterSections
+              layout="bar"
+              :state="filterSectionsState"
+              :show-card-pool="false"
+              :visible-sections="visibleFilterSections"
+              :on-reset="resetFilters"
+              :has-active-state="hasActiveFilterState"
+            />
+          </template>
+          <template #actions>
+            <CardSortMenu
+              :sort="effectiveSort"
+              :default-sort="defaultSort"
+              :override-active="gallerySortOverride !== null"
+              allow-default-option
+              @update:sort="setGallerySortOverride"
+              @reset="clearGallerySortOverride"
+            />
+            <GalleryOptionsMenu
+              :hover-mode="effectiveHoverMode"
+              :default-hover-mode="defaultHoverMode"
+              :hover-mode-override-active="galleryHoverModeOverride !== null"
+              allow-hover-mode-default-option
+              :card-scale="cardScale"
+              :show-card-groups="showCardGroups"
+              :page-size="pageSize"
+              show-page-size-control
+              @update:hover-mode="setGalleryHoverModeOverride"
+              @reset:hover-mode="clearGalleryHoverModeOverride"
+              @update:card-scale="cardScale = $event"
+              @update:show-card-groups="showCardGroups = $event"
+              @update:page-size="pageSize = $event"
+            />
+            <ExtraActionsMenu
+              v-if="auth.canAccessStaffRoutes"
+              button-label="Export cards"
+              panel-class="w-56"
             >
-              Retry filter options
-            </button>
-          </div>
-
-          <template #footer>
-            <div class="flex w-full flex-col gap-2">
-              <div class="flex flex-wrap items-center gap-2">
-                <CardSortMenu
-                  :sort="effectiveSort"
-                  :default-sort="defaultSort"
-                  :override-active="gallerySortOverride !== null"
-                  allow-default-option
-                  @update:sort="setGallerySortOverride"
-                  @reset="clearGallerySortOverride"
-                />
-                <GalleryOptionsMenu
-                  :hover-mode="effectiveHoverMode"
-                  :default-hover-mode="defaultHoverMode"
-                  :hover-mode-override-active="galleryHoverModeOverride !== null"
-                  allow-hover-mode-default-option
-                  :card-scale="cardScale"
-                  :show-card-groups="showCardGroups"
-                  :page-size="pageSize"
-                  show-page-size-control
-                  @update:hover-mode="setGalleryHoverModeOverride"
-                  @reset:hover-mode="clearGalleryHoverModeOverride"
-                  @update:card-scale="cardScale = $event"
-                  @update:show-card-groups="showCardGroups = $event"
-                  @update:page-size="pageSize = $event"
-                />
-              </div>
-              <div
-                v-if="auth.canAccessStaffRoutes"
-                class="flex flex-wrap gap-2"
-              >
+              <template #default="{ close }">
                 <button
-                  class="btn-secondary inline-flex w-fit items-center gap-2 whitespace-nowrap"
+                  class="btn-secondary app-menu-action"
                   type="button"
                   :disabled="isExportingTtsCards || !exportsReady"
-                  @click="exportTtsCards"
+                  @click="close(); void exportTtsCards()"
                 >
-                  <Copy class="h-4 w-4" />
+                  <Copy class="h-4 w-4 shrink-0" />
                   <span>{{ isExportingTtsCards ? 'Exporting...' : 'Export TTS Cards' }}</span>
                 </button>
                 <button
-                  class="btn-secondary inline-flex w-fit items-center gap-2 whitespace-nowrap"
+                  class="btn-secondary app-menu-action"
                   type="button"
                   :disabled="!exportsReady"
-                  @click="exportCsv"
+                  @click="close(); void exportCsv()"
                 >
-                  <Download class="h-4 w-4" />
+                  <Download class="h-4 w-4 shrink-0" />
                   <span>Export CSV</span>
                 </button>
-              </div>
-            </div>
+              </template>
+            </ExtraActionsMenu>
           </template>
-        </GalleryFilterSidebar>
+        </AppCollectionToolbar>
       </template>
+    </AppPageHeader>
+
+    <AppPageLayout columns="one">
+      <div
+        v-if="filtersError"
+        class="theme-alert-warning mb-4 flex flex-wrap items-center justify-between gap-3"
+        role="status"
+      >
+        <span>Filter options could not be loaded. Card browsing is still available.</span>
+        <button
+          class="btn-secondary"
+          type="button"
+          @click="retryFilterLoad"
+        >
+          Retry filter options
+        </button>
+      </div>
 
       <div class="space-y-6">
         <div
@@ -143,12 +147,20 @@
           <span v-else>Scroll to load more.</span>
         </div>
 
-        <div
+        <AppEmptyState
           v-if="hasLoadedOnce && !isLoadingInitial && !isRefreshing && cards.length === 0"
-          class="page-card theme-section-muted text-sm"
+          :icon="CARD_POOL_ICONS[workspace.activePool]"
+          title="No cards found for the current filters."
+          message="Try removing a filter or searching for something else."
         >
-          No cards found for the current filters.
-        </div>
+          <button
+            class="btn-secondary"
+            type="button"
+            @click="resetFilters"
+          >
+            Clear filters
+          </button>
+        </AppEmptyState>
       </div>
     </AppPageLayout>
   </section>
@@ -204,7 +216,10 @@ import {
 import { appendCardSortSearchParam } from '@/domain/cards/utils/gallery/cardSort';
 import { useCardSortSurface } from '@/domain/cards/composables/useCardSortPreferences';
 import CardFilterSections from '@/domain/cards/components/filters/CardFilterSections.vue';
-import GalleryFilterSidebar from '@/domain/cards/components/filters/GalleryFilterSidebar.vue';
+import AppCollectionSearch from '@/shared/components/app/AppCollectionSearch.vue';
+import AppCollectionToolbar from '@/shared/components/app/AppCollectionToolbar.vue';
+import AppEmptyState from '@/shared/components/app/AppEmptyState.vue';
+import ExtraActionsMenu from '@/shared/components/app/ExtraActionsMenu.vue';
 import { useCardCollection } from '@/domain/cards/composables/useCardCollection';
 import { useGalleryOptions } from '@/domain/cards/composables/useGalleryOptions';
 import { useHoverModeSurface } from '@/domain/cards/composables/useHoverModePreferences';
@@ -621,6 +636,14 @@ watch(
     saveGallerySnapshot(searchParams, collection.galleryState.value, scrollTopRef.value);
   },
   { immediate: true },
+);
+
+// Reset returns to a bare /cards, so any filter key in the route, a search, or a pending edit counts as active.
+const hasActiveFilterState = computed(
+  () =>
+    query.value.trim() !== '' ||
+    pendingFilterRouteState.value !== null ||
+    Object.keys(route.query).some((key) => key !== 'card_pool'),
 );
 
 const resetFilters = (): void => {

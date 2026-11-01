@@ -64,16 +64,9 @@ export const buildDeckReturnLocation = (query: LocationQuery): RouteLocationRaw 
   };
 };
 
-export const buildDeckEditorLocation = (
-  deckId: string,
-  query: LocationQuery,
-): RouteLocationRaw => ({
-  path: `/my/decks/${deckId}/edit`,
-  query: withDeckEditorMode(query, 'details'),
-});
-
+// The builder opens on Cards; only an explicit request opens the details overlay.
 export const getRequestedDeckEditorMode = (query: LocationQuery): 'details' | 'cards' =>
-  queryString(query[DECK_EDITOR_MODE_QUERY_KEY]) === 'cards' ? 'cards' : 'details';
+  queryString(query[DECK_EDITOR_MODE_QUERY_KEY]) === 'details' ? 'details' : 'cards';
 
 export const withDeckEditorMode = (
   query: LocationQuery,

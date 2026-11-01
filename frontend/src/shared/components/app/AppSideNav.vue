@@ -36,7 +36,7 @@ withDefaults(
   }>(),
   {
     description: '',
-    listClass: 'flex flex-col gap-2',
+    listClass: 'flex flex-col gap-0.5',
   },
 );
 </script>

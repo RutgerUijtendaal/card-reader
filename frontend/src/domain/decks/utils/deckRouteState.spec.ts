@@ -211,7 +211,8 @@ describe('deckRouteState', () => {
       editor_mode: 'details',
       return_to: 'my_decks',
     });
-    expect(getRequestedDeckEditorMode({ return_to: 'my_decks' })).toBe('details');
+    expect(getRequestedDeckEditorMode({ return_to: 'my_decks' })).toBe('cards');
+    expect(getRequestedDeckEditorMode({ editor_mode: 'details' })).toBe('details');
   });
 
   test('returns deck detail from the editor when deck context is present', () => {

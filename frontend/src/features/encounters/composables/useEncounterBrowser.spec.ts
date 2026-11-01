@@ -27,7 +27,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 const mount = async () => {
-  const mode = ref<'boss' | 'details' | 'cards'>('cards');
+  const mode = ref<'boss' | 'cards'>('cards');
   const factions = ref<CardFaction[]>([]);
   const cardIds = ref<string[]>([]);
   let browser!: ReturnType<typeof useEncounterBrowser>;
@@ -86,7 +86,7 @@ test('boss presets clear only faction exclusions and preserve search, sorting an
   expect(state.attackMin).toBe('5');
   expect(browser.buildSearchParams().get('sort')).toBe('name_asc');
   browser.filters.filterSectionsState.value.onUpdateSelectedCardFactions(['dark']);
-  mode.value = 'details';
+  mode.value = 'boss';
   await nextTick();
   mode.value = 'cards';
   await nextTick();

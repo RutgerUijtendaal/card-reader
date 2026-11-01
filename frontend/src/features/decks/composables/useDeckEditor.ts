@@ -46,10 +46,9 @@ export const useDeckEditor = () => {
 
   const deckId = computed(() => (typeof route.params.id === 'string' ? route.params.id : ''));
   const isPublished = computed(() => Boolean(deckId.value));
-  const requestedEditorMode = deckId.value ? getRequestedDeckEditorMode(route.query) : 'details';
-  const editorMode = ref<DeckEditorMode>(deckId.value ? requestedEditorMode : 'cards');
-  const originalHeroId = ref<string | null>(null);
-  const heroReturnMode = ref<'details' | 'cards'>('details');
+  const editorMode = ref<DeckEditorMode>('cards');
+  // Details overlay whatever pool is showing; existing links open it with ?editor_mode=details.
+  const detailsOpen = ref(Boolean(deckId.value) && getRequestedDeckEditorMode(route.query) === 'details');
   const shouldApplyHeroCardPreset = ref(Boolean(deckId.value));
   const loading = ref(Boolean(deckId.value));
   const saving = ref(false);
@@ -151,62 +150,29 @@ export const useDeckEditor = () => {
 
   const openDetails = (): void => {
     if (isMutationLocked.value) return;
-    editorMode.value = 'details';
+    detailsOpen.value = true;
     syncEditorModeRoute('details');
   };
 
-  const openCards = (): void => {
-    if (isMutationLocked.value) return;
-    activateCards();
+  const closeDetails = (): void => {
+    if (!detailsOpen.value) return;
+    detailsOpen.value = false;
     syncEditorModeRoute('cards');
   };
 
-  const beginHeroChange = (): void => {
+  // Choosing a pool means looking at it, so it also closes the details overlay.
+  const openCards = (): void => {
     if (isMutationLocked.value) return;
-    heroReturnMode.value = editorMode.value === 'cards' ? 'cards' : 'details';
-    originalHeroId.value = deck.form.hero_card_id;
-    filters.resetFilters();
-    editorMode.value = 'hero';
+    activateCards();
+    closeDetails();
   };
 
+  // Heroes is another view of the card pool; picking one is an ordinary draft edit.
   const openHero = (): void => {
     if (isMutationLocked.value) return;
-    if (isPublished.value) {
-      beginHeroChange();
-      return;
-    }
     filters.resetFilters();
-    originalHeroId.value = null;
     editorMode.value = 'hero';
-  };
-
-  const applyHeroChange = (): void => {
-    if (isMutationLocked.value) return;
-    if (originalHeroId.value === null || !deck.form.hero_card_id) {
-      return;
-    }
-    shouldApplyHeroCardPreset.value = true;
-    originalHeroId.value = null;
-    if (heroReturnMode.value === 'cards') {
-      openCards();
-    } else {
-      openDetails();
-    }
-  };
-
-  const cancelHeroChange = (): void => {
-    if (isMutationLocked.value) return;
-    if (originalHeroId.value === null) {
-      return;
-    }
-    deck.form.hero_card_id = originalHeroId.value;
-    shouldApplyHeroCardPreset.value = true;
-    originalHeroId.value = null;
-    if (heroReturnMode.value === 'cards') {
-      openCards();
-    } else {
-      openDetails();
-    }
+    closeDetails();
   };
 
   const hydrateFromDeck = (record: DeckRecord): void => {
@@ -483,13 +449,9 @@ export const useDeckEditor = () => {
 
   const hasUnsavedChanges = computed(() => savedPayloadSignature.value !== '' && payloadSignature.value !== savedPayloadSignature.value);
   const hasLocalDraft = computed(() => !isPublished.value && hasUnsavedChanges.value);
-  const isChangingHero = computed(() => originalHeroId.value !== null);
-  const canApplyHeroChange = computed(
-    () => isChangingHero.value
-      && Boolean(deck.form.hero_card_id)
-      && deck.form.hero_card_id !== originalHeroId.value,
+  const canAutosync = computed(
+    () => isPublished.value && editorMode.value === 'cards' && !detailsOpen.value,
   );
-  const canAutosync = computed(() => isPublished.value && editorMode.value === 'cards');
   const changeStatusLabel = computed(() => {
     if (loading.value) {
       return 'Loading';
@@ -710,7 +672,6 @@ export const useDeckEditor = () => {
     cardLookup.value = {};
     filters.resetFilters();
     shouldApplyHeroCardPreset.value = false;
-    originalHeroId.value = null;
     editorMode.value = 'cards';
     markSavedPayload();
     void gallery.searchCards();
@@ -753,7 +714,6 @@ export const useDeckEditor = () => {
     cardLookup.value = {};
     filters.resetFilters();
     shouldApplyHeroCardPreset.value = false;
-    originalHeroId.value = null;
     editorMode.value = 'cards';
     markSavedPayload();
     void gallery.searchCards();
@@ -851,21 +811,27 @@ export const useDeckEditor = () => {
   watch(
     () => getRequestedDeckEditorMode(route.query),
     (mode) => {
-      if (!deckId.value || mode === editorMode.value) {
+      if (!deckId.value) {
         return;
       }
-      if (mode === 'cards') {
-        activateCards();
-      } else {
-        editorMode.value = 'details';
-      }
+      detailsOpen.value = mode === 'details';
     },
   );
 
   watch(
     () => deck.form.hero_card_id,
     (heroCardId, previousHeroCardId) => {
-      if (!isPublished.value && heroCardId !== previousHeroCardId) {
+      if (heroCardId === previousHeroCardId) {
+        return;
+      }
+      if (editorMode.value === 'hero' && heroCardId) {
+        // Choosing a hero returns the pool to Cards with that hero's mana families preset; an open
+        // details overlay stays open.
+        shouldApplyHeroCardPreset.value = true;
+        activateCards();
+        return;
+      }
+      if (!isPublished.value) {
         shouldApplyHeroCardPreset.value = Boolean(heroCardId);
       }
     },
@@ -942,8 +908,6 @@ export const useDeckEditor = () => {
     hasLocalDraft,
     localDraftPersistenceFailed: localDraft.storageUnavailable,
     canAutosync,
-    isChangingHero,
-    canApplyHeroChange,
     changeStatusLabel,
     autosyncEnabled,
     discardChangesModalOpen,
@@ -962,10 +926,9 @@ export const useDeckEditor = () => {
     deck,
     openHero,
     openDetails,
+    closeDetails,
+    detailsOpen,
     openCards,
-    beginHeroChange,
-    applyHeroChange,
-    cancelHeroChange,
     saveDeck,
     resumeLocalDraft,
     discardPendingLocalDraft,

@@ -85,14 +85,15 @@ describe('AppSideNavItem', () => {
     mounted.unmount();
   });
 
-  test('emits button clicks and exposes the inactive shared surface', async () => {
+  test('emits button clicks and renders the flat inactive row', async () => {
     const onClick = vi.fn();
     const mounted = await mountItem({ label: 'Flag reviews', onClick });
     const button = mounted.container.querySelector<HTMLButtonElement>('button');
 
     button?.click();
     expect(button?.type).toBe('button');
-    expect(button?.classList.contains('theme-card-frame')).toBe(true);
+    expect(button?.classList.contains('theme-side-nav-item')).toBe(true);
+    expect(button?.classList.contains('theme-selected-surface-strong')).toBe(false);
     expect(button?.getAttribute('aria-current')).toBeNull();
     expect(onClick).toHaveBeenCalledOnce();
 

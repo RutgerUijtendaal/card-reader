@@ -182,7 +182,7 @@ describe('OperationsPage', () => {
       button.textContent?.includes('TTS card sheets'),
     );
     expect(selectedQueueButton?.getAttribute('aria-current')).toBe('page');
-    expect(selectedQueueButton?.classList.contains('rounded-lg')).toBe(true);
+    expect(selectedQueueButton?.classList.contains('theme-side-nav-item')).toBe(true);
     expect(selectedQueueButton?.textContent).toContain('running 1');
 
     mounted.app.unmount();

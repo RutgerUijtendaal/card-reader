@@ -31,6 +31,14 @@
         />
       </section>
 
+      <BuilderPanelTabs
+        class="!mt-0"
+        label="Deck builder view"
+        :tabs="viewTabs"
+        :disabled="controller.isMutationLocked.value"
+        @select="selectView"
+      />
+
       <CardBuilderBoards
         :active-board-id="controller.deck.activeBoardId.value"
         :mainboard-count="controller.deck.totalMainboardCards.value"
@@ -132,6 +140,8 @@
 <script setup lang="ts">
 import { useSortable } from '@vueuse/integrations/useSortable';
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
+import { Crown, FileText, LayoutGrid } from 'lucide-vue-next';
+import BuilderPanelTabs from '@/shared/components/builders/BuilderPanelTabs.vue';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
 import { useFloatingPopover } from '@/shared/composables/useFloatingPopover';
 import CardBuilderBoards from '@/domain/cards/components/CardBuilderBoards.vue';
@@ -270,6 +280,28 @@ const activeBoardCount = computed(() =>
 const heroHeaderObjectPosition = '30% 10%';
 const heroHeaderTransform = 'scale(1.28)';
 const heroHeaderOpacity = 0.75;
+type DeckBuilderView = 'cards' | 'hero' | 'details';
+
+const viewTabs = computed(() => {
+  const detailsOpen = props.controller.detailsOpen.value;
+  const mode = props.controller.editorMode.value;
+  return [
+    { id: 'hero' as const, label: 'Hero', icon: Crown, active: !detailsOpen && mode === 'hero' },
+    { id: 'cards' as const, label: 'Cards', icon: LayoutGrid, active: !detailsOpen && mode === 'cards' },
+    { id: 'details' as const, label: 'Details', icon: FileText, active: detailsOpen },
+  ];
+});
+
+const selectView = (view: DeckBuilderView): void => {
+  if (view === 'cards') {
+    props.controller.openCards();
+  } else if (view === 'hero') {
+    props.controller.openHero();
+  } else {
+    props.controller.openDetails();
+  }
+};
+
 const handleHeroHeaderClick = (): void => {
   if (!props.controller.deck.selectedHero.value) {
     props.controller.openHero();

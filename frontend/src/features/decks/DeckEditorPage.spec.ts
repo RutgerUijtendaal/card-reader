@@ -12,8 +12,8 @@ const { controller } = vi.hoisted(() => {
       isPublished: refValue(true),
       backLink: refValue('/my/decks'),
       backLabel: refValue('Back to My Decks'),
-      editorMode: refValue<'hero' | 'details' | 'cards'>('cards'),
-      isChangingHero: refValue(false),
+      editorMode: refValue<'hero' | 'cards'>('cards'),
+      detailsOpen: refValue(false),
       saving: refValue(false),
       manualSaving: refValue(false),
       isCreating: refValue(false),
@@ -51,6 +51,7 @@ const { controller } = vi.hoisted(() => {
       openHero: vi.fn(),
       openDetails: vi.fn(),
       openCards: vi.fn(),
+      closeDetails: vi.fn(),
       confirmDiscardChanges: vi.fn(),
       cancelDiscardChanges: vi.fn(),
       requestDiscardLocalDraft: vi.fn(),
@@ -64,6 +65,8 @@ const { controller } = vi.hoisted(() => {
       openCreatedConflictDeck: vi.fn(),
       keepConflictAsNewDraft: vi.fn(),
       deck: {
+        form: { name: '' },
+        selectedHero: refValue(null),
         overallTotalCards: refValue(42),
         totalMainboardCards: refValue(40),
         totalMainboardManaTypeCards: refValue(12),
@@ -97,6 +100,7 @@ vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
           h('h1', props.title),
           slots.center?.(),
           slots.actions?.(),
+          slots.bottomLeft?.(),
         ]);
     },
   }),
@@ -146,10 +150,10 @@ vi.mock('@/shared/components/modals/ConfirmModal.vue', () => ({
   }),
 }));
 
-vi.mock('@/features/decks/components/DeckBuilderFiltersPanel.vue', () => ({
+vi.mock('@/features/decks/components/DeckBuilderFilterBar.vue', () => ({
   default: defineComponent({
     setup() {
-      return () => h('aside', 'Filters');
+      return () => h('div', { 'data-testid': 'deck-filter-bar' }, 'Filters');
     },
   }),
 }));
@@ -256,7 +260,7 @@ describe('DeckEditorPage', () => {
     controller.deckId.value = 'deck-1';
     controller.isPublished.value = true;
     controller.editorMode.value = 'cards';
-    controller.isChangingHero.value = false;
+    controller.detailsOpen.value = false;
     controller.loading.value = false;
     controller.saving.value = false;
     controller.manualSaving.value = false;
@@ -280,20 +284,22 @@ describe('DeckEditorPage', () => {
     vi.clearAllMocks();
   });
 
-  test('renders deck builder status bar between the asides and above the gallery', async () => {
+  test('keeps the deck panel before the pool in reading order, below header filters and above status', async () => {
     const mounted = await mountPage();
     const statusBar = mounted.container.querySelector<HTMLElement>('[aria-label="Deck builder status"]');
-    const leftAside = Array.from(mounted.container.querySelectorAll('aside')).find((aside) => aside.textContent === 'Filters');
+    const filterBar = mounted.container.querySelector<HTMLElement>('header [data-testid="deck-filter-bar"]');
     const gallery = mounted.container.querySelector<HTMLElement>('[data-testid="builder-gallery"]');
     const rightAside = Array.from(mounted.container.querySelectorAll('aside')).find((aside) => aside.textContent === 'Summary');
     const autosyncCheckbox = statusBar?.querySelector<HTMLInputElement>('input[type="checkbox"]');
 
-    if (!statusBar || !leftAside || !gallery || !rightAside) {
+    if (!statusBar || !filterBar || !gallery || !rightAside) {
       throw new Error('expected builder layout landmarks');
     }
-    expect(leftAside.compareDocumentPosition(statusBar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(statusBar.compareDocumentPosition(gallery) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(gallery.compareDocumentPosition(rightAside) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(mounted.container.querySelectorAll('aside')).toHaveLength(1);
+    expect(filterBar.compareDocumentPosition(gallery) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(rightAside.compareDocumentPosition(gallery) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(rightAside.compareDocumentPosition(statusBar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(statusBar.closest('.builder-workspace-footer')).not.toBeNull();
     expect(statusBar?.textContent).toContain('Unsaved');
     expect(statusBar?.textContent).toContain('Autosync');
     expect(statusBar?.textContent).toContain('Total');
@@ -302,63 +308,58 @@ describe('DeckEditorPage', () => {
     expect(autosyncCheckbox?.disabled).toBe(false);
     expect(gallery.parentElement?.classList.contains('builder-gallery-scroll')).toBe(true);
     expect(gallery.parentElement?.classList.contains('app-scrollbar')).toBe(true);
+    expect(mounted.container.querySelector('nav[aria-label="Deck editor sections"]')).toBeNull();
 
     mounted.unmount();
   });
 
-  test('renders hero browsing without the cards status or board sidebar', async () => {
+  test('keeps the deck panel and status bar while browsing heroes', async () => {
     controller.deckId.value = '';
     controller.isPublished.value = false;
     controller.editorMode.value = 'hero';
 
     const mounted = await mountPage();
 
-    expect(mounted.container.querySelector('[aria-label="Deck builder status"]')).toBeNull();
+    expect(mounted.container.querySelector('[aria-label="Deck builder status"]')).not.toBeNull();
     expect(mounted.container.querySelector('[data-testid="builder-gallery"]')).not.toBeNull();
-    expect(
-      mounted.container
-        .querySelector('[data-testid="builder-gallery"]')
-        ?.parentElement?.classList.contains('builder-gallery-scroll'),
-    ).toBe(true);
-    expect(mounted.container.querySelector('[data-testid="hero-selection-panel"]')).not.toBeNull();
     expect(mounted.container.textContent).toContain('Filters');
-    expect(mounted.container.textContent).not.toContain('Summary');
+    expect(mounted.container.textContent).toContain('Summary');
 
     mounted.unmount();
     controller.deckId.value = 'deck-1';
     controller.isPublished.value = true;
   });
 
-  test('renders the wide details layout without a gallery or board sidebar', async () => {
-    controller.editorMode.value = 'details';
+  test('opens details as an overlay above the still-mounted pool and closes back to it', async () => {
+    controller.detailsOpen.value = true;
 
     const mounted = await mountPage();
+    const overlay = mounted.container.querySelector('.builder-workspace-overlay');
 
-    expect(mounted.container.querySelector('[data-testid="details-hero-panel"]')).not.toBeNull();
-    expect(mounted.container.querySelector('[data-testid="details-form"]')).not.toBeNull();
-    const status = mounted.container.querySelector('[aria-label="Deck save status"]');
-    expect(status?.textContent).toContain('Unsaved');
-    expect(status?.textContent).toContain('Autosync');
-    expect(status?.nextElementSibling?.querySelector('[data-testid="details-form"]')).not.toBeNull();
-    expect(mounted.container.querySelector('[data-testid="builder-gallery"]')).toBeNull();
-    expect(mounted.container.textContent).not.toContain('Filters');
-    expect(mounted.container.textContent).not.toContain('Summary');
+    expect(overlay?.querySelector('[data-testid="details-form"]')).not.toBeNull();
+    expect(mounted.container.querySelector('[data-testid="builder-gallery"]')).not.toBeNull();
+    expect(mounted.container.querySelector('header [data-testid="deck-filter-bar"]')).not.toBeNull();
+    expect(mounted.container.textContent).toContain('Summary');
+    expect(mounted.container.querySelector('[aria-label="Deck builder status"]')).not.toBeNull();
+
+    overlay?.querySelector<HTMLButtonElement>('button[aria-label="Close deck details"]')?.click();
+    await nextTick();
+    expect(controller.closeDetails).toHaveBeenCalledTimes(1);
 
     mounted.unmount();
   });
 
-  test('renders a details-shaped loading state while the deck loads', async () => {
-    controller.editorMode.value = 'details';
+  test('renders a details-shaped loading state in the overlay while the deck loads', async () => {
+    controller.detailsOpen.value = true;
     controller.loading.value = true;
 
     const mounted = await mountPage();
+    const overlay = mounted.container.querySelector('.builder-workspace-overlay');
 
-    expect(mounted.container.querySelector('[data-testid="builder-layout"]')).not.toBeNull();
+    expect(overlay?.querySelectorAll('.deck-builder-loading-line').length).toBeGreaterThan(0);
+    expect(mounted.container.querySelector('[data-testid="details-form"]')).toBeNull();
     expect(mounted.container.querySelectorAll('.deck-builder-loading-panel')).toHaveLength(1);
-    expect(mounted.container.querySelector('[data-testid="builder-gallery"]')).toBeNull();
     expect(mounted.container.textContent).not.toContain('Loading deck...');
-    expect(mounted.container.textContent).not.toContain('Filters');
-    expect(mounted.container.textContent).not.toContain('Summary');
 
     mounted.unmount();
   });
@@ -370,7 +371,8 @@ describe('DeckEditorPage', () => {
     const mounted = await mountPage();
     const gallery = mounted.container.querySelector('[data-testid="builder-gallery"]');
 
-    expect(mounted.container.querySelectorAll('.deck-builder-loading-panel')).toHaveLength(2);
+    expect(mounted.container.querySelectorAll('.deck-builder-loading-panel')).toHaveLength(1);
+    expect(mounted.container.querySelector('[data-testid="deck-filter-bar"]')).toBeNull();
     expect(gallery?.getAttribute('data-loading')).toBe('true');
     expect(mounted.container.querySelector('.builder-gallery-scroll')).not.toBeNull();
     expect(mounted.container.querySelector('[aria-label="Deck builder status"]')).toBeNull();
@@ -379,22 +381,7 @@ describe('DeckEditorPage', () => {
     mounted.unmount();
   });
 
-  test('switches between Details and Cards from persistent header tabs', async () => {
-    controller.editorMode.value = 'details';
-    const mounted = await mountPage();
-    const detailsTab = mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Open deck details"]');
-    const cardsTab = mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Open deck cards"]');
-
-    expect(detailsTab?.getAttribute('aria-pressed')).toBe('true');
-    expect(cardsTab?.getAttribute('aria-pressed')).toBe('false');
-    cardsTab?.click();
-    await nextTick();
-
-    expect(controller.openCards).toHaveBeenCalledTimes(1);
-    mounted.unmount();
-  });
-
-  test('shows Hero, Details, Cards, and Create for an unpublished draft', async () => {
+  test('shows only Create in the header for an unpublished draft', async () => {
     controller.deckId.value = '';
     controller.isPublished.value = false;
     controller.editorMode.value = 'cards';
@@ -402,9 +389,6 @@ describe('DeckEditorPage', () => {
     controller.changeStatusLabel.value = 'Local Draft';
 
     const mounted = await mountPage();
-    const heroTab = mounted.container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Open deck hero"]',
-    );
     const createButton = mounted.container.querySelector<HTMLButtonElement>(
       'button[aria-label="Create deck"]',
     );
@@ -412,34 +396,18 @@ describe('DeckEditorPage', () => {
       'input[type="checkbox"]',
     );
 
-    expect(heroTab).not.toBeNull();
-    expect(mounted.container.querySelector('button[aria-label="Open deck details"]')).not.toBeNull();
-    expect(mounted.container.querySelector('button[aria-label="Open deck cards"]')).not.toBeNull();
+    expect(mounted.container.querySelector('nav[aria-label="Deck editor sections"]')).toBeNull();
+    expect(mounted.container.querySelector('header button[aria-label*="details"]')).toBeNull();
+    expect(mounted.container.querySelector('header h1')?.textContent).toBe('New deck');
     expect(mounted.container.querySelectorAll('.deck-editor-header-divider')).toHaveLength(1);
-    expect(
-      mounted.container.querySelector('nav[aria-label="Deck editor sections"]'),
-    ).not.toBeNull();
     expect(createButton?.textContent).toBe('Create');
     expect(autosyncCheckbox?.disabled).toBe(true);
     expect(mounted.container.textContent).toContain('Autosync after creation');
 
-    heroTab?.click();
     createButton?.click();
     await nextTick();
 
-    expect(controller.openHero).toHaveBeenCalledTimes(1);
     expect(controller.saveDeck).toHaveBeenCalledTimes(1);
-    mounted.unmount();
-  });
-
-  test('hides section tabs during explicit hero replacement', async () => {
-    controller.editorMode.value = 'hero';
-    controller.isChangingHero.value = true;
-    const mounted = await mountPage();
-
-    expect(mounted.container.querySelector('button[aria-label="Open deck details"]')).toBeNull();
-    expect(mounted.container.querySelector('button[aria-label="Open deck cards"]')).toBeNull();
-
     mounted.unmount();
   });
 
@@ -489,19 +457,10 @@ describe('DeckEditorPage', () => {
 
     const mounted = await mountPage();
     const page = mounted.container.querySelector('section');
-    const layout = mounted.container.querySelector<HTMLElement>('[data-testid="builder-layout"]');
+    const layout = mounted.container.querySelector<HTMLElement>('.builder-workspace-layout');
 
     expect(layout?.hasAttribute('inert')).toBe(true);
     expect(page?.getAttribute('aria-busy')).toBe('true');
-    expect(
-      mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Open deck hero"]')?.disabled,
-    ).toBe(true);
-    expect(
-      mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Open deck details"]')?.disabled,
-    ).toBe(true);
-    expect(
-      mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Open deck cards"]')?.disabled,
-    ).toBe(true);
     expect(
       mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Discard local draft"]')?.disabled,
     ).toBe(true);
