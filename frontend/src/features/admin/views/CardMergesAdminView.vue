@@ -1,7 +1,7 @@
 <template>
-  <div class="page-card flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
+  <div class="flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
     <div class="space-y-1">
-      <h3 class="theme-section-title text-base font-semibold">
+      <h3 class="theme-section-title theme-display text-xl">
         Card Merges
       </h3>
       <p class="theme-section-muted text-sm">
@@ -27,8 +27,8 @@
     <div class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
       <div class="app-scrollbar grid min-h-0 gap-4 overflow-y-auto pr-1 xl:grid-cols-[minmax(14rem,1fr)_auto_minmax(14rem,1fr)] xl:items-stretch">
         <div class="theme-panel-shell flex min-h-[32rem] flex-col space-y-5 p-4 xl:min-h-0">
-          <div class="theme-card-frame-muted rounded-xl p-3">
-            <h4 class="theme-section-title text-lg font-semibold">
+          <div class="theme-divider border-b pb-3">
+            <h4 class="theme-section-title theme-display text-xl">
               Source Card
             </h4>
             <p class="theme-section-muted mt-1 text-sm">
@@ -102,8 +102,8 @@
         </div>
 
         <div class="theme-panel-shell flex min-h-[32rem] flex-col space-y-5 p-4 xl:min-h-0">
-          <div class="theme-card-frame-muted rounded-xl p-3">
-            <h4 class="theme-section-title text-lg font-semibold">
+          <div class="theme-divider border-b pb-3">
+            <h4 class="theme-section-title theme-display text-xl">
               Target Card
             </h4>
             <p class="theme-section-muted mt-1 text-sm">
@@ -171,7 +171,7 @@
         </div>
       </div>
 
-      <aside class="theme-muted-panel app-scrollbar min-h-0 overflow-y-auto p-4">
+      <aside class="theme-divider app-scrollbar min-h-0 overflow-y-auto border-t pt-4 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
         <div class="flex flex-wrap gap-3">
           <button
             class="btn-secondary"
@@ -204,7 +204,7 @@
             </p>
           </div>
 
-          <div class="theme-card-frame-muted rounded-xl p-3 text-sm">
+          <div class="theme-card-frame-muted rounded-lg p-3 text-sm">
             <p>Deck collisions: {{ preview.relations.deck_entry_collisions }}</p>
             <p>Sideboard collisions: {{ preview.relations.sideboard_entry_collisions }}</p>
             <p>Group collisions: {{ preview.relations.group_member_collisions }}</p>
@@ -215,7 +215,7 @@
 
           <div
             v-if="preview.warnings.length > 0"
-            class="theme-card-frame-muted rounded-xl border border-amber-400/40 p-3"
+            class="theme-card-frame-muted rounded-lg border border-[var(--color-warning-border)] p-3"
           >
             <h5 class="theme-section-title text-sm font-semibold">
               Warnings
@@ -247,7 +247,7 @@
 
           <div
             v-if="preview.blocking_conflicts.length > 0"
-            class="theme-card-frame-muted rounded-xl border border-amber-400/40 p-3"
+            class="theme-card-frame-muted rounded-lg border border-[var(--color-warning-border)] p-3"
           >
             <h5 class="theme-section-title text-sm font-semibold">
               Blocking Conflicts

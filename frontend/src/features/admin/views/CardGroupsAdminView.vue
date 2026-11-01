@@ -1,7 +1,7 @@
 <template>
-  <div class="page-card flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
+  <div class="flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
     <div>
-      <h3 class="theme-section-title text-base font-semibold">
+      <h3 class="theme-section-title theme-display text-xl">
         Card groups
       </h3>
       <p class="theme-section-muted text-sm">
@@ -47,8 +47,8 @@
             v-for="group in filteredGroups"
             :key="group.id"
             type="button"
-            class="w-full rounded-xl border p-3 text-left transition"
-            :class="selectedGroupId === group.id ? 'theme-selected-surface-strong' : 'theme-card-frame hover:-translate-y-0.5'"
+            class="w-full rounded-lg border p-3 text-left transition"
+            :class="selectedGroupId === group.id ? 'theme-selected-surface-strong' : 'theme-card-frame'"
             @click="selectGroup(group.id)"
           >
             <div class="flex items-start justify-between gap-3">
@@ -182,7 +182,7 @@
                 <div
                   v-for="(member, index) in editor.members"
                   :key="member.card_id"
-                  class="theme-card-frame flex items-center gap-3 rounded-xl p-3"
+                  class="theme-card-frame flex items-center gap-3 rounded-lg p-3"
                   draggable="true"
                   @dragstart="onDragStart(index)"
                   @dragover.prevent

@@ -97,6 +97,24 @@ test('boss presets clear only faction exclusions and preserve search, sorting an
   expect(browser.filters.query.value).toBe('guard');
 });
 
+test('picking a boss neither filters nor reloads the boss gallery, and presets Cards on leaving it', async () => {
+  const { browser, factions, mode } = await mount();
+  mode.value = 'boss';
+  await nextTick();
+  await vi.advanceTimersByTimeAsync(250);
+  api.bosses.mockClear();
+  for (const picked of [['order'], ['blood', 'dark'], ['order']] as CardFaction[][]) {
+    factions.value = picked;
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(250);
+  }
+  expect(api.bosses).not.toHaveBeenCalled();
+  expect(browser.filters.readFilterState().cardFactionKeys).toEqual([]);
+  mode.value = 'cards';
+  await nextTick();
+  expect(browser.filters.readFilterState().cardFactionKeys).toEqual(['order']);
+});
+
 test('editing deck contents preserves loaded gallery pages when Current Encounter Only is off', async () => {
   api.cards.mockResolvedValueOnce({
     results: [{ id: 'first', result_type: 'card' }],

@@ -2,7 +2,7 @@
   <AppModal
     :open="open"
     aria-labelledby="mana-type-groups-title"
-    panel-class="theme-popover app-scrollbar max-h-[90vh] w-full max-w-3xl overflow-y-auto p-5 shadow-xl"
+    panel-class="theme-popover app-scrollbar max-h-[90vh] w-full max-w-3xl overflow-y-auto p-5"
     @close="requestClose"
   >
     <div class="flex items-start justify-between gap-4">

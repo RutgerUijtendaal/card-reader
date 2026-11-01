@@ -1,8 +1,8 @@
 <template>
-  <div class="page-card space-y-6">
+  <div class="space-y-6">
     <div class="theme-divider flex flex-wrap items-center justify-between gap-4 border-b pb-4">
       <div>
-        <h3 class="theme-section-title text-base font-semibold">
+        <h3 class="theme-section-title theme-display text-xl">
           Card backs
         </h3>
         <p class="theme-section-muted mt-1 text-sm">
@@ -55,7 +55,7 @@
       role="region"
       aria-labelledby="card-back-defaults-tab"
     >
-      <div class="theme-card-frame-muted rounded-xl px-4 py-3">
+      <div class="theme-card-frame-muted rounded-lg px-4 py-3">
         <div class="flex flex-wrap items-center gap-2 text-sm">
           <span class="theme-section-muted mr-1 text-xs font-semibold uppercase tracking-wide">
             Resolution order
@@ -292,7 +292,7 @@
         <div
           v-for="index in 6"
           :key="index"
-          class="theme-card-frame-muted animate-pulse rounded-xl p-3"
+          class="theme-card-frame-muted animate-pulse rounded-lg p-3"
         >
           <div class="aspect-[63/88] rounded-lg bg-[var(--color-surface-soft)]" />
           <div class="mt-3 h-4 w-2/3 rounded bg-[var(--color-surface-soft)]" />
@@ -302,7 +302,7 @@
 
       <div
         v-else-if="filteredCardBacks.length === 0"
-        class="theme-empty-state mt-4 rounded-xl p-10 text-center text-sm"
+        class="theme-empty-state mt-4 rounded-lg p-10 text-center text-sm"
       >
         <h4 class="theme-section-title font-semibold">
           {{ cardBacks.length === 0 ? 'No card backs yet' : 'No matching card backs' }}
@@ -331,7 +331,7 @@
         <article
           v-for="cardBack in filteredCardBacks"
           :key="cardBack.id"
-          class="theme-card-frame rounded-xl p-3"
+          class="theme-card-frame rounded-lg p-3"
           role="listitem"
         >
           <div class="theme-card-image-well aspect-[63/88] overflow-hidden rounded-lg">

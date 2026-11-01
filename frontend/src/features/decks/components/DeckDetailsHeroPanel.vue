@@ -4,7 +4,7 @@
   >
     <div class="space-y-5">
       <div class="space-y-1">
-        <h3 class="theme-section-title text-lg font-semibold">
+        <h3 class="theme-section-title theme-display text-xl">
           Hero
         </h3>
         <p class="theme-section-muted text-sm">
@@ -32,7 +32,7 @@
         >
           No hero image
         </div>
-        <p class="theme-section-title text-center font-semibold">
+        <p class="theme-section-title theme-display text-center text-lg">
           {{ controller.deck.selectedHero.value.name }}
         </p>
       </div>

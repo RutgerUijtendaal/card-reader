@@ -1,6 +1,6 @@
 <template>
-  <div class="page-card flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
-    <h3 class="theme-section-title text-base font-semibold">
+  <div class="flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
+    <h3 class="theme-section-title theme-display text-xl">
       Catalog
     </h3>
 

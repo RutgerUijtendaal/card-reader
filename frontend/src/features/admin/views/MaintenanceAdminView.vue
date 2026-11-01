@@ -1,14 +1,14 @@
 <template>
-  <div class="page-card flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
+  <div class="flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
     <div class="space-y-1">
-      <h3 class="theme-section-title text-base font-semibold">
+      <h3 class="theme-section-title theme-display text-xl">
         Maintenance
       </h3>
     </div>
 
     <div class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div class="app-scrollbar min-h-0 space-y-4 overflow-y-auto pr-1">
-        <section class="theme-muted-panel p-4">
+      <div class="app-scrollbar min-h-0 overflow-y-auto pr-1">
+        <section class="theme-form-section">
           <div class="space-y-1">
             <h4 class="theme-section-title text-sm font-semibold">
               Utility
@@ -46,7 +46,7 @@
           </div>
         </section>
 
-        <section class="theme-muted-panel p-4">
+        <section class="theme-form-section">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="space-y-1">
               <h4 class="theme-section-title text-sm font-semibold">
@@ -68,7 +68,7 @@
           </div>
 
           <div class="mt-4 space-y-4">
-            <div class="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
+            <div class="theme-muted-panel p-4">
               <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div class="space-y-1">
                   <div class="theme-section-title text-sm font-semibold">
@@ -157,7 +157,7 @@
         </section>
       </div>
 
-      <aside class="theme-muted-panel app-scrollbar min-h-0 overflow-y-auto p-4">
+      <aside class="theme-divider app-scrollbar min-h-0 overflow-y-auto border-t pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
         <h4 class="theme-section-title text-sm font-semibold">
           Notes
         </h4>

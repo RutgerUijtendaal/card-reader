@@ -54,11 +54,11 @@
       <button
         v-for="entry in currentRows"
         :key="entry.id"
-        class="w-full rounded-xl border px-3 py-3 text-left transition"
+        class="w-full rounded-lg border px-3 py-3 text-left transition"
         :class="
           selectedEntryId === entry.id
             ? 'theme-selected-surface-strong'
-            : 'theme-card-frame hover:-translate-y-0.5'
+            : 'theme-card-frame'
         "
         type="button"
         @click="emit('select-entry', entry.id)"
@@ -87,7 +87,7 @@
         >
           <span
             class="h-2.5 w-2.5 rounded-full"
-            :class="entry.enabled ? 'bg-emerald-500' : 'bg-rose-500'"
+            :class="entry.enabled ? 'bg-[var(--color-success-text)]' : 'bg-[var(--color-error-text)]'"
           />
           <span>{{ entry.text_token ? `Token ${entry.text_token}` : 'No text token' }}</span>
         </div>

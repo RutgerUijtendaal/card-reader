@@ -4,7 +4,7 @@
     :aria-busy="publication.isCreating.value"
   >
     <AppPageHeader
-      :icon="APP_SECTION_ICONS.encounters"
+      :icon="APP_SECTION_ICONS.encounterBuilder"
       :title="editor.id ? 'Edit Encounter' : 'Build Encounter'"
       :subtitle="subtitle"
       :back-to="publication.isCreating.value ? null : '/my/encounters'"
@@ -37,7 +37,7 @@
         />
         <AppHeaderAction
           v-if="!editor.readOnly.value"
-          :icon="busy ? LoaderCircle : editor.id ? Save : APP_SECTION_ICONS.encounters"
+          :icon="busy ? LoaderCircle : editor.id ? Save : APP_SECTION_ICONS.encounterBuilder"
           :label="saveLabel"
           :short-label="saveLabel"
           variant="primary"
@@ -197,7 +197,6 @@
         :loading="loading"
         :hover-mode="browser.filters.hoverMode.value"
         :selection-mode="mode === 'boss'"
-        :is-selected="isSelected"
         :action-label="() => (mode === 'boss' ? 'Select boss' : 'Add card to Encounter')"
         :action-disabled="() => locked"
         :remove-disabled="(id) => locked || quantity(id) === 0"
@@ -328,11 +327,6 @@ const activate = (card: GalleryItem) => {
   if (mode.value === 'boss') void editor.selectBoss(card);
   else editor.add(card);
 };
-const isSelected = (card: GalleryItem) =>
-  mode.value === 'boss' &&
-  (card.result_type === 'card_group'
-    ? form.boss_group_id === card.group_id
-    : !form.boss_group_id && form.boss_card_id === card.id);
 const confirmReload = () => {
   if (window.confirm('Replace your local edits with the saved Encounter?')) void editor.reload();
 };

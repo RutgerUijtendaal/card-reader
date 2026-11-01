@@ -117,13 +117,13 @@ const deckTagGroups = computed<MetadataPillOptionGroup[]>(() => [
     key: 'roles',
     label: 'Roles',
     options: props.controller.filterCatalog.value.deckTags.filter((tag) => tag.kind === 'role'),
-    selectedClass: 'theme-choice-chip-accent shadow-sm',
+    selectedClass: 'theme-choice-chip-accent',
   },
   {
     key: 'types',
     label: 'Types',
     options: props.controller.filterCatalog.value.deckTags.filter((tag) => tag.kind === 'type'),
-    selectedClass: 'theme-choice-chip-keyword shadow-sm',
+    selectedClass: 'theme-choice-chip-keyword',
   },
 ]);
 </script>

@@ -5,7 +5,7 @@
   >
     <div class="space-y-5">
       <div class="space-y-1">
-        <h3 class="theme-section-title text-lg font-semibold">
+        <h3 class="theme-section-title theme-display text-xl">
           {{ controller.isChangingHero.value ? 'Change Hero' : 'Deck Setup' }}
         </h3>
         <p class="theme-section-muted text-sm">
@@ -24,7 +24,7 @@
 
       <div
         v-if="!controller.isChangingHero.value && setupBlockingMessages.length > 0"
-        class="theme-muted-panel space-y-2 p-3"
+        class="theme-danger-panel space-y-2"
       >
         <p class="theme-section-title text-sm font-semibold">
           Setup Issues

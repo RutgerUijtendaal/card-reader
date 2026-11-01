@@ -21,7 +21,7 @@
         class="group relative flex min-w-0 items-center gap-3 rounded-lg border px-2.5 py-2 text-left transition"
         :class="version.version_id === selectedVersionId
           ? 'theme-selected-surface-strong'
-          : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
+          : 'theme-card-frame theme-section-title hover:border-[var(--color-border-strong)]'"
       >
         <button
           type="button"

@@ -1,5 +1,5 @@
 <template>
-  <section class="theme-card-frame-muted flex min-h-0 flex-col rounded-2xl p-3">
+  <section class="theme-card-frame-muted flex min-h-0 flex-col rounded-lg p-3">
     <div class="shrink-0 space-y-2">
       <div class="flex items-center justify-between gap-3">
         <h4 class="theme-section-title text-sm font-semibold">
@@ -28,7 +28,7 @@
 
     <div
       v-if="previewWarning"
-      class="theme-info-box mt-3 rounded-xl px-3 py-2 text-sm"
+      class="theme-info-box mt-3 rounded-lg px-3 py-2 text-sm"
     >
       {{ previewWarning }}
     </div>
@@ -62,7 +62,7 @@
 
       <div
         v-else
-        class="theme-card-frame theme-section-muted flex min-h-[28rem] flex-1 items-center justify-center rounded-2xl px-6 text-center text-sm"
+        class="theme-card-frame theme-section-muted flex min-h-[28rem] flex-1 items-center justify-center rounded-lg px-6 text-center text-sm"
       >
         Choose a preview card to visualize the template regions.
       </div>

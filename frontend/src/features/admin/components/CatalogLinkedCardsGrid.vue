@@ -7,7 +7,7 @@
       v-for="card in cards"
       :key="card.card_version_id"
       :to="detailLocation(card.card_id)"
-      class="theme-card-frame group w-[210px] rounded-lg transition duration-200 hover:-translate-y-0.5"
+      class="theme-card-frame group w-[210px] rounded-lg transition duration-200"
       :title="`${card.card_label} (${card.card_version_name})`"
       @mouseenter="showHoverPreview(card, $event)"
       @mouseleave="hideHoverPreview"
@@ -68,7 +68,7 @@
       class="pointer-events-none fixed left-0 top-0 z-[1200]"
       :style="{ left: `${hoverPreviewX}px`, top: `${hoverPreviewY}px` }"
     >
-      <div class="theme-card-frame w-[320px] rounded-xl shadow-2xl">
+      <div class="theme-card-frame w-[320px] rounded-lg shadow-2xl">
         <div class="theme-card-image-well aspect-[0.72]">
           <img
             :src="toAbsoluteApiUrl(hoverPreview.image_url!)"

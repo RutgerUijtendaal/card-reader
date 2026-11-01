@@ -215,11 +215,11 @@ onMounted(async () => {
 }
 
 .comparison-version-link:hover {
-  color: var(--theme-accent);
+  color: var(--accent);
 }
 
 .comparison-version-link:focus-visible {
-  outline: 2px solid var(--theme-accent);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
@@ -247,7 +247,7 @@ onMounted(async () => {
 .comparison-preset:focus-visible {
   position: relative;
   z-index: 1;
-  outline: 2px solid var(--theme-accent);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
@@ -289,9 +289,10 @@ onMounted(async () => {
   backdrop-filter: blur(6px);
 }
 
-.comparison-viewer:focus-within {
+/* Keyboard focus only: dragging the full-size slider with a pointer must not frame the card. */
+.comparison-viewer:has(.comparison-range:focus-visible) {
   box-shadow:
     0 16px 32px color-mix(in srgb, var(--color-text) 14%, transparent),
-    0 0 0 3px color-mix(in srgb, var(--theme-accent) 68%, transparent);
+    0 0 0 3px color-mix(in srgb, var(--accent) 68%, transparent);
 }
 </style>

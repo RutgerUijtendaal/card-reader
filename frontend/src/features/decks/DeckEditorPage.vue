@@ -218,14 +218,14 @@
           <div class="flex flex-wrap items-center justify-start gap-x-5 gap-y-2 lg:justify-end">
             <div class="flex items-center gap-2">
               <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Total</span>
-              <span class="theme-section-title text-base font-semibold">{{
+              <span class="theme-section-title theme-display text-lg tabular-nums">{{
                 controller.deck.overallTotalCards.value
               }}</span>
             </div>
             <div class="theme-divider hidden h-4 border-l lg:block" />
             <div class="flex items-center gap-2">
               <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Main</span>
-              <span class="theme-section-title text-base font-semibold">
+              <span class="theme-section-title theme-display text-lg tabular-nums">
                 {{ controller.deck.totalMainboardCards.value
                 }}<template v-if="controller.deck.totalMainboardCards.value >= mainboardMaxCards">
                   / {{ mainboardMaxCards }}</template>
@@ -234,7 +234,7 @@
             <div class="theme-divider hidden h-4 border-l lg:block" />
             <div class="flex items-center gap-2">
               <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Mana</span>
-              <span class="theme-section-title text-base font-semibold">{{
+              <span class="theme-section-title theme-display text-lg tabular-nums">{{
                 controller.deck.totalMainboardManaTypeCards.value
               }}</span>
               <InfoTooltip
@@ -244,11 +244,11 @@
               >
                 <CircleCheckBig
                   v-if="controller.deck.hasFreeMulliganManaRatio.value"
-                  class="h-4 w-4 text-emerald-400"
+                  class="theme-success-text h-4 w-4"
                 />
                 <CircleX
                   v-else
-                  class="h-4 w-4 text-rose-400"
+                  class="theme-error-text h-4 w-4"
                 />
               </InfoTooltip>
             </div>
@@ -305,7 +305,7 @@
                 <div
                   v-if="hardIssuesOpen"
                   ref="hardIssuePanelRef"
-                  class="theme-popover pointer-events-none z-50 w-72 p-3 text-sm shadow-lg"
+                  class="theme-popover pointer-events-none z-50 w-72 p-3 text-sm"
                   role="tooltip"
                   :style="{ position: 'fixed', left: `${hardIssueX}px`, top: `${hardIssueY}px` }"
                 >
@@ -350,7 +350,7 @@
                 <div
                   v-if="warningsOpen"
                   ref="warningPanelRef"
-                  class="theme-popover pointer-events-none z-50 w-72 p-3 text-sm shadow-lg"
+                  class="theme-popover pointer-events-none z-50 w-72 p-3 text-sm"
                   role="tooltip"
                   :style="{ position: 'fixed', left: `${warningX}px`, top: `${warningY}px` }"
                 >
@@ -375,7 +375,7 @@
             />
             <div class="flex items-center gap-2">
               <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Unique</span>
-              <span class="theme-section-title text-base font-semibold">{{
+              <span class="theme-section-title theme-display text-lg tabular-nums">{{
                 controller.deck.overallUniqueCards.value
               }}</span>
             </div>
@@ -385,7 +385,7 @@
               <span
                 class="text-base font-semibold"
                 :class="
-                  controller.deck.isDeckValid.value ? 'text-emerald-300' : 'theme-section-title'
+                  controller.deck.isDeckValid.value ? 'theme-success-text' : 'theme-section-title'
                 "
               >
                 {{ controller.deck.deckStatusLabel.value }}

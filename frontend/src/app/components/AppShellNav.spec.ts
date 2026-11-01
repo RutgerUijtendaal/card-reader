@@ -218,23 +218,41 @@ describe('AppShellNav', () => {
     mounted.unmount();
   });
 
-  test('places the workspace picker immediately before the hotkeys area', async () => {
+  test('places labeled workspace tabs directly above the navigation', async () => {
     const mounted = await mountNav();
     const pickerSection = mounted.container.querySelector(
       '[data-testid="card-pool-workspace-switcher"]',
     )?.parentElement;
-    const hotkeysSection = mounted.container.querySelector('[data-testid="hotkeys-panel"]')
-      ?.parentElement?.parentElement;
+    const navigation = mounted.container.querySelector('nav');
     const poolButtons = Array.from(
       mounted.container.querySelectorAll<HTMLButtonElement>(
         '[data-testid="card-pool-workspace-switcher"] button',
       ),
     );
 
-    expect(pickerSection?.nextElementSibling).toBe(hotkeysSection);
-    expect(poolButtons.every((button) => button.parentElement?.classList.contains('flex-1'))).toBe(
-      true,
+    expect(pickerSection?.nextElementSibling).toBe(navigation);
+    expect(poolButtons.every((button) => button.classList.contains('flex-1'))).toBe(true);
+    expect(poolButtons.map((button) => button.textContent?.trim())).toEqual([
+      'Player',
+      'Evil',
+      'Neutral',
+    ]);
+    mounted.unmount();
+  });
+
+  test('orders Player links as browse, own, build, then playtest', async () => {
+    const mounted = await mountNav();
+    const labels = Array.from(mounted.container.querySelectorAll('nav a.nav-link')).map((link) =>
+      link.textContent?.trim(),
     );
+    const decksIndex = labels.indexOf('Decks');
+
+    expect(labels.slice(decksIndex, decksIndex + 4)).toEqual([
+      'Decks',
+      'My Decks',
+      'Build a deck',
+      'Playtester',
+    ]);
     mounted.unmount();
   });
 
@@ -538,8 +556,8 @@ describe('AppShellNav', () => {
     mounted.unmount();
   });
 
-  test('shows pool names in tooltips on hover', async () => {
-    const mounted = await mountNav();
+  test('shows pool names in tooltips on hover in the collapsed rail', async () => {
+    const mounted = await mountNav({ collapsed: true });
     const evilButton = mounted.container.querySelector<HTMLButtonElement>(
       '[aria-label="Evil workspace"]',
     );

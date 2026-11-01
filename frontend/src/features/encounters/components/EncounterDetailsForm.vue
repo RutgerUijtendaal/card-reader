@@ -17,7 +17,7 @@
     />
     <section class="space-y-5">
       <div class="space-y-1">
-        <h2 class="theme-section-title text-lg font-semibold">
+        <h2 class="theme-section-title theme-display text-xl">
           Organization
         </h2>
         <p class="theme-section-muted text-sm">

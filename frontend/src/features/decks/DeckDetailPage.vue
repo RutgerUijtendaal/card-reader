@@ -70,7 +70,7 @@
           </h3>
           <div class="space-y-3">
             <div
-              class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-2xl"
+              class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-xl"
             >
               <img
                 v-if="deck.hero_card.image_url"
@@ -86,7 +86,7 @@
               </div>
             </div>
 
-            <p class="theme-section-title text-lg font-semibold">
+            <p class="theme-section-title theme-display text-xl">
               {{ deck.hero_card.name }}
             </p>
             <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
@@ -512,10 +512,10 @@ onMounted(async () => {
 }
 
 .deck-detail-panel-trigger:hover {
-  background: color-mix(in srgb, var(--theme-accent) 7%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
 }
 
 .deck-detail-panel-trigger:focus-visible {
-  box-shadow: 0 0 0 2px var(--theme-accent);
+  box-shadow: 0 0 0 2px var(--accent);
 }
 </style>

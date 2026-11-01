@@ -78,7 +78,7 @@ const cardClass = computed(() => [
   'collection-list-card-surface page-card',
   props.variant ? `collection-list-card-${props.variant}` : '',
   props.to
-    ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-surface)]'
+    ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--table-canvas)]'
     : '',
 ]);
 const navigate = (event: MouseEvent | KeyboardEvent): void => {

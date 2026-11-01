@@ -1,7 +1,7 @@
 <template>
   <section class="space-y-5">
     <div class="space-y-1">
-      <h2 class="theme-section-title text-xl font-semibold">
+      <h2 class="theme-section-title theme-display text-2xl">
         {{ kind }} details
       </h2>
       <p class="theme-section-muted text-sm">

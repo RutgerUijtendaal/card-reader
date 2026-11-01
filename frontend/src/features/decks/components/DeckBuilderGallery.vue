@@ -4,7 +4,6 @@
     :loading="loading"
     :hover-mode="controller.filters.hoverMode.value"
     :selection-mode="controller.deck.isHeroStep.value"
-    :is-selected="card => card.result_type === 'card' && controller.deck.isHeroStep.value && controller.deck.form.hero_card_id === card.id"
     :action-label="card => card.result_type === 'card' ? controller.deck.galleryActionLabel(card) : 'Card unavailable'"
     :action-disabled="card => card.result_type !== 'card' || controller.deck.galleryActionDisabled(card)"
     :remove-disabled="controller.deck.galleryRemoveActionDisabled"

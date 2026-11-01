@@ -143,16 +143,16 @@ const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_cou
 
 .deck-compact-card:hover,
 .deck-compact-card:focus-visible {
-  border-color: color-mix(in srgb, var(--color-accent) 46%, var(--color-border));
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--color-border));
   background: color-mix(in srgb, var(--color-surface-strong) 92%, transparent);
   outline: none;
   transform: translateY(-0.05rem);
 }
 
 .deck-compact-card-selected {
-  border-color: color-mix(in srgb, var(--color-accent) 76%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface-strong));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 48%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 76%, var(--color-border));
+  background: color-mix(in srgb, var(--accent) 16%, var(--color-surface-strong));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 48%, transparent);
 }
 
 .deck-compact-card-playtester.deck-compact-card-selected {
@@ -192,8 +192,8 @@ const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_cou
   border: 1px solid var(--color-border-strong);
   border-radius: 0.7rem 0 0 0.7rem;
   background:
-    radial-gradient(circle at top left, rgba(148, 163, 184, 0.26), transparent 55%),
-    linear-gradient(135deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.92));
+    radial-gradient(circle at top left, color-mix(in srgb, var(--color-sidebar-text) 18%, transparent), transparent 55%),
+    var(--color-sidebar);
 }
 
 .deck-compact-card-art-image {
@@ -214,9 +214,9 @@ const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_cou
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at top left, rgba(244, 114, 182, 0.28), transparent 45%),
-    radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.22), transparent 48%),
-    linear-gradient(140deg, rgba(30, 41, 59, 0.86), rgba(15, 23, 42, 0.94));
+    radial-gradient(circle at top left, color-mix(in srgb, var(--sidebar-accent) 30%, transparent), transparent 50%),
+    radial-gradient(circle at bottom left, color-mix(in srgb, var(--sidebar-accent) 16%, transparent), transparent 48%),
+    var(--color-sidebar);
 }
 
 .deck-compact-card-content {

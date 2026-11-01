@@ -75,7 +75,7 @@
     >
       <div class="theme-divider flex flex-wrap items-center justify-between gap-3 border-b pb-5">
         <div>
-          <h2 class="theme-section-title text-lg font-semibold">
+          <h2 class="theme-section-title theme-display text-xl">
             Images
           </h2>
           <p class="theme-section-muted text-sm">

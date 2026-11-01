@@ -18,7 +18,7 @@
     </span>
     <button
       v-if="hiddenCount > 0"
-      class="theme-pill theme-pill-neutral cursor-pointer px-2 py-1 text-xs font-semibold transition hover:border-[var(--color-border-strong)] hover:text-[var(--color-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
+      class="theme-pill theme-pill-neutral cursor-pointer px-2 py-1 text-xs font-semibold transition hover:border-[var(--color-border-strong)] hover:text-[var(--color-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
       type="button"
       :aria-label="`Show all ${orderedItems.length} deck tags`"
       :aria-expanded="expanded"

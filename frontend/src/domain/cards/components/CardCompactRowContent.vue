@@ -67,11 +67,11 @@
       class="absolute inset-y-0 left-0 w-[42%]"
       style="background: linear-gradient(to right, var(--color-surface-strong) 0%, color-mix(in srgb, var(--color-surface-strong) 92%, transparent 8%) 18%, color-mix(in srgb, var(--color-surface-strong) 74%, transparent 26%) 42%, color-mix(in srgb, var(--color-surface-strong) 46%, transparent 54%) 72%, transparent 100%);"
     />
-    <div class="absolute inset-0 bg-gradient-to-l from-slate-950/70 via-slate-950/30 to-transparent" />
+    <div class="theme-art-scrim-edge absolute inset-0" />
   </div>
   <div
     v-else
-    class="theme-divider card-compact-row-art relative z-10 h-full shrink-0 border-l bg-gradient-to-l from-slate-800/35 via-slate-700/12 to-transparent"
+    class="theme-divider card-compact-row-art relative z-10 h-full shrink-0 theme-card-image-well border-l"
     :style="{ width: artWidth }"
   />
 </template>

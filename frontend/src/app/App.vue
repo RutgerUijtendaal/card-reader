@@ -87,7 +87,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, watchEffect } from 'vue';
 import { useEventListener, useLocalStorage, useMediaQuery, useResizeObserver } from '@vueuse/core';
 import { Menu } from 'lucide-vue-next';
 import { Toaster } from 'vue-sonner';
@@ -161,6 +161,13 @@ const hoverModeHotkeyActions = computed(() => {
       hoverModeOverride.value = null;
     },
   };
+});
+
+// The active side of the table tints the shell (see the theme model in styles/base.css).
+watchEffect(() => {
+  if (typeof document !== 'undefined') {
+    document.documentElement.dataset.cardPool = workspace.activePool;
+  }
 });
 
 provideScrollContainer(scrollContainerRef);

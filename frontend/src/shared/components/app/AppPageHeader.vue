@@ -3,10 +3,7 @@
     to="#app-page-header-outlet"
     :disabled="!hasShellHeaderOutlet"
   >
-    <header
-      class="theme-page-header border-b"
-      :style="headerStyle"
-    >
+    <header class="theme-page-header border-b">
       <div
         class="flex flex-col gap-4 px-5 py-5"
         :class="[
@@ -20,18 +17,17 @@
           class="app-page-header-primary flex min-w-0 flex-1 gap-3"
           :class="hasSupportingContent ? 'items-start' : 'items-center'"
         >
-          <div class="theme-card-frame-muted theme-section-title flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
-            <component
-              :is="icon"
-              class="h-5 w-5"
-            />
-          </div>
+          <component
+            :is="icon"
+            class="theme-page-header-icon mt-[0.3rem] h-5 w-5 shrink-0"
+            aria-hidden="true"
+          />
 
           <div class="min-w-0">
             <div class="flex min-w-0 flex-wrap items-center gap-2">
               <component
                 :is="titleTag"
-                class="theme-section-title truncate font-semibold"
+                class="theme-section-title theme-display truncate"
                 :class="titleClass"
               >
                 {{ title }}
@@ -85,9 +81,8 @@
 
       <div
         v-if="hasBottomRow"
-        class="theme-divider theme-subheader-row flex flex-wrap items-center gap-3 border-t px-5 py-4"
+        class="theme-divider theme-page-header-bottom flex flex-wrap items-center gap-3 border-t px-5 py-3"
         :class="[bottomRowClass, bottomRowLayoutClass]"
-        :style="bottomRowStyle"
       >
         <div
           v-if="hasBottomLeft"
@@ -129,7 +124,7 @@ const props = withDefaults(
   }>(),
   {
     titleTag: 'h1',
-    titleClass: 'text-xl',
+    titleClass: 'text-2xl',
     subtitle: '',
     subtitleClass: 'text-sm',
     backTo: null,
@@ -169,23 +164,6 @@ const bottomRowLayoutClass = computed(() => {
   return 'justify-start';
 });
 const resolvedBackTo = computed<RouteLocationRaw>(() => props.backTo ?? '/');
-const headerStyle = computed(() => ({
-  borderColor: 'color-mix(in srgb, var(--color-border-strong) 48%, transparent)',
-  background: [
-    'linear-gradient(180deg,',
-    'color-mix(in srgb, var(--color-surface-strong) 72%, transparent) 0%,',
-    'color-mix(in srgb, var(--color-surface) 42%, transparent) 100%)',
-  ].join(' '),
-  backdropFilter: 'blur(24px) saturate(1.45)',
-  WebkitBackdropFilter: 'blur(24px) saturate(1.45)',
-  color: 'var(--color-text)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 1px 0 rgba(148,163,184,0.2), 0 14px 38px rgba(15,23,42,0.14)',
-}));
-const bottomRowStyle = computed(() => ({
-  background: 'color-mix(in srgb, var(--color-surface) 34%, transparent)',
-  backdropFilter: 'blur(20px) saturate(1.35)',
-  WebkitBackdropFilter: 'blur(20px) saturate(1.35)',
-}));
 const topRowClass = computed(() => []);
 const bottomRowClass = computed(() => '');
 

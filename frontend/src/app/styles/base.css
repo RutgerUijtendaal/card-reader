@@ -1,173 +1,282 @@
+@font-face {
+  font-family: 'Lora';
+  src: url('./fonts/lora-variable.woff') format('woff');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lora';
+  src: url('./fonts/lora-italic-variable.woff') format('woff');
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('./fonts/inter-regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('./fonts/inter-medium.woff') format('woff');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('./fonts/inter-semibold.woff') format('woff');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('./fonts/inter-bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
+  /*
+   * Theme model
+   * - Daylight (light) and Night (dark) set the table: canvas, surfaces, ink, and lines.
+   * - The active card pool sets the light source: one accent hue per side of the table,
+   *   applied through html[data-card-pool]. Every accent-driven token derives from
+   *   --accent, --accent-strong, --accent-ink, and --accent-glow.
+   */
   :root {
     color-scheme: light;
+    --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    --font-display: 'Lora', Georgia, 'Times New Roman', serif;
     --app-page-single-column-max-width: 72rem;
-    --app-bg-from: #f7f9fc;
-    --app-bg-to: #dfe7f0;
-    --color-text: #0f172a;
-    --color-text-muted: #475569;
-    --color-text-soft: #64748b;
-    --color-border: rgba(100, 116, 139, 0.34);
-    --color-border-strong: rgba(71, 85, 105, 0.48);
-    --color-surface: rgba(255, 255, 255, 0.84);
-    --color-surface-strong: rgba(255, 255, 255, 0.93);
-    --color-surface-muted: rgba(248, 250, 252, 0.78);
-    --color-surface-soft: rgba(241, 245, 249, 0.92);
-    --color-popover: rgba(255, 255, 255, 0.96);
-    --color-sidebar: linear-gradient(180deg, rgba(15, 23, 42, 0.94) 0%, rgba(30, 41, 59, 0.92) 100%);
-    --color-sidebar-border: rgba(148, 163, 184, 0.16);
-    --color-sidebar-text: #e2e8f0;
-    --color-sidebar-surface: rgba(30, 41, 59, 0.62);
-    --color-sidebar-surface-hover: rgba(51, 65, 85, 0.82);
-    --color-nav-text: #cbd5e1;
-    --color-nav-hover-bg: rgba(255, 255, 255, 0.08);
-    --color-nav-hover-text: #f8fafc;
-    --color-nav-active-bg: linear-gradient(135deg, rgba(14, 165, 233, 0.18) 0%, rgba(59, 130, 246, 0.16) 100%);
-    --color-nav-active-text: #eff6ff;
-    --color-selected-bg: linear-gradient(135deg, rgba(224, 242, 254, 0.82) 0%, rgba(219, 234, 254, 0.92) 100%);
-    --color-selected-bg-strong: linear-gradient(135deg, rgba(219, 234, 254, 0.92) 0%, rgba(191, 219, 254, 0.98) 100%);
-    --color-selected-border: rgba(96, 165, 250, 0.38);
-    --color-selected-text: #1e3a8a;
-    --color-link: #2563eb;
-    --color-link-hover: #1d4ed8;
-    --color-control-accent: #0f766e;
-    --color-pill-neutral-bg: rgba(241, 245, 249, 0.95);
-    --color-pill-neutral-border: rgba(203, 213, 225, 0.9);
-    --color-pill-neutral-text: #475569;
-    --color-pill-success-bg: rgba(220, 252, 231, 0.94);
-    --color-pill-success-border: rgba(134, 239, 172, 0.72);
-    --color-pill-success-text: #166534;
-    --color-pill-accent-bg: rgba(204, 251, 241, 0.96);
-    --color-pill-accent-border: rgba(94, 234, 212, 0.82);
-    --color-pill-accent-text: #115e59;
-    --color-pill-keyword-bg: rgba(219, 234, 254, 0.94);
-    --color-pill-keyword-border: rgba(147, 197, 253, 0.78);
-    --color-pill-keyword-text: #1d4ed8;
-    --color-pill-symbol-bg: rgba(237, 233, 254, 0.96);
-    --color-pill-symbol-border: rgba(196, 181, 253, 0.8);
-    --color-pill-symbol-text: #6d28d9;
-    --color-pill-warning-bg: rgba(254, 249, 195, 0.94);
-    --color-pill-warning-border: rgba(253, 224, 71, 0.72);
-    --color-pill-warning-text: #a16207;
-    --color-pill-danger-bg: rgba(254, 226, 226, 0.94);
-    --color-pill-danger-border: rgba(252, 165, 165, 0.75);
-    --color-pill-danger-text: #b91c1c;
-    --color-success-text: #166534;
-    --color-error-text: #b91c1c;
-    --color-input-bg: rgba(255, 255, 255, 0.96);
-    --color-input-border: rgba(148, 163, 184, 0.55);
-    --color-input-focus: rgba(14, 165, 233, 0.85);
-    --color-input-ring: rgba(125, 211, 252, 0.35);
-    --color-secondary-bg: linear-gradient(135deg, rgba(240, 249, 255, 0.96) 0%, rgba(224, 231, 255, 0.94) 100%);
-    --color-secondary-hover: linear-gradient(135deg, rgba(224, 242, 254, 0.98) 0%, rgba(199, 210, 254, 0.98) 100%);
-    --color-primary-from: rgb(59 130 246);
-    --color-primary-to: rgb(99 102 241);
-    --color-primary-hover-from: rgb(37 99 235);
-    --color-primary-hover-to: rgb(79 70 229);
-    --color-secondary-text: #334155;
-    --color-secondary-border: rgba(96, 165, 250, 0.24);
-    --color-disabled-bg: rgba(241, 245, 249, 0.95);
-    --color-disabled-border: rgba(203, 213, 225, 0.9);
-    --color-disabled-text: #94a3b8;
-    --color-danger-bg: rgba(254, 242, 242, 0.94);
-    --color-danger-hover: rgba(254, 226, 226, 0.98);
-    --color-danger-border: rgba(251, 146, 146, 0.7);
-    --color-danger-text: #b91c1c;
-    --color-filter-exclude-bg: rgba(255, 241, 242, 0.9);
-    --color-filter-exclude-hover: rgba(255, 228, 230, 0.94);
-    --color-filter-exclude-border: rgba(251, 113, 133, 0.42);
-    --color-filter-exclude-text: #9f1239;
-    --color-warning-bg: rgba(255, 251, 235, 0.94);
-    --color-warning-border: rgba(252, 211, 77, 0.72);
-    --color-warning-text: #b45309;
-    --color-overlay: rgba(15, 23, 42, 0.52);
-    --scrollbar-thumb: rgba(148, 163, 184, 0.9);
-    --scrollbar-thumb-hover: rgba(100, 116, 139, 0.96);
+
+    /* Daylight table */
+    --table-canvas: #eceff6;
+    --table-canvas-deep: #e1e5f0;
+    --accent: #3454d1;
+    --accent-strong: #2741ae;
+    --accent-ink: #ffffff;
+    --accent-glow: rgba(52, 84, 209, 0.13);
+    /* Fixed per-pool hues, for places that show every side at once. */
+    --pool-player: #3454d1;
+    --pool-evil: #7440c8;
+    --pool-neutral: #1f7a68;
+
+    --app-bg-from: var(--table-canvas);
+    --app-bg-to: var(--table-canvas-deep);
+    --color-text: #182040;
+    --color-text-muted: #4a5478;
+    --color-text-soft: #6c7698;
+    --color-border: rgba(40, 55, 110, 0.14);
+    --color-border-strong: rgba(40, 55, 110, 0.26);
+    --color-surface: rgba(255, 255, 255, 0.72);
+    --color-surface-strong: #ffffff;
+    --color-surface-muted: rgba(246, 247, 251, 0.86);
+    --color-surface-soft: #f3f5fa;
+    --color-popover: #ffffff;
+
+    /* The sidebar spine stays night in both themes so the brand mark always sits on its own sky. */
+    --color-sidebar: #10152a;
+    --color-sidebar-border: rgba(150, 170, 230, 0.12);
+    --color-sidebar-text: #e8ebf7;
+    --color-sidebar-surface: rgba(150, 170, 230, 0.07);
+    --color-sidebar-surface-hover: rgba(150, 170, 230, 0.12);
+    --sidebar-accent: #9db6ff;
+    --color-nav-text: #aab2cf;
+    --color-nav-hover-bg: rgba(150, 170, 230, 0.07);
+    --color-nav-hover-text: #f3f5fd;
+    --color-nav-active-bg: color-mix(in srgb, var(--sidebar-accent) 13%, transparent);
+    --color-nav-active-text: #ffffff;
+
+    --color-selected-bg: color-mix(in srgb, var(--accent) 9%, var(--color-surface-strong));
+    --color-selected-bg-strong: color-mix(in srgb, var(--accent) 15%, var(--color-surface-strong));
+    --color-selected-border: color-mix(in srgb, var(--accent) 42%, transparent);
+    --color-selected-text: var(--accent-strong);
+    --color-link: var(--accent);
+    --color-link-hover: var(--accent-strong);
+    --color-control-accent: var(--accent);
+
+    --color-pill-neutral-bg: rgba(40, 55, 110, 0.06);
+    --color-pill-neutral-border: rgba(40, 55, 110, 0.14);
+    --color-pill-neutral-text: #4a5478;
+    --color-pill-success-bg: rgba(24, 128, 84, 0.1);
+    --color-pill-success-border: rgba(24, 128, 84, 0.26);
+    --color-pill-success-text: #12603f;
+    --color-pill-accent-bg: color-mix(in srgb, var(--accent) 10%, transparent);
+    --color-pill-accent-border: color-mix(in srgb, var(--accent) 30%, transparent);
+    --color-pill-accent-text: var(--accent-strong);
+    --color-pill-keyword-bg: rgba(52, 84, 209, 0.08);
+    --color-pill-keyword-border: rgba(52, 84, 209, 0.24);
+    --color-pill-keyword-text: #2741ae;
+    --color-pill-symbol-bg: rgba(116, 64, 200, 0.08);
+    --color-pill-symbol-border: rgba(116, 64, 200, 0.24);
+    --color-pill-symbol-text: #5b2fa3;
+    --color-pill-warning-bg: rgba(196, 132, 18, 0.1);
+    --color-pill-warning-border: rgba(196, 132, 18, 0.3);
+    --color-pill-warning-text: #8a5a06;
+    --color-pill-danger-bg: rgba(200, 40, 70, 0.08);
+    --color-pill-danger-border: rgba(200, 40, 70, 0.26);
+    --color-pill-danger-text: #a3213f;
+    --color-success-text: #12603f;
+    --color-error-text: #a3213f;
+
+    --color-input-bg: #ffffff;
+    --color-input-border: rgba(40, 55, 110, 0.2);
+    --color-input-focus: var(--accent);
+    --color-input-ring: color-mix(in srgb, var(--accent) 18%, transparent);
+
+    --color-secondary-bg: transparent;
+    --color-secondary-hover: color-mix(in srgb, var(--accent) 8%, transparent);
+    --color-secondary-text: var(--color-text);
+    --color-secondary-border: var(--color-border-strong);
+    --color-primary-from: var(--accent);
+    --color-primary-to: var(--accent);
+    --color-primary-hover-from: var(--accent-strong);
+    --color-primary-hover-to: var(--accent-strong);
+
+    --color-disabled-bg: rgba(40, 55, 110, 0.05);
+    --color-disabled-border: rgba(40, 55, 110, 0.12);
+    --color-disabled-text: #9199b5;
+    --color-danger-bg: rgba(200, 40, 70, 0.06);
+    --color-danger-hover: rgba(200, 40, 70, 0.12);
+    --color-danger-border: rgba(200, 40, 70, 0.3);
+    --color-danger-text: #a3213f;
+    --color-filter-exclude-bg: rgba(200, 40, 70, 0.07);
+    --color-filter-exclude-hover: rgba(200, 40, 70, 0.12);
+    --color-filter-exclude-border: rgba(200, 40, 70, 0.3);
+    --color-filter-exclude-text: #a3213f;
+    --color-warning-bg: rgba(196, 132, 18, 0.08);
+    --color-warning-border: rgba(196, 132, 18, 0.3);
+    --color-warning-text: #8a5a06;
+    --color-overlay: rgba(16, 21, 42, 0.56);
+    --scrollbar-thumb: rgba(74, 84, 120, 0.5);
+    --scrollbar-thumb-hover: rgba(74, 84, 120, 0.75);
+  }
+
+  html[data-card-pool='evil'] {
+    --accent: #7440c8;
+    --accent-strong: #5b2fa3;
+    --accent-glow: rgba(116, 64, 200, 0.14);
+    --table-canvas: #efedf6;
+    --table-canvas-deep: #e5e1f0;
+    --sidebar-accent: #c4a3ff;
+  }
+
+  html[data-card-pool='neutral'] {
+    --accent: #1f7a68;
+    --accent-strong: #165f51;
+    --accent-glow: rgba(31, 122, 104, 0.12);
+    --table-canvas: #ebf0f0;
+    --table-canvas-deep: #dfe7e7;
+    --sidebar-accent: #8fd6c4;
   }
 
   html.dark {
     color-scheme: dark;
-    --app-bg-from: #20262b;
-    --app-bg-to: #323a43;
-    --color-text: #edf1f5;
-    --color-text-muted: #b4bec8;
-    --color-text-soft: #88939f;
-    --color-border: rgba(130, 142, 155, 0.46);
-    --color-border-strong: rgba(154, 166, 178, 0.58);
-    --color-surface: rgba(49, 56, 62, 0.82);
-    --color-surface-strong: rgba(56, 63, 70, 0.93);
-    --color-surface-muted: rgba(63, 70, 77, 0.8);
-    --color-surface-soft: rgba(72, 79, 87, 0.88);
-    --color-popover: rgba(45, 51, 58, 0.96);
-    --color-sidebar: linear-gradient(180deg, rgba(37, 43, 49, 0.96) 0%, rgba(29, 35, 40, 0.94) 100%);
-    --color-sidebar-border: rgba(148, 163, 184, 0.1);
-    --color-sidebar-text: #edf1f5;
-    --color-sidebar-surface: rgba(63, 72, 80, 0.76);
-    --color-sidebar-surface-hover: rgba(80, 91, 101, 0.9);
-    --color-nav-text: #d4dbe3;
-    --color-nav-hover-bg: rgba(255, 255, 255, 0.06);
-    --color-nav-hover-text: #ffffff;
-    --color-nav-active-bg: linear-gradient(135deg, rgba(56, 189, 248, 0.14) 0%, rgba(96, 165, 250, 0.12) 100%);
-    --color-nav-active-text: #eff6ff;
-    --color-selected-bg: linear-gradient(135deg, rgba(30, 58, 95, 0.62) 0%, rgba(37, 56, 88, 0.74) 100%);
-    --color-selected-bg-strong: linear-gradient(135deg, rgba(36, 67, 106, 0.78) 0%, rgba(46, 67, 101, 0.86) 100%);
-    --color-selected-border: rgba(96, 165, 250, 0.34);
-    --color-selected-text: #eff6ff;
-    --color-link: #d7dde4;
-    --color-link-hover: #ffffff;
-    --color-control-accent: #5eead4;
-    --color-pill-neutral-bg: rgba(80, 91, 101, 0.82);
-    --color-pill-neutral-border: rgba(115, 126, 138, 0.72);
-    --color-pill-neutral-text: #f1f5f9;
-    --color-pill-success-bg: rgba(39, 76, 58, 0.76);
-    --color-pill-success-border: rgba(74, 222, 128, 0.28);
-    --color-pill-success-text: #dcfce7;
-    --color-pill-accent-bg: rgba(19, 78, 74, 0.8);
-    --color-pill-accent-border: rgba(45, 212, 191, 0.32);
-    --color-pill-accent-text: #ccfbf1;
-    --color-pill-keyword-bg: rgba(34, 65, 107, 0.78);
-    --color-pill-keyword-border: rgba(96, 165, 250, 0.34);
-    --color-pill-keyword-text: #dbeafe;
-    --color-pill-symbol-bg: rgba(74, 47, 115, 0.8);
-    --color-pill-symbol-border: rgba(167, 139, 250, 0.34);
-    --color-pill-symbol-text: #f3e8ff;
-    --color-pill-warning-bg: rgba(98, 76, 29, 0.72);
-    --color-pill-warning-border: rgba(250, 204, 21, 0.3);
-    --color-pill-warning-text: #fef3c7;
-    --color-pill-danger-bg: rgba(102, 45, 45, 0.76);
-    --color-pill-danger-border: rgba(248, 113, 113, 0.3);
-    --color-pill-danger-text: #fee2e2;
-    --color-success-text: #bbf7d0;
-    --color-error-text: #fecaca;
-    --color-input-bg: rgba(44, 50, 56, 0.92);
-    --color-input-border: rgba(111, 123, 136, 0.72);
-    --color-input-focus: rgba(154, 166, 178, 0.78);
-    --color-input-ring: rgba(148, 163, 184, 0.18);
-    --color-secondary-bg: linear-gradient(135deg, rgba(40, 52, 70, 0.92) 0%, rgba(52, 50, 83, 0.9) 100%);
-    --color-secondary-hover: linear-gradient(135deg, rgba(49, 66, 89, 0.98) 0%, rgba(64, 63, 101, 0.96) 100%);
-    --color-primary-from: rgb(96 165 250);
-    --color-primary-to: rgb(129 140 248);
-    --color-primary-hover-from: rgb(59 130 246);
-    --color-primary-hover-to: rgb(99 102 241);
-    --color-secondary-text: #dbeafe;
-    --color-secondary-border: rgba(96, 165, 250, 0.24);
-    --color-disabled-bg: rgba(58, 65, 72, 0.88);
-    --color-disabled-border: rgba(96, 108, 120, 0.88);
-    --color-disabled-text: #8d99a6;
-    --color-danger-bg: rgba(69, 10, 10, 0.48);
-    --color-danger-hover: rgba(127, 29, 29, 0.56);
-    --color-danger-border: rgba(248, 113, 113, 0.34);
-    --color-danger-text: #fecaca;
-    --color-filter-exclude-bg: rgba(94, 45, 63, 0.54);
-    --color-filter-exclude-hover: rgba(113, 55, 74, 0.62);
-    --color-filter-exclude-border: rgba(251, 113, 133, 0.28);
-    --color-filter-exclude-text: #ffe4e6;
-    --color-warning-bg: rgba(120, 53, 15, 0.38);
-    --color-warning-border: rgba(251, 191, 36, 0.3);
-    --color-warning-text: #fde68a;
-    --color-overlay: rgba(24, 29, 34, 0.66);
-    --scrollbar-thumb: rgba(110, 122, 136, 0.92);
-    --scrollbar-thumb-hover: rgba(138, 151, 166, 0.98);
+
+    /* Night table */
+    --table-canvas: #151b30;
+    --table-canvas-deep: #11162a;
+    --accent: #86a8ff;
+    --accent-strong: #a9c1ff;
+    --accent-ink: #0f1530;
+    --accent-glow: rgba(96, 132, 255, 0.2);
+    --pool-player: #86a8ff;
+    --pool-evil: #b88cff;
+    --pool-neutral: #7ccbb8;
+
+    --color-text: #e8ebf7;
+    --color-text-muted: #aab2cf;
+    --color-text-soft: #7e87a8;
+    --color-border: rgba(150, 170, 230, 0.14);
+    --color-border-strong: rgba(150, 170, 230, 0.26);
+    --color-surface: rgba(30, 38, 66, 0.6);
+    --color-surface-strong: #1c2440;
+    --color-surface-muted: rgba(30, 38, 66, 0.5);
+    --color-surface-soft: #212a4a;
+    --color-popover: #1e2644;
+
+    --color-sidebar: #0f1426;
+    --color-selected-bg: color-mix(in srgb, var(--accent) 12%, var(--table-canvas));
+    --color-selected-bg-strong: color-mix(in srgb, var(--accent) 20%, var(--table-canvas));
+    --color-selected-border: color-mix(in srgb, var(--accent) 45%, transparent);
+    --color-selected-text: var(--accent-strong);
+
+    --color-pill-neutral-bg: rgba(150, 170, 230, 0.08);
+    --color-pill-neutral-border: rgba(150, 170, 230, 0.16);
+    --color-pill-neutral-text: #c8cee6;
+    --color-pill-success-bg: rgba(80, 200, 140, 0.12);
+    --color-pill-success-border: rgba(80, 200, 140, 0.28);
+    --color-pill-success-text: #a7ecc6;
+    --color-pill-accent-bg: color-mix(in srgb, var(--accent) 14%, transparent);
+    --color-pill-accent-border: color-mix(in srgb, var(--accent) 34%, transparent);
+    --color-pill-accent-text: var(--accent-strong);
+    --color-pill-keyword-bg: rgba(134, 168, 255, 0.12);
+    --color-pill-keyword-border: rgba(134, 168, 255, 0.28);
+    --color-pill-keyword-text: #c9d7ff;
+    --color-pill-symbol-bg: rgba(184, 140, 255, 0.12);
+    --color-pill-symbol-border: rgba(184, 140, 255, 0.28);
+    --color-pill-symbol-text: #e0ccff;
+    --color-pill-warning-bg: rgba(240, 180, 70, 0.12);
+    --color-pill-warning-border: rgba(240, 180, 70, 0.3);
+    --color-pill-warning-text: #f6d595;
+    --color-pill-danger-bg: rgba(240, 90, 120, 0.12);
+    --color-pill-danger-border: rgba(240, 90, 120, 0.3);
+    --color-pill-danger-text: #ffc2d0;
+    --color-success-text: #a7ecc6;
+    --color-error-text: #ffb3c4;
+
+    --color-input-bg: rgba(10, 14, 30, 0.35);
+    --color-input-border: rgba(150, 170, 230, 0.2);
+    --color-input-ring: color-mix(in srgb, var(--accent) 22%, transparent);
+
+    --color-secondary-hover: color-mix(in srgb, var(--accent) 10%, transparent);
+
+    --color-disabled-bg: rgba(150, 170, 230, 0.05);
+    --color-disabled-border: rgba(150, 170, 230, 0.12);
+    --color-disabled-text: #6c7596;
+    --color-danger-bg: rgba(240, 90, 120, 0.08);
+    --color-danger-hover: rgba(240, 90, 120, 0.16);
+    --color-danger-border: rgba(240, 90, 120, 0.32);
+    --color-danger-text: #ffb3c4;
+    --color-filter-exclude-bg: rgba(240, 90, 120, 0.1);
+    --color-filter-exclude-hover: rgba(240, 90, 120, 0.16);
+    --color-filter-exclude-border: rgba(240, 90, 120, 0.32);
+    --color-filter-exclude-text: #ffc2d0;
+    --color-warning-bg: rgba(240, 180, 70, 0.08);
+    --color-warning-border: rgba(240, 180, 70, 0.28);
+    --color-warning-text: #f6d595;
+    --color-overlay: rgba(6, 9, 20, 0.66);
+    --scrollbar-thumb: rgba(150, 170, 230, 0.32);
+    --scrollbar-thumb-hover: rgba(150, 170, 230, 0.5);
+  }
+
+  html.dark[data-card-pool='evil'] {
+    --table-canvas: #19162f;
+    --table-canvas-deep: #13112a;
+    --accent: #b88cff;
+    --accent-strong: #d1b4ff;
+    --accent-ink: #1a1030;
+    --accent-glow: rgba(150, 90, 255, 0.22);
+  }
+
+  html.dark[data-card-pool='neutral'] {
+    --table-canvas: #131c2a;
+    --table-canvas-deep: #0f1724;
+    --accent: #7ccbb8;
+    --accent-strong: #a3ddcf;
+    --accent-ink: #0c1d1a;
+    --accent-glow: rgba(90, 190, 165, 0.16);
   }
 
   html,
@@ -178,8 +287,32 @@
 
   body {
     @apply m-0 overflow-hidden antialiased;
-    background-image: linear-gradient(to bottom right, var(--app-bg-from), var(--app-bg-to));
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01';
+    background-color: var(--table-canvas);
+    /* The lamp: one soft light source above the table, tinted by the active side. */
+    background-image:
+      radial-gradient(ellipse 70% 55% at 58% -12%, var(--accent-glow) 0%, transparent 70%),
+      linear-gradient(180deg, var(--table-canvas) 0%, var(--table-canvas-deep) 100%);
+    background-attachment: fixed;
     color: var(--color-text);
+    transition: background-color 400ms ease;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    body {
+      transition: none;
+    }
   }
 }
-

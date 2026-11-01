@@ -1,5 +1,5 @@
 <template>
-  <section class="theme-muted-panel flex min-w-[12rem] flex-col gap-3">
+  <section class="theme-filter-section flex min-w-[12rem] flex-col gap-3">
     <button
       type="button"
       class="flex min-h-9 items-center justify-between gap-2 text-left"
