@@ -625,7 +625,9 @@ describe('CardGalleryPage pool-aware filters', () => {
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(mounted.requestRoutes).toEqual([]);
 
-    mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Reset filters"]')?.click();
+    Array.from(mounted.container.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent?.trim() === 'Clear filters')
+      ?.click();
 
     await vi.waitFor(() => {
       expect(mounted.router.currentRoute.value.fullPath).toBe('/cards');

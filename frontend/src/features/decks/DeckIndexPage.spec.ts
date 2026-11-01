@@ -170,10 +170,11 @@ vi.mock('@/shared/components/app/ExtraActionsMenu.vue', () => ({
   }),
 }));
 
-vi.mock('@/features/decks/components/DeckBrowseFiltersPanel.vue', () => ({
+vi.mock('@/features/decks/components/DeckBrowseFilterBar.vue', () => ({
   default: defineComponent({
     props: {
       controller: { type: Object, required: true },
+      hasActiveFilters: { type: Boolean, required: true },
     },
     setup() {
       return () => h('aside', { 'data-testid': 'deck-filters' });

@@ -4,15 +4,9 @@
     scroll-class="space-y-4"
   >
     <div class="space-y-2">
-      <div
-        class="flex justify-between gap-3"
-        :class="showSearch ? '' : 'items-center'"
-      >
+      <div class="flex justify-between gap-3">
         <div>
-          <h3
-            class="theme-section-title"
-            :class="showSearch ? 'text-lg font-semibold' : 'text-sm font-semibold uppercase tracking-[0.14em]'"
-          >
+          <h3 class="theme-section-title text-lg font-semibold">
             <button
               v-if="!isSideColumn"
               type="button"
@@ -40,8 +34,7 @@
           </p>
         </div>
         <button
-          class="btn-secondary inline-flex shrink-0 items-center justify-center px-0"
-          :class="showSearch ? 'h-11 w-11' : 'h-9 w-9'"
+          class="btn-secondary inline-flex h-11 w-11 shrink-0 items-center justify-center px-0"
           type="button"
           title="Reset filters"
           aria-label="Reset filters"
@@ -52,7 +45,6 @@
       </div>
 
       <AppCollectionSearch
-        v-if="showSearch"
         layout="stacked"
         :query="query"
         :placeholder="searchPlaceholder"
@@ -93,26 +85,16 @@ withDefaults(
   defineProps<{
     title: string;
     description?: string;
+    query: string;
+    onUpdateQuery: (value: string) => void;
+    searchPlaceholder: string;
+    totalCount: number;
     onReset: () => void;
-    /**
-     * Browse pages search from the page header toolbar; builders keep search at the top of
-     * their filter column.
-     */
-    showSearch?: boolean;
-    query?: string;
-    onUpdateQuery?: (value: string) => void;
-    searchPlaceholder?: string;
-    totalCount?: number;
     stickyToViewport?: boolean;
     enableSearchHotkey?: boolean;
   }>(),
   {
     description: undefined,
-    showSearch: true,
-    query: '',
-    onUpdateQuery: () => undefined,
-    searchPlaceholder: 'Search...',
-    totalCount: 0,
     stickyToViewport: true,
     enableSearchHotkey: true,
   },

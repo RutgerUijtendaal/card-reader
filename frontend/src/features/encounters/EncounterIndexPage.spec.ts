@@ -85,13 +85,14 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-test('public browsing uses summary cards and a left sidebar without staff controls for anonymous visitors', async () => {
+test('public browsing uses summary cards and header filters without staff controls for anonymous visitors', async () => {
   auth.canAccessStaffRoutes = false;
   auth.authenticated = false;
   fetchList.mockResolvedValue(page([record({ can_edit: false, can_delete: false })]));
   const { target } = await mount();
   expect(fetchList.mock.calls[0][0]).toBe('public');
-  expect(target.querySelector('.app-page-layout')?.firstElementChild?.tagName).toBe('ASIDE');
+  expect(target.querySelector('.app-page-layout aside')).toBeNull();
+  expect(target.querySelector('header [role="group"][aria-label="Factions"]')).not.toBeNull();
   expect(target.querySelector('.collection-list-card-surface')?.textContent).toContain(
     'Hold the gate',
   );
@@ -143,9 +144,9 @@ test('search and multiple faction filters survive the public/staff library switc
   await flush();
   expect(router.currentRoute.value.query.q).toBe('gate');
   expect(fetchList.mock.calls.at(-1)?.[0]).toBe('staff');
-  (target.querySelector('[aria-label="Reset filters"]') as HTMLElement).dispatchEvent(
-    new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
-  );
+  Array.from(target.querySelectorAll('button'))
+    .find((button) => button.textContent?.trim() === 'Clear filters')
+    ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
   await vi.advanceTimersByTimeAsync(300);
   await flush();
   expect(router.currentRoute.value.query).toEqual({});

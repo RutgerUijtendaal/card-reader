@@ -1,30 +1,51 @@
 <template>
-  <GalleryFilterSidebar
-    title="Filters"
-    :show-search="false"
-    :on-reset="controller.resetFilters"
-  >
-    <SymbolToggleGroup
-      v-model:included-value="selectedAffinitySymbolIds"
-      v-model:excluded-value="excludedAffinitySymbolIds"
-      v-model:match-mode="affinitySymbolMatch"
-      :default-open="true"
+  <div class="flex flex-wrap items-center gap-2">
+    <AppFilterChip
       label="Affinity"
-      :options="controller.filterCatalog.value.affinitySymbols"
-      @reset="controller.resetAffinitySymbols"
-    />
+      :active-count="affinityCount"
+    >
+      <SymbolToggleGroup
+        v-model:included-value="selectedAffinitySymbolIds"
+        v-model:excluded-value="excludedAffinitySymbolIds"
+        v-model:match-mode="affinitySymbolMatch"
+        :default-open="true"
+        :collapsible="false"
+        label="Affinity"
+        :options="controller.filterCatalog.value.affinitySymbols"
+        @reset="controller.resetAffinitySymbols"
+      />
+    </AppFilterChip>
 
-    <MetadataPillGroup
-      v-model:included-value="selectedDeckTagIds"
-      v-model:excluded-value="excludedDeckTagIds"
-      v-model:match-mode="deckTagMatch"
+    <AppFilterChip
       label="Tags"
-      :options="controller.filterCatalog.value.deckTags"
-      :groups="deckTagGroups"
-      :default-open="true"
-      @reset="controller.resetDeckTags"
-    />
-  </GalleryFilterSidebar>
+      :active-count="deckTagCount"
+    >
+      <MetadataPillGroup
+        v-model:included-value="selectedDeckTagIds"
+        v-model:excluded-value="excludedDeckTagIds"
+        v-model:match-mode="deckTagMatch"
+        label="Tags"
+        :options="controller.filterCatalog.value.deckTags"
+        :groups="deckTagGroups"
+        :default-open="true"
+        :collapsible="false"
+        @reset="controller.resetDeckTags"
+      />
+    </AppFilterChip>
+
+    <button
+      v-if="hasActiveFilters"
+      type="button"
+      class="theme-ghost-button inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium"
+      @click="controller.resetFilters"
+    >
+      <X
+        class="h-3.5 w-3.5"
+        aria-hidden="true"
+      />
+      Clear filters
+    </button>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -33,12 +54,22 @@ import SymbolToggleGroup from '@/domain/cards/components/filters/SymbolToggleGro
 import MetadataPillGroup, {
   type MetadataPillOptionGroup,
 } from '@/domain/cards/components/filters/MetadataPillGroup.vue';
-import GalleryFilterSidebar from '@/domain/cards/components/filters/GalleryFilterSidebar.vue';
+import AppFilterChip from '@/shared/components/app/AppFilterChip.vue';
+import { X } from 'lucide-vue-next';
 import type { DeckBrowseFiltersController } from '@/features/decks/composables/useDeckBrowseFilters';
 
 const props = defineProps<{
   controller: DeckBrowseFiltersController;
+  /** Whether any search or filter is applied, including the search query. */
+  hasActiveFilters: boolean;
 }>();
+
+const affinityCount = computed(
+  () => props.controller.affinitySymbolIds.value.length + props.controller.affinitySymbolExcludeIds.value.length,
+);
+const deckTagCount = computed(
+  () => props.controller.deckTagIds.value.length + props.controller.deckTagExcludeIds.value.length,
+);
 
 const selectedAffinitySymbolIds = computed({
   get: () => props.controller.affinitySymbolIds.value,

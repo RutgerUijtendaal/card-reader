@@ -3,7 +3,8 @@
     <button
       type="button"
       class="flex min-h-9 items-center justify-between gap-2 text-left"
-      @click="isOpen = !isOpen"
+      :class="collapsible ? '' : 'cursor-default'"
+      @click="collapsible && (isOpen = !isOpen)"
     >
       <div class="min-w-0">
         <h3 class="theme-section-title text-sm font-semibold">
@@ -43,18 +44,19 @@
           <RotateCcw class="h-3.5 w-3.5" />
         </button>
         <span
-          v-if="includedValue.length > 0"
+          v-if="collapsible && includedValue.length > 0"
           class="theme-pill theme-pill-accent px-2 py-0.5 text-xs font-medium"
         >
           +{{ includedValue.length }}
         </span>
         <span
-          v-if="excludedValue.length > 0"
+          v-if="collapsible && excludedValue.length > 0"
           class="theme-pill theme-pill-filter-exclude px-2 py-0.5 text-xs font-medium"
         >
           -{{ excludedValue.length }}
         </span>
         <ChevronDown
+          v-if="collapsible"
           class="h-4 w-4 transition"
           :class="isOpen ? 'rotate-180' : ''"
         />
@@ -181,12 +183,15 @@ const props = withDefaults(
     excludedValue: string[];
     matchMode: 'any' | 'all';
     defaultOpen?: boolean;
+    /** Off when the group already sits in its own popover, which shows the selection count. */
+    collapsible?: boolean;
     showReset?: boolean;
     initialVisibleCount?: number;
     groups?: MetadataPillOptionGroup[];
   }>(),
   {
     defaultOpen: false,
+    collapsible: true,
     showReset: true,
     initialVisibleCount: 10,
     groups: () => [],

@@ -26,21 +26,27 @@
         />
       </template>
       <template #bottomLeft>
-        <AppCollectionSearch
-          :query="filterController.query.value"
-          :placeholder="searchPlaceholder"
-          :total-count="totalDeckCount"
-          :result-noun="['deck', 'decks']"
-          @update:query="filterController.updateQuery"
-        />
+        <AppCollectionToolbar>
+          <template #search>
+            <AppCollectionSearch
+              :query="filterController.query.value"
+              :placeholder="searchPlaceholder"
+              :total-count="totalDeckCount"
+              :result-noun="['deck', 'decks']"
+              @update:query="filterController.updateQuery"
+            />
+          </template>
+          <template #filters>
+            <DeckBrowseFilterBar
+              :controller="filterController"
+              :has-active-filters="hasActiveFilters"
+            />
+          </template>
+        </AppCollectionToolbar>
       </template>
     </AppPageHeader>
 
-    <AppPageLayout>
-      <template #aside>
-        <DeckBrowseFiltersPanel :controller="filterController" />
-      </template>
-
+    <AppPageLayout columns="one">
       <div
         v-if="(loading && decks.length === 0) || !filtersLoaded"
         class="app-page-single-column deck-index-grid grid gap-4"
@@ -326,6 +332,7 @@ import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import AppSelect from '@/shared/components/app/AppSelect.vue';
 import ExtraActionsMenu from '@/shared/components/app/ExtraActionsMenu.vue';
 import AppCollectionSearch from '@/shared/components/app/AppCollectionSearch.vue';
+import AppCollectionToolbar from '@/shared/components/app/AppCollectionToolbar.vue';
 import AppEmptyState from '@/shared/components/app/AppEmptyState.vue';
 import AppScopeTabs, { type AppScopeTab } from '@/shared/components/app/AppScopeTabs.vue';
 import TtsCopyIcon from '@/shared/components/icons/TtsCopyIcon.vue';
@@ -339,7 +346,7 @@ import {
   fetchPublicDeckSummaryPage,
   updateDeck,
 } from '@/domain/decks/api';
-import DeckBrowseFiltersPanel from '@/features/decks/components/DeckBrowseFiltersPanel.vue';
+import DeckBrowseFilterBar from '@/features/decks/components/DeckBrowseFilterBar.vue';
 import DeckLoadingSkeleton from '@/shared/components/CollectionLoadingSkeleton.vue';
 import DeckListCard from '@/domain/decks/components/DeckListCard.vue';
 import DeckTagManagementModal from '@/domain/decks/components/DeckTagManagementModal.vue';

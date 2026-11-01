@@ -33,42 +33,43 @@
         />
       </template>
       <template #bottomLeft>
-        <AppCollectionSearch
-          :query="query"
-          placeholder="Search Encounters by name..."
-          :total-count="count"
-          :result-noun="['Encounter', 'Encounters']"
-          @update:query="(value) => (query = value)"
-        />
-      </template>
-    </AppPageHeader>
-    <AppPageLayout>
-      <template #aside>
-        <GalleryFilterSidebar
-          title="Filters"
-          :show-search="false"
-          :on-reset="reset"
-        >
-          <section class="theme-filter-section space-y-3">
-            <h3 class="theme-section-title text-sm font-semibold">
-              Official status
-            </h3>
-            <div class="flex flex-wrap gap-2">
-              <ChoicePill
+        <AppCollectionToolbar>
+          <template #search>
+            <AppCollectionSearch
+              :query="query"
+              placeholder="Search Encounters by name..."
+              :total-count="count"
+              :result-noun="['Encounter', 'Encounters']"
+              @update:query="(value) => (query = value)"
+            />
+          </template>
+          <template #filters>
+            <div
+              class="theme-toggle-shell"
+              role="group"
+              aria-label="Official status"
+            >
+              <button
                 v-for="option in officialOptions"
                 :key="option.value"
-                :selected="official === option.value"
+                type="button"
+                class="theme-toggle-option"
+                :class="{ 'theme-toggle-option-active': official === option.value }"
+                :aria-pressed="official === option.value"
                 @click="official = option.value"
               >
                 {{ option.label }}
-              </ChoicePill>
+              </button>
             </div>
-          </section>
-          <section class="theme-filter-section space-y-3">
-            <h3 class="theme-section-title text-sm font-semibold">
-              Factions
-            </h3>
-            <div class="flex flex-wrap gap-2">
+            <span
+              class="theme-divider mx-1 h-5 border-l"
+              aria-hidden="true"
+            />
+            <div
+              class="flex flex-wrap items-center gap-2"
+              role="group"
+              aria-label="Factions"
+            >
               <ChoicePill
                 v-for="option in CARD_FACTION_OPTIONS"
                 :key="option.value"
@@ -78,9 +79,23 @@
                 {{ option.label }}
               </ChoicePill>
             </div>
-          </section>
-        </GalleryFilterSidebar>
+            <button
+              v-if="hasActiveFilters"
+              type="button"
+              class="theme-ghost-button inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium"
+              @click="reset"
+            >
+              <X
+                class="h-3.5 w-3.5"
+                aria-hidden="true"
+              />
+              Clear filters
+            </button>
+          </template>
+        </AppCollectionToolbar>
       </template>
+    </AppPageHeader>
+    <AppPageLayout columns="one">
       <div
         v-if="loading"
         class="app-page-single-column grid gap-4"
@@ -180,14 +195,15 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
+import { X } from 'lucide-vue-next';
 import { useIntersectionObserver } from '@vueuse/core';
 import { CARD_FACTION_OPTIONS } from '@/domain/cards/cardFactions';
 import { useAuthStore } from '@/domain/session/store';
-import GalleryFilterSidebar from '@/domain/cards/components/filters/GalleryFilterSidebar.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppCollectionSearch from '@/shared/components/app/AppCollectionSearch.vue';
+import AppCollectionToolbar from '@/shared/components/app/AppCollectionToolbar.vue';
 import AppEmptyState from '@/shared/components/app/AppEmptyState.vue';
 import AppScopeTabs, { type AppScopeTab } from '@/shared/components/app/AppScopeTabs.vue';
 import CollectionLoadingSkeleton from '@/shared/components/CollectionLoadingSkeleton.vue';
