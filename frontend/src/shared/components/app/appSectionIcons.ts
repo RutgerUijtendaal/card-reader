@@ -1,5 +1,6 @@
 import {
   Activity,
+  Anvil,
   Swords,
   Bell,
   BookOpen,
@@ -8,6 +9,7 @@ import {
   Gamepad2,
   Hammer,
   House,
+  Scroll,
   Settings,
   SlidersHorizontal,
   Upload,
@@ -16,6 +18,8 @@ import {
 export const APP_SECTION_ICONS = {
   home: House,
   encounters: Swords,
+  myEncounters: Scroll,
+  encounterBuilder: Anvil,
   decks: BookOpen,
   playtester: Gamepad2,
   myDecks: Folders,

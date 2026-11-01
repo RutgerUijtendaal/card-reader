@@ -277,7 +277,6 @@ const items = computed<NavItem[]>(() => [
   ...(workspace.activePool === 'player'
     ? [
         { label: 'Decks', to: '/decks', icon: APP_SECTION_ICONS.decks },
-        { label: 'Playtester', to: '/playtester', icon: APP_SECTION_ICONS.playtester },
         { label: 'My Decks', to: '/my/decks', icon: APP_SECTION_ICONS.myDecks, requiresAuth: true },
         {
           label: 'Build a deck',
@@ -285,6 +284,7 @@ const items = computed<NavItem[]>(() => [
           icon: APP_SECTION_ICONS.deckBuilder,
           requiresAuth: true,
         },
+        { label: 'Playtester', to: '/playtester', icon: APP_SECTION_ICONS.playtester },
       ]
     : []),
   ...(workspace.activePool === 'evil'
@@ -293,13 +293,13 @@ const items = computed<NavItem[]>(() => [
         {
           label: 'My Encounters',
           to: '/my/encounters',
-          icon: APP_SECTION_ICONS.encounters,
+          icon: APP_SECTION_ICONS.myEncounters,
           requiresAuth: true,
         },
         {
           label: 'Build Encounter',
           to: '/my/encounters/new',
-          icon: APP_SECTION_ICONS.encounters,
+          icon: APP_SECTION_ICONS.encounterBuilder,
           requiresAuth: true,
         },
       ]

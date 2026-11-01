@@ -1,7 +1,7 @@
 <template>
   <section class="flex flex-col gap-5">
     <AppPageHeader
-      :icon="APP_SECTION_ICONS.encounters"
+      :icon="mine ? APP_SECTION_ICONS.myEncounters : APP_SECTION_ICONS.encounters"
       :title="staff ? 'Manage Encounters' : mine ? 'My Encounters' : 'Encounters'"
       :subtitle="
         staff
@@ -23,7 +23,7 @@
         />
         <AppHeaderAction
           v-if="auth.authenticated"
-          :icon="APP_SECTION_ICONS.encounters"
+          :icon="APP_SECTION_ICONS.encounterBuilder"
           label="Build Encounter"
           short-label="Build Encounter"
           variant="primary"

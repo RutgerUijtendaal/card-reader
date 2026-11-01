@@ -4,7 +4,7 @@
     :aria-busy="publication.isCreating.value"
   >
     <AppPageHeader
-      :icon="APP_SECTION_ICONS.encounters"
+      :icon="APP_SECTION_ICONS.encounterBuilder"
       :title="editor.id ? 'Edit Encounter' : 'Build Encounter'"
       :subtitle="subtitle"
       :back-to="publication.isCreating.value ? null : '/my/encounters'"
@@ -37,7 +37,7 @@
         />
         <AppHeaderAction
           v-if="!editor.readOnly.value"
-          :icon="busy ? LoaderCircle : editor.id ? Save : APP_SECTION_ICONS.encounters"
+          :icon="busy ? LoaderCircle : editor.id ? Save : APP_SECTION_ICONS.encounterBuilder"
           :label="saveLabel"
           :short-label="saveLabel"
           variant="primary"
