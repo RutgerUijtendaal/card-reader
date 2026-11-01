@@ -46,6 +46,20 @@
           @click="editor.save()"
         />
       </template>
+      <template
+        v-if="mode !== 'details'"
+        #bottomLeft
+      >
+        <CardBuilderFilterBar
+          :filters="browser.filters"
+          :total-count="browser.gallery.totalCount.value"
+          :search-placeholder="mode === 'boss' ? 'Search bosses...' : 'Search cards...'"
+          :result-noun="mode === 'boss' ? ['boss', 'bosses'] : ['card', 'cards']"
+          :show-current-only="mode === 'cards'"
+          current-only-label="Current Encounter only"
+          :visible-sections="visibleFilters"
+        />
+      </template>
     </AppPageHeader>
     <div
       v-if="editor.readOnly.value"
@@ -124,21 +138,6 @@
       <EncounterDetailsForm :editor="editor" />
     </BuilderDetailsLayout>
     <BuilderWorkspaceLayout v-else>
-      <template #aside>
-        <CardBuilderFiltersPanel
-          :filters="browser.filters"
-          :total-count="browser.gallery.totalCount.value"
-          :title="mode === 'boss' ? 'Boss Gallery' : 'Card Gallery'"
-          :description="
-            mode === 'boss' ? 'Browse boss cards and groups.' : 'Search and filter cards.'
-          "
-          :search-placeholder="mode === 'boss' ? 'Search bosses...' : 'Search cards...'"
-          :show-current-only="mode === 'cards'"
-          current-only-label="Current Encounter Only"
-          :visible-sections="visibleFilters"
-          :default-open-sections="['factions']"
-        />
-      </template>
       <template #status>
         <BuilderStatusBar aria-label="Encounter builder status">
           <BuilderSaveStatus
@@ -260,7 +259,7 @@ import BuilderSaveStatus from '@/shared/components/builders/BuilderSaveStatus.vu
 import BuilderStatusBar from '@/shared/components/builders/BuilderStatusBar.vue';
 import InfoTooltip from '@/shared/components/InfoTooltip.vue';
 import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
-import CardBuilderFiltersPanel from '@/domain/cards/components/CardBuilderFiltersPanel.vue';
+import CardBuilderFilterBar from '@/domain/cards/components/CardBuilderFilterBar.vue';
 import CardBuilderGallery from '@/domain/cards/components/CardBuilderGallery.vue';
 import { emptyEncounter } from '@/domain/encounters/types';
 import type { GalleryItem } from '@/domain/cards/types';

@@ -97,6 +97,7 @@ vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
           h('h1', props.title),
           slots.center?.(),
           slots.actions?.(),
+          slots.bottomLeft?.(),
         ]);
     },
   }),
@@ -146,10 +147,10 @@ vi.mock('@/shared/components/modals/ConfirmModal.vue', () => ({
   }),
 }));
 
-vi.mock('@/features/decks/components/DeckBuilderFiltersPanel.vue', () => ({
+vi.mock('@/features/decks/components/DeckBuilderFilterBar.vue', () => ({
   default: defineComponent({
     setup() {
-      return () => h('aside', 'Filters');
+      return () => h('div', { 'data-testid': 'deck-filter-bar' }, 'Filters');
     },
   }),
 }));
@@ -280,18 +281,19 @@ describe('DeckEditorPage', () => {
     vi.clearAllMocks();
   });
 
-  test('renders deck builder status bar between the asides and above the gallery', async () => {
+  test('renders the filter bar in the header and the status bar above the gallery', async () => {
     const mounted = await mountPage();
     const statusBar = mounted.container.querySelector<HTMLElement>('[aria-label="Deck builder status"]');
-    const leftAside = Array.from(mounted.container.querySelectorAll('aside')).find((aside) => aside.textContent === 'Filters');
+    const filterBar = mounted.container.querySelector<HTMLElement>('header [data-testid="deck-filter-bar"]');
     const gallery = mounted.container.querySelector<HTMLElement>('[data-testid="builder-gallery"]');
     const rightAside = Array.from(mounted.container.querySelectorAll('aside')).find((aside) => aside.textContent === 'Summary');
     const autosyncCheckbox = statusBar?.querySelector<HTMLInputElement>('input[type="checkbox"]');
 
-    if (!statusBar || !leftAside || !gallery || !rightAside) {
+    if (!statusBar || !filterBar || !gallery || !rightAside) {
       throw new Error('expected builder layout landmarks');
     }
-    expect(leftAside.compareDocumentPosition(statusBar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(mounted.container.querySelectorAll('aside')).toHaveLength(1);
+    expect(filterBar.compareDocumentPosition(statusBar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(statusBar.compareDocumentPosition(gallery) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(gallery.compareDocumentPosition(rightAside) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(statusBar?.textContent).toContain('Unsaved');
@@ -370,7 +372,8 @@ describe('DeckEditorPage', () => {
     const mounted = await mountPage();
     const gallery = mounted.container.querySelector('[data-testid="builder-gallery"]');
 
-    expect(mounted.container.querySelectorAll('.deck-builder-loading-panel')).toHaveLength(2);
+    expect(mounted.container.querySelectorAll('.deck-builder-loading-panel')).toHaveLength(1);
+    expect(mounted.container.querySelector('[data-testid="deck-filter-bar"]')).toBeNull();
     expect(gallery?.getAttribute('data-loading')).toBe('true');
     expect(mounted.container.querySelector('.builder-gallery-scroll')).not.toBeNull();
     expect(mounted.container.querySelector('[aria-label="Deck builder status"]')).toBeNull();
@@ -489,7 +492,7 @@ describe('DeckEditorPage', () => {
 
     const mounted = await mountPage();
     const page = mounted.container.querySelector('section');
-    const layout = mounted.container.querySelector<HTMLElement>('[data-testid="builder-layout"]');
+    const layout = mounted.container.querySelector<HTMLElement>('.builder-workspace-layout');
 
     expect(layout?.hasAttribute('inert')).toBe(true);
     expect(page?.getAttribute('aria-busy')).toBe('true');

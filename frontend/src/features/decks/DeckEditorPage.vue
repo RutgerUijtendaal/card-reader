@@ -77,6 +77,12 @@
           />
         </nav>
       </template>
+      <template
+        v-if="controller.editorMode.value !== 'details' && !controller.loading.value"
+        #bottomLeft
+      >
+        <DeckBuilderFilterBar :controller="controller" />
+      </template>
     </AppPageHeader>
 
     <AppPageLayout
@@ -123,9 +129,6 @@
       v-if="!controller.loading.value && controller.editorMode.value === 'hero'"
       :inert="controller.isMutationLocked.value"
     >
-      <template #aside>
-        <DeckBuilderFiltersPanel :controller="controller" />
-      </template>
       <DeckBuilderGallery :controller="controller" />
       <template #endAside>
         <DeckHeroSelectionPanel :controller="controller" />
@@ -158,32 +161,6 @@
       v-if="controller.editorMode.value === 'cards'"
       :inert="controller.isMutationLocked.value"
     >
-      <template #aside>
-        <aside
-          v-if="controller.loading.value"
-          class="app-sticky-aside app-sticky-aside-left deck-builder-loading-panel"
-        >
-          <div class="app-sticky-aside-scroll space-y-6">
-            <div class="space-y-3">
-              <div class="deck-builder-loading-line h-4 w-28" />
-              <div class="deck-builder-loading-line h-10 w-full" />
-              <div class="deck-builder-loading-line h-10 w-5/6" />
-            </div>
-            <div class="space-y-3">
-              <div class="deck-builder-loading-line h-4 w-20" />
-              <div
-                v-for="index in 5"
-                :key="`loading-filter-${index}`"
-                class="deck-builder-loading-line h-8 w-full"
-              />
-            </div>
-          </div>
-        </aside>
-        <DeckBuilderFiltersPanel
-          v-else
-          :controller="controller"
-        />
-      </template>
       <template #status>
         <section
           v-if="controller.loading.value"
@@ -487,7 +464,7 @@ import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import InfoTooltip from '@/shared/components/InfoTooltip.vue';
 import ConfirmModal from '@/shared/components/modals/ConfirmModal.vue';
-import DeckBuilderFiltersPanel from '@/features/decks/components/DeckBuilderFiltersPanel.vue';
+import DeckBuilderFilterBar from '@/features/decks/components/DeckBuilderFilterBar.vue';
 import DeckBuilderGallery from '@/features/decks/components/DeckBuilderGallery.vue';
 import DeckBuilderSummaryPanel from '@/features/decks/components/DeckBuilderSummaryPanel.vue';
 import DeckDetailsForm from '@/features/decks/components/DeckDetailsForm.vue';

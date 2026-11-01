@@ -22,7 +22,7 @@ vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
     setup:
       (_, { slots }) =>
       () =>
-        h('header', [slots.center?.(), slots.actions?.()]),
+        h('header', [slots.center?.(), slots.actions?.(), slots.bottomLeft?.()]),
   }),
 }));
 vi.mock('@/shared/components/app/AppHeaderAction.vue', () => ({
@@ -35,8 +35,8 @@ vi.mock('@/shared/components/app/AppHeaderAction.vue', () => ({
         h('button', { onClick: () => emit('click') }, props.label),
   }),
 }));
-vi.mock('@/domain/cards/components/CardBuilderFiltersPanel.vue', () => ({
-  default: { template: '<aside data-testid="shared-filters" />' },
+vi.mock('@/domain/cards/components/CardBuilderFilterBar.vue', () => ({
+  default: { template: '<div data-testid="shared-filters" />' },
 }));
 vi.mock('@/domain/cards/components/CardBuilderGallery.vue', () => ({
   default: { template: '<div data-testid="shared-gallery" />' },
@@ -101,15 +101,16 @@ const mount = () => {
   });
   return target;
 };
-test('Cards uses the shared three-column workspace with filters left, status/gallery center and deck right', () => {
+test('Cards uses the shared workbench with header filters, status/gallery first and deck right', () => {
   const target = mount();
-  const layout = target.querySelector('.app-page-layout-three')!;
-  expect(layout.children[0].getAttribute('data-testid')).toBe('shared-filters');
-  expect(layout.children[1].querySelector('[data-testid="shared-gallery"]')).not.toBeNull();
+  expect(target.querySelector('header [data-testid="shared-filters"]')).not.toBeNull();
+  const layout = target.querySelector('.builder-workspace-layout')!;
+  expect(layout.children).toHaveLength(2);
+  expect(layout.children[0].querySelector('[data-testid="shared-gallery"]')).not.toBeNull();
   expect(
-    layout.children[1].querySelector('[aria-label="Encounter builder status"]'),
+    layout.children[0].querySelector('[aria-label="Encounter builder status"]'),
   ).not.toBeNull();
-  expect(layout.children[2].getAttribute('data-testid')).toBe('encounter-deck');
+  expect(layout.children[1].getAttribute('data-testid')).toBe('encounter-deck');
   const autosync = layout.querySelector('input[type="checkbox"]') as HTMLInputElement;
   autosync.checked = true;
   autosync.dispatchEvent(new Event('change', { bubbles: true }));
@@ -119,10 +120,10 @@ test('Boss keeps the same filters and gallery and replaces the right-hand deck w
   const target = mount();
   editor.mode.value = 'boss';
   await nextTick();
-  const layout = target.querySelector('.app-page-layout-three')!;
-  expect(layout.children[0].getAttribute('data-testid')).toBe('shared-filters');
-  expect(layout.children[1].querySelector('[data-testid="shared-gallery"]')).not.toBeNull();
-  expect(layout.children[2].getAttribute('data-testid')).toBe('boss-selection');
+  expect(target.querySelector('header [data-testid="shared-filters"]')).not.toBeNull();
+  const layout = target.querySelector('.builder-workspace-layout')!;
+  expect(layout.children[0].querySelector('[data-testid="shared-gallery"]')).not.toBeNull();
+  expect(layout.children[1].getAttribute('data-testid')).toBe('boss-selection');
   expect(target.querySelector('[data-testid="encounter-deck"]')).toBeNull();
 });
 

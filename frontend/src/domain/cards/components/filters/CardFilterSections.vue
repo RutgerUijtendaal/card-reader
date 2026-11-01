@@ -1,5 +1,5 @@
 <template>
-  <div :class="layout === 'bar' ? 'flex flex-wrap items-center gap-2' : 'space-y-3'">
+  <div :class="layout === 'bar' ? 'contents' : 'space-y-3'">
     <label
       v-if="showCardPool && state.cardPoolOptions.length > 1"
       class="block space-y-1"

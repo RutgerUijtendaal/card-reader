@@ -1,11 +1,8 @@
 <template>
-  <div
-    class="flex min-w-0"
-    :class="layout === 'inline' ? 'flex-1 items-center gap-4' : 'flex-col gap-2'"
-  >
+  <div class="flex min-w-0 flex-1 items-center gap-4">
     <AppSearchInput
       ref="searchInputRef"
-      :class="layout === 'inline' ? 'min-w-0 max-w-xl flex-1' : ''"
+      class="min-w-0 max-w-xl flex-1"
       :model-value="query"
       :placeholder="placeholder"
       @update:model-value="emit('update:query', $event)"
@@ -18,8 +15,7 @@
       </template>
     </AppSearchInput>
     <p
-      class="theme-section-muted shrink-0 tabular-nums"
-      :class="layout === 'inline' ? 'text-sm' : 'text-xs'"
+      class="theme-section-muted shrink-0 text-sm tabular-nums"
       aria-live="polite"
     >
       {{ countLabel }}
@@ -39,13 +35,10 @@ const props = withDefaults(
     totalCount: number;
     /** Noun for the result count, as [singular, plural]. */
     resultNoun?: readonly [string, string];
-    /** `inline` sits in a toolbar row; `stacked` sits at the top of a filter column. */
-    layout?: 'inline' | 'stacked';
     enableSearchHotkey?: boolean;
   }>(),
   {
     resultNoun: () => ['result', 'results'],
-    layout: 'inline',
     enableSearchHotkey: true,
   },
 );
