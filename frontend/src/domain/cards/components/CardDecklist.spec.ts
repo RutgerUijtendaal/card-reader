@@ -101,4 +101,14 @@ describe('CardDecklist', () => {
     expect(target.querySelectorAll('[data-testid="card-decklist-mana"]')).toHaveLength(0);
     expect(target.querySelector('a[href="/cards/free"]')).not.toBeNull();
   });
+
+  test('keeps a variable cost whose mana value counts as zero', async () => {
+    const target = await mountDecklist({
+      entries: [{ card: card('x', { mana_cost: '{X}', mana_symbols: ['x'], mana_value: 0 }), quantity: 1 }],
+      groups: [],
+      groupByType: false,
+    });
+
+    expect(target.querySelectorAll('[data-testid="card-decklist-mana"]')).toHaveLength(1);
+  });
 });

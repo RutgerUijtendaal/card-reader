@@ -68,13 +68,15 @@ const rowElement = computed<HTMLElement | null>(() => {
 const manaSymbolByKey = computed(() =>
   Object.fromEntries(props.card.symbols.map((symbol) => [symbol.key, symbol])),
 );
-// Costless cards print 0 or a dash; the list leaves their cost column empty instead.
+// Costless cards print 0 or a dash; the list leaves their cost column empty instead. This reads
+// the printed cost, not mana_value, which counts variable costs such as X as zero.
+const EMPTY_COST_TOKENS = new Set(['', '0', '-']);
 const showManaCost = computed(() => {
-  if (props.card.mana_symbols.length > 0) {
-    return props.card.mana_value !== 0;
+  const symbols = props.card.mana_symbols.map((symbol) => symbol.trim());
+  if (symbols.length > 0) {
+    return symbols.some((symbol) => !EMPTY_COST_TOKENS.has(symbol));
   }
-  const cost = props.card.mana_cost.trim();
-  return cost !== '' && cost !== '0' && cost !== '-';
+  return !EMPTY_COST_TOKENS.has(props.card.mana_cost.trim());
 });
 </script>
 
