@@ -60,7 +60,7 @@
 
       <template #bottomLeft>
         <AppBoardTabs
-          v-model="activeBoardId"
+          v-model="activeView"
           label="Deck boards"
           :tabs="boardTabs"
         />
@@ -134,33 +134,11 @@
 
           <section
             class="theme-divider space-y-2 border-t pt-4"
-            :class="deck.long_description ? 'deck-detail-panel-trigger' : ''"
-            :role="deck.long_description ? 'button' : undefined"
-            :tabindex="deck.long_description ? 0 : undefined"
-            :aria-expanded="deck.long_description ? activeDetailPanel === 'summary' : undefined"
-            :aria-controls="deck.long_description ? 'deck-detail-panel' : undefined"
             data-testid="deck-description"
-            @click="deck.long_description && toggleDetailPanel('summary')"
-            @keydown.enter="deck.long_description && toggleDetailPanel('summary')"
-            @keydown.space.prevent="deck.long_description && toggleDetailPanel('summary')"
           >
-            <div class="flex items-center justify-between gap-3">
-              <h4 class="theme-section-title text-sm font-semibold">
-                Summary
-              </h4>
-              <span
-                v-if="deck.long_description"
-                class="deck-detail-header-action theme-section-muted inline-flex items-center gap-1 text-xs font-medium"
-                data-testid="deck-summary-details-button"
-              >
-                <span>Details</span>
-                <ChevronRight
-                  class="h-3.5 w-3.5 transition-transform duration-200"
-                  :class="activeDetailPanel === 'summary' ? 'rotate-90' : ''"
-                  aria-hidden="true"
-                />
-              </span>
-            </div>
+            <h4 class="theme-section-title text-sm font-semibold">
+              Summary
+            </h4>
             <CardMarkupText
               v-if="deck.description_markup || deck.description"
               class="theme-section-muted text-sm"
@@ -173,6 +151,14 @@
             >
               No description provided.
             </p>
+            <button
+              v-if="deck.long_description && !aboutOpen"
+              type="button"
+              class="theme-link text-sm font-semibold"
+              @click="activeView = ABOUT_VIEW"
+            >
+              Read the full description
+            </button>
           </section>
         </div>
 
@@ -212,22 +198,8 @@
         </div>
       </template>
       <template #details>
-        <section
-          v-if="activeDetailPanel === 'summary' && deck.long_description"
-          class="space-y-2"
-          data-testid="deck-long-description"
-        >
-          <h3 class="theme-section-title text-base font-semibold">
-            About this deck
-          </h3>
-          <CardMarkupText
-            class="theme-section-muted break-words text-sm"
-            :markup="deck.long_description_markup || deck.long_description"
-            :hover-mode="effectiveHoverMode"
-          />
-        </section>
         <DeckManaDistribution
-          v-else-if="activeDetailPanel === 'mana'"
+          v-if="activeDetailPanel === 'mana'"
           :entries="activeBoardEntries"
           :symbols="filterOptions.symbols"
           :types="filterOptions.types"
@@ -247,7 +219,24 @@
           Close details
         </button>
       </template>
-      <section class="space-y-4">
+      <section
+        v-if="aboutOpen && deck.long_description"
+        class="mx-auto max-w-[70ch] space-y-3 px-1 pb-10 pt-2"
+        data-testid="deck-long-description"
+      >
+        <h3 class="theme-section-title theme-display text-2xl">
+          About this deck
+        </h3>
+        <CardMarkupText
+          class="theme-section-title break-words text-base leading-7"
+          :markup="deck.long_description_markup || deck.long_description"
+          :hover-mode="effectiveHoverMode"
+        />
+      </section>
+      <section
+        v-else
+        class="space-y-4"
+      >
         <div class="sr-only">
           <h3>
             {{ activeBoardTitle }}
@@ -278,7 +267,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { useLocalStorage, useMediaQuery } from '@vueuse/core';
+import { useLocalStorage } from '@vueuse/core';
 import { ChevronRight, Gamepad2, Gauge, Pencil, Share2, X } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { toast } from 'vue-sonner';
@@ -343,12 +332,25 @@ const { effectiveSort } = sortSurface;
 const hoverSurface = useHoverModeSurface('deckDetail');
 const { effectiveHoverMode } = hoverSurface;
 const { exportTtsDeck } = useDeckExport();
+const ABOUT_VIEW = 'about';
 const activeBoardId = ref('mainboard');
+// About replaces the card area with the long description; boards bring the cards back as they were.
+const aboutOpen = ref(false);
+const activeView = computed({
+  get: () => (aboutOpen.value ? ABOUT_VIEW : activeBoardId.value),
+  set: (view: string) => {
+    aboutOpen.value = view === ABOUT_VIEW;
+    if (view !== ABOUT_VIEW) {
+      activeBoardId.value = view;
+    }
+  },
+});
 const boardTabs = computed<AppBoardTab[]>(() => {
   if (!deck.value) {
     return [];
   }
   return [
+    ...(deck.value.long_description ? [{ id: ABOUT_VIEW, label: 'About' }] : []),
     {
       id: 'mainboard',
       label: 'Mainboard',
@@ -363,10 +365,9 @@ const boardTabs = computed<AppBoardTab[]>(() => {
     })),
   ];
 });
-type DeckDetailPanel = 'summary' | 'mana';
+type DeckDetailPanel = 'mana';
 const activeDetailPanel = ref<DeckDetailPanel | null>(null);
 const detailsExpanded = computed(() => activeDetailPanel.value !== null);
-const canAutoExpandDetails = useMediaQuery('(min-width: 1536px)');
 const toggleDetailPanel = (panel: DeckDetailPanel): void => {
   activeDetailPanel.value = activeDetailPanel.value === panel ? null : panel;
 };
@@ -451,8 +452,8 @@ const loadDeck = async (): Promise<void> => {
     ? await fetchMyDeck(String(route.params.id))
     : await fetchDeckDetail(String(route.params.id));
   activeBoardId.value = 'mainboard';
-  activeDetailPanel.value =
-    deck.value.long_description && canAutoExpandDetails.value ? 'summary' : null;
+  aboutOpen.value = false;
+  activeDetailPanel.value = null;
 };
 
 const loadFilterOptions = async (): Promise<void> => {

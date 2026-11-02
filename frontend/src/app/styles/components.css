@@ -455,6 +455,22 @@
     color: var(--color-nav-text);
   }
 
+  /* A solid action chip for controls laid over card art, readable on light and dark scans alike. */
+  .theme-art-chip {
+    @apply inline-flex items-center justify-center rounded-full border font-semibold transition;
+    border-color: color-mix(in srgb, var(--color-sidebar-text) 22%, transparent);
+    background: color-mix(in srgb, var(--color-sidebar) 90%, transparent);
+    color: var(--color-sidebar-text);
+    box-shadow: 0 4px 14px -6px rgba(4, 6, 18, 0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+
+  .theme-art-chip:hover {
+    background: var(--color-sidebar);
+    border-color: color-mix(in srgb, var(--sidebar-accent) 55%, transparent);
+  }
+
   .theme-input-disabled-key {
     @apply cursor-not-allowed border-dashed;
     border-color: var(--color-disabled-border);

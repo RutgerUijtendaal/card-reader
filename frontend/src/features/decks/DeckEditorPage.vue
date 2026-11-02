@@ -172,8 +172,7 @@
               }}</span>
               <InfoTooltip
                 text="If at least 25% of your deck is Mana cards, you can mulligan anytime you draw a starting hand with 0 mana cards."
-                placement="bottom"
-                :allow-flip="false"
+                placement="top"
               >
                 <CircleCheckBig
                   v-if="controller.deck.hasFreeMulliganManaRatio.value"
@@ -399,14 +398,14 @@ const {
   panelRef: hardIssuePanelRef,
   x: hardIssueX,
   y: hardIssueY,
-} = useFloatingPopover({ placement: 'bottom', allowFlip: false });
+} = useFloatingPopover({ placement: 'top' });
 const {
   isOpen: warningsOpen,
   triggerRef: warningTriggerRef,
   panelRef: warningPanelRef,
   x: warningX,
   y: warningY,
-} = useFloatingPopover({ placement: 'bottom', allowFlip: false });
+} = useFloatingPopover({ placement: 'top' });
 const mainboardMinCards = computed(
   () => controller.deckBuildingRules.value.mainboard_card_count.min ?? 0,
 );

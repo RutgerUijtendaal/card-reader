@@ -213,15 +213,16 @@ test('boss view includes linked cards once and preserves separate mainboard quan
   expect(target.querySelector('[data-card-id="linked"]')).toBeNull();
 });
 
-test('long descriptions expand beside the summary and grouping remains a display preference', async () => {
+test('long descriptions open as an About view and grouping remains a display preference', async () => {
   const { target } = await mount();
-  await click(target, 'Details');
-  expect(target.querySelector('.collection-detail-layout-expanded')).not.toBeNull();
-  expect(target.querySelector('[data-testid="encounter-long-description"]')?.textContent).toContain(
-    'Setup and tactics.',
-  );
-  await click(target, 'Close details');
-  expect(target.querySelector('.collection-detail-layout-expanded')).toBeNull();
+  expect(target.querySelector('[data-testid="encounter-long-description"]')).toBeNull();
+  await click(target, 'About');
+  const longDescription = target.querySelector('[data-testid="encounter-long-description"]');
+  expect(longDescription?.textContent).toContain('Setup and tactics.');
+  expect(longDescription?.closest('.collection-detail-primary-aside')).toBeNull();
+  expect(target.querySelector('[data-testid="card-type-group"]')).toBeNull();
+  await click(target, 'Mainboard');
+  expect(target.querySelector('[data-testid="encounter-long-description"]')).toBeNull();
   expect(target.querySelector('[data-testid="card-type-group"]')).not.toBeNull();
   await click(target, 'Group by Type');
   expect(target.querySelector('[data-testid="card-type-group"]')).toBeNull();
@@ -260,10 +261,24 @@ test('anonymous detail uses the public API, hides staff actions, and exports the
   (target.querySelector('[aria-label="Copy Encounter TTS"]') as HTMLElement).click();
   await flush();
   expect(exportRecord).toHaveBeenCalledWith('fight-1', undefined);
-  expect(copyExport).toHaveBeenCalled();
-  expect(target.querySelector('textarea')?.value).toBe('tts-code');
+  expect(copyExport).toHaveBeenCalledWith(
+    expect.objectContaining({ encodedPayload: 'tts-code' }),
+    'TTS Encounter copied to clipboard',
+  );
 });
 
+test('exports from the About view through the shared copy helper', async () => {
+  const { target } = await mount();
+  await click(target, 'About');
+  (target.querySelector('[aria-label="Copy Encounter TTS"]') as HTMLElement).click();
+  await flush();
+  expect(target.querySelector('[data-testid="encounter-long-description"]')).not.toBeNull();
+  expect(copyExport).toHaveBeenCalledWith(
+    expect.objectContaining({ encodedPayload: 'tts-code' }),
+    'TTS Encounter copied to clipboard',
+  );
+  expect(target.querySelector('textarea')).toBeNull();
+});
 test('official owners see a read-only explanation and return to their filtered personal library', async () => {
   auth.canAccessStaffRoutes = false;
   fetchRecord.mockResolvedValue(

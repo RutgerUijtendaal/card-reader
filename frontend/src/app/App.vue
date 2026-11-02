@@ -79,6 +79,7 @@
     </div>
   </Teleport>
 
+  <TtsExportFallbackDialog />
   <Toaster
     rich-colors
     position="bottom-right"
@@ -93,6 +94,7 @@ import { Menu } from 'lucide-vue-next';
 import { Toaster } from 'vue-sonner';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import AppShellNav from '@/app/components/AppShellNav.vue';
+import TtsExportFallbackDialog from '@/domain/cards/components/TtsExportFallbackDialog.vue';
 import { useGlobalNavigationHotkeys, useHoverModeHotkeys } from '@/app/composables/useHotkeys';
 import { provideScrollContainer } from '@/shared/composables/useScrollContainer';
 import { usePrimarySearchHotkeys } from '@/shared/composables/usePrimarySearch';

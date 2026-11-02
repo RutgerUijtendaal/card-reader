@@ -82,7 +82,7 @@
         #bottomLeft
       >
         <AppBoardTabs
-          v-model="activeBoard"
+          v-model="activeView"
           label="Encounter boards"
           :tabs="boardTabs"
         />
@@ -115,11 +115,7 @@
     >
       This is an Official Encounter. Only staff can edit or delete it. It remains in My Encounters.
     </p>
-    <CollectionDetailLayout
-      v-if="record"
-      :expanded="detailsExpanded"
-      details-id="encounter-detail-panel"
-    >
+    <CollectionDetailLayout v-if="record">
       <template #aside>
         <div class="space-y-4">
           <h3 class="theme-section-title text-base font-semibold">
@@ -153,24 +149,9 @@
             class="theme-divider space-y-2 border-t pt-4"
             data-testid="encounter-summary"
           >
-            <div class="flex items-center justify-between gap-3">
-              <h4 class="theme-section-title text-sm font-semibold">
-                Summary
-              </h4>
-              <button
-                v-if="record.long_description_markup || record.long_description"
-                class="theme-ghost-button inline-flex items-center gap-1 text-xs font-medium"
-                type="button"
-                :aria-expanded="detailsExpanded"
-                aria-controls="encounter-detail-panel"
-                @click="detailsExpanded = !detailsExpanded"
-              >
-                Details<ChevronRight
-                  class="h-3.5 w-3.5"
-                  :class="detailsExpanded ? 'rotate-90' : ''"
-                />
-              </button>
-            </div>
+            <h4 class="theme-section-title text-sm font-semibold">
+              Summary
+            </h4>
             <CardMarkupText
               v-if="record.description_markup || record.description"
               class="theme-section-muted text-sm"
@@ -183,6 +164,14 @@
             >
               No description provided.
             </p>
+            <button
+              v-if="hasLongDescription && !aboutOpen"
+              type="button"
+              class="theme-link text-sm font-semibold"
+              @click="activeView = ABOUT_VIEW"
+            >
+              Read the full description
+            </button>
           </section>
           <section class="theme-divider space-y-3 border-t pt-4">
             <div class="flex flex-wrap gap-2">
@@ -213,31 +202,24 @@
           </section>
         </div>
       </template>
-      <template #details>
-        <section
-          class="space-y-2"
-          data-testid="encounter-long-description"
-        >
-          <h3 class="theme-section-title text-base font-semibold">
-            About this Encounter
-          </h3>
-          <CardMarkupText
-            class="theme-section-muted break-words text-sm"
-            :markup="record.long_description_markup || record.long_description"
-            :hover-mode="hoverSurface.effectiveHoverMode.value"
-          />
-        </section>
-      </template>
-      <template #details-footer>
-        <button
-          class="theme-ghost-button flex w-full items-center justify-center gap-2 px-3 py-2 text-sm font-semibold"
-          type="button"
-          @click="detailsExpanded = false"
-        >
-          <X class="h-4 w-4" />Close details
-        </button>
-      </template>
-      <section class="space-y-4">
+      <section
+        v-if="aboutOpen && hasLongDescription"
+        class="mx-auto max-w-[70ch] space-y-3 px-1 pb-10 pt-2"
+        data-testid="encounter-long-description"
+      >
+        <h3 class="theme-section-title theme-display text-2xl">
+          About this Encounter
+        </h3>
+        <CardMarkupText
+          class="theme-section-title break-words text-base leading-7"
+          :markup="record.long_description_markup || record.long_description"
+          :hover-mode="hoverSurface.effectiveHoverMode.value"
+        />
+      </section>
+      <section
+        v-else
+        class="space-y-4"
+      >
         <p
           v-if="!activeEntries.length"
           class="theme-section-muted text-sm"
@@ -255,37 +237,21 @@
           :hover-mode="hoverSurface.effectiveHoverMode.value"
           :navigation-target="cardLocation"
         />
-        <div
-          v-if="exportText"
-          class="space-y-2"
-        >
-          <label class="field-label">TTS import code<textarea
-            :value="exportText"
-            readonly
-            class="input-base h-24"
-            @focus="($event.target as HTMLTextAreaElement).select()"
-          />
-          </label>
-          <p class="theme-section-muted text-sm">
-            {{ exportMessage }}
-          </p>
-        </div>
       </section>
     </CollectionDetailLayout>
   </section>
 </template>
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { useLocalStorage, useMediaQuery } from '@vueuse/core';
+import { useLocalStorage } from '@vueuse/core';
 import { useRoute, useRouter } from 'vue-router';
-import { ChevronRight, Pencil, Trash2, X } from 'lucide-vue-next';
+import { Pencil, Trash2 } from 'lucide-vue-next';
 import { fetchEncounter, deleteEncounter, exportEncounter } from '@/domain/encounters/api';
 import type { EncounterRecord } from '@/domain/encounters/types';
 import type { CardFiltersResponse } from '@/domain/cards/types';
 import { fetchCardFilters } from '@/domain/cards/api';
 import { useAuthStore } from '@/domain/session/store';
 import { cardFactionLabel } from '@/domain/cards/cardFactions';
-import { ttsExportSheetDescription } from '@/domain/cards/utils/ttsExportResponse';
 import { copyTtsExport } from '@/domain/cards/utils/copyTtsExport';
 import { useCardCollectionGrid } from '@/domain/cards/composables/useCardCollectionGrid';
 import { useCardSortSurface } from '@/domain/cards/composables/useCardSortPreferences';
@@ -311,16 +277,26 @@ const record = ref<EncounterRecord | null>(null);
 const loading = ref(true);
 const error = ref('');
 const exporting = ref(false);
-const exportText = ref('');
-const exportMessage = ref('');
-const detailsExpanded = ref(false);
-const canAutoExpand = useMediaQuery('(min-width: 1536px)');
 const activeBoard = ref('mainboard');
 const countBoardCards = (entries: { quantity: number }[]): number =>
   entries.reduce((sum, entry) => sum + entry.quantity, 0);
+const ABOUT_VIEW = 'about';
+// About replaces the card area with the long description; boards bring the cards back as they were.
+const aboutOpen = ref(false);
+const hasLongDescription = computed(() =>
+  Boolean(record.value?.long_description_markup || record.value?.long_description),
+);
+const activeView = computed({
+  get: () => (aboutOpen.value ? ABOUT_VIEW : activeBoard.value),
+  set: (view: string) => {
+    aboutOpen.value = view === ABOUT_VIEW;
+    if (view !== ABOUT_VIEW) activeBoard.value = view;
+  },
+});
 const boardTabs = computed<AppBoardTab[]>(() => {
   if (!record.value) return [];
   const tabs: AppBoardTab[] = [
+    ...(hasLongDescription.value ? [{ id: ABOUT_VIEW, label: 'About' }] : []),
     {
       id: 'mainboard',
       label: 'Mainboard',
@@ -389,10 +365,9 @@ const load = async () => {
   record.value = null;
   loading.value = true;
   error.value = '';
-  exportText.value = '';
   exporting.value = false;
   activeBoard.value = 'mainboard';
-  detailsExpanded.value = false;
+  aboutOpen.value = false;
   try {
     const [value, filters] = await Promise.all([
       fetchEncounter(String(route.params.id), false),
@@ -401,9 +376,6 @@ const load = async () => {
     if (current !== generation) return;
     record.value = value;
     types.value = filters?.types ?? [];
-    detailsExpanded.value = Boolean(
-      (value.long_description_markup || value.long_description) && canAutoExpand.value,
-    );
   } catch (cause) {
     if (current === generation)
       error.value = getApiErrorMessage(cause, 'Encounter not found or unavailable.');
@@ -420,17 +392,10 @@ const copyExport = async () => {
   try {
     const result = await exportEncounter(record.value.id, sideboardId);
     if (current !== generation) return;
-    exportText.value = result.encodedPayload;
-    exportMessage.value = `${result.exportedCount} cards. ${ttsExportSheetDescription(result)}`;
-    try {
-      await copyTtsExport(
-        result,
-        sideboardId ? 'TTS sideboard copied to clipboard' : 'TTS Encounter copied to clipboard',
-      );
-      exportMessage.value = `Copied to clipboard. ${exportMessage.value}`;
-    } catch {
-      /* The import code remains selectable. */
-    }
+    await copyTtsExport(
+      result,
+      sideboardId ? 'TTS sideboard copied to clipboard' : 'TTS Encounter copied to clipboard',
+    );
   } catch (cause) {
     if (current === generation) error.value = getApiErrorMessage(cause, 'Export failed.');
   } finally {

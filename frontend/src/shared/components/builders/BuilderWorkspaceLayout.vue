@@ -67,9 +67,7 @@ watch(
 
 .builder-workspace-main {
   position: relative;
-  padding-top: 0;
-  padding-right: 0;
-  padding-left: 0;
+  padding: 0;
 }
 
 .builder-workspace-overlay {

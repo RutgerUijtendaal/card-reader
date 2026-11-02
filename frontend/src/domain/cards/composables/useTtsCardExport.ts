@@ -1,6 +1,7 @@
 import { readonly, ref, type DeepReadonly, type Ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { exportTtsCards, type TtsCardExportSource } from '@/domain/cards/api';
+import { copyTtsExport } from '@/domain/cards/utils/copyTtsExport';
 import { ttsExportSheetDescription } from '@/domain/cards/utils/ttsExportResponse';
 import { getApiErrorMessage } from '@/shared/api/errors';
 
@@ -35,12 +36,11 @@ export const useTtsCardExport = (): UseTtsCardExportResult => {
       if (!requestIsCurrent()) {
         return;
       }
-      await navigator.clipboard.writeText(result.encodedPayload);
-      if (!requestIsCurrent()) {
-        return;
-      }
-      const cardLabel = `${result.exportedCount} TTS card${result.exportedCount === 1 ? '' : 's'} copied to clipboard`;
-      toast.success(cardLabel, { description: ttsExportSheetDescription(result) });
+      await copyTtsExport(
+        result,
+        `${result.exportedCount} TTS card${result.exportedCount === 1 ? '' : 's'} copied to clipboard`,
+        { description: ttsExportSheetDescription(result), isCurrent: requestIsCurrent },
+      );
     } catch (error) {
       if (!requestIsCurrent()) {
         return;
