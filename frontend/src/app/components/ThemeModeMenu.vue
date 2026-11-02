@@ -3,29 +3,21 @@
     <button
       ref="triggerRef"
       type="button"
-      :class="compact ? 'theme-mode-button-compact' : 'theme-mode-button'"
+      class="nav-link w-full"
+      :class="compact ? 'justify-center px-0' : ''"
       :title="buttonTitle"
       aria-label="Open theme menu"
+      :aria-expanded="isOpen"
       @click="toggle"
     >
-      <span :class="compact ? 'theme-mode-icon-wrap-compact' : 'theme-mode-icon-wrap'">
-        <component
-          :is="activeIcon"
-          class="h-4 w-4"
-        />
-      </span>
-      <span
-        v-if="!compact"
-        class="min-w-0 flex-1 text-left"
-      >
-        <span class="block text-sm font-semibold">Theme</span>
-        <span class="block text-xs opacity-75">{{ activeLabel }}</span>
-      </span>
-      <ChevronDown
-        v-if="!compact"
-        class="h-4 w-4 shrink-0 transition"
-        :class="isOpen ? 'rotate-180' : ''"
+      <component
+        :is="activeIcon"
+        class="h-[1.125rem] w-[1.125rem] shrink-0"
       />
+      <template v-if="!compact">
+        <span class="min-w-0 flex-1 truncate text-left">Theme</span>
+        <span class="shrink-0 text-xs opacity-60">{{ activeLabel }}</span>
+      </template>
     </button>
 
     <Teleport to="body">
@@ -69,7 +61,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ChevronDown, LaptopMinimal, MoonStar, SunMedium } from 'lucide-vue-next';
+import { LaptopMinimal, MoonStar, SunMedium } from 'lucide-vue-next';
 import { useFloatingPopover } from '@/shared/composables/useFloatingPopover';
 import { useTheme, type ThemePreference } from '@/shared/composables/useTheme';
 
