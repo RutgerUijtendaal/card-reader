@@ -1,107 +1,22 @@
 <template>
-  <div
-    class="relative w-full"
-    :class="compact ? 'flex justify-center' : ''"
-  >
+  <div class="relative w-full">
     <button
-      v-if="showsHotkeysPopover"
       ref="triggerRef"
       type="button"
-      :class="compact ? 'theme-hotkeys-button-compact' : 'theme-hotkeys-panel theme-hotkeys-panel-button'"
+      class="nav-link w-full"
+      :class="compact ? 'justify-center px-0' : ''"
       :aria-label="popoverButtonLabel"
       :aria-controls="popoverId"
       :aria-expanded="isOpen"
       :title="compact ? popoverButtonLabel : undefined"
       @click="toggle"
     >
-      <template v-if="compact">
-        <span class="theme-hotkeys-icon-wrap-compact">
-          <Keyboard class="h-4 w-4" />
-        </span>
-      </template>
-
-      <template v-else>
-        <span class="flex w-full items-center gap-2">
-          <span class="theme-hotkeys-icon-wrap">
-            <Keyboard class="h-4 w-4" />
-          </span>
-          <span class="min-w-0 flex-1 text-left">
-            <span class="block text-sm font-semibold">Hotkeys</span>
-            <span class="block text-xs opacity-75">Playtester essentials</span>
-          </span>
-          <ChevronRight
-            class="h-4 w-4 shrink-0 transition"
-            :class="isOpen ? 'rotate-180' : ''"
-          />
-        </span>
-
-        <span
-          class="grid w-full gap-2 text-sm"
-          data-testid="playtester-hotkey-essentials"
-        >
-          <span
-            v-for="hotkey in playtesterEssentials"
-            :key="hotkey.id"
-            class="flex items-center justify-between gap-3"
-          >
-            <span class="opacity-80">{{ hotkey.label }}</span>
-            <span class="inline-flex shrink-0 items-center gap-1">
-              <span
-                v-for="key in hotkey.keys"
-                :key="key"
-                class="theme-hotkey-chip"
-              >
-                {{ key }}
-              </span>
-            </span>
-          </span>
-
-          <span class="theme-hotkeys-more-link flex min-h-5 w-full items-center justify-between gap-3">
-            <span>View all shortcuts</span>
-            <span class="text-xs font-semibold">{{ playtesterHotkeyCount }}</span>
-          </span>
-        </span>
+      <Keyboard class="h-[1.125rem] w-[1.125rem] shrink-0" />
+      <template v-if="!compact">
+        <span class="min-w-0 flex-1 truncate text-left">{{ triggerLabel }}</span>
+        <ChevronRight class="h-4 w-4 shrink-0 opacity-60" />
       </template>
     </button>
-
-    <div
-      v-else
-      class="theme-hotkeys-panel"
-      :data-hotkey-count="globalHotkeys.length"
-    >
-      <div class="flex items-center gap-2">
-        <span class="theme-hotkeys-icon-wrap">
-          <Keyboard class="h-4 w-4" />
-        </span>
-        <div class="min-w-0">
-          <p class="text-sm font-semibold">
-            Hotkeys
-          </p>
-          <p class="text-xs opacity-75">
-            Search and quick actions
-          </p>
-        </div>
-      </div>
-
-      <div class="space-y-2 text-sm">
-        <div
-          v-for="hotkey in globalHotkeys"
-          :key="hotkey.id"
-          class="flex items-center justify-between gap-3"
-        >
-          <span class="opacity-80">{{ hotkey.label }}</span>
-          <span class="inline-flex shrink-0 items-center gap-1">
-            <span
-              v-for="key in hotkey.keys"
-              :key="key"
-              class="theme-hotkey-chip"
-            >
-              {{ key }}
-            </span>
-          </span>
-        </div>
-      </div>
-    </div>
 
     <Teleport to="body">
       <div
@@ -248,9 +163,7 @@ const playtesterHotkeyGroups: HotkeyGroup[] = [
 ];
 
 const isPlaytesterRoute = computed(() => route.path === '/playtester' || route.path.startsWith('/playtester/'));
-const showsHotkeysPopover = computed(() => props.compact || isPlaytesterRoute.value);
-const playtesterEssentials = playtesterHotkeyGroups[0].hotkeys;
-const playtesterHotkeyCount = playtesterHotkeyGroups.reduce((total, group) => total + group.hotkeys.length, 0);
+const triggerLabel = computed(() => isPlaytesterRoute.value ? 'Playtester hotkeys' : 'Hotkeys');
 const globalHotkeys = computed<HotkeyDefinition[]>(() => [
   { id: 'search', label: 'Search', keys: ['/'] },
   { id: 'hover-mode', label: 'Hover Mode', keys: ['Alt+1/2/3/4/5'] },

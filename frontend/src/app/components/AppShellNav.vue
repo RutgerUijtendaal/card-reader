@@ -1,16 +1,16 @@
 <template>
   <div
     class="app-sidebar app-scrollbar flex h-full flex-col overflow-y-auto"
-    :class="collapsed ? 'px-3 py-4' : 'px-5 py-6'"
+    :class="collapsed ? 'px-3 py-4' : 'px-4 py-5'"
   >
     <div
-      class="mb-5 flex w-full items-center gap-3"
+      class="mb-4 flex w-full items-center gap-2"
       :class="collapsed ? 'justify-center' : 'justify-between'"
     >
       <button
         v-if="collapsed && !mobile"
         type="button"
-        class="hover:theme-card-frame-muted group relative inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl transition"
+        class="hover:theme-card-frame-muted group relative inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl transition"
         aria-label="Expand sidebar"
         title="Expand sidebar"
         @click="$emit('toggleCollapse')"
@@ -32,12 +32,12 @@
 
       <RouterLink
         v-else
-        class="flex min-w-0 items-center gap-3 rounded-xl transition"
+        class="flex min-w-0 items-center gap-2.5 rounded-xl transition"
         :class="collapsed ? 'justify-center' : ''"
         to="/"
         @click="handleNavClick"
       >
-        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
           <img
             :src="cardLogoUrl"
             alt=""
@@ -46,17 +46,14 @@
         </span>
         <span
           v-if="!collapsed"
-          class="min-w-0"
-        >
-          <span class="app-sidebar-brand-name block">Maity's Card Game</span>
-        </span>
+          class="app-sidebar-brand-name min-w-0 truncate"
+        >Maity's Card Game</span>
       </RouterLink>
 
       <button
         v-if="mobile || (canCollapse && !collapsed)"
         type="button"
-        class="nav-link shrink-0"
-        :class="collapsed ? 'justify-center px-0' : ''"
+        class="app-sidebar-icon-button shrink-0"
         :aria-label="
           mobile ? 'Close navigation' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'
         "
@@ -78,7 +75,7 @@
       </button>
     </div>
 
-    <div class="mb-4 w-full">
+    <div class="mb-3 w-full">
       <CardPoolWorkspaceSwitcher
         :collapsed="collapsed"
         @selected="handleNavClick"
@@ -86,130 +83,104 @@
     </div>
 
     <nav class="grid w-full gap-0.5">
-      <template
-        v-for="item in publicItems"
-        :key="item.label"
-      >
-        <RouterLink
-          class="nav-link relative"
-          :class="[collapsed ? 'justify-center px-0' : '', { 'router-link-active': isAlsoActive(item) }]"
-          :to="item.to"
-          :title="collapsed ? item.label : undefined"
-          :aria-label="collapsed ? item.label : undefined"
-          @click="handleNavClick"
-        >
-          <component
-            :is="item.icon"
-            class="h-[1.125rem] w-[1.125rem] shrink-0"
-            :data-card-pool-icon="item.cardPool"
-          />
-          <span v-if="!collapsed">{{ item.label }}</span>
-          <span
-            v-if="collapsed && item.badgeCount && item.badgeCount > 0"
-            class="nav-indicator-dot"
-            aria-hidden="true"
-          />
-          <span
-            v-if="!collapsed && item.badgeCount && item.badgeCount > 0"
-            class="nav-badge theme-pill theme-pill-success ml-auto text-[11px] font-semibold"
-          >
-            {{ item.badgeCount }}
-          </span>
-        </RouterLink>
-      </template>
+      <AppShellNavLink
+        :item="homeItem"
+        :collapsed="collapsed"
+        @navigate="handleNavClick"
+      />
 
-      <div
-        v-if="staffItems.length > 0"
-        class="app-sidebar-divider mt-4 pt-2"
+      <p
+        v-if="!collapsed"
+        class="app-sidebar-group-label"
+        data-testid="workspace-nav-label"
       >
+        {{ activePoolLabel }}
+      </p>
+      <div
+        v-else
+        class="app-sidebar-divider my-1.5"
+        aria-hidden="true"
+      />
+
+      <AppShellNavLink
+        v-for="item in poolItems"
+        :key="item.label"
+        :item="item"
+        :collapsed="collapsed"
+        :also-active="isAlsoActive(item)"
+        @navigate="handleNavClick"
+      />
+
+      <template v-if="staffItems.length > 0">
         <p
           v-if="!collapsed"
-          class="app-sidebar-group-label"
+          class="app-sidebar-group-label mt-2"
         >
           Workshop
         </p>
-      </div>
+        <div
+          v-else
+          class="app-sidebar-divider my-1.5"
+          aria-hidden="true"
+        />
 
-      <template
-        v-for="item in staffItems"
-        :key="item.label"
-      >
-        <RouterLink
-          class="nav-link relative"
-          :class="[collapsed ? 'justify-center px-0' : '', { 'router-link-active': isAlsoActive(item) }]"
-          :to="item.to"
-          :title="collapsed ? item.label : undefined"
-          :aria-label="collapsed ? item.label : undefined"
-          @click="handleNavClick"
-        >
-          <component
-            :is="item.icon"
-            class="h-[1.125rem] w-[1.125rem] shrink-0"
-            :data-card-pool-icon="item.cardPool"
-          />
-          <span v-if="!collapsed">{{ item.label }}</span>
-          <span
-            v-if="collapsed && item.badgeCount && item.badgeCount > 0"
-            class="nav-indicator-dot"
-            aria-hidden="true"
-          />
-          <span
-            v-if="!collapsed && item.badgeCount && item.badgeCount > 0"
-            class="nav-badge theme-pill theme-pill-success ml-auto text-[11px] font-semibold"
-          >
-            {{ item.badgeCount }}
-          </span>
-        </RouterLink>
+        <AppShellNavLink
+          v-for="item in staffItems"
+          :key="item.label"
+          :item="item"
+          :collapsed="collapsed"
+          @navigate="handleNavClick"
+        />
       </template>
     </nav>
 
-    <div class="app-sidebar-divider mt-auto w-full space-y-1 pt-4">
-      <div :class="collapsed ? 'flex justify-center' : ''">
-        <AppHotkeysPanel :compact="collapsed" />
+    <div
+      class="app-sidebar-divider mt-auto grid w-full gap-0.5 pt-3"
+      data-testid="sidebar-account"
+    >
+      <AppShellNavLink
+        v-for="item in accountItems"
+        :key="item.label"
+        :item="item"
+        :collapsed="collapsed"
+        @navigate="handleNavClick"
+      />
+      <AppHotkeysPanel :compact="collapsed" />
+      <ThemeModeMenu :compact="collapsed" />
+
+      <div
+        v-if="auth.authenticated"
+        class="app-sidebar-divider mt-2 pt-2"
+      >
+        <AppAccountMenu
+          :compact="collapsed"
+          @sign-out="signOut"
+        />
       </div>
 
-      <div :class="collapsed ? 'flex justify-center' : ''">
-        <ThemeModeMenu :compact="collapsed" />
-      </div>
-
-      <div>
-        <RouterLink
-          v-if="!auth.authenticated"
-          class="nav-link"
-          :class="collapsed ? 'w-full justify-center px-0' : 'w-full'"
-          to="/login"
-          :title="collapsed ? 'Sign in' : undefined"
-          :aria-label="collapsed ? 'Sign in' : undefined"
-          @click="handleNavClick"
-        >
-          <LogIn class="h-[1.125rem] w-[1.125rem] shrink-0" />
-          <span v-if="!collapsed">Sign in</span>
-        </RouterLink>
-
-        <button
-          v-if="auth.authenticated"
-          class="nav-link"
-          :class="collapsed ? 'w-full justify-center px-0' : 'w-full'"
-          type="button"
-          :title="collapsed ? 'Sign out' : undefined"
-          :aria-label="collapsed ? 'Sign out' : undefined"
-          @click="signOut"
-        >
-          <LogOut class="h-[1.125rem] w-[1.125rem] shrink-0" />
-          <span v-if="!collapsed">Sign out</span>
-        </button>
-      </div>
+      <RouterLink
+        v-else
+        class="nav-link mt-2"
+        :class="collapsed ? 'justify-center px-0' : ''"
+        to="/login"
+        :title="collapsed ? 'Sign in' : undefined"
+        :aria-label="collapsed ? 'Sign in' : undefined"
+        @click="handleNavClick"
+      >
+        <LogIn class="h-[1.125rem] w-[1.125rem] shrink-0" />
+        <span v-if="!collapsed">Sign in</span>
+      </RouterLink>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Component } from 'vue';
-import { ChevronRight, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-vue-next';
+import { ChevronRight, LogIn, PanelLeftClose, PanelLeftOpen, X } from 'lucide-vue-next';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
-import type { RouteLocationRaw } from 'vue-router';
+import AppAccountMenu from '@/app/components/AppAccountMenu.vue';
 import AppHotkeysPanel from '@/app/components/AppHotkeysPanel.vue';
+import AppShellNavLink, { type AppShellNavItem } from '@/app/components/AppShellNavLink.vue';
 import CardPoolWorkspaceSwitcher from '@/app/components/CardPoolWorkspaceSwitcher.vue';
 import ThemeModeMenu from '@/app/components/ThemeModeMenu.vue';
 import { useAccessRequestSummary } from '@/domain/access-requests/composables/useAccessRequestSummary';
@@ -221,18 +192,11 @@ import {
   useCardPoolWorkspaceStore,
 } from '@/domain/cards/cardPoolWorkspace';
 import { CARD_POOL_ICONS } from '@/domain/cards/cardPoolIcons';
-import type { CardPool } from '@/domain/cards/cardPools';
+import { cardPoolLabel } from '@/domain/cards/cardPools';
 import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 
-type NavItem = {
-  label: string;
-  to: RouteLocationRaw;
-  icon: Component;
-  cardPool?: CardPool;
-  requiresStaff?: boolean;
+type NavItem = AppShellNavItem & {
   requiresAuth?: boolean;
-  requiresAuthenticatedUser?: boolean;
-  badgeCount?: number;
   /** Other path prefixes that belong to this link, such as the Mine scope of a library. */
   alsoActiveFor?: string[];
 };
@@ -264,101 +228,92 @@ const { openReviewCount } = useReviewSummary();
 const { unreadNotificationCount } = useNotificationSummary();
 const { pendingAccessRequestCount } = useAccessRequestSummary();
 
-const galleryLocation = computed(() => buildWorkspaceGalleryLocation(workspace.activePool));
-const items = computed<NavItem[]>(() => [
-  {
-    label: 'Home',
-    to: '/',
-    icon: APP_SECTION_ICONS.home,
-  },
-  {
-    label: 'Gallery',
-    to: galleryLocation.value,
-    icon: CARD_POOL_ICONS[workspace.activePool],
-    cardPool: workspace.activePool,
-  },
-  ...(workspace.activePool === 'player'
-    ? [
-        { label: 'Decks', to: '/decks', icon: APP_SECTION_ICONS.decks, alsoActiveFor: ['/my/decks'] },
-        {
-          label: 'Build a deck',
-          to: '/my/decks/new?return_to=my_decks',
-          icon: APP_SECTION_ICONS.deckBuilder,
-          requiresAuth: true,
-        },
-        { label: 'Playtester', to: '/playtester', icon: APP_SECTION_ICONS.playtester },
-      ]
-    : []),
-  ...(workspace.activePool === 'evil'
-    ? [
-        {
-          label: 'Encounters',
-          to: '/encounters',
-          icon: APP_SECTION_ICONS.encounters,
-          alsoActiveFor: ['/my/encounters', '/staff/encounters'],
-        },
-        {
-          label: 'Build Encounter',
-          to: '/my/encounters/new',
-          icon: APP_SECTION_ICONS.encounterBuilder,
-          requiresAuth: true,
-        },
-      ]
-    : []),
-  {
-    label: 'Notifications',
-    to: '/notifications',
-    icon: APP_SECTION_ICONS.notifications,
-    requiresAuthenticatedUser: true,
-    badgeCount: unreadNotificationCount.value,
-  },
-  { label: 'Settings', to: '/settings', icon: APP_SECTION_ICONS.settings },
-  { label: 'Imports', to: '/imports', icon: APP_SECTION_ICONS.imports, requiresStaff: true },
-  {
-    label: 'Operations',
-    to: '/operations',
-    icon: APP_SECTION_ICONS.operations,
-    requiresStaff: true,
-  },
-  {
-    label: 'Review Queue',
-    to: '/review',
-    icon: APP_SECTION_ICONS.review,
-    requiresStaff: true,
-    badgeCount: openReviewCount.value,
-  },
-  {
-    label: 'Admin',
-    to: '/admin',
-    icon: APP_SECTION_ICONS.admin,
-    requiresStaff: true,
-    badgeCount: pendingAccessRequestCount.value,
-  },
-]);
+const homeItem: NavItem = { label: 'Home', to: '/', icon: APP_SECTION_ICONS.home };
+const activePoolLabel = computed(() => cardPoolLabel(workspace.activePool));
+
+const canShowItem = (item: NavItem): boolean => !item.requiresAuth || auth.authenticated;
+
+// Everything scoped to the selected workspace sits under its heading, so switching pools only
+// changes this group.
+const poolItems = computed<NavItem[]>(() => {
+  const items: NavItem[] = [
+    {
+      label: 'Gallery',
+      to: buildWorkspaceGalleryLocation(workspace.activePool),
+      icon: CARD_POOL_ICONS[workspace.activePool],
+      cardPool: workspace.activePool,
+    },
+  ];
+  if (workspace.activePool === 'player') {
+    items.push(
+      { label: 'Decks', to: '/decks', icon: APP_SECTION_ICONS.decks, alsoActiveFor: ['/my/decks'] },
+      {
+        label: 'Build a deck',
+        to: '/my/decks/new?return_to=my_decks',
+        icon: APP_SECTION_ICONS.deckBuilder,
+        requiresAuth: true,
+      },
+      { label: 'Playtester', to: '/playtester', icon: APP_SECTION_ICONS.playtester },
+    );
+  }
+  if (workspace.activePool === 'evil') {
+    items.push(
+      {
+        label: 'Encounters',
+        to: '/encounters',
+        icon: APP_SECTION_ICONS.encounters,
+        alsoActiveFor: ['/my/encounters', '/staff/encounters'],
+      },
+      {
+        label: 'Build Encounter',
+        to: '/my/encounters/new',
+        icon: APP_SECTION_ICONS.encounterBuilder,
+        requiresAuth: true,
+      },
+    );
+  }
+  return items.filter(canShowItem);
+});
+
+const staffItems = computed<NavItem[]>(() => {
+  if (!auth.canAccessStaffRoutes) {
+    return [];
+  }
+  return [
+    { label: 'Imports', to: '/imports', icon: APP_SECTION_ICONS.imports },
+    { label: 'Operations', to: '/operations', icon: APP_SECTION_ICONS.operations },
+    {
+      label: 'Review Queue',
+      to: '/review',
+      icon: APP_SECTION_ICONS.review,
+      badgeCount: openReviewCount.value,
+    },
+    {
+      label: 'Admin',
+      to: '/admin',
+      icon: APP_SECTION_ICONS.admin,
+      badgeCount: pendingAccessRequestCount.value,
+    },
+  ];
+});
+
+const accountItems = computed<NavItem[]>(() => {
+  const items: NavItem[] = [
+    {
+      label: 'Notifications',
+      to: '/notifications',
+      icon: APP_SECTION_ICONS.notifications,
+      requiresAuth: true,
+      badgeCount: unreadNotificationCount.value,
+    },
+    { label: 'Settings', to: '/settings', icon: APP_SECTION_ICONS.settings },
+  ];
+  return items.filter(canShowItem);
+});
 
 // Builder routes such as /my/decks/new have their own link, so only the library path itself matches.
 const isAlsoActive = (item: NavItem): boolean =>
   item.alsoActiveFor?.includes(route.path) ?? false;
-
-const canShowItem = (item: NavItem): boolean => {
-  if (item.requiresStaff && !auth.canAccessStaffRoutes) {
-    return false;
-  }
-  if (item.requiresAuth && !auth.authenticated) {
-    return false;
-  }
-  if (item.requiresAuthenticatedUser && !auth.authenticated) {
-    return false;
-  }
-  return true;
-};
-
-const publicItems = computed(() =>
-  items.value.filter((item) => !item.requiresStaff && canShowItem(item)),
-);
-const staffItems = computed(() =>
-  items.value.filter((item) => item.requiresStaff && canShowItem(item)),
-);
 
 const handleNavClick = (): void => {
   if (props.mobile) {
@@ -374,25 +329,3 @@ const signOut = async (): Promise<void> => {
   await router.push('/');
 };
 </script>
-
-<style scoped>
-.nav-badge {
-  height: 1.25rem;
-  min-width: 1.25rem;
-  justify-content: center;
-  padding: 0 0.375rem;
-  line-height: 1;
-}
-
-.nav-indicator-dot {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.75rem;
-  width: 0.55rem;
-  height: 0.55rem;
-  border: 2px solid rgba(15, 23, 42, 0.92);
-  border-radius: 9999px;
-  background: var(--color-pill-success-text);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-pill-success-border) 34%, transparent);
-}
-</style>

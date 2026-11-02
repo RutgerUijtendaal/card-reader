@@ -46,7 +46,7 @@
         v-for="option in workspace.availableOptions"
         :key="option.value"
         type="button"
-        class="workspace-switcher-tab inline-flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 px-1 text-[13px] font-medium transition"
+        class="workspace-switcher-tab inline-flex h-10 min-w-0 flex-1 items-center justify-center gap-1 px-0.5 text-[13px] font-medium transition"
         :class="workspace.activePool === option.value ? 'workspace-switcher-tab-active' : ''"
         :aria-label="`${option.label} workspace`"
         :aria-pressed="workspace.activePool === option.value"

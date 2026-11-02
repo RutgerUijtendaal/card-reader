@@ -78,29 +78,33 @@ describe('AppHotkeysPanel', () => {
     workspaceState.activePool = 'player';
   });
 
-  test('shows default hotkeys away from the active playtester route', async () => {
+  const openPopover = async (container: HTMLElement): Promise<string> => {
+    container.querySelector<HTMLButtonElement>('button[aria-controls="app-hotkeys-popover"]')?.click();
+    await nextTick();
+    return document.body.querySelector('[data-testid="hotkeys-popover"]')?.textContent ?? '';
+  };
+
+  test('opens the global hotkeys from a single sidebar row away from the playtester', async () => {
     const mounted = await mountPanel('/cards');
 
-    expect(mounted.container.textContent).toContain('Search and quick actions');
-    expect(mounted.container.textContent).toContain('Search');
-    expect(mounted.container.textContent).toContain('New Deck');
-    expect(mounted.container.textContent).not.toContain('Shuffle');
-    expect(mounted.container.querySelector('[data-hotkey-count]')?.getAttribute('data-hotkey-count')).toBe('4');
+    expect(mounted.container.textContent?.trim()).toBe('Hotkeys');
+    const popoverText = await openPopover(mounted.container);
+    expect(popoverText).toContain('Global hotkeys');
+    expect(popoverText).toContain('Search');
+    expect(popoverText).toContain('New Deck');
+    expect(popoverText).not.toContain('Shuffle');
 
     mounted.unmount();
   });
 
-  test('shows playtester hotkeys on the playtester deck selector', async () => {
+  test('labels the row for the playtester on the playtester deck selector', async () => {
     const mounted = await mountPanel('/playtester');
 
-    expect(mounted.container.textContent).toContain('Playtester essentials');
-    expect(mounted.container.textContent).toContain('Next turn');
-    expect(mounted.container.textContent).toContain('Untap all');
-    expect(mounted.container.textContent).toContain('Draw');
-    expect(mounted.container.textContent).toContain('View all shortcuts');
-    expect(mounted.container.textContent).not.toContain('Shuffle');
-    expect(mounted.container.textContent).not.toContain('Search and quick actions');
-    expect(mounted.container.textContent).not.toContain('New Deck');
+    expect(mounted.container.textContent?.trim()).toBe('Playtester hotkeys');
+    const popoverText = await openPopover(mounted.container);
+    expect(popoverText).toContain('Next turn');
+    expect(popoverText).toContain('Shuffle');
+    expect(popoverText).not.toContain('New Deck');
 
     mounted.unmount();
   });
@@ -109,9 +113,9 @@ describe('AppHotkeysPanel', () => {
     workspaceState.activePool = 'evil';
     const mounted = await mountPanel('/cards');
 
-    expect(mounted.container.textContent).toContain('Search');
-    expect(mounted.container.textContent).not.toContain('New Deck');
-    expect(mounted.container.querySelector('[data-hotkey-count]')?.getAttribute('data-hotkey-count')).toBe('3');
+    const popoverText = await openPopover(mounted.container);
+    expect(popoverText).toContain('Search');
+    expect(popoverText).not.toContain('New Deck');
 
     mounted.unmount();
   });
@@ -166,7 +170,7 @@ describe('AppHotkeysPanel', () => {
     );
 
     expect(trigger).not.toBeNull();
-    expect(trigger?.parentElement?.classList.contains('justify-center')).toBe(true);
+    expect(trigger?.classList.contains('justify-center')).toBe(true);
     expect(mounted.container.textContent?.trim()).toBe('');
     trigger?.click();
     await nextTick();

@@ -252,6 +252,19 @@ describe('AppShellNav', () => {
     mounted.unmount();
   });
 
+  test('groups workspace links under the active pool and keeps account links in the footer', async () => {
+    const mounted = await mountNav();
+
+    expect(
+      mounted.container.querySelector('[data-testid="workspace-nav-label"]')?.textContent?.trim(),
+    ).toBe('Player');
+    const footer = mounted.container.querySelector('[data-testid="sidebar-account"]');
+    expect(footer?.querySelector('a[href="/notifications"]')).not.toBeNull();
+    expect(footer?.querySelector('a[href="/settings"]')).not.toBeNull();
+    expect(mounted.container.querySelector('nav a[href="/settings"]')).toBeNull();
+    mounted.unmount();
+  });
+
   test('keeps Decks highlighted on the Mine scope of the deck library', async () => {
     const mounted = await mountNav({}, false, '/my/decks');
     const decksLink = Array.from(mounted.container.querySelectorAll('nav a.nav-link')).find(
@@ -382,10 +395,13 @@ describe('AppShellNav', () => {
 
   test('returns Home after signing out', async () => {
     const mounted = await mountNav({}, false, '/settings');
-    const signOutButton = Array.from(mounted.container.querySelectorAll('button')).find(
-      (button) => button.textContent?.includes('Sign out'),
-    );
+    mounted.container.querySelector<HTMLButtonElement>('button[aria-controls="app-account-menu"]')?.click();
+    await nextTick();
+    const signOutButton = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>('[data-testid="account-menu"] button'),
+    ).find((button) => button.textContent?.includes('Sign out'));
 
+    expect(signOutButton).not.toBeUndefined();
     signOutButton?.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
     await nextTick();
