@@ -525,10 +525,12 @@ onMounted(async () => {
   color: var(--color-text);
 }
 
-/* The hover surface bleeds past the chart so its content keeps breathing room inside it. */
+/* The trigger is its own padded surface, so the hover fill frames the chart instead of stopping
+   at its text. The top padding is taken from the gap above it and the chart already pads its
+   labels, so the aside keeps its height; horizontally it stays inside the column. */
 .deck-detail-panel-trigger {
-  margin: -0.75rem;
-  padding: 0.75rem;
+  margin-top: -0.75rem;
+  padding: 0.75rem 0.75rem 0.25rem;
   border-radius: 0.5rem;
   cursor: pointer;
   outline: none;
