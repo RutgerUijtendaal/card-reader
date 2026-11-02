@@ -16,7 +16,7 @@
 
     <div
       v-if="deckReferences.length > 0"
-      class="grid gap-3"
+      class="app-page-collection-grid grid gap-3"
     >
       <div
         v-for="deck in deckReferences"
@@ -40,7 +40,7 @@
       v-else
       class="relative"
     >
-      <DeckLoadingSkeleton :animated="false" />
+      <CollectionTileSkeleton :animated="false" />
       <RouterLink
         class="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--table-canvas)]"
         style="border-color: color-mix(in srgb, var(--color-border-strong) 62%, transparent 38%); background: color-mix(in srgb, var(--color-surface-strong) 88%, transparent 12%); color: var(--color-text-muted);"
@@ -60,7 +60,7 @@ import { computed } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import type { CardDeckReferenceSummary } from '@/domain/card-deck-references/types';
 import { buildCardReturnContextLocation } from '@/domain/card-navigation/cardReturnState';
-import DeckLoadingSkeleton from '@/shared/components/CollectionLoadingSkeleton.vue';
+import CollectionTileSkeleton from '@/shared/components/CollectionTileSkeleton.vue';
 import DeckListCard from '@/domain/decks/components/DeckListCard.vue';
 
 const props = defineProps<{

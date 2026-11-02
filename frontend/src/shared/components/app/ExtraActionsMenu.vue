@@ -3,7 +3,7 @@
     <button
       ref="triggerRef"
       type="button"
-      class="theme-card-frame-muted theme-icon-button theme-section-title inline-flex h-10 w-10 items-center justify-center rounded-lg"
+      :class="buttonClass"
       :aria-label="buttonLabel"
       :title="buttonLabel"
       @click="toggle"
@@ -35,10 +35,14 @@ withDefaults(
   defineProps<{
     buttonLabel?: string;
     panelClass?: string;
+    /** Replaces the default framed square, for example with a chip laid over art. */
+    buttonClass?: string;
   }>(),
   {
     buttonLabel: 'Open extra actions',
     panelClass: 'w-[15rem]',
+    buttonClass:
+      'theme-card-frame-muted theme-icon-button theme-section-title inline-flex h-10 w-10 items-center justify-center rounded-lg',
   },
 );
 

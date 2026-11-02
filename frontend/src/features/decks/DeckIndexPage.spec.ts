@@ -200,7 +200,8 @@ vi.mock('@/domain/decks/components/DeckListCard.vue', () => ({
           [
             h('h2', (props.deck as { name: string }).name),
             slots.actions?.(),
-            props.mode === 'browse' ? slots['menu-actions']?.({ close: () => undefined }) : null,
+            slots['menu-actions']?.({ close: () => undefined }),
+            slots['menu-danger-actions']?.({ close: () => undefined }),
           ],
         );
     },
@@ -393,7 +394,7 @@ describe('DeckIndexPage', () => {
     apiGetMock.mockReturnValue(new Promise(() => undefined));
     const mounted = await mountPage('/decks');
 
-    expect(mounted.container.querySelectorAll('.deck-loading-skeleton')).toHaveLength(10);
+    expect(mounted.container.querySelectorAll('.collection-tile-skeleton')).toHaveLength(9);
     expect(mounted.container.textContent).not.toContain('Loading decks');
 
     mounted.unmount();
@@ -565,7 +566,7 @@ describe('DeckIndexPage', () => {
 
     expect(mounted.container.textContent).toContain('Owned Deck');
     expect(mounted.container.textContent).not.toContain('Stale Deck');
-    expect(mounted.container.querySelector('.deck-loading-skeleton')).toBeNull();
+    expect(mounted.container.querySelector('.collection-tile-skeleton')).toBeNull();
 
     mounted.unmount();
   });
@@ -643,36 +644,16 @@ describe('DeckIndexPage', () => {
     mounted.unmount();
   });
 
-  test('owned actions keep one edit action with extra actions and quick metadata selects', async () => {
+  test('owned decks keep editing in the tile menu instead of inline controls', async () => {
     const mounted = await mountPage('/my/decks');
-    const text = mounted.container.textContent ?? '';
 
-    expect(text).toContain('Share');
-    expect(text).toContain('TTS');
-    expect(text).toContain('Delete');
-    expect(text).toContain('Tags');
-    expect(text).not.toContain('Copy Share Link');
-    expect(text).not.toContain('Copy TTS');
-    expect(text).not.toContain('Manage Tags');
+    expect(mounted.container.querySelector('[aria-label="Edit deck"]')?.getAttribute('href')).toContain(
+      '/my/decks/deck-1',
+    );
     expect(mounted.container.querySelector('[aria-label="Manage deck tags"] svg')).not.toBeNull();
-    expect(mounted.container.querySelector('[aria-label="Playtest deck"] svg')).not.toBeNull();
-    expect(mounted.container.querySelector('[aria-label="Copy share link"] svg')).not.toBeNull();
-    expect(mounted.container.querySelector('[aria-label="Copy Mainboard TTS"] svg')).not.toBeNull();
     expect(mounted.container.querySelector('[aria-label="Delete deck"] svg')).not.toBeNull();
-    expect(text.match(/\bEdit\b/g) ?? []).toHaveLength(1);
-    expect(mounted.container.querySelector('[aria-label="Deck visibility"]')).not.toBeNull();
-    expect(mounted.container.querySelector('[data-testid="deck-quick-metadata-controls"]')?.classList)
-      .toContain('sm:grid-cols-2');
-    const difficultySelect = mounted.container.querySelector<HTMLSelectElement>('[aria-label="Deck difficulty"]');
-    expect(difficultySelect).not.toBeNull();
-    expect(difficultySelect?.options[0]?.textContent).toBe('Difficulty');
-    expect(difficultySelect?.options[0]?.disabled).toBe(true);
-    expect(Array.from(difficultySelect?.options ?? []).map((option) => option.value)).toEqual([
-      '',
-      'easy',
-      'medium',
-      'hard',
-    ]);
+    expect(mounted.container.querySelector('[aria-label="Deck visibility"]')).toBeNull();
+    expect(mounted.container.querySelector('[aria-label="Deck difficulty"]')).toBeNull();
 
     mounted.unmount();
   });
@@ -713,63 +694,6 @@ describe('DeckIndexPage', () => {
       suggested_type_labels: ['Tempo Burst'],
     });
     expect(fetchPublicDeckSummariesMock).toHaveBeenCalledTimes(2);
-
-    mounted.unmount();
-  });
-
-  test('owned visibility changes send a partial deck patch', async () => {
-    const mounted = await mountPage('/my/decks');
-    const select = mounted.container.querySelector<HTMLSelectElement>('[aria-label="Deck visibility"]');
-    if (!select) {
-      throw new Error('expected visibility select');
-    }
-
-    select.value = 'private';
-    select.dispatchEvent(new Event('change'));
-    await flushPage();
-
-    expect(updateDeckMock).toHaveBeenCalledWith('deck-1', { visibility: 'private' });
-    expect(fetchMyDeckSummariesMock).toHaveBeenCalledTimes(2);
-
-    mounted.unmount();
-  });
-
-  test('keeps confirmed metadata visible when the ordering refresh fails', async () => {
-    updateDeckMock.mockResolvedValueOnce({ ...deckRecord, visibility: 'private' });
-    fetchMyDeckSummariesMock
-      .mockResolvedValueOnce(deckPage())
-      .mockRejectedValueOnce(new Error('refresh failed'));
-    const mounted = await mountPage('/my/decks');
-    const select = mounted.container.querySelector<HTMLSelectElement>('[aria-label="Deck visibility"]');
-    if (!select) {
-      throw new Error('expected visibility select');
-    }
-
-    select.value = 'private';
-    select.dispatchEvent(new Event('change'));
-    await flushPage();
-
-    expect(select.value).toBe('private');
-
-    mounted.unmount();
-  });
-
-  test('owned difficulty changes send a partial deck patch without offering a clear option', async () => {
-    const mounted = await mountPage('/my/decks');
-    const select = mounted.container.querySelector<HTMLSelectElement>('[aria-label="Deck difficulty"]');
-    if (!select) {
-      throw new Error('expected difficulty select');
-    }
-
-    expect(Array.from(select.options).some((option) => option.value === 'null')).toBe(false);
-    expect(select.options[0]?.disabled).toBe(true);
-
-    select.value = 'medium';
-    select.dispatchEvent(new Event('change'));
-    await flushPage();
-
-    expect(updateDeckMock).toHaveBeenCalledWith('deck-1', { difficulty: 'medium' });
-    expect(fetchMyDeckSummariesMock).toHaveBeenCalledTimes(2);
 
     mounted.unmount();
   });

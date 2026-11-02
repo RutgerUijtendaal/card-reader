@@ -4,10 +4,25 @@ from typing import Any
 from uuid import UUID
 
 from django.db import transaction
-from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, QuerySet, Subquery, Sum
+from django.db.models import (
+    Case,
+    Count,
+    Exists,
+    F,
+    IntegerField,
+    OuterRef,
+    Prefetch,
+    Q,
+    QuerySet,
+    Subquery,
+    Sum,
+    Value,
+    When,
+)
 from django.db.models.functions import Coalesce, Trim
 
 from card_reader_core.models import (
+    CARD_FACTIONS,
     Card,
     CardGroup,
     CardGroupMember,
@@ -157,6 +172,29 @@ def get_encounter(encounter_id: str) -> Encounter | None:
     return encounter_queryset().filter(pk=encounter_id).first()
 
 
+MIXED_FACTION_GROUP = len(CARD_FACTIONS)
+NO_FACTION_GROUP = len(CARD_FACTIONS) + 1
+
+
+def faction_group_order() -> Case:
+    """Rank Encounters for faction-grouped lists.
+
+    Single-faction Encounters follow the canonical faction order, then Encounters with several
+    factions, then those with none. Stored factions are already canonical, so the first two
+    entries decide the group.
+    """
+    single_faction_ranks = []
+    for rank, faction in enumerate(CARD_FACTIONS):
+        is_only_faction = Q(factions__0=faction) & Q(factions__1__isnull=True)
+        single_faction_ranks.append(When(is_only_faction, then=Value(rank)))
+    return Case(
+        *single_faction_ranks,
+        When(factions__1__isnull=False, then=Value(MIXED_FACTION_GROUP)),
+        default=Value(NO_FACTION_GROUP),
+        output_field=IntegerField(),
+    )
+
+
 def list_encounters(
     *,
     staff: bool,
@@ -185,6 +223,11 @@ def list_encounters(
             for index in range(5):
                 match |= Q(**{f"factions__{index}": faction})
         records = records.filter(match)
+    # Pages arrive in faction-group order so clients can show stable faction sections while
+    # loading more.
+    records = records.annotate(faction_group=faction_group_order()).order_by(
+        "faction_group", "-created_at", "id"
+    )
     return records.count(), list(records[(page - 1) * page_size : page * page_size])
 
 

@@ -304,6 +304,14 @@
     max-width: var(--app-page-single-column-max-width);
   }
 
+  /* Deck and Encounter tiles: as many columns as fit, each at least 20rem wide, capped at four
+     columns so large screens get a centered shelf rather than an endless row. */
+  .app-page-collection-grid {
+    @apply mx-auto w-full;
+    max-width: 90rem;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  }
+
   .app-page-layout-sidebar {
     grid-template-columns: 1fr;
   }

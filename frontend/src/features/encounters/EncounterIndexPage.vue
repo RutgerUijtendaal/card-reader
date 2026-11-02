@@ -81,11 +81,11 @@
     <AppPageLayout columns="one">
       <div
         v-if="loading"
-        class="app-page-single-column grid gap-4"
+        class="app-page-collection-grid grid gap-4"
         aria-label="Loading Encounters"
       >
-        <CollectionLoadingSkeleton
-          v-for="index in 10"
+        <CollectionTileSkeleton
+          v-for="index in 9"
           :key="index"
         />
       </div>
@@ -138,16 +138,34 @@
       </AppEmptyState>
       <div
         v-else
-        class="app-page-single-column grid gap-4"
+        class="space-y-8"
       >
-        <EncounterListCard
-          v-for="item in records"
-          :key="item.id"
-          :encounter="item"
-          :staff="staff"
-          :mine="mine"
-          :filter-query="filterQuery"
-        />
+        <section
+          v-for="section in factionSections"
+          :key="section.key"
+          class="encounter-faction-section mx-auto w-full"
+          :aria-labelledby="`encounter-section-${section.key}`"
+          data-testid="encounter-faction-section"
+          :data-faction-section="section.key"
+        >
+          <h2
+            :id="`encounter-section-${section.key}`"
+            class="encounter-faction-heading"
+          >
+            {{ section.label }}
+          </h2>
+          <div class="app-page-collection-grid grid gap-4">
+            <EncounterListCard
+              v-for="item in section.encounters"
+              :key="item.id"
+              :encounter="item"
+              :staff="staff"
+              :mine="mine"
+              :filter-query="filterQuery"
+              :show-factions="section.key === 'mixed'"
+            />
+          </div>
+        </section>
         <div
           v-if="nextPage"
           ref="sentinel"
@@ -190,11 +208,12 @@ import AppCollectionToolbar from '@/shared/components/app/AppCollectionToolbar.v
 import AppEmptyState from '@/shared/components/app/AppEmptyState.vue';
 import AppScopeToggle, { type AppScopeOption } from '@/shared/components/app/AppScopeToggle.vue';
 import AppSegmentedToggle from '@/shared/components/app/AppSegmentedToggle.vue';
-import CollectionLoadingSkeleton from '@/shared/components/CollectionLoadingSkeleton.vue';
+import CollectionTileSkeleton from '@/shared/components/CollectionTileSkeleton.vue';
 import ChoicePill from '@/shared/components/ChoicePill.vue';
 import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import EncounterListCard from './components/EncounterListCard.vue';
 import { useEncounterList } from './composables/useEncounterList';
+import { groupEncountersByFaction } from './utils/encounterFactionSections';
 const auth = useAuthStore();
 const officialOptions = [
   { value: '', label: 'All' },
@@ -220,6 +239,7 @@ const {
   toggleFaction,
 } = useEncounterList();
 const hasActiveFilters = computed(() => Boolean(query.value || factions.value.length || official.value));
+const factionSections = computed(() => groupEncountersByFaction(records.value));
 const scopeOptions = computed<AppScopeOption[]>(() => [
   {
     label: 'Public',
@@ -255,3 +275,21 @@ watch([visible, loading, loadingMore, nextPage], () => {
     void load(true);
 });
 </script>
+
+<style scoped>
+/* Matches the tile grid's width so each heading sits over its own tiles on wide screens. */
+.encounter-faction-section {
+  max-width: 90rem;
+}
+
+.encounter-faction-heading {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+</style>
