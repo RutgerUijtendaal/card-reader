@@ -82,7 +82,7 @@
         #bottomLeft
       >
         <AppBoardTabs
-          v-model="activeBoard"
+          v-model="activeView"
           label="Encounter boards"
           :tabs="boardTabs"
         />
@@ -164,6 +164,14 @@
             >
               No description provided.
             </p>
+            <button
+              v-if="hasLongDescription && !aboutOpen"
+              type="button"
+              class="theme-link text-sm font-semibold"
+              @click="activeView = ABOUT_VIEW"
+            >
+              Read the full description
+            </button>
           </section>
           <section class="theme-divider space-y-3 border-t pt-4">
             <div class="flex flex-wrap gap-2">
@@ -194,23 +202,24 @@
           </section>
         </div>
       </template>
-      <section class="space-y-4">
-        <section
-          v-if="record.long_description_markup || record.long_description"
-          class="max-w-[70ch] space-y-2 pb-2"
-          data-testid="encounter-long-description"
-        >
-          <h3 class="theme-section-title theme-display text-lg">
-            About this Encounter
-          </h3>
-          <AppReadMore>
-            <CardMarkupText
-              class="theme-section-title break-words text-[0.9375rem] leading-7"
-              :markup="record.long_description_markup || record.long_description"
-              :hover-mode="hoverSurface.effectiveHoverMode.value"
-            />
-          </AppReadMore>
-        </section>
+      <section
+        v-if="aboutOpen && hasLongDescription"
+        class="mx-auto max-w-[70ch] space-y-3 px-1 pb-10 pt-2"
+        data-testid="encounter-long-description"
+      >
+        <h3 class="theme-section-title theme-display text-2xl">
+          About this Encounter
+        </h3>
+        <CardMarkupText
+          class="theme-section-title break-words text-base leading-7"
+          :markup="record.long_description_markup || record.long_description"
+          :hover-mode="hoverSurface.effectiveHoverMode.value"
+        />
+      </section>
+      <section
+        v-else
+        class="space-y-4"
+      >
         <p
           v-if="!activeEntries.length"
           class="theme-section-muted text-sm"
@@ -269,7 +278,6 @@ import CardCollectionViewOptions from '@/domain/cards/components/CardCollectionV
 import CardCollectionDetailLoadingSkeleton from '@/domain/cards/components/CardCollectionDetailLoadingSkeleton.vue';
 import CardMarkupText from '@/domain/cards/components/CardMarkupText.vue';
 import CollectionDetailLayout from '@/shared/components/CollectionDetailLayout.vue';
-import AppReadMore from '@/shared/components/AppReadMore.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import ExtraActionsMenu from '@/shared/components/app/ExtraActionsMenu.vue';
@@ -290,9 +298,23 @@ const exportMessage = ref('');
 const activeBoard = ref('mainboard');
 const countBoardCards = (entries: { quantity: number }[]): number =>
   entries.reduce((sum, entry) => sum + entry.quantity, 0);
+const ABOUT_VIEW = 'about';
+// About replaces the card area with the long description; boards bring the cards back as they were.
+const aboutOpen = ref(false);
+const hasLongDescription = computed(() =>
+  Boolean(record.value?.long_description_markup || record.value?.long_description),
+);
+const activeView = computed({
+  get: () => (aboutOpen.value ? ABOUT_VIEW : activeBoard.value),
+  set: (view: string) => {
+    aboutOpen.value = view === ABOUT_VIEW;
+    if (view !== ABOUT_VIEW) activeBoard.value = view;
+  },
+});
 const boardTabs = computed<AppBoardTab[]>(() => {
   if (!record.value) return [];
   const tabs: AppBoardTab[] = [
+    ...(hasLongDescription.value ? [{ id: ABOUT_VIEW, label: 'About' }] : []),
     {
       id: 'mainboard',
       label: 'Mainboard',
@@ -364,6 +386,7 @@ const load = async () => {
   exportText.value = '';
   exporting.value = false;
   activeBoard.value = 'mainboard';
+  aboutOpen.value = false;
   try {
     const [value, filters] = await Promise.all([
       fetchEncounter(String(route.params.id), false),

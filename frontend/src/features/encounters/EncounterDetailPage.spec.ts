@@ -213,12 +213,16 @@ test('boss view includes linked cards once and preserves separate mainboard quan
   expect(target.querySelector('[data-card-id="linked"]')).toBeNull();
 });
 
-test('long descriptions read in the main column and grouping remains a display preference', async () => {
+test('long descriptions open as an About view and grouping remains a display preference', async () => {
   const { target } = await mount();
+  expect(target.querySelector('[data-testid="encounter-long-description"]')).toBeNull();
+  await click(target, 'About');
   const longDescription = target.querySelector('[data-testid="encounter-long-description"]');
   expect(longDescription?.textContent).toContain('Setup and tactics.');
   expect(longDescription?.closest('.collection-detail-primary-aside')).toBeNull();
-  expect(target.querySelector('.collection-detail-layout-expanded')).toBeNull();
+  expect(target.querySelector('[data-testid="card-type-group"]')).toBeNull();
+  await click(target, 'Mainboard');
+  expect(target.querySelector('[data-testid="encounter-long-description"]')).toBeNull();
   expect(target.querySelector('[data-testid="card-type-group"]')).not.toBeNull();
   await click(target, 'Group by Type');
   expect(target.querySelector('[data-testid="card-type-group"]')).toBeNull();

@@ -16,7 +16,10 @@
       @click="emit('update:modelValue', tab.id)"
     >
       <span class="max-w-[12rem] truncate">{{ tab.label }}</span>
-      <span class="board-tab-count tabular-nums">{{ tab.count }}</span>
+      <span
+        v-if="tab.count !== undefined"
+        class="board-tab-count tabular-nums"
+      >{{ tab.count }}</span>
     </button>
   </div>
 </template>
@@ -25,8 +28,8 @@
 export type AppBoardTab = {
   id: string;
   label: string;
-  /** Total cards on the board, shown beside the name. */
-  count: number;
+  /** Total cards on the board, shown beside the name; omitted for non-board views such as About. */
+  count?: number;
   /** Longer description for the tooltip, such as "23 cards, 12 unique". */
   detail?: string;
 };

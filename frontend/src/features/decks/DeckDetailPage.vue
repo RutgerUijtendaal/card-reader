@@ -60,7 +60,7 @@
 
       <template #bottomLeft>
         <AppBoardTabs
-          v-model="activeBoardId"
+          v-model="activeView"
           label="Deck boards"
           :tabs="boardTabs"
         />
@@ -151,6 +151,14 @@
             >
               No description provided.
             </p>
+            <button
+              v-if="deck.long_description && !aboutOpen"
+              type="button"
+              class="theme-link text-sm font-semibold"
+              @click="activeView = ABOUT_VIEW"
+            >
+              Read the full description
+            </button>
           </section>
         </div>
 
@@ -211,23 +219,24 @@
           Close details
         </button>
       </template>
-      <section class="space-y-4">
-        <section
-          v-if="deck.long_description"
-          class="collection-about max-w-[70ch] space-y-2 pb-2"
-          data-testid="deck-long-description"
-        >
-          <h3 class="theme-section-title theme-display text-lg">
-            About this deck
-          </h3>
-          <AppReadMore>
-            <CardMarkupText
-              class="theme-section-title break-words text-[0.9375rem] leading-7"
-              :markup="deck.long_description_markup || deck.long_description"
-              :hover-mode="effectiveHoverMode"
-            />
-          </AppReadMore>
-        </section>
+      <section
+        v-if="aboutOpen && deck.long_description"
+        class="mx-auto max-w-[70ch] space-y-3 px-1 pb-10 pt-2"
+        data-testid="deck-long-description"
+      >
+        <h3 class="theme-section-title theme-display text-2xl">
+          About this deck
+        </h3>
+        <CardMarkupText
+          class="theme-section-title break-words text-base leading-7"
+          :markup="deck.long_description_markup || deck.long_description"
+          :hover-mode="effectiveHoverMode"
+        />
+      </section>
+      <section
+        v-else
+        class="space-y-4"
+      >
         <div class="sr-only">
           <h3>
             {{ activeBoardTitle }}
@@ -264,7 +273,6 @@ import { useRoute } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
 import CollectionDetailLayout from '@/shared/components/CollectionDetailLayout.vue';
-import AppReadMore from '@/shared/components/AppReadMore.vue';
 import AppBoardTabs, { type AppBoardTab } from '@/shared/components/app/AppBoardTabs.vue';
 import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
@@ -324,12 +332,25 @@ const { effectiveSort } = sortSurface;
 const hoverSurface = useHoverModeSurface('deckDetail');
 const { effectiveHoverMode } = hoverSurface;
 const { exportTtsDeck } = useDeckExport();
+const ABOUT_VIEW = 'about';
 const activeBoardId = ref('mainboard');
+// About replaces the card area with the long description; boards bring the cards back as they were.
+const aboutOpen = ref(false);
+const activeView = computed({
+  get: () => (aboutOpen.value ? ABOUT_VIEW : activeBoardId.value),
+  set: (view: string) => {
+    aboutOpen.value = view === ABOUT_VIEW;
+    if (view !== ABOUT_VIEW) {
+      activeBoardId.value = view;
+    }
+  },
+});
 const boardTabs = computed<AppBoardTab[]>(() => {
   if (!deck.value) {
     return [];
   }
   return [
+    ...(deck.value.long_description ? [{ id: ABOUT_VIEW, label: 'About' }] : []),
     {
       id: 'mainboard',
       label: 'Mainboard',
@@ -431,6 +452,7 @@ const loadDeck = async (): Promise<void> => {
     ? await fetchMyDeck(String(route.params.id))
     : await fetchDeckDetail(String(route.params.id));
   activeBoardId.value = 'mainboard';
+  aboutOpen.value = false;
   activeDetailPanel.value = null;
 };
 

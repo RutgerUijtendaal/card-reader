@@ -511,7 +511,7 @@ describe('DeckDetailPage type grouping', () => {
     mounted.unmount();
   });
 
-  test('shows the long description in the main column and keeps the side panel for the mana breakdown', async () => {
+  test('opens the long description as an About view that replaces the cards and keeps the side panel for mana', async () => {
     const mounted = await mountPage();
     const manaSection = mounted.container.querySelector<HTMLElement>(
       '[data-testid="deck-mana-details-button"]',
@@ -519,6 +519,18 @@ describe('DeckDetailPage type grouping', () => {
     if (!(manaSection instanceof HTMLElement)) {
       throw new Error('expected interactive mana section');
     }
+    const tab = (label: string) =>
+      Array.from(mounted.container.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find((button) =>
+        button.textContent?.trim().startsWith(label),
+      );
+
+    expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).toBeNull();
+    expect(tab('About')).toBeDefined();
+
+    Array.from(mounted.container.querySelectorAll('button'))
+      .find((button) => button.textContent?.trim() === 'Read the full description')
+      ?.click();
+    await nextTick();
 
     const longDescription = mounted.container.querySelector<HTMLElement>('[data-testid="deck-long-description"]');
     expect(longDescription?.closest('.collection-detail-primary-aside')).toBeNull();
@@ -526,23 +538,19 @@ describe('DeckDetailPage type grouping', () => {
     expect(longDescription?.textContent).toContain('Opening plan');
     expect(longDescription?.textContent).toContain('Sideboard notes');
     expect(longDescription?.querySelector('.card-markup-text')?.classList.contains('break-words')).toBe(true);
-    expect(mounted.container.querySelector('[data-testid="deck-summary-details-button"]')).toBeNull();
-    expect(mounted.container.querySelector('.collection-detail-layout-expanded')).toBeNull();
+    expect(tab('About')?.getAttribute('aria-selected')).toBe('true');
+
+    tab('Mainboard')?.click();
+    await nextTick();
+    expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).toBeNull();
 
     manaSection.querySelector('[data-testid="mana-curve"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await nextTick();
 
     expect(manaSection.getAttribute('aria-expanded')).toBe('true');
     expect(mounted.container.querySelector('[data-testid="mana-distribution"]')?.textContent).toContain('Spell Card');
-    expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).not.toBeNull();
 
-    const sideboardButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Sideboard'),
-    );
-    if (!(sideboardButton instanceof HTMLButtonElement)) {
-      throw new Error('expected sideboard tab');
-    }
-    sideboardButton.click();
+    tab('Sideboard')?.click();
     await nextTick();
 
     expect(mounted.container.querySelector('[data-testid="mana-distribution"]')?.textContent).toBe('Attachment Card');
@@ -555,10 +563,15 @@ describe('DeckDetailPage type grouping', () => {
     mounted.unmount();
   });
 
-  test('shows the long description on narrow screens too', async () => {
+  test('offers the About view on narrow screens too', async () => {
     stubDesktopViewport(false);
     const mounted = await mountPage();
+    const aboutTab = Array.from(mounted.container.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find(
+      (button) => button.textContent?.trim() === 'About',
+    );
 
+    aboutTab?.click();
+    await nextTick();
     expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).not.toBeNull();
     expect(mounted.container.querySelector('.collection-detail-layout-expanded')).toBeNull();
 
