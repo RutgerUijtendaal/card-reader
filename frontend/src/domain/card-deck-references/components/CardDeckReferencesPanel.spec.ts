@@ -173,8 +173,8 @@ describe('CardDeckReferencesPanel', () => {
     const mounted = await mountPanel([]);
 
     expect(mounted.container.textContent).toContain('Card is in 0 decks');
-    expect(mounted.container.querySelector('.deck-loading-skeleton')).not.toBeNull();
-    expect(mounted.container.querySelector('.deck-loading-skeleton-static')).not.toBeNull();
+    expect(mounted.container.querySelector('.collection-tile-skeleton')).not.toBeNull();
+    expect(mounted.container.querySelector('.collection-tile-skeleton-static')).not.toBeNull();
     const createLink = mounted.container.querySelector<HTMLAnchorElement>('a[aria-label="Create deck"]');
     expect(createLink?.getAttribute('href')).toBe('/my/decks/new?q=dragon&card_id=card-source&return_to=card');
 

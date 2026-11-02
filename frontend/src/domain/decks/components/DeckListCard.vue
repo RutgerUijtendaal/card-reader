@@ -7,22 +7,18 @@
     :to="titleTo"
     :variant="mode === 'browse' ? 'browse' : 'owned'"
   >
-    <template #title-extra>
-      <span
-        v-if="deprecatedCardCount > 0"
-        class="theme-pill theme-pill-warning inline-flex shrink-0 items-center gap-1 px-2 py-1 text-xs"
-        title="Deck contains deprecated cards"
-      >
-        <TriangleAlert class="h-3.5 w-3.5" />
-        <span>{{ deprecatedCardCount }}</span>
-      </span>
-    </template>
     <template #badge>
       <span
-        class="collection-list-card-title-pill theme-pill shrink-0 text-xs"
-        :class="titlePillClass"
+        class="collection-tile-badge theme-art-chip gap-1.5 px-2 py-0.5 text-xs"
+        data-testid="deck-tile-badge"
       >
-        {{ titlePillLabel }}
+        <span
+          v-if="isOwnedMode"
+          class="h-1.5 w-1.5 rounded-full"
+          :style="{ background: visibilityDotColor }"
+          aria-hidden="true"
+        />
+        {{ badgeLabel }}
       </span>
     </template>
     <template #actions>
@@ -32,8 +28,9 @@
       />
 
       <ExtraActionsMenu
-        v-else-if="isBrowseMode"
+        v-else
         button-label="Open deck actions"
+        button-class="theme-art-chip h-8 w-8"
         panel-class="w-52"
       >
         <template #default="{ close }">
@@ -81,89 +78,72 @@
             />
             TTS
           </button>
+
+          <slot
+            name="menu-danger-actions"
+            :close="close"
+          />
         </template>
       </ExtraActionsMenu>
     </template>
-    <template #tags>
+    <template
+      v-if="heroAffinitySymbols.length > 0"
+      #art-corner
+    >
+      <SymbolToken
+        v-for="symbol in heroAffinitySymbols"
+        :key="symbol.id"
+        :asset-url="symbol.asset_url"
+        :label="symbol.label"
+        :text-token="symbol.text_token"
+        class="h-6 w-6 drop-shadow"
+      />
+    </template>
+    <template #title-extra>
+      <span
+        v-if="deprecatedCardCount > 0"
+        class="theme-pill theme-pill-warning inline-flex shrink-0 items-center gap-1 px-2 py-0.5 text-xs"
+        title="Deck contains deprecated cards"
+      >
+        <TriangleAlert class="h-3.5 w-3.5" />
+        <span>{{ deprecatedCardCount }}</span>
+      </span>
+    </template>
+    <template
+      v-if="(deck.tags ?? []).length > 0 || (isOwnedMode && (deck.pending_tag_suggestions ?? []).length > 0)"
+      #tags
+    >
       <DeckTagPills
-        class="collection-list-card-tags"
         :tags="deck.tags ?? []"
         :pending-suggestions="isOwnedMode ? (deck.pending_tag_suggestions ?? []) : []"
-        :max-visible="6"
+        :max-visible="4"
       />
     </template>
     <template #footer>
-      <div class="collection-list-card-footer-meta theme-section-muted text-xs">
-        <span class="collection-list-card-footer-meta-item">
-          <LibraryBig
-            class="h-4 w-4"
-            aria-hidden="true"
-          />
-          <span>Maindeck {{ deck.mainboard.total_cards }}</span>
-        </span>
-        <span class="collection-list-card-footer-meta-item">
-          <Copy
-            class="h-4 w-4"
-            aria-hidden="true"
-          />
-          <span>Unique {{ deck.mainboard.unique_cards }}</span>
-        </span>
-        <span class="collection-list-card-footer-meta-item">
-          <PanelRight
-            class="h-4 w-4"
-            aria-hidden="true"
-          />
-          <span>Sideboards {{ sideboardCount }}</span>
-        </span>
+      <span class="collection-tile-footer-items">
+        <span class="collection-tile-footer-item">{{ deck.mainboard.total_cards }} cards</span>
+        <span
+          v-if="sideboardCount > 0"
+          class="collection-tile-footer-item"
+        >{{ sideboardCount }} sideboard{{ sideboardCount === 1 ? '' : 's' }}</span>
         <span
           v-if="difficultyLabel"
-          class="collection-list-card-footer-meta-item"
+          class="collection-tile-footer-item"
           data-testid="deck-difficulty"
-        >
-          <Gauge
-            class="h-4 w-4"
-            aria-hidden="true"
-          />
-          <span>Difficulty · {{ difficultyLabel }}</span>
-        </span>
-        <span class="collection-list-card-footer-meta-item">
-          <CalendarDays
-            class="h-4 w-4"
-            aria-hidden="true"
-          />
-          <span>Updated {{ formatDate(deck.updated_at) }}</span>
-        </span>
-      </div>
-
-      <div
-        v-if="heroAffinitySymbols.length > 0"
-        class="flex flex-wrap items-center justify-end gap-1.5"
-      >
-        <SymbolToken
-          v-for="symbol in heroAffinitySymbols"
-          :key="symbol.id"
-          :asset-url="symbol.asset_url"
-          :label="symbol.label"
-          :text-token="symbol.text_token"
-          class="h-6 w-6 p-0.5"
-        />
-      </div>
+          :title="`${difficultyLabel} difficulty`"
+        >{{ difficultyLabel }}</span>
+      </span>
+      <span
+        v-if="isOwnedMode"
+        class="collection-tile-footer-end"
+      >Updated {{ formatDate(deck.updated_at) }}</span>
     </template>
   </CollectionListCard>
 </template>
 <script setup lang="ts">
 import { computed } from 'vue';
 import CollectionListCard from '@/shared/components/CollectionListCard.vue';
-import {
-  CalendarDays,
-  Copy,
-  Gamepad2,
-  Gauge,
-  LibraryBig,
-  PanelRight,
-  Share2,
-  TriangleAlert,
-} from 'lucide-vue-next';
+import { Gamepad2, Share2, TriangleAlert } from 'lucide-vue-next';
 import { useRouter, type RouteLocationRaw } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
@@ -174,9 +154,9 @@ import TtsCopyIcon from '@/shared/components/icons/TtsCopyIcon.vue';
 import { formatDeckOwnerName } from '@/domain/decks/utils/display';
 import { deckDifficultyLabels } from '@/domain/decks/utils/difficulty';
 import { buildDeckShareUrl, canShareDeck } from '@/domain/decks/utils/share';
-import type { DeckListRecord } from '@/domain/decks/types';
+import type { DeckListRecord, DeckVisibility } from '@/domain/decks/types';
 import { useDeckExport } from '@/domain/decks/composables/useDeckExport';
-import { deckVisibilityBadgeClasses, deckVisibilityLabels } from '@/domain/decks/utils/visibility';
+import { deckVisibilityLabels } from '@/domain/decks/utils/visibility';
 
 const props = defineProps<{
   deck: DeckListRecord;
@@ -187,12 +167,9 @@ const props = defineProps<{
 const router = useRouter();
 const { exportTtsDeck } = useDeckExport();
 
-const isBrowseMode = computed(() => props.mode === 'browse');
 const isOwnedMode = computed(() => props.mode === 'owned');
-const formatDate = (value: string): string => {
-  const date = new Date(value);
-  return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
-};
+const formatDate = (value: string): string =>
+  new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 const sideboardCount = computed(() =>
   'sideboard_count' in props.deck ? props.deck.sideboard_count : props.deck.sideboards.length,
 );
@@ -200,12 +177,16 @@ const heroAffinitySymbols = computed(() =>
   props.deck.hero_card.symbols.filter((symbol) => symbol.symbol_type === 'affinity'),
 );
 const ownerDisplayName = computed(() => formatDeckOwnerName(props.deck.owner.username));
-const titlePillLabel = computed(() =>
+// Browsing names the owner; your own decks show their visibility instead.
+const badgeLabel = computed(() =>
   isOwnedMode.value ? deckVisibilityLabels[props.deck.visibility] : ownerDisplayName.value,
 );
-const titlePillClass = computed(() =>
-  isOwnedMode.value ? deckVisibilityBadgeClasses[props.deck.visibility] : 'theme-pill-neutral',
-);
+const VISIBILITY_DOT_COLORS: Record<DeckVisibility, string> = {
+  private: 'var(--color-nav-text)',
+  unlisted: 'var(--color-pill-warning-text)',
+  public: 'var(--color-pill-success-text)',
+};
+const visibilityDotColor = computed(() => VISIBILITY_DOT_COLORS[props.deck.visibility]);
 const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_count ?? 0);
 const difficultyLabel = computed(() =>
   props.deck.difficulty ? deckDifficultyLabels[props.deck.difficulty] : null,

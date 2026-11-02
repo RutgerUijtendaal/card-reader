@@ -147,7 +147,7 @@
             <span class="card-detail-loading-line h-2.5 w-72 max-w-full" />
           </div>
           <div class="card-detail-loading-deck-reference">
-            <DeckLoadingSkeleton />
+            <CollectionTileSkeleton />
           </div>
         </template>
       </div>
@@ -157,7 +157,7 @@
 
 <script setup lang="ts">
 import CardLoadingSkeleton from '@/domain/cards/components/CardLoadingSkeleton.vue';
-import DeckLoadingSkeleton from '@/shared/components/CollectionLoadingSkeleton.vue';
+import CollectionTileSkeleton from '@/shared/components/CollectionTileSkeleton.vue';
 
 defineProps<{
   mode: 'public' | 'editor';

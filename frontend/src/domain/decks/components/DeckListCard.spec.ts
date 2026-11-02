@@ -184,44 +184,37 @@ describe('DeckListCard', () => {
     vi.unstubAllGlobals();
   });
 
-  test('renders browse mode as a static horizontal card without foldout controls', async () => {
+  test('renders browse mode as a tile with the owner over the art and a compact footer', async () => {
     const mounted = await mountDeckListCard('browse');
     const text = mounted.container.textContent ?? '';
-    const footerText = mounted.container.querySelector('.collection-list-card-footer-meta')?.textContent ?? '';
+    const footerText = mounted.container.querySelector('.collection-tile-footer')?.textContent ?? '';
 
-    expect(mounted.container.querySelector('.collection-list-card-browse')).not.toBeNull();
-    expect(mounted.container.querySelector('.collection-list-card-description')).not.toBeNull();
-    expect(mounted.container.querySelector('.collection-list-card-footer')).not.toBeNull();
-    expect(mounted.container.querySelector('img[alt="Azure Hero"]')).not.toBeNull();
-    expect(mounted.container.querySelector('button[aria-label="Toggle deck details"]')).toBeNull();
-    expect(mounted.container.querySelector('.collection-list-card-browse-details')).toBeNull();
-    expect(text).toContain('Azure Tempo');
-    expect(text).toContain('Maitys');
+    expect(mounted.container.querySelector('.collection-tile-browse')).not.toBeNull();
+    expect(mounted.container.querySelector('.collection-tile-art img[alt="Azure Hero"]')).not.toBeNull();
+    expect(mounted.container.querySelector('.collection-tile-art-badge')?.textContent).toContain('Maitys');
     expect(text).not.toContain('maitys');
-    expect(mounted.container.querySelector('.collection-list-card-title-row')?.classList).toContain('justify-between');
-    expect(mounted.container.querySelector('.collection-list-card-title-row h3')?.classList).toContain('text-xl');
-    expect(mounted.container.querySelector('.collection-list-card-title-row h3')?.classList).toContain('truncate');
-    expect(mounted.container.querySelector('.collection-list-card-title-pill')?.classList).toContain('theme-pill-neutral');
-    expect(text).toContain('{F}');
-    expect(text).toContain('Pressure early, then pivot into efficient trades.');
-    expect(text).toContain('Damage');
-    expect(text).toContain('Armor');
-    expect(mounted.container.querySelector('.collection-list-card-title-row')?.textContent).not.toContain('Damage');
-    expect(mounted.container.querySelector('.collection-list-card-title-row')?.textContent).not.toContain('Armor');
-    expect(mounted.container.querySelector('.collection-list-card-tags')?.textContent).toContain('Damage');
-    expect(mounted.container.querySelector('.collection-list-card-tags')?.textContent).toContain('Armor');
-    expect(mounted.container.querySelector('.collection-list-card-main .collection-list-card-tags')).toBeNull();
-    expect(mounted.container.querySelector('.collection-list-card-tags-region .collection-list-card-tags')).not.toBeNull();
-    expect(mounted.container.querySelector('.collection-list-card-tags-region')?.nextElementSibling?.classList).toContain('collection-list-card-footer');
+    expect(mounted.container.querySelector('.collection-tile-art-corner')?.textContent).toContain('{F}');
+    expect(mounted.container.querySelector('.collection-tile-title')?.textContent).toContain('Azure Tempo');
+    expect(mounted.container.querySelector('.collection-tile-description')?.textContent).toContain(
+      'Pressure early, then pivot into efficient trades.',
+    );
+    expect(mounted.container.querySelector('.collection-tile-tags')?.textContent).toContain('Damage');
+    expect(mounted.container.querySelector('.collection-tile-tags')?.textContent).toContain('Armor');
     expect(text).not.toContain('Tempo Burst');
-    expect(text).not.toContain('Maindeck 40 · 24 unique · 1 sideboard');
-    expect(text).not.toContain('Mainboard 40 · 24 unique · 1 sideboard');
+    expect(footerText).toContain('40 cards');
+    expect(footerText).toContain('1 sideboard');
+    expect(footerText).toContain('Hard');
+    expect(footerText).not.toContain('Updated');
     expect(footerText).not.toContain('Azure Hero');
-    expect(footerText).toContain('Maindeck 40');
-    expect(footerText).toContain('Unique 24');
-    expect(footerText).toContain('Sideboards 1');
-    expect(footerText).toContain('Difficulty · Hard');
-    expect(footerText).toContain('Updated 2025/1/1');
+
+    mounted.unmount();
+  });
+
+  test('omits the description when a deck has none', async () => {
+    const mounted = await mountDeckListCard('browse', { deck: { description: '' } });
+
+    expect(mounted.container.querySelector('.collection-tile-description')).toBeNull();
+    expect(mounted.container.textContent).not.toContain('No description available.');
 
     mounted.unmount();
   });
@@ -234,36 +227,23 @@ describe('DeckListCard', () => {
     mounted.unmount();
   });
 
-  test('keeps owned deck cards on the management layout', async () => {
+  test('shows visibility, pending tag suggestions, and the update date on owned tiles', async () => {
     const mounted = await mountDeckListCard('owned');
-    const text = mounted.container.textContent ?? '';
-    const footerText = mounted.container.querySelector('.collection-list-card-footer-meta')?.textContent ?? '';
+    const footerText = mounted.container.querySelector('.collection-tile-footer')?.textContent ?? '';
 
-    expect(mounted.container.querySelector('.collection-list-card-owned')).not.toBeNull();
-    expect(mounted.container.querySelector('img[alt="Azure Hero"]')).not.toBeNull();
-    expect(text).toContain('Azure Tempo');
-    expect(text).toContain('Public');
-    expect(text).toContain('{F}');
-    expect(text).toContain('Damage');
-    expect(text).toContain('Armor');
-    expect(text).toContain('Tempo Burst');
-    expect(mounted.container.querySelector('.collection-list-card-title-row')?.textContent).not.toContain('Damage');
-    expect(mounted.container.querySelector('.collection-list-card-title-row')?.textContent).not.toContain('Tempo Burst');
-    expect(mounted.container.querySelector('.collection-list-card-tags')?.textContent).toContain('Damage');
-    expect(mounted.container.querySelector('.collection-list-card-tags')?.textContent).toContain('Tempo Burst');
-    expect(text).not.toContain('Maindeck 40 · 24 unique · 1 sideboard');
-    expect(footerText).not.toContain('Azure Hero');
-    expect(footerText).toContain('Maindeck 40');
-    expect(footerText).toContain('Unique 24');
-    expect(footerText).toContain('Sideboards 1');
-    expect(footerText).toContain('Updated 2025/1/1');
+    expect(mounted.container.querySelector('.collection-tile-owned')).not.toBeNull();
+    expect(mounted.container.querySelector('.collection-tile-art-badge')?.textContent).toContain('Public');
+    expect(mounted.container.querySelector('.collection-tile-tags')?.textContent).toContain('Damage');
+    expect(mounted.container.querySelector('.collection-tile-tags')?.textContent).toContain('Tempo Burst');
+    expect(footerText).toContain('40 cards');
+    expect(footerText).toContain('Updated');
 
     mounted.unmount();
   });
 
   test('browse card keeps the expected navigation target', async () => {
     const mounted = await mountDeckListCard('browse');
-    const card = mounted.container.querySelector('.collection-list-card-browse');
+    const card = mounted.container.querySelector('.collection-tile-browse');
 
     expect(card).not.toBeNull();
     expect(card?.getAttribute('data-navigation-target')).toBe('/decks/deck-1');
@@ -303,8 +283,8 @@ describe('DeckListCard', () => {
   });
 
   test.each([
-    ['browse', '.collection-list-card-browse', '/decks/deck-1'],
-    ['owned', '.collection-list-card-owned', '/my/decks/deck-1'],
+    ['browse', '.collection-tile-browse', '/decks/deck-1'],
+    ['owned', '.collection-tile-owned', '/my/decks/deck-1'],
   ] as const)('clickable %s deck cards remain keyboard focusable links', async (mode, selector, target) => {
     const mounted = await mountDeckListCard(mode);
     const card = mounted.container.querySelector<HTMLElement>(selector);

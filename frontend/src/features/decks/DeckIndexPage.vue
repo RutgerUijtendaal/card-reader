@@ -50,9 +50,9 @@
     <AppPageLayout columns="one">
       <div
         v-if="(loading && decks.length === 0) || !filtersLoaded"
-        class="app-page-single-column deck-index-grid grid gap-4"
+        class="app-page-collection-grid grid gap-4"
       >
-        <DeckLoadingSkeleton
+        <CollectionTileSkeleton
           v-for="index in loadingSkeletonCount"
           :key="`deck-loading-${index}`"
         />
@@ -97,7 +97,7 @@
 
       <div
         v-else
-        class="app-page-single-column deck-index-grid grid gap-4"
+        class="app-page-collection-grid grid gap-4"
       >
         <DeckListCard
           v-for="deck in decks"
@@ -107,12 +107,12 @@
           :title-to="isOwnedMode ? `/my/decks/${deck.id}` : `/decks/${deck.id}`"
         >
           <template
-            v-if="!isOwnedMode && canEditDeck(deck)"
+            v-if="isOwnedMode || canEditDeck(deck)"
             #menu-actions="{ close }"
           >
             <RouterLink
               class="btn-secondary app-menu-action"
-              :to="buildPublicDeckEditorLocation(deck.id)"
+              :to="isOwnedMode ? buildMyDeckEditorLocation(deck.id) : buildPublicDeckEditorLocation(deck.id)"
               aria-label="Edit deck"
               @click="close"
             >
@@ -139,114 +139,20 @@
 
           <template
             v-if="isOwnedMode"
-            #actions
+            #menu-danger-actions="{ close }"
           >
-            <div class="flex w-[10.75rem] flex-col items-stretch gap-3 sm:w-64">
-              <div class="flex items-center gap-2">
-                <RouterLink
-                  class="btn-secondary min-w-0 flex-1"
-                  :to="buildMyDeckEditorLocation(deck.id)"
-                >
-                  Edit
-                </RouterLink>
-                <ExtraActionsMenu
-                  button-label="Open deck actions"
-                  panel-class="w-52"
-                >
-                  <template #default="{ close }">
-                    <button
-                      class="btn-secondary app-menu-action"
-                      type="button"
-                      aria-label="Manage deck tags"
-                      @click="openTagManager(deck, close)"
-                    >
-                      <Tags
-                        class="h-4 w-4 shrink-0"
-                        aria-hidden="true"
-                      />
-                      Tags
-                    </button>
-
-                    <button
-                      class="btn-secondary app-menu-action"
-                      type="button"
-                      aria-label="Playtest deck"
-                      @click="goToPlaytester(deck); close()"
-                    >
-                      <Gamepad2
-                        class="h-4 w-4 shrink-0"
-                        aria-hidden="true"
-                      />
-                      Playtest
-                    </button>
-
-                    <button
-                      v-if="canShareDeck(deck)"
-                      class="btn-secondary app-menu-action"
-                      type="button"
-                      aria-label="Copy share link"
-                      @click="copyShareLink(deck); close()"
-                    >
-                      <Share2
-                        class="h-4 w-4 shrink-0"
-                        aria-hidden="true"
-                      />
-                      Share
-                    </button>
-
-                    <button
-                      class="btn-secondary app-menu-action"
-                      type="button"
-                      aria-label="Copy Mainboard TTS"
-                      @click="exportDeck(deck); close()"
-                    >
-                      <TtsCopyIcon
-                        class="h-4 w-4 shrink-0"
-                        aria-hidden="true"
-                      />
-                      TTS
-                    </button>
-
-                    <button
-                      class="btn-danger-secondary app-menu-action"
-                      type="button"
-                      aria-label="Delete deck"
-                      @click="promptDelete(deck); close()"
-                    >
-                      <Trash2
-                        class="h-4 w-4 shrink-0"
-                        aria-hidden="true"
-                      />
-                      Delete
-                    </button>
-                  </template>
-                </ExtraActionsMenu>
-              </div>
-
-              <div
-                class="grid gap-2 sm:grid-cols-2"
-                data-testid="deck-quick-metadata-controls"
-              >
-                <AppSelect
-                  wrapper-class="min-w-0 w-full"
-                  aria-label="Deck visibility"
-                  :disabled="savingDeckIds.has(deck.id)"
-                  :model-value="deck.visibility"
-                  :options="visibilityOptions"
-                  @update:model-value="handleVisibilitySelect(deck, $event)"
-                />
-                <AppSelect
-                  wrapper-class="min-w-0 w-full"
-                  aria-label="Deck difficulty"
-                  :disabled="savingDeckIds.has(deck.id)"
-                  :model-value="deck.difficulty"
-                  :options="difficultyOptions"
-                  placeholder="Difficulty"
-                  placeholder-disabled
-                  @update:model-value="handleDifficultySelect(deck, $event)"
-                />
-              </div>
-            </div>
+            <button
+              class="btn-danger-secondary app-menu-action"
+              type="button"
+              aria-label="Delete deck"
+              @click="promptDelete(deck); close()"
+            >
+              <Trash2
+                class="h-4 w-4 shrink-0"
+                aria-hidden="true"
+              />
+              Delete
+            </button>
           </template>
         </DeckListCard>
       </div>
@@ -258,10 +164,15 @@
         data-testid="deck-load-more-sentinel"
         aria-live="polite"
       >
-        <DeckLoadingSkeleton
+        <div
           v-if="loadingNextPage"
-          class="w-full"
-        />
+          class="app-page-collection-grid grid w-full gap-4"
+        >
+          <CollectionTileSkeleton
+            v-for="index in 3"
+            :key="`deck-next-${index}`"
+          />
+        </div>
         <div
           v-else-if="loadMoreError"
           class="flex items-center gap-3"
@@ -322,7 +233,7 @@
 
 <script setup lang="ts">
 import { useDebounceFn, useIntersectionObserver } from '@vueuse/core';
-import { Gamepad2, Pencil, Share2, Tags, Trash2 } from 'lucide-vue-next';
+import { Pencil, Tags, Trash2 } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { useRoute, useRouter } from 'vue-router';
@@ -330,13 +241,10 @@ import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
-import AppSelect from '@/shared/components/app/AppSelect.vue';
-import ExtraActionsMenu from '@/shared/components/app/ExtraActionsMenu.vue';
 import AppCollectionSearch from '@/shared/components/app/AppCollectionSearch.vue';
 import AppCollectionToolbar from '@/shared/components/app/AppCollectionToolbar.vue';
 import AppEmptyState from '@/shared/components/app/AppEmptyState.vue';
 import AppScopeToggle, { type AppScopeOption } from '@/shared/components/app/AppScopeToggle.vue';
-import TtsCopyIcon from '@/shared/components/icons/TtsCopyIcon.vue';
 import ConfirmModal from '@/shared/components/modals/ConfirmModal.vue';
 import { useAuthStore } from '@/domain/session/store';
 import {
@@ -348,7 +256,7 @@ import {
   updateDeck,
 } from '@/domain/decks/api';
 import DeckBrowseFilterBar from '@/features/decks/components/DeckBrowseFilterBar.vue';
-import DeckLoadingSkeleton from '@/shared/components/CollectionLoadingSkeleton.vue';
+import CollectionTileSkeleton from '@/shared/components/CollectionTileSkeleton.vue';
 import DeckListCard from '@/domain/decks/components/DeckListCard.vue';
 import DeckTagManagementModal from '@/domain/decks/components/DeckTagManagementModal.vue';
 import { useDeckBrowseFilters } from '@/features/decks/composables/useDeckBrowseFilters';
@@ -364,18 +272,7 @@ import {
   buildNewDeckEditorLocation,
   buildPublicDeckEditorLocation,
 } from '@/domain/decks/utils/deckRouteState';
-import { deckDifficultyLabels, deckDifficultyOptions } from '@/domain/decks/utils/difficulty';
-import { buildDeckShareUrl, canShareDeck } from '@/domain/decks/utils/share';
-import type {
-  DeckDifficulty,
-  DeckRecord,
-  DeckSummaryCursor,
-  DeckSummaryRecord,
-  DeckUpdateRequest,
-  DeckVisibility,
-} from '@/domain/decks/types';
-import { useDeckExport } from '@/domain/decks/composables/useDeckExport';
-import { deckVisibilityLabels, deckVisibilityOptions } from '@/domain/decks/utils/visibility';
+import type { DeckRecord, DeckSummaryCursor, DeckSummaryRecord } from '@/domain/decks/types';
 import { getDeckTagSuggestionFeedback } from '@/domain/decks/utils/deckTagSuggestionFeedback';
 import {
   appendGalleryPage,
@@ -401,16 +298,12 @@ const loadMoreSentinelRef = ref<HTMLElement | null>(null);
 const loadMoreSentinelIsIntersecting = ref(false);
 const deleting = ref(false);
 const deleteTarget = ref<DeckSummaryRecord | null>(null);
-const savingDeckIds = ref(new Set<string>());
 const tagManagerTarget = ref<DeckSummaryRecord | null>(null);
 const tagManagerTagIds = ref<string[]>([]);
 const tagManagerSuggestedTypeLabels = ref<string[]>([]);
 const tagManagerLoading = ref(false);
 const tagManagerSaving = ref(false);
 const tagManagerError = ref<string | null>(null);
-const visibilityOptions = deckVisibilityOptions;
-const difficultyOptions = deckDifficultyOptions;
-const { exportTtsDeck } = useDeckExport();
 const filterController = useDeckBrowseFilters();
 const {
   filtersLoaded,
@@ -431,7 +324,7 @@ const searchPlaceholder = computed(() =>
     ? 'Search your decks, heroes, or cards...'
     : 'Search public decks, heroes, owners, or cards...',
 );
-const loadingSkeletonCount = 10;
+const loadingSkeletonCount = 9;
 const currentRouteFilterState = computed(() => parseDeckBrowseFilterRouteQuery(route.query));
 const effectiveRouteFilterState = computed(() => currentRouteFilterState.value);
 const scopeFilterRouteQuery = computed(() => buildDeckBrowseFilterRouteQuery(currentRouteFilterState.value));
@@ -721,81 +614,6 @@ const saveManagedDeckTags = async (): Promise<void> => {
   }
 };
 
-const updateDeckQuickMetadata = async (
-  deck: DeckSummaryRecord,
-  payload: DeckUpdateRequest,
-  successMessage: string,
-  errorMessage: string,
-): Promise<void> => {
-  savingDeckIds.value = new Set(savingDeckIds.value).add(deck.id);
-  try {
-    const nextDeck = await updateDeck(deck.id, payload);
-    applyUpdatedDeckRecord(nextDeck);
-    toast.success(successMessage);
-    if (!(await refreshDecks())) {
-      toast.error('The deck was updated, but the deck list could not be refreshed.');
-    }
-  } catch {
-    toast.error(errorMessage);
-  } finally {
-    const nextSavingDeckIds = new Set(savingDeckIds.value);
-    nextSavingDeckIds.delete(deck.id);
-    savingDeckIds.value = nextSavingDeckIds;
-  }
-};
-
-const updateDeckVisibility = async (deck: DeckSummaryRecord, visibility: DeckVisibility): Promise<void> => {
-  if (deck.visibility === visibility) {
-    return;
-  }
-  await updateDeckQuickMetadata(
-    deck,
-    { visibility },
-    `Deck is now ${deckVisibilityLabels[visibility].toLowerCase()}.`,
-    'Unable to update deck visibility.',
-  );
-};
-
-const updateDeckDifficulty = async (deck: DeckSummaryRecord, difficulty: DeckDifficulty): Promise<void> => {
-  if (deck.difficulty === difficulty) {
-    return;
-  }
-  await updateDeckQuickMetadata(
-    deck,
-    { difficulty },
-    `Difficulty set to ${deckDifficultyLabels[difficulty]}.`,
-    'Unable to update deck difficulty.',
-  );
-};
-
-const handleVisibilitySelect = (deck: DeckSummaryRecord, value: string | number | null): void => {
-  if (value === 'private' || value === 'unlisted' || value === 'public') {
-    void updateDeckVisibility(deck, value);
-  }
-};
-
-const handleDifficultySelect = (deck: DeckSummaryRecord, value: string | number | null): void => {
-  if (value === 'easy' || value === 'medium' || value === 'hard') {
-    void updateDeckDifficulty(deck, value);
-  }
-};
-
-const copyShareLink = async (deck: DeckSummaryRecord): Promise<void> => {
-  if (!canShareDeck(deck)) {
-    return;
-  }
-  await navigator.clipboard.writeText(buildDeckShareUrl(deck.id));
-  toast.success('Share link copied.');
-};
-
-const goToPlaytester = (deck: DeckSummaryRecord): void => {
-  void router.push(`/playtester/${deck.id}`);
-};
-
-const exportDeck = async (deck: DeckSummaryRecord): Promise<void> => {
-  await exportTtsDeck(deck.id);
-};
-
 const confirmDelete = async (): Promise<void> => {
   if (!deleteTarget.value) return;
   deleting.value = true;
@@ -821,9 +639,3 @@ onMounted(() => {
   void loadFilters().catch(() => undefined);
 });
 </script>
-
-<style scoped>
-.deck-index-grid {
-  grid-template-columns: minmax(0, 1fr);
-}
-</style>

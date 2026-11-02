@@ -1,69 +1,84 @@
 <template>
-  <div class="collection-list-card-shell min-w-0">
-    <div
-      :class="cardClass"
-      :data-navigation-target="navigationTarget"
-      :role="to ? 'link' : undefined"
-      :tabindex="to ? 0 : undefined"
-      @click="navigate"
-      @keydown.enter.prevent="navigate"
-      @keydown.space.prevent="navigate"
-    >
-      <div class="collection-list-card-art">
-        <img
-          v-if="imageUrl"
-          :src="imageUrl"
-          :alt="imageAlt"
-          class="collection-list-card-art-image"
-        >
-        <div
-          v-else
-          class="collection-list-card-art-fallback"
-          aria-hidden="true"
-        />
+  <article
+    :class="cardClass"
+    :data-navigation-target="navigationTarget"
+    :role="to ? 'link' : undefined"
+    :tabindex="to ? 0 : undefined"
+    @click="navigate"
+    @keydown.enter.prevent="navigate"
+    @keydown.space.prevent="navigate"
+  >
+    <div class="collection-tile-art">
+      <img
+        v-if="imageUrl"
+        :src="imageUrl"
+        :alt="imageAlt"
+        class="collection-tile-art-image"
+        loading="lazy"
+      >
+      <div
+        v-else
+        class="collection-tile-art-fallback"
+        aria-hidden="true"
+      />
+      <div
+        class="collection-tile-art-scrim"
+        aria-hidden="true"
+      />
+      <div
+        v-if="$slots.badge"
+        class="collection-tile-art-badge"
+      >
+        <slot name="badge" />
       </div>
-      <div class="collection-list-card-content">
-        <div class="flex items-start gap-4">
-          <div class="collection-list-card-main min-w-0 flex-1">
-            <div
-              class="collection-list-card-title-row flex min-w-0 items-center justify-between gap-3"
-            >
-              <div class="flex min-w-0 flex-1 items-center gap-2">
-                <h3 class="theme-section-title min-w-0 flex-1 truncate text-xl font-semibold">
-                  {{ title }}
-                </h3>
-                <slot name="title-extra" />
-              </div>
-              <slot name="badge" />
-            </div>
-            <p
-              class="collection-list-card-description text-sm"
-              :class="description ? 'theme-section-title' : 'theme-section-muted'"
-            >
-              {{ description || 'No description available.' }}
-            </p>
-          </div>
-          <div
-            v-if="$slots.actions"
-            class="shrink-0"
-            data-card-click-ignore="true"
-          >
-            <slot name="actions" />
-          </div>
-        </div>
-        <div class="collection-list-card-tags-region">
-          <slot name="tags" />
-        </div>
-        <div class="collection-list-card-footer flex flex-wrap items-center justify-between gap-3">
-          <slot name="footer" />
-        </div>
+      <div
+        v-if="$slots.actions"
+        class="collection-tile-art-actions"
+        data-card-click-ignore="true"
+      >
+        <slot name="actions" />
+      </div>
+      <div
+        v-if="$slots['art-corner']"
+        class="collection-tile-art-corner"
+      >
+        <slot name="art-corner" />
       </div>
     </div>
-  </div>
+
+    <div class="collection-tile-body">
+      <div class="flex min-w-0 items-start gap-2">
+        <h3 class="collection-tile-title theme-section-title theme-display min-w-0 flex-1">
+          {{ title }}
+        </h3>
+        <slot name="title-extra" />
+      </div>
+      <p
+        v-if="description"
+        class="collection-tile-description theme-section-muted text-sm"
+      >
+        {{ description }}
+      </p>
+      <div
+        v-if="$slots.tags"
+        class="collection-tile-tags"
+      >
+        <slot name="tags" />
+      </div>
+      <div class="collection-tile-footer theme-section-muted text-xs">
+        <slot name="footer" />
+      </div>
+    </div>
+  </article>
 </template>
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter, type RouteLocationRaw } from 'vue-router';
+
+/**
+ * A deck or Encounter tile: cover art cropped to the hero or boss with status and actions laid
+ * over it, then the title, an optional description, tags, and a one-line footer.
+ */
 const props = defineProps<{
   title: string;
   description?: string | null;
@@ -75,8 +90,8 @@ const props = defineProps<{
 const router = useRouter();
 const navigationTarget = computed(() => (props.to ? router.resolve(props.to).fullPath : undefined));
 const cardClass = computed(() => [
-  'collection-list-card-surface page-card',
-  props.variant ? `collection-list-card-${props.variant}` : '',
+  'collection-tile page-card',
+  props.variant ? `collection-tile-${props.variant}` : '',
   props.to
     ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--table-canvas)]'
     : '',
@@ -94,122 +109,139 @@ const navigate = (event: MouseEvent | KeyboardEvent): void => {
 };
 </script>
 <style scoped>
-.collection-list-card-surface {
-  --collection-card-art-text-gap: 1.5rem;
-  --collection-card-art-position: 23% 7%;
-  --collection-card-art-scale: 1.265;
-  --collection-card-art-hover-scale: 1.27;
-  --collection-card-art-hover-shift-x: 0.2rem;
-  --collection-card-content-padding-left: 20rem;
-  --collection-card-art-width: calc(
-    var(--collection-card-content-padding-left) - var(--collection-card-art-text-gap)
-  );
-  position: relative;
-  min-height: 14.5rem;
+.collection-tile {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
   overflow: hidden;
   padding: 0;
+  transition:
+    border-color 180ms ease,
+    transform 180ms ease;
 }
 
-.collection-list-card-art {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: var(--collection-card-art-width);
+.collection-tile:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--color-border));
+}
+
+/* The cover keeps close to the shape of the printed art window, trimmed a little at the top and
+   bottom so neither the name banner nor the type line shows, rather than stretching the art. */
+.collection-tile-art {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  flex-shrink: 0;
   overflow: hidden;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 0.75rem 0 0 0.75rem;
-  background:
-    radial-gradient(circle at top left, rgba(148, 163, 184, 0.26), transparent 55%),
-    linear-gradient(135deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.92));
+  background: var(--color-surface-soft);
 }
 
-.collection-list-card-art-image {
-  height: 100%;
-  width: 100%;
-  object-fit: cover;
-  object-position: var(--collection-card-art-position);
-  transform: scale(var(--collection-card-art-scale));
-  transition: transform 240ms ease;
+/* Show only the art window: the image is widened past the side borders and lifted past the
+   name banner. Percentage margins resolve against the tile width, matching the card's shape. */
+.collection-tile-art-image {
+  display: block;
+  width: 114%;
+  max-width: none;
+  height: auto;
+  margin-top: -14%;
+  margin-left: -7%;
 }
 
-.collection-list-card-surface:hover .collection-list-card-art-image,
-.collection-list-card-surface:focus-within .collection-list-card-art-image {
-  transform: scale(var(--collection-card-art-hover-scale))
-    translateX(var(--collection-card-art-hover-shift-x));
-}
-
-.collection-list-card-art-fallback {
+.collection-tile-art-fallback {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at top left, rgba(244, 114, 182, 0.32), transparent 45%),
-    radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.24), transparent 48%),
-    linear-gradient(140deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.96));
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 30%, transparent), transparent 55%),
+    linear-gradient(140deg, var(--color-surface-strong), var(--color-surface-soft));
 }
 
-.collection-list-card-content {
-  position: relative;
-  z-index: 1;
+.collection-tile-art-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgb(4 6 18 / 0.35) 0%,
+    transparent 30%,
+    transparent 62%,
+    rgb(4 6 18 / 0.55) 100%
+  );
+}
+
+.collection-tile-art-badge {
+  position: absolute;
+  top: 0.625rem;
+  left: 0.625rem;
   display: flex;
-  min-height: inherit;
-  min-width: 0;
-  flex-direction: column;
-  padding: 1.1rem 1.2rem 1.1rem var(--collection-card-content-padding-left);
+  max-width: calc(100% - 4rem);
+  flex-wrap: wrap;
+  gap: 0.375rem;
 }
 
-.collection-list-card-description {
+.collection-tile-art-actions {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.375rem;
+}
+
+.collection-tile-art-corner {
+  position: absolute;
+  right: 0.625rem;
+  bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.collection-tile-body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.875rem 1rem 0.875rem;
+}
+
+.collection-tile-title {
   display: -webkit-box;
   overflow: hidden;
-  margin-top: 0.75rem;
+  font-size: 1.125rem;
+  line-height: 1.3;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-.collection-list-card-main {
-  display: flex;
-  flex-direction: column;
+.collection-tile-description {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
-.collection-list-card-tags-region {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  padding-block: 0.75rem;
-}
-
-:deep(.collection-list-card-tags) {
-  align-items: center;
-}
-
-:deep(.collection-list-card-footer-meta) {
+.collection-tile-footer {
   display: flex;
   min-width: 0;
-  flex-wrap: wrap;
   align-items: center;
-  row-gap: 0.35rem;
-}
-
-:deep(.collection-list-card-footer-meta-item) {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.25rem;
   white-space: nowrap;
 }
 
-:deep(.collection-list-card-footer-meta-item + .collection-list-card-footer-meta-item) {
-  margin-left: 0.75rem;
-  border-left: 1px solid var(--color-border-strong);
-  padding-left: 0.75rem;
+:deep(.collection-tile-footer-items) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-@media (max-width: 767px) {
-  .collection-list-card-surface {
-    --collection-card-art-text-gap: 1rem;
-    --collection-card-content-padding-left: clamp(5.4rem, 24%, 7.5rem);
-    min-height: 12rem;
-  }
+:deep(.collection-tile-footer-item + .collection-tile-footer-item)::before {
+  content: '·';
+  margin-right: 0.5rem;
+  opacity: 0.7;
+}
 
-  .collection-list-card-content {
-    padding: 0.95rem 1rem 0.95rem var(--collection-card-content-padding-left);
-  }
+:deep(.collection-tile-footer-end) {
+  flex-shrink: 0;
+  margin-left: auto;
 }
 </style>

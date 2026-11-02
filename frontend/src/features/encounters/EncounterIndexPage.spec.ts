@@ -93,7 +93,7 @@ test('public browsing uses summary cards and header filters without staff contro
   expect(fetchList.mock.calls[0][0]).toBe('public');
   expect(target.querySelector('.app-page-layout aside')).toBeNull();
   expect(target.querySelector('header [role="group"][aria-label="Factions"]')).not.toBeNull();
-  expect(target.querySelector('.collection-list-card-surface')?.textContent).toContain(
+  expect(target.querySelector('.collection-tile')?.textContent).toContain(
     'Hold the gate',
   );
   expect(target.textContent).toContain('Another author');
@@ -186,7 +186,7 @@ test('pagination appends summaries, preserves existing cards after failure, and 
   expect(target.textContent).toContain('Retry loading more');
   button()?.click();
   await flush();
-  expect(target.querySelectorAll('.collection-list-card-surface')).toHaveLength(2);
+  expect(target.querySelectorAll('.collection-tile')).toHaveLength(2);
   expect((fetchList.mock.calls.at(-1)?.[1] as URLSearchParams).get('page')).toBe('2');
 });
 
@@ -214,9 +214,9 @@ test('personal library preserves Official filters and shows read-only endorsed o
   expect(target.querySelector('[aria-label="Encounter library"] [aria-current="page"]')?.textContent?.trim()).toBe(
     'Mine',
   );
-  expect(target.querySelector('.collection-list-card-surface')?.textContent).toContain('Official');
+  expect(target.querySelector('.collection-tile')?.textContent).toContain('Official');
   expect(target.querySelector('[aria-label="Edit Encounter"]')).toBeNull();
-  const detail = target.querySelector('.collection-list-card-surface[role="link"]') as HTMLElement;
+  const detail = target.querySelector('.collection-tile[role="link"]') as HTMLElement;
   detail.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
   await flush();
   expect(router.currentRoute.value.query).toMatchObject({
@@ -248,4 +248,25 @@ test('Official and Community filters compose with search and factions and clear 
   await flush();
   expect(router.currentRoute.value.query).not.toHaveProperty('is_official');
   expect(router.currentRoute.value.query.q).toBe('gate');
+});
+
+test('groups loaded Encounters into faction sections', async () => {
+  fetchList.mockResolvedValue(
+    page([
+      record({ id: 'order-1', name: 'Order fight', factions: ['order'] }),
+      record({ id: 'mixed-1', name: 'Mixed fight', factions: ['order', 'fire'] }),
+      record({ id: 'none-1', name: 'Open fight', factions: [] }),
+    ]),
+  );
+  const { target } = await mount();
+
+  const sections = Array.from(
+    target.querySelectorAll<HTMLElement>('[data-testid="encounter-faction-section"]'),
+  );
+  expect(sections.map((section) => section.querySelector('h2')?.textContent?.trim())).toEqual([
+    'Order',
+    'Multiple factions',
+    'No faction',
+  ]);
+  expect(sections[1].textContent).toContain('Mixed fight');
 });
