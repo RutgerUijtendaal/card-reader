@@ -137,8 +137,12 @@
             Boss
           </h3>
           <div class="space-y-3">
-            <div
-              class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-2xl"
+            <component
+              :is="record.boss_card ? RouterLink : 'div'"
+              :to="record.boss_card ? cardLocation(record.boss_card.id) : undefined"
+              :aria-label="record.boss_card ? `Open ${record.boss_card.name}` : undefined"
+              class="theme-card-frame theme-card-image-well mx-auto block aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-2xl"
+              data-testid="encounter-boss-card"
             >
               <img
                 v-if="bossImageUrl && record.boss_card"
@@ -152,7 +156,7 @@
               >
                 {{ record.boss_card ? 'No image' : 'No boss selected' }}
               </div>
-            </div>
+            </component>
           </div>
           <section
             class="theme-divider space-y-2 border-t pt-4"
@@ -261,7 +265,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useLocalStorage } from '@vueuse/core';
-import { useRoute, useRouter } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { Pencil, Trash2 } from 'lucide-vue-next';
 import { fetchEncounter, deleteEncounter, exportEncounter } from '@/domain/encounters/api';
 import type { EncounterRecord } from '@/domain/encounters/types';

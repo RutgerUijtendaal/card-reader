@@ -83,7 +83,9 @@ describe('CardDecklist', () => {
       groupByType: false,
     });
 
-    expect(target.querySelectorAll('[data-testid="card-decklist-group"]')).toHaveLength(1);
+    const groups = target.querySelectorAll('[data-testid="card-decklist-group"]');
+    expect(groups).toHaveLength(1);
+    expect(groups[0].classList.contains('card-decklist-group-flowing')).toBe(true);
     expect(target.querySelector('h3')).toBeNull();
   });
 

@@ -117,8 +117,11 @@
             Hero
           </h3>
           <div class="space-y-3">
-            <div
-              class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-xl"
+            <RouterLink
+              :to="detailLocation(deck.hero_card.id)"
+              :aria-label="`Open ${deck.hero_card.name}`"
+              class="theme-card-frame theme-card-image-well mx-auto block aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-xl"
+              data-testid="deck-hero-card"
             >
               <img
                 v-if="heroImageUrl"
@@ -132,7 +135,7 @@
               >
                 No image
               </div>
-            </div>
+            </RouterLink>
           </div>
 
           <section
@@ -281,7 +284,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useLocalStorage } from '@vueuse/core';
 import { ChevronRight, Gamepad2, Gauge, Pencil, Share2, X } from 'lucide-vue-next';
-import { useRoute } from 'vue-router';
+import { RouterLink, useRoute } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
 import CollectionDetailLayout from '@/shared/components/CollectionDetailLayout.vue';
@@ -522,7 +525,11 @@ onMounted(async () => {
   color: var(--color-text);
 }
 
+/* The hover surface bleeds past the chart so its content keeps breathing room inside it. */
 .deck-detail-panel-trigger {
+  margin: -0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
   cursor: pointer;
   outline: none;
   transition:

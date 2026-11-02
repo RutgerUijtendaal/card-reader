@@ -7,6 +7,7 @@
       v-for="group in visibleGroups"
       :key="group.key"
       class="card-decklist-group"
+      :class="{ 'card-decklist-group-flowing': !groupByType }"
       data-testid="card-decklist-group"
       :data-type-group-key="group.key"
     >
@@ -71,6 +72,15 @@ const countCards = (entries: Entry[]): number =>
 .card-decklist-group {
   break-inside: avoid;
   margin-bottom: 1.25rem;
+}
+
+/* An ungrouped list is one section, so it splits across the columns row by row. */
+.card-decklist-group-flowing {
+  break-inside: auto;
+}
+
+.card-decklist-group-flowing > :deep(*) {
+  break-inside: avoid;
 }
 
 .card-decklist-group-title {

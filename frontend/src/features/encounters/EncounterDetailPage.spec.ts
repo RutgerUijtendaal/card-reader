@@ -356,6 +356,10 @@ test('shows card images by default, switches to the decklist, and hides the Boss
     Array.from(target.querySelectorAll('button')).some((button) => button.textContent?.trim().startsWith('Boss')),
   ).toBe(false);
 
+  expect(target.querySelector('[data-testid="encounter-boss-card"]')?.getAttribute('href')).toContain(
+    '/cards/boss',
+  );
+
   target.querySelector<HTMLButtonElement>('button[aria-label="Show as a list"]')?.click();
   await flush();
   expect(target.querySelector('[data-testid="card-decklist"]')).not.toBeNull();
