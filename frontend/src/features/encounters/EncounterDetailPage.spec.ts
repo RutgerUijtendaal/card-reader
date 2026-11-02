@@ -261,10 +261,24 @@ test('anonymous detail uses the public API, hides staff actions, and exports the
   (target.querySelector('[aria-label="Copy Encounter TTS"]') as HTMLElement).click();
   await flush();
   expect(exportRecord).toHaveBeenCalledWith('fight-1', undefined);
-  expect(copyExport).toHaveBeenCalled();
-  expect(target.querySelector('textarea')?.value).toBe('tts-code');
+  expect(copyExport).toHaveBeenCalledWith(
+    expect.objectContaining({ encodedPayload: 'tts-code' }),
+    'TTS Encounter copied to clipboard',
+  );
 });
 
+test('exports from the About view through the shared copy helper', async () => {
+  const { target } = await mount();
+  await click(target, 'About');
+  (target.querySelector('[aria-label="Copy Encounter TTS"]') as HTMLElement).click();
+  await flush();
+  expect(target.querySelector('[data-testid="encounter-long-description"]')).not.toBeNull();
+  expect(copyExport).toHaveBeenCalledWith(
+    expect.objectContaining({ encodedPayload: 'tts-code' }),
+    'TTS Encounter copied to clipboard',
+  );
+  expect(target.querySelector('textarea')).toBeNull();
+});
 test('official owners see a read-only explanation and return to their filtered personal library', async () => {
   auth.canAccessStaffRoutes = false;
   fetchRecord.mockResolvedValue(

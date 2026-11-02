@@ -237,21 +237,6 @@
           :hover-mode="hoverSurface.effectiveHoverMode.value"
           :navigation-target="cardLocation"
         />
-        <div
-          v-if="exportText"
-          class="space-y-2"
-        >
-          <label class="field-label">TTS import code<textarea
-            :value="exportText"
-            readonly
-            class="input-base h-24"
-            @focus="($event.target as HTMLTextAreaElement).select()"
-          />
-          </label>
-          <p class="theme-section-muted text-sm">
-            {{ exportMessage }}
-          </p>
-        </div>
       </section>
     </CollectionDetailLayout>
   </section>
@@ -267,7 +252,6 @@ import type { CardFiltersResponse } from '@/domain/cards/types';
 import { fetchCardFilters } from '@/domain/cards/api';
 import { useAuthStore } from '@/domain/session/store';
 import { cardFactionLabel } from '@/domain/cards/cardFactions';
-import { ttsExportSheetDescription } from '@/domain/cards/utils/ttsExportResponse';
 import { copyTtsExport } from '@/domain/cards/utils/copyTtsExport';
 import { useCardCollectionGrid } from '@/domain/cards/composables/useCardCollectionGrid';
 import { useCardSortSurface } from '@/domain/cards/composables/useCardSortPreferences';
@@ -293,8 +277,6 @@ const record = ref<EncounterRecord | null>(null);
 const loading = ref(true);
 const error = ref('');
 const exporting = ref(false);
-const exportText = ref('');
-const exportMessage = ref('');
 const activeBoard = ref('mainboard');
 const countBoardCards = (entries: { quantity: number }[]): number =>
   entries.reduce((sum, entry) => sum + entry.quantity, 0);
@@ -383,7 +365,6 @@ const load = async () => {
   record.value = null;
   loading.value = true;
   error.value = '';
-  exportText.value = '';
   exporting.value = false;
   activeBoard.value = 'mainboard';
   aboutOpen.value = false;
@@ -411,17 +392,10 @@ const copyExport = async () => {
   try {
     const result = await exportEncounter(record.value.id, sideboardId);
     if (current !== generation) return;
-    exportText.value = result.encodedPayload;
-    exportMessage.value = `${result.exportedCount} cards. ${ttsExportSheetDescription(result)}`;
-    try {
-      await copyTtsExport(
-        result,
-        sideboardId ? 'TTS sideboard copied to clipboard' : 'TTS Encounter copied to clipboard',
-      );
-      exportMessage.value = `Copied to clipboard. ${exportMessage.value}`;
-    } catch {
-      /* The import code remains selectable. */
-    }
+    await copyTtsExport(
+      result,
+      sideboardId ? 'TTS sideboard copied to clipboard' : 'TTS Encounter copied to clipboard',
+    );
   } catch (cause) {
     if (current === generation) error.value = getApiErrorMessage(cause, 'Export failed.');
   } finally {
