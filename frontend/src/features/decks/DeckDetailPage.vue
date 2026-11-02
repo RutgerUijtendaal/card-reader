@@ -19,9 +19,37 @@
       :back-label="backLabel"
       title-tag="h2"
       title-class="text-xl"
-      subtitle-class="!mt-4 text-sm"
+      :backdrop-image-url="heroImageUrl"
     >
       <template #subtitle>
+        <p class="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span data-testid="deck-owner">
+            By
+            <span class="theme-section-title font-medium">{{
+              formatDeckOwnerName(deck.owner.username)
+            }}</span>
+          </span>
+          <span aria-hidden="true">·</span>
+          <span>{{ deck.hero_card.name }}</span>
+          <template v-if="difficultyLabel">
+            <span aria-hidden="true">·</span>
+            <span
+              class="inline-flex items-center gap-1"
+              data-testid="deck-difficulty"
+            >
+              <Gauge
+                class="h-3.5 w-3.5"
+                aria-hidden="true"
+              />
+              {{ difficultyLabel }} difficulty
+            </span>
+          </template>
+        </p>
+      </template>
+      <template
+        v-if="(deck.tags ?? []).length > 0 || (canEdit && (deck.pending_tag_suggestions ?? []).length > 0)"
+        #details
+      >
         <DeckTagPills
           :tags="deck.tags ?? []"
           :pending-suggestions="canEdit ? (deck.pending_tag_suggestions ?? []) : []"
@@ -69,6 +97,7 @@
         <span class="theme-section-muted text-sm tabular-nums">
           {{ deck.totals.overall_total_cards }} cards across all boards
         </span>
+        <CardCollectionLayoutToggle v-model="layout" />
         <CardCollectionViewOptions
           v-model:card-scale="cardScale"
           v-model:group-by-type="groupByType"
@@ -92,8 +121,8 @@
               class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-xl"
             >
               <img
-                v-if="deck.hero_card.image_url"
-                :src="toAbsoluteApiUrl(deck.hero_card.image_url)"
+                v-if="heroImageUrl"
+                :src="heroImageUrl"
                 :alt="deck.hero_card.name"
                 class="h-full w-full object-cover"
               >
@@ -103,32 +132,6 @@
               >
                 No image
               </div>
-            </div>
-
-            <p class="theme-section-title theme-display text-xl">
-              {{ deck.hero_card.name }}
-            </p>
-            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
-              <p
-                class="theme-section-muted"
-                data-testid="deck-owner"
-              >
-                By
-                <span class="theme-section-title font-medium">{{
-                  formatDeckOwnerName(deck.owner.username)
-                }}</span>
-              </p>
-              <p
-                v-if="difficultyLabel"
-                class="theme-section-muted flex shrink-0 items-center gap-1.5"
-                data-testid="deck-difficulty"
-              >
-                <Gauge
-                  class="h-4 w-4"
-                  aria-hidden="true"
-                />
-                <span>Difficulty · {{ difficultyLabel }}</span>
-              </p>
             </div>
           </div>
 
@@ -243,7 +246,16 @@
           </h3>
         </div>
 
+        <CardDecklist
+          v-if="layout === 'list'"
+          :entries="sortedActiveBoardEntries"
+          :groups="groupedActiveBoardEntries"
+          :group-by-type="groupByType"
+          :hover-mode="effectiveHoverMode"
+          :navigation-target="detailLocation"
+        />
         <CardCollectionGrid
+          v-else
           :entries="sortedActiveBoardEntries"
           :groups="groupedActiveBoardEntries"
           :group-by-type="groupByType"
@@ -278,6 +290,8 @@ import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import CardCollectionGrid from '@/domain/cards/components/CardCollectionGrid.vue';
+import CardCollectionLayoutToggle from '@/domain/cards/components/CardCollectionLayoutToggle.vue';
+import CardDecklist from '@/domain/cards/components/CardDecklist.vue';
 import CardMarkupText from '@/domain/cards/components/CardMarkupText.vue';
 import { fetchCardFilters } from '@/domain/cards/api';
 import CardCollectionViewOptions from '@/domain/cards/components/CardCollectionViewOptions.vue';
@@ -296,6 +310,7 @@ import {
 } from '@/domain/notifications/notificationRouteState';
 import type { CardFiltersResponse, CardListItem } from '@/domain/cards/types';
 import { useCardCollectionGrid } from '@/domain/cards/composables/useCardCollectionGrid';
+import { useCardCollectionLayout } from '@/domain/cards/composables/useCardCollectionLayout';
 import { useCardSortSurface } from '@/domain/cards/composables/useCardSortPreferences';
 import { useGalleryOptions } from '@/domain/cards/composables/useGalleryOptions';
 import { useHoverModeSurface } from '@/domain/cards/composables/useHoverModePreferences';
@@ -327,6 +342,7 @@ const filterOptions = ref<CardFiltersResponse>({
   types: [],
 });
 const { cardScale } = useGalleryOptions();
+const { layout } = useCardCollectionLayout();
 const sortSurface = useCardSortSurface('deckDetail');
 const { effectiveSort } = sortSurface;
 const hoverSurface = useHoverModeSurface('deckDetail');
@@ -381,6 +397,9 @@ const isOwnedRoute = computed(() => route.path.startsWith('/my/decks/'));
 
 const canEdit = computed(() => deck.value?.owner.id === auth.user?.id || auth.canAccessStaffRoutes);
 const canShare = computed(() => (deck.value ? canShareDeck(deck.value) : false));
+const heroImageUrl = computed(() =>
+  deck.value?.hero_card.image_url ? toAbsoluteApiUrl(deck.value.hero_card.image_url) : null,
+);
 const difficultyLabel = computed(() =>
   deck.value?.difficulty ? deckDifficultyLabels[deck.value.difficulty] : null,
 );

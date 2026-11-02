@@ -99,6 +99,8 @@ const card = (id: string, role = '') =>
     types: [],
     symbols: [],
     image_url: '/boss.png',
+    mana_cost: '0',
+    mana_symbols: [],
     mana_value: 0,
     result_type: 'card',
   }) as unknown as CardListItem;
@@ -184,7 +186,7 @@ test('uses the shared detail layout with boss information left and quantity gall
   const { target } = await mount('/encounters/fight-1?return_to=encounters');
   expect(fetchRecord).toHaveBeenCalledWith('fight-1', false);
   expect(fetchFilters).toHaveBeenCalledWith('evil');
-  expect(target.querySelector('.collection-detail-primary-aside')?.textContent).toContain(
+  expect(target.querySelector('[data-testid="encounter-creator"]')?.textContent).toContain(
     'Another author',
   );
   expect(target.querySelector('.collection-detail-primary-aside')?.textContent).toContain(
@@ -342,4 +344,20 @@ test('sideboard tabs show saved quantities and export only the selected board', 
   expect(exportRecord).toHaveBeenCalledWith('fight-1', 'reserve');
   await click(target, 'Mainboard');
   expect(target.querySelector('[aria-label="Copy Encounter TTS"]')).not.toBeNull();
+});
+
+test('shows card images by default, switches to the decklist, and hides the Boss tab for a single-card boss', async () => {
+  fetchRecord.mockResolvedValue(fixture({ boss_cards: [card('boss', 'boss')] }));
+  const { target } = await mount();
+
+  expect(target.querySelector('[data-card-id="army"]')).not.toBeNull();
+  expect(target.querySelector('[data-testid="card-decklist"]')).toBeNull();
+  expect(
+    Array.from(target.querySelectorAll('button')).some((button) => button.textContent?.trim().startsWith('Boss')),
+  ).toBe(false);
+
+  target.querySelector<HTMLButtonElement>('button[aria-label="Show as a list"]')?.click();
+  await flush();
+  expect(target.querySelector('[data-testid="card-decklist"]')).not.toBeNull();
+  expect(localStorage.getItem('card-reader.collection-detail-layout')).toBe('list');
 });
