@@ -115,11 +115,7 @@
     >
       This is an Official Encounter. Only staff can edit or delete it. It remains in My Encounters.
     </p>
-    <CollectionDetailLayout
-      v-if="record"
-      :expanded="detailsExpanded"
-      details-id="encounter-detail-panel"
-    >
+    <CollectionDetailLayout v-if="record">
       <template #aside>
         <div class="space-y-4">
           <h3 class="theme-section-title text-base font-semibold">
@@ -153,24 +149,9 @@
             class="theme-divider space-y-2 border-t pt-4"
             data-testid="encounter-summary"
           >
-            <div class="flex items-center justify-between gap-3">
-              <h4 class="theme-section-title text-sm font-semibold">
-                Summary
-              </h4>
-              <button
-                v-if="record.long_description_markup || record.long_description"
-                class="theme-ghost-button inline-flex items-center gap-1 text-xs font-medium"
-                type="button"
-                :aria-expanded="detailsExpanded"
-                aria-controls="encounter-detail-panel"
-                @click="detailsExpanded = !detailsExpanded"
-              >
-                Details<ChevronRight
-                  class="h-3.5 w-3.5"
-                  :class="detailsExpanded ? 'rotate-90' : ''"
-                />
-              </button>
-            </div>
+            <h4 class="theme-section-title text-sm font-semibold">
+              Summary
+            </h4>
             <CardMarkupText
               v-if="record.description_markup || record.description"
               class="theme-section-muted text-sm"
@@ -213,31 +194,23 @@
           </section>
         </div>
       </template>
-      <template #details>
+      <section class="space-y-4">
         <section
-          class="space-y-2"
+          v-if="record.long_description_markup || record.long_description"
+          class="max-w-[70ch] space-y-2 pb-2"
           data-testid="encounter-long-description"
         >
-          <h3 class="theme-section-title text-base font-semibold">
+          <h3 class="theme-section-title theme-display text-lg">
             About this Encounter
           </h3>
-          <CardMarkupText
-            class="theme-section-muted break-words text-sm"
-            :markup="record.long_description_markup || record.long_description"
-            :hover-mode="hoverSurface.effectiveHoverMode.value"
-          />
+          <AppReadMore>
+            <CardMarkupText
+              class="theme-section-title break-words text-[0.9375rem] leading-7"
+              :markup="record.long_description_markup || record.long_description"
+              :hover-mode="hoverSurface.effectiveHoverMode.value"
+            />
+          </AppReadMore>
         </section>
-      </template>
-      <template #details-footer>
-        <button
-          class="theme-ghost-button flex w-full items-center justify-center gap-2 px-3 py-2 text-sm font-semibold"
-          type="button"
-          @click="detailsExpanded = false"
-        >
-          <X class="h-4 w-4" />Close details
-        </button>
-      </template>
-      <section class="space-y-4">
         <p
           v-if="!activeEntries.length"
           class="theme-section-muted text-sm"
@@ -276,9 +249,9 @@
 </template>
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { useLocalStorage, useMediaQuery } from '@vueuse/core';
+import { useLocalStorage } from '@vueuse/core';
 import { useRoute, useRouter } from 'vue-router';
-import { ChevronRight, Pencil, Trash2, X } from 'lucide-vue-next';
+import { Pencil, Trash2 } from 'lucide-vue-next';
 import { fetchEncounter, deleteEncounter, exportEncounter } from '@/domain/encounters/api';
 import type { EncounterRecord } from '@/domain/encounters/types';
 import type { CardFiltersResponse } from '@/domain/cards/types';
@@ -296,6 +269,7 @@ import CardCollectionViewOptions from '@/domain/cards/components/CardCollectionV
 import CardCollectionDetailLoadingSkeleton from '@/domain/cards/components/CardCollectionDetailLoadingSkeleton.vue';
 import CardMarkupText from '@/domain/cards/components/CardMarkupText.vue';
 import CollectionDetailLayout from '@/shared/components/CollectionDetailLayout.vue';
+import AppReadMore from '@/shared/components/AppReadMore.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import ExtraActionsMenu from '@/shared/components/app/ExtraActionsMenu.vue';
@@ -313,8 +287,6 @@ const error = ref('');
 const exporting = ref(false);
 const exportText = ref('');
 const exportMessage = ref('');
-const detailsExpanded = ref(false);
-const canAutoExpand = useMediaQuery('(min-width: 1536px)');
 const activeBoard = ref('mainboard');
 const countBoardCards = (entries: { quantity: number }[]): number =>
   entries.reduce((sum, entry) => sum + entry.quantity, 0);
@@ -392,7 +364,6 @@ const load = async () => {
   exportText.value = '';
   exporting.value = false;
   activeBoard.value = 'mainboard';
-  detailsExpanded.value = false;
   try {
     const [value, filters] = await Promise.all([
       fetchEncounter(String(route.params.id), false),
@@ -401,9 +372,6 @@ const load = async () => {
     if (current !== generation) return;
     record.value = value;
     types.value = filters?.types ?? [];
-    detailsExpanded.value = Boolean(
-      (value.long_description_markup || value.long_description) && canAutoExpand.value,
-    );
   } catch (cause) {
     if (current === generation)
       error.value = getApiErrorMessage(cause, 'Encounter not found or unavailable.');

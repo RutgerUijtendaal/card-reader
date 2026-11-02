@@ -119,8 +119,7 @@
             <InfoTooltip
               v-if="issues.length"
               :text="issues.join(' ')"
-              placement="bottom"
-              :allow-flip="false"
+              placement="top"
             >
               <span
                 class="theme-pill theme-pill-danger inline-flex items-center gap-1.5 px-2 py-1 text-xs font-semibold"
