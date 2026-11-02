@@ -21,11 +21,25 @@
       back-label="Back to Encounters"
       title-tag="h2"
       title-class="text-xl"
-      subtitle-class="!mt-4 text-sm"
+      :backdrop-image-url="bossImageUrl"
     >
       <template
         v-if="record"
         #subtitle
+      >
+        <p class="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span data-testid="encounter-creator">
+            By <span class="theme-section-title font-medium">{{ record.creator.username }}</span>
+          </span>
+          <template v-if="record.boss_card">
+            <span aria-hidden="true">·</span>
+            <span>{{ record.boss_card.name }}</span>
+          </template>
+        </p>
+      </template>
+      <template
+        v-if="record && (record.is_official || record.factions.length > 0)"
+        #details
       >
         <div class="flex flex-wrap gap-1.5">
           <span
@@ -94,6 +108,7 @@
         <span class="theme-section-muted text-sm tabular-nums">
           {{ record.total_cards + record.boss_cards.length }} cards including boss
         </span>
+        <CardCollectionLayoutToggle v-model="layout" />
         <CardCollectionViewOptions
           v-model:card-scale="cardScale"
           v-model:group-by-type="groupByType"
@@ -122,12 +137,16 @@
             Boss
           </h3>
           <div class="space-y-3">
-            <div
-              class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-2xl"
+            <component
+              :is="record.boss_card ? RouterLink : 'div'"
+              :to="record.boss_card ? cardLocation(record.boss_card.id) : undefined"
+              :aria-label="record.boss_card ? `Open ${record.boss_card.name}` : undefined"
+              class="theme-card-frame theme-card-image-well mx-auto block aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-2xl"
+              data-testid="encounter-boss-card"
             >
               <img
-                v-if="record.boss_card?.image_url"
-                :src="toAbsoluteApiUrl(record.boss_card.image_url)"
+                v-if="bossImageUrl && record.boss_card"
+                :src="bossImageUrl"
                 :alt="record.boss_card.name"
                 class="h-full w-full object-cover"
               >
@@ -137,13 +156,7 @@
               >
                 {{ record.boss_card ? 'No image' : 'No boss selected' }}
               </div>
-            </div>
-            <p class="theme-section-title text-lg font-semibold">
-              {{ record.boss_card?.name || 'No boss selected' }}
-            </p>
-            <p class="theme-section-muted text-sm">
-              By <span class="theme-section-title font-medium">{{ record.creator.username }}</span>
-            </p>
+            </component>
           </div>
           <section
             class="theme-divider space-y-2 border-t pt-4"
@@ -226,6 +239,14 @@
         >
           No cards added to this Encounter yet.
         </p>
+        <CardDecklist
+          v-else-if="layout === 'list'"
+          :entries="sortedEntries"
+          :groups="groupedEntries"
+          :group-by-type="groupByType && activeBoard !== 'boss'"
+          :hover-mode="hoverSurface.effectiveHoverMode.value"
+          :navigation-target="cardLocation"
+        />
         <CardCollectionGrid
           v-else
           :entries="sortedEntries"
@@ -244,7 +265,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useLocalStorage } from '@vueuse/core';
-import { useRoute, useRouter } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { Pencil, Trash2 } from 'lucide-vue-next';
 import { fetchEncounter, deleteEncounter, exportEncounter } from '@/domain/encounters/api';
 import type { EncounterRecord } from '@/domain/encounters/types';
@@ -257,7 +278,10 @@ import { useCardCollectionGrid } from '@/domain/cards/composables/useCardCollect
 import { useCardSortSurface } from '@/domain/cards/composables/useCardSortPreferences';
 import { useHoverModeSurface } from '@/domain/cards/composables/useHoverModePreferences';
 import { useGalleryOptions } from '@/domain/cards/composables/useGalleryOptions';
+import { useCardCollectionLayout } from '@/domain/cards/composables/useCardCollectionLayout';
 import CardCollectionGrid from '@/domain/cards/components/CardCollectionGrid.vue';
+import CardCollectionLayoutToggle from '@/domain/cards/components/CardCollectionLayoutToggle.vue';
+import CardDecklist from '@/domain/cards/components/CardDecklist.vue';
 import CardCollectionViewOptions from '@/domain/cards/components/CardCollectionViewOptions.vue';
 import CardCollectionDetailLoadingSkeleton from '@/domain/cards/components/CardCollectionDetailLoadingSkeleton.vue';
 import CardMarkupText from '@/domain/cards/components/CardMarkupText.vue';
@@ -310,7 +334,8 @@ const boardTabs = computed<AppBoardTab[]>(() => {
       detail: `${countBoardCards(board.entries)} cards, ${board.entries.length} unique`,
     })),
   ];
-  if (record.value.boss_cards.length) {
+  // The aside already shows a single boss; the tab only earns its place for a multi-card boss group.
+  if (record.value.boss_cards.length > 1) {
     tabs.push({ id: 'boss', label: 'Boss', count: record.value.boss_cards.length });
   }
   return tabs;
@@ -349,6 +374,10 @@ const types = ref<CardFiltersResponse['types']>([]);
 const sortSurface = useCardSortSurface('deckDetail');
 const hoverSurface = useHoverModeSurface('deckDetail');
 const { cardScale } = useGalleryOptions();
+const { layout } = useCardCollectionLayout();
+const bossImageUrl = computed(() =>
+  record.value?.boss_card?.image_url ? toAbsoluteApiUrl(record.value.boss_card.image_url) : null,
+);
 const groupByType = useLocalStorage('card-reader.encounter-detail-group-by-type', true);
 const activeEntries = computed(() =>
   !record.value

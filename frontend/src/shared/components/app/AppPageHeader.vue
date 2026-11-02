@@ -3,9 +3,9 @@
     to="#app-page-header-outlet"
     :disabled="!hasShellHeaderOutlet"
   >
-    <header class="theme-page-header border-b">
+    <header class="theme-page-header overflow-hidden border-b">
       <div
-        class="flex flex-col gap-4 px-5 py-5"
+        class="relative flex flex-col gap-4 px-5 py-5"
         :class="[
           topRowClass,
           hasCenterContent
@@ -14,16 +14,27 @@
         ]"
       >
         <div
-          class="app-page-header-primary flex min-w-0 flex-1 gap-3"
+          class="app-page-header-primary relative flex min-w-0 flex-1 gap-3"
           :class="hasSupportingContent ? 'items-start' : 'items-center'"
         >
+          <div
+            v-if="backdropImageUrl"
+            class="app-page-header-backdrop"
+            aria-hidden="true"
+            data-testid="page-header-backdrop"
+          >
+            <img
+              :src="backdropImageUrl"
+              alt=""
+            >
+          </div>
           <component
             :is="icon"
-            class="theme-page-header-icon mt-[0.3rem] h-5 w-5 shrink-0"
+            class="theme-page-header-icon relative mt-[0.3rem] h-5 w-5 shrink-0"
             aria-hidden="true"
           />
 
-          <div class="min-w-0">
+          <div class="relative min-w-0">
             <div class="flex min-w-0 flex-wrap items-center gap-2">
               <component
                 :is="titleTag"
@@ -57,14 +68,14 @@
 
         <div
           v-if="hasCenterContent"
-          class="app-page-header-center flex min-w-0 justify-center"
+          class="app-page-header-center relative flex min-w-0 justify-center"
         >
           <slot name="center" />
         </div>
 
         <div
           v-if="hasHeaderActions"
-          class="lg:flex lg:self-stretch lg:items-center lg:justify-end lg:justify-self-end"
+          class="relative lg:flex lg:self-stretch lg:items-center lg:justify-end lg:justify-self-end"
         >
           <div class="flex flex-wrap items-center gap-2 lg:justify-end">
             <AppHeaderAction
@@ -81,7 +92,7 @@
 
       <div
         v-if="hasBottomRow"
-        class="theme-divider theme-page-header-bottom flex flex-wrap items-center gap-3 border-t px-5 py-3"
+        class="theme-divider theme-page-header-bottom relative flex flex-wrap items-center gap-3 border-t px-5 py-3"
         :class="[bottomRowClass, bottomRowLayoutClass]"
       >
         <div
@@ -121,6 +132,8 @@ const props = withDefaults(
     titleTag?: 'h1' | 'h2' | 'h3';
     titleClass?: string;
     subtitleClass?: string;
+    /** Art shown faded behind the title row, such as a deck's hero. */
+    backdropImageUrl?: string | null;
   }>(),
   {
     titleTag: 'h1',
@@ -129,6 +142,7 @@ const props = withDefaults(
     subtitleClass: 'text-sm',
     backTo: null,
     backLabel: '',
+    backdropImageUrl: null,
   },
 );
 
@@ -171,3 +185,33 @@ onMounted(() => {
   hasShellHeaderOutlet.value = document.getElementById('app-page-header-outlet') !== null;
 });
 </script>
+
+<style scoped>
+/* The art sits in the space between the title and the actions, so faces stay clear of buttons. */
+.app-page-header-backdrop {
+  position: absolute;
+  top: -1.25rem;
+  right: 0;
+  bottom: -1.25rem;
+  width: min(30rem, 60%);
+  pointer-events: none;
+  /* Both ends are fully clear well inside the printed frame, so the card's side borders never show. */
+  mask-image: linear-gradient(
+    to right,
+    transparent 6%,
+    rgb(0 0 0 / 0.7) 40%,
+    rgb(0 0 0 / 0.85) 72%,
+    transparent 93%
+  );
+}
+
+.app-page-header-backdrop img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  /* Card art starts under the name banner and faces sit near its top. */
+  object-position: 50% 12%;
+  opacity: 0.6;
+}
+
+</style>

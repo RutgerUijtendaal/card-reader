@@ -64,6 +64,7 @@ vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
             : props.subtitle
               ? h('p', { 'data-testid': 'header-subtitle' }, props.subtitle)
               : null,
+          slots.details ? h('div', { 'data-testid': 'header-details' }, slots.details()) : null,
           slots.actions?.(),
           slots.bottomLeft?.(),
           slots.bottomRight?.(),
@@ -343,20 +344,18 @@ describe('DeckDetailPage type grouping', () => {
     mounted.unmount();
   });
 
-  test('renders deck tags in the header subtitle row and the owner as side-panel text', async () => {
+  test('puts the owner and hero in the header subtitle and the tags beneath it', async () => {
     const mounted = await mountPage();
     const header = mounted.container.querySelector('header');
     const titleMeta = mounted.container.querySelector('[data-testid="header-title-meta"]');
     const subtitle = mounted.container.querySelector('[data-testid="header-subtitle"]');
-    const owner = mounted.container.querySelector('[data-testid="deck-owner"]');
+    const owner = subtitle?.querySelector('[data-testid="deck-owner"]');
 
     expect(header?.textContent).toContain('Grouped Deck');
     expect(titleMeta).toBeNull();
-    expect(subtitle?.textContent).toContain('Tank');
-    expect(subtitle?.classList.contains('!mt-4')).toBe(true);
-    expect(header?.textContent).not.toContain('Owner');
-    expect(header?.textContent).not.toContain('By');
-    expect(owner?.textContent).toContain('By Owner');
+    expect(owner?.textContent?.replace(/\s+/g, ' ').trim()).toBe('By Owner');
+    expect(subtitle?.textContent).not.toContain('Tank');
+    expect(header?.textContent).toContain('Tank');
 
     mounted.unmount();
   });
@@ -373,7 +372,7 @@ describe('DeckDetailPage type grouping', () => {
     const mounted = await mountPage();
 
     expect(mounted.container.querySelector('[data-testid="deck-difficulty"]')?.textContent)
-      .toContain('Difficulty · Hard');
+      .toContain('Hard difficulty');
     mounted.unmount();
 
     fetchDeckDetailMock.mockResolvedValueOnce({ ...deckRecord, difficulty: null });
