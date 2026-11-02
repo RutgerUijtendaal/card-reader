@@ -184,7 +184,7 @@
               <RouterLink
                 v-if="isCard && cardItem"
                 :to="buildAdminCardDetailLocation(cardItem.id, route.query)"
-                class="btn-secondary pointer-events-auto gap-1.5 rounded-full px-3 py-1.5 text-xs"
+                class="theme-art-chip pointer-events-auto gap-1.5 px-3 py-1.5 text-xs"
               >
                 <Pencil class="h-3.5 w-3.5" />
                 <span>Edit</span>

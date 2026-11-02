@@ -37,7 +37,7 @@
                 class="pointer-events-none flex items-center gap-2 opacity-0 transition duration-200 group-hover:pointer-events-auto group-hover:opacity-100"
               >
                 <button
-                  class="theme-card-frame-muted theme-icon-button theme-section-title inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold disabled:cursor-not-allowed disabled:border-[color:var(--color-disabled-border)] disabled:bg-[color:var(--color-disabled-bg)] disabled:text-[color:var(--color-disabled-text)] disabled:opacity-100"
+                  class="theme-art-chip h-8 w-8 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                   type="button"
                   :disabled="removeDisabled(card.id)"
                   :aria-label="`Remove copy from ${collectionLabel}`"
@@ -46,7 +46,7 @@
                   <Minus class="h-4 w-4" />
                 </button>
                 <button
-                  class="theme-card-frame-muted theme-icon-button theme-section-title inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold disabled:cursor-not-allowed disabled:border-[color:var(--color-disabled-border)] disabled:bg-[color:var(--color-disabled-bg)] disabled:text-[color:var(--color-disabled-text)] disabled:opacity-100"
+                  class="theme-art-chip h-8 w-8 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                   type="button"
                   :disabled="actionDisabled(card)"
                   :aria-label="`Add copy to ${collectionLabel}`"
