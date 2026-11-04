@@ -410,7 +410,7 @@ Python-specific tricks.
 - Treat the backend as Django/DRF with Django-owned models and migrations.
 - Keep README files declarative and current-state focused.
 - Do not store real credentials in the app repo.
-- Do not run service/integration tests
+- Do not run parser tests, including parser-focused integration tests. Other backend tests may be run.
 
 ## Ad hoc commands
 When running ad hoc checks in this repo, prefer the helper below so temporary

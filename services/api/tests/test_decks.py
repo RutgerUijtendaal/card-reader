@@ -4,6 +4,8 @@ from collections.abc import Iterable
 from datetime import timedelta
 from itertools import count
 
+import pytest
+
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.db.models import Prefetch
@@ -23,6 +25,7 @@ from card_reader_core.models import (
     CardVersionType,
     ContentVersion,
     Deck,
+    DeckVisibility,
     DeckEntry,
     DeckSideboard,
     DeckSideboardEntry,
@@ -323,7 +326,7 @@ def test_public_deck_list_excludes_invalid_public_decks() -> None:
     assert deck.id not in [row["id"] for row in response.json()]
 
 
-def test_public_deck_list_excludes_decks_with_deprecated_cards_but_owner_can_view_warning() -> None:
+def test_public_deck_list_excludes_deprecated_cards_but_shared_detail_shows_warning() -> None:
     owner = _create_user("deck-deprecated-card-owner", "password")
     hero = _create_card(name="Deprecated Warning Hero", hero=True)
     deprecated_card = _create_card(
@@ -354,13 +357,14 @@ def test_public_deck_list_excludes_decks_with_deprecated_cards_but_owner_can_vie
 
     assert public_list_response.status_code == 200
     assert deck.id not in [row["id"] for row in public_list_response.json()]
-    assert public_detail_response.status_code == 404
+    assert public_detail_response.status_code == 200
     assert owner_detail_response.status_code == 200
     status_payload = owner_detail_response.json()["status"]
     assert status_payload["is_valid"] is False
     assert status_payload["deprecated_card_count"] == 1
     assert status_payload["deprecated_card_ids"] == [deprecated_card.id]
     assert "Deck contains deprecated cards." in status_payload["issues"]
+    assert public_detail_response.json()["status"] == status_payload
 
 
 def test_public_deck_list_includes_valid_20_card_public_decks() -> None:
@@ -1332,6 +1336,45 @@ def test_public_deck_detail_allows_unlisted_decks_for_guests() -> None:
 
     assert response.status_code == 200
     assert response.json()["visibility"] == "unlisted"
+
+
+@pytest.mark.parametrize("visibility", ["private", "unlisted", "public"])
+@pytest.mark.parametrize("authenticated", [False, True])
+def test_invalid_deck_sharing_respects_visibility_and_excludes_public_discovery(
+    visibility: DeckVisibility, authenticated: bool
+) -> None:
+    owner = _create_user("invalid-shared-owner", "password")
+    hero = _create_card(name="Incomplete Shared Hero", hero=True)
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Incomplete Shared Deck",
+        description=None,
+        visibility=visibility,
+        hero_card_id=hero.id,
+        entries=[],
+        sideboards=[],
+    )
+    client = Client(HTTP_HOST="localhost")
+    if authenticated:
+        client.force_login(_create_user("invalid-shared-viewer", "password"))
+
+    response = client.get(f"/decks/{deck.id}")
+    if visibility == "private":
+        assert response.status_code == 404
+    else:
+        assert response.status_code == 200
+        assert response.json()["id"] == deck.id
+        assert response.json()["status"]["is_valid"] is False
+        assert response.json()["status"]["issues"]
+
+    for query in ({}, {"view": "summary"}, {"view": "summary", "page": 1, "page_size": 12}):
+        listing = client.get("/decks", query)
+        assert listing.status_code == 200
+        payload = listing.json()
+        records = payload["results"] if "page" in query else payload
+        assert deck.id not in [record["id"] for record in records]
+        if "page" in query:
+            assert payload["count"] == 0
 
 
 def test_authenticated_owner_can_crud_decks() -> None:

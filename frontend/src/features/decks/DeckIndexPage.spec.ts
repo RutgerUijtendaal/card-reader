@@ -285,7 +285,7 @@ const deckPage = (
     : null,
   previous_page: null,
   page: 1,
-  page_size: 10,
+  page_size: 12,
   snapshot_at: '2026-08-09T17:00:00Z',
   results,
   ...overrides,
@@ -394,7 +394,7 @@ describe('DeckIndexPage', () => {
     apiGetMock.mockReturnValue(new Promise(() => undefined));
     const mounted = await mountPage('/decks');
 
-    expect(mounted.container.querySelectorAll('.collection-tile-skeleton')).toHaveLength(9);
+    expect(mounted.container.querySelectorAll('.collection-tile-skeleton')).toHaveLength(12);
     expect(mounted.container.textContent).not.toContain('Loading decks');
 
     mounted.unmount();
@@ -444,7 +444,7 @@ describe('DeckIndexPage', () => {
     expect(fetchPublicDeckSummariesMock).toHaveBeenCalledWith(
       expect.any(URLSearchParams),
       1,
-      10,
+      12,
       null,
       null,
     );
@@ -457,7 +457,7 @@ describe('DeckIndexPage', () => {
     expect(fetchPublicDeckSummariesMock).toHaveBeenLastCalledWith(
       expect.any(URLSearchParams),
       2,
-      10,
+      12,
       '2026-08-09T17:00:00Z',
       { created_at: '2025-01-01T00:00:00Z', id: 'deck-1' },
     );
@@ -499,7 +499,7 @@ describe('DeckIndexPage', () => {
     expect(fetchPublicDeckSummariesMock).toHaveBeenLastCalledWith(
       expect.any(URLSearchParams),
       2,
-      10,
+      12,
       '2026-08-09T17:00:00Z',
       { created_at: '2025-01-01T00:00:00Z', id: 'deck-1' },
     );

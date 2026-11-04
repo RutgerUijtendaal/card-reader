@@ -40,7 +40,7 @@ Follow `AGENTS.md`, `card-reader-core`, and `docs/developer-data.md`. Treat bund
 2. State whether the change affects current output, retained input, publication selection, authorization, build orchestration, or bootstrap consumption.
 3. Define the compatibility matrix before changing a bundle field or format.
 4. Update validation before or with exporters so invalid archives cannot be published.
-5. Check export, isolated import, idempotent re-import, retained-version adoption, and rejection coverage relevant to the change. Respect the repository restriction on running service/integration tests.
+5. Run relevant non-parser tests for export, isolated import, idempotent re-import, retained-version adoption, and rejection coverage. Respect the repository restriction on parser tests, including parser-focused integration tests.
 6. Update the documentation and bootstrap messaging with any contract or operator-flow change.
 
 ## Hotspots And Checks
@@ -55,4 +55,4 @@ Follow `AGENTS.md`, `card-reader-core`, and `docs/developer-data.md`. Treat bund
 - `frontend/src/domain/developer-data`
 - `frontend/src/features/settings/components/DeveloperDataSettingsSection.vue`
 
-Run core and API lint/typecheck and permitted script/frontend checks; inspect backend coverage without running service/integration tests. Use a temporary output under `.tmp/dev-data/`; do not publish a production version unless the user explicitly requests it.
+Run core and API lint/typecheck, script/frontend checks, and relevant non-parser backend tests. Do not run parser tests, including parser-focused integration tests. Use a temporary output under `.tmp/dev-data/`; do not publish a production version unless the user explicitly requests it.

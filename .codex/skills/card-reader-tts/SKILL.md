@@ -50,7 +50,7 @@ Follow `AGENTS.md`, `card-reader-core`, and `tts/README.md`. Treat the website's
 2. Define slot identity, claim ownership, authoritative publication success, cache behavior, and cleanup semantics before changing renderer state.
 3. Keep payload schema changes synchronized across Python serialization, TypeScript handling, Lua validation/spawning, tests, and `tts/README.md`.
 4. Cover pool partitioning, merge behavior, stale claims, failed renders, atomic publication, previous-revision serving, quantities/roles, deprecated cards, and authorization as applicable.
-5. Run affected lint/typecheck and permitted frontend checks. Read focused backend tests for coverage; respect `AGENTS.md`'s restriction on running service/integration tests. Validate Lua syntax or exercise the importer path when `tts/importer.lua` changes.
+5. Run affected lint/typecheck, frontend checks, and relevant non-parser backend tests. Respect `AGENTS.md`'s restriction on parser tests, including parser-focused integration tests. Validate Lua syntax or exercise the importer path when `tts/importer.lua` changes.
 
 ## Hotspots
 

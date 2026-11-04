@@ -6,10 +6,10 @@ describe('deck visibility helpers', () => {
     expect(deckVisibilityOptions).toEqual([
       { value: 'private', label: 'Private', description: 'Only you can view this deck.' },
       { value: 'unlisted', label: 'Unlisted', description: 'Anyone with the link can view this deck.' },
-      { value: 'public', label: 'Public', description: 'Listed for everyone to discover.' },
+      { value: 'public', label: 'Public', description: 'Anyone with the link can view; listed publicly when valid.' },
     ]);
     expect(deckVisibilityLabels.unlisted).toBe('Unlisted');
-    expect(deckVisibilityDescriptions.public).toBe('Listed for everyone to discover.');
+    expect(deckVisibilityDescriptions.public).toBe('Anyone with the link can view; listed publicly when valid.');
   });
 
   test('maps every visibility state to a badge class', () => {

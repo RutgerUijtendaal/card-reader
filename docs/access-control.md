@@ -12,7 +12,7 @@ Inactive users cannot authenticate or continue using protected capabilities. The
 
 The main access levels are:
 
-- Public visitors can browse Player, Evil, and Neutral cards, groups, generations, and direct assets, plus public deck surfaces.
+- Public visitors can browse Player, Evil, and Neutral cards, groups, generations, and direct assets. The public deck browser lists only valid Public decks; direct links allow anyone to view Public and Unlisted decks even when invalid. Private decks remain owner-only.
 - Active authenticated users can use account-scoped features and other capabilities granted to ordinary members.
 - Staff users can access administrative workflows including imports, review, catalogs, templates, exports, user management, and developer-data publishing.
 - Active authenticated users can create community Encounters. Owners inspect all their records and edit/delete community records; staff manage all records and exclusively set or clear Official status. Official records lock ordinary owner mutations without changing ownership or visibility. Everyone can discover valid public Encounters and view valid public/unlisted details. Exports authorize by owner, staff, or public/unlisted visibility and validate only the requested board, without requiring full Encounter validity. Private records remain owner/staff-only. See [Encounters](encounters.md) for the endpoint and revision contracts.

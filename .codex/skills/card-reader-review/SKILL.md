@@ -63,7 +63,7 @@ Follow `AGENTS.md` first. Use this skill when reviewing pull requests, local dif
 4. Check that backend changes preserve the controller -> service -> repository boundary.
 5. Prefer concrete findings with file references and impact.
 6. Call out missing tests when a regression risk is not otherwise covered.
-7. Treat lint and typecheck as baseline for code changes, not substitutes for review. For docs/skills-only changes, validate the artifacts directly. Respect `AGENTS.md`'s restriction on running service/integration tests.
+7. Treat lint and typecheck as baseline for code changes, not substitutes for review. For docs/skills-only changes, validate the artifacts directly. Run relevant non-parser backend tests; respect `AGENTS.md`'s restriction on parser tests, including parser-focused integration tests.
 8. Keep summaries brief and secondary.
 
 ## Implementation Follow-Through

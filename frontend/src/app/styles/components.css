@@ -485,6 +485,13 @@
     color: var(--color-nav-text);
   }
 
+  /* Opaque badges keep counts legible over any card image in either theme. */
+  .theme-art-badge {
+    border-color: var(--color-sidebar-text);
+    background: var(--color-sidebar);
+    color: var(--color-sidebar-text);
+  }
+
   /* A solid action chip for controls laid over card art, readable on light and dark scans alike. */
   .theme-art-chip {
     @apply inline-flex items-center justify-center rounded-full border font-semibold transition;
