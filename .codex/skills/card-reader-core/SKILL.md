@@ -35,7 +35,7 @@ Follow `AGENTS.md` first. Use this skill for shared backend behavior; combine it
 5. Update `docs/card-database-diagram.svg` when card-related models or relationships change, using `card-reader-db-diagrams`.
 6. Update relevant docs when behavior, permissions, contracts, onboarding, or operations change.
 7. Test the public seam and important failure or replay behavior, not only internal helpers.
-8. Run core lint and typecheck. Inspect focused backend tests for coverage, but do not run service/integration tests under the current `AGENTS.md` policy.
+8. Run core lint, typecheck, and relevant non-parser backend tests. Inspect parser tests without running them, as required by `AGENTS.md`.
 
 ## Checks
 
@@ -46,7 +46,7 @@ pnpm --filter @card-reader/core lint
 pnpm --filter @card-reader/core typecheck
 ```
 
-Also run affected API/parser lint and typecheck when they consume the changed core behavior. Read their tests without executing service/integration suites unless the user explicitly overrides the repository restriction.
+Also run affected API/parser lint and typecheck when they consume the changed core behavior. Run relevant API and non-parser integration tests; do not run parser tests, including parser-focused integration tests, unless the user explicitly overrides the repository restriction.
 
 ## Review Focus
 

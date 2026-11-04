@@ -1,7 +1,7 @@
 <template>
   <span
     v-if="!hideWhenZero || quantity > 0"
-    class="theme-pill theme-pill-accent pointer-events-auto text-xs"
+    class="theme-pill theme-art-badge pointer-events-auto text-xs"
   >
     x{{ quantity }}
   </span>

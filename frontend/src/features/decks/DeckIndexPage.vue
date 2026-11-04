@@ -289,7 +289,7 @@ const totalDeckCount = computed(() => deckPageState.value.count);
 const nextPage = computed(() => deckPageState.value.nextPage);
 const deckSnapshotAt = ref<string | null>(null);
 const deckNextCursor = ref<DeckSummaryCursor | null>(null);
-const pageSize = 10;
+const pageSize = 12;
 const loading = ref(false);
 const loadingNextPage = ref(false);
 const initialLoadError = ref<string | null>(null);
@@ -324,7 +324,7 @@ const searchPlaceholder = computed(() =>
     ? 'Search your decks, heroes, or cards...'
     : 'Search public decks, heroes, owners, or cards...',
 );
-const loadingSkeletonCount = 9;
+const loadingSkeletonCount = pageSize;
 const currentRouteFilterState = computed(() => parseDeckBrowseFilterRouteQuery(route.query));
 const effectiveRouteFilterState = computed(() => currentRouteFilterState.value);
 const scopeFilterRouteQuery = computed(() => buildDeckBrowseFilterRouteQuery(currentRouteFilterState.value));

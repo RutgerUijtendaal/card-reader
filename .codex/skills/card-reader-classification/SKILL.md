@@ -49,7 +49,7 @@ Follow `AGENTS.md` first and use `card-reader-core` for shared backend changes. 
 3. Define compatibility for existing rows and retained developer-data versions before changing required fields or code-owned values.
 4. Add regression coverage for atomic updates, ambiguous matching, public/all-pool behavior, SQL ordering, route sanitation, and compatibility as applicable.
 5. Update classification docs and the database diagram when contracts or schema change.
-6. Run affected lint/typecheck and permitted frontend tests. Inspect backend coverage without running service/integration tests under the current `AGENTS.md` policy.
+6. Run affected lint/typecheck, frontend tests, and relevant non-parser backend tests. Do not run parser tests, including parser-focused integration tests, under the current `AGENTS.md` policy.
 
 ## Hotspots
 

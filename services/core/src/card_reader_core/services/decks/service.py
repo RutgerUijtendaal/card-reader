@@ -341,14 +341,8 @@ class DeckService:
         return get_deck_for_viewer(deck_id, viewer_id=viewer_id)
 
     def get_deck_for_viewer(self, deck_id: str, *, viewer_id: str | None) -> Deck | None:
-        deck = self.get_visible_deck_for_viewer(deck_id, viewer_id=viewer_id)
-        if deck is None:
-            return None
-        if viewer_id and str(getattr(deck.owner, "pk", "")) == viewer_id:
-            return deck
-        if deck.visibility == "private":
-            return None
-        return deck if self.get_deck_validation(deck).is_valid else None
+        """Allow shared detail by visibility; validity only gates public discovery."""
+        return self.get_visible_deck_for_viewer(deck_id, viewer_id=viewer_id)
 
     @transaction.atomic
     def create_owner_deck(

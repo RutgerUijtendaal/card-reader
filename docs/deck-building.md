@@ -16,7 +16,7 @@ Deck creation, normalization, validation, TTS export, and Playtester eligibility
 
 A future Campaign would compose Player decks, Encounters, and additional piles without turning a deck into a mixed-pool container. Campaign revisions, game setup, and mixed-pool composition remain proposals in the [Campaign building plan](campaign-building-plan.md).
 
-Decks are owned by users and may be private or publicly listed according to their visibility state. List surfaces use compact summary records; detail, editing, export, and playtest flows load the full deck only when board entries are required.
+Decks are owned by users. Private decks are owner-only. Public and Unlisted decks can be viewed by anyone with the link, including unfinished or invalid decks; shared details retain validation issues and warnings. Public discovery lists only valid Public decks, so invalid decks remain shareable without appearing in the browser. Unlisted decks never appear in public discovery. List surfaces use compact summary records; detail, editing, export, and playtest flows load the full deck only when board entries are required. The deck browser loads 12 summaries per page.
 
 ## Local-first creation
 

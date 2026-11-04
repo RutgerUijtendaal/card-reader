@@ -3,7 +3,7 @@ import type { DeckVisibility } from '@/domain/decks/types';
 export const deckVisibilityOptions: Array<{ value: DeckVisibility; label: string; description: string }> = [
   { value: 'private', label: 'Private', description: 'Only you can view this deck.' },
   { value: 'unlisted', label: 'Unlisted', description: 'Anyone with the link can view this deck.' },
-  { value: 'public', label: 'Public', description: 'Listed for everyone to discover.' },
+  { value: 'public', label: 'Public', description: 'Anyone with the link can view; listed publicly when valid.' },
 ];
 
 export const deckVisibilityLabels: Record<DeckVisibility, string> = {
@@ -15,7 +15,7 @@ export const deckVisibilityLabels: Record<DeckVisibility, string> = {
 export const deckVisibilityDescriptions: Record<DeckVisibility, string> = {
   private: 'Only you can view this deck.',
   unlisted: 'Anyone with the link can view this deck.',
-  public: 'Listed for everyone to discover.',
+  public: 'Anyone with the link can view; listed publicly when valid.',
 };
 
 export const deckVisibilityBadgeClasses: Record<DeckVisibility, string> = {

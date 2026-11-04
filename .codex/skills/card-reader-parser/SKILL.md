@@ -32,7 +32,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing parser changes a
 6. Trace claim-time and process-time inputs separately when a task can outlive configuration, template, or catalog changes.
 7. Treat data writes as domain operations; route them through existing repositories/services unless the task explicitly requires a new shared abstraction.
 8. Add fixtures for raw OCR ambiguity and the affected card pool instead of covering only normalized happy paths.
-9. Run lint and typecheck. Inspect focused backend tests and fixtures for coverage, but do not run service/integration tests under the current `AGENTS.md` policy.
+9. Run lint and typecheck. Inspect parser tests and fixtures for coverage, but do not run parser tests, including parser-focused integration tests, under the current `AGENTS.md` policy. Other backend tests may be run.
 
 ## Review Focus
 

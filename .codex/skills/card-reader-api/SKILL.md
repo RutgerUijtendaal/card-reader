@@ -35,7 +35,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing API changes and 
 7. If the change affects auth or public/staff/superuser access, trace the current rules before changing endpoint behavior.
 8. If the change affects deck-building constraints, keep `GET /decks/rules` aligned with supported rule ids, defaults, allowed values, and example config.
 9. If an endpoint returns cards, card-derived counts, or embedded cards, decide lifecycle and pool scope explicitly and keep list/detail/count behavior aligned.
-10. Run lint and typecheck. Inspect focused backend tests for coverage, but do not run service/integration tests under the current `AGENTS.md` policy.
+10. Run lint, typecheck, and relevant non-parser backend tests. Do not run parser tests, including parser-focused integration tests, under the current `AGENTS.md` policy.
 
 ## Review Focus
 
