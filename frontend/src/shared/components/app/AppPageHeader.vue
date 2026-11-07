@@ -91,19 +91,18 @@
       </div>
 
       <div
-        v-if="hasBottomRow"
+        v-if="$slots.bottomLeft || $slots.bottomRight"
         class="theme-divider theme-page-header-bottom relative flex flex-wrap items-center gap-3 border-t px-5 py-3"
-        :class="[bottomRowClass, bottomRowLayoutClass]"
       >
         <div
-          v-if="hasBottomLeft"
+          v-if="$slots.bottomLeft"
           class="flex min-w-[16rem] flex-1 flex-wrap items-center gap-2"
         >
           <slot name="bottomLeft" />
         </div>
 
         <div
-          v-if="hasBottomRight"
+          v-if="$slots.bottomRight"
           class="ml-auto lg:flex lg:self-stretch lg:items-center lg:justify-end"
         >
           <div class="flex flex-wrap items-center gap-2 lg:justify-end">
@@ -149,7 +148,7 @@ const props = withDefaults(
 const slots = useSlots();
 const hasShellHeaderOutlet = ref(false);
 const hasRenderableSlot = (
-  name: 'actions' | 'bottomLeft' | 'bottomRight' | 'center' | 'details' | 'subtitle' | 'titleMeta',
+  name: 'actions' | 'center' | 'details' | 'subtitle' | 'titleMeta',
 ): boolean => {
   const slot = slots[name];
   if (!slot) {
@@ -163,23 +162,8 @@ const hasSubtitleContent = computed(() => hasSubtitle.value || hasRenderableSlot
 const hasSupportingContent = computed(() => hasSubtitleContent.value || hasRenderableSlot('details'));
 const hasHeaderActions = computed(() => hasBackLink.value || hasRenderableSlot('actions'));
 const hasCenterContent = computed(() => hasRenderableSlot('center'));
-const hasBottomLeft = computed(() => hasRenderableSlot('bottomLeft'));
-const hasBottomRight = computed(() => hasRenderableSlot('bottomRight'));
-const hasBottomRow = computed(() => hasBottomLeft.value || hasBottomRight.value);
-const bottomRowLayoutClass = computed(() => {
-  if (hasBottomLeft.value && hasBottomRight.value) {
-    return 'justify-between';
-  }
-
-  if (hasBottomRight.value) {
-    return 'justify-end';
-  }
-
-  return 'justify-start';
-});
 const resolvedBackTo = computed<RouteLocationRaw>(() => props.backTo ?? '/');
 const topRowClass = computed(() => []);
-const bottomRowClass = computed(() => '');
 
 onMounted(() => {
   hasShellHeaderOutlet.value = document.getElementById('app-page-header-outlet') !== null;
