@@ -143,6 +143,14 @@ const navigate = (event: MouseEvent | KeyboardEvent): void => {
   height: auto;
   margin-top: -14%;
   margin-left: -7%;
+  /* Zoom around the middle of the visible art window, so the crop edges stay clean. */
+  transform-origin: 50% 30%;
+  transition: transform 240ms ease;
+}
+
+.collection-tile:hover .collection-tile-art-image,
+.collection-tile:focus-within .collection-tile-art-image {
+  transform: scale(1.05);
 }
 
 .collection-tile-art-fallback {
