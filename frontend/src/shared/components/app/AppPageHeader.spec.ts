@@ -1,5 +1,5 @@
 /* eslint-disable vue/one-component-per-file */
-import { createApp, defineComponent, h, nextTick } from 'vue';
+import { createApp, defineComponent, h, nextTick, ref } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, describe, expect, test } from 'vitest';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
@@ -138,5 +138,34 @@ describe('AppPageHeader', () => {
 
     app.unmount();
     container.remove();
+  });
+
+  test('shows the deck filter row when the editor finishes loading', async () => {
+    const loading = ref(true);
+    const container = document.createElement('div');
+    const outlet = document.createElement('div');
+    outlet.id = 'app-page-header-outlet';
+    document.body.append(container, outlet);
+    const app = createApp({
+      setup: () => () => h(AppPageHeader, { icon: TestIcon, title: 'Edit deck' },
+        loading.value ? {} : { bottomLeft: () => h('input', { placeholder: 'Search cards...' }) },
+      ),
+    });
+    app.mount(container);
+    try {
+      await nextTick();
+      expect(outlet.querySelector('header')).not.toBeNull();
+      expect(outlet.querySelector('.theme-page-header-bottom')).toBeNull();
+
+      loading.value = false;
+      await nextTick();
+      expect(outlet.querySelector('input[placeholder="Search cards..."]')).not.toBeNull();
+
+      loading.value = true;
+      await nextTick();
+      expect(outlet.querySelector('.theme-page-header-bottom')).toBeNull();
+    } finally {
+      app.unmount();
+    }
   });
 });
